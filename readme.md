@@ -13,9 +13,4 @@ streamlit 사용
 4. 국가 * 연도 수출액 (히트맵 상위 8개국)      /       무역액 등급분포
 5. 상위 5개국 * 무역액 등급 교차표
     원본건수           정규화비율
-    sdfs jfkldsjfsd
-    fsd fjkdsljfklsdf
-    sdfjdskf jsdf
-    sdf sdjf sdf
-     sdf lksdjfsdf
-     sdf sdf sdf
+    test
