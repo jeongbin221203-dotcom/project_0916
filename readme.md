@@ -14,3 +14,5 @@ streamlit 사용
 5. 상위 5개국 * 무역액 등급 교차표
     원본건수           정규화비율
     test
+
+# asdfj;sakdjfk
