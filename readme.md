@@ -16,3 +16,5 @@ streamlit 사용
     test
 
 # asdfj;sakdjfk
+# 2:34
+# ㅁㄴㅇㄻㄴㅇㄹ
