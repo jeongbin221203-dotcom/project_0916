@@ -1,20 +1,13 @@
-무역 분석 대시보드
-사이드바에 국가 선택, 무역액등급 선택(대, 중, 소) 필터
-baci_85_sample.csv
-country_codes_sample.csv    사용
-streamlit 사용
+# 프로젝트 목표 : 견적서 작성 사이트
+# 웹 사이트 이름 : 포워더즈 (ForwardUs): "앞으로 나아가다(Forward)" + "포워더(Forwarder)인 우리들(Us)" 
+# 조 이름 : 서류 딱 끝났조?
+# 캐릭터 이름 : 포포링(foforing.png)
+# 사이트 운영 방식: 
+# 개발환경:
+Flask기반 웹페이지
+# python = 3.10
 
-한글지원(글꼴 다운로드) [text](../AX2_JBL/0907/NanumGothic-Bold.ttf)
+# 사이트 래퍼런스는  https://zimgo.tradlinx.com/logistics/quote-request
+-> 기능 및 입력 요소들 전부 MECE하게 카피해서 웹사이트에 적용해줘.
 
-오른쪽 화면에
-1. 타이틀 : 무역 분석 대시보드
-2. baci_85_sample.csv이 파일의 결측치 처리
-3. 총거래건수      /       총수출액(달러)
-4. 국가 * 연도 수출액 (히트맵 상위 8개국)      /       무역액 등급분포
-5. 상위 5개국 * 무역액 등급 교차표
-    원본건수           정규화비율
-    test
-
-
-
-    vscode에서 수정
+# 디자인 래퍼런스는  https://corp.tossinvest.com/ko 를 MECE하게 분석해서 웹사이트에 적용해줘.
