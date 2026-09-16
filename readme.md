@@ -19,3 +19,6 @@ streamlit 사용
 # 2:34
 # ㅁㄴㅇㄻㄴㅇㄹ
 hyeib====ddfmf
+
+
+2:50
