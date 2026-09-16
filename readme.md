@@ -18,7 +18,4 @@ streamlit 사용
 # asdfj;sakdjfk
 # 2:34
 # ㅁㄴㅇㄻㄴㅇㄹ
-hyeib====ddfmf
-
-
-2:50
+# 김민서
