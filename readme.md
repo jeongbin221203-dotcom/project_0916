@@ -17,3 +17,4 @@ streamlit 사용
 
 # asdfj;sakdjfk
 # 2:34
+# ㅁㄴㅇㄻㄴㅇㄹ
