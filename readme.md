@@ -6,6 +6,7 @@ streamlit 사용
 
 한글지원(글꼴 다운로드) [text](../AX2_JBL/0907/NanumGothic-Bold.ttf)
 
+<<<<<<< Updated upstream
 오른쪽 화면에
 1. 타이틀 : 무역 분석 대시보드
 2. baci_85_sample.csv이 파일의 결측치 처리
@@ -18,3 +19,10 @@ streamlit 사용
 # asdfj;sakdjfk
 # 2:34
 # ㅁㄴㅇㄻㄴㅇㄹ
+=======
+>>>>>>> Stashed changes
+
+
+
+
+1.
