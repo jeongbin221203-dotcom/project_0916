@@ -59,16 +59,3 @@ st.checkbox: 적하보험(Marine Insurance) 가입 여부
     원본건수           정규화비율
     test
 
-# asdfj;sakdjfk
-# 2:34
-# ㅁㄴㅇㄻㄴㅇㄹ
-=======
->>>>>>> Stashed changes
-
-
-
-
-1.
-=======
-
->>>>>>> 5c099e49c68726f75aaff422ac7f25eb540b3c58
