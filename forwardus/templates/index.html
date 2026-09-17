@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="수출입 운송 경로부터 상세 비용까지 비교하는 디지털 포워딩 견적 서비스">
+    <title>Forwardus | 디지털 포워딩 견적</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%232B66F6'/%3E%3Cpath d='M14 33h34M36 20l13 13-13 13' fill='none' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='33' r='6' fill='%238FE6D2'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  </head>
+  <body>
+    <header class="site_header">
+      <div class="header_inner">
+        <button class="brand" type="button" data-go="home" aria-label="Forwardus 홈">
+          <span class="brand_mark">↗</span>
+          <span>FORWARDUS</span>
+        </button>
+        <nav class="main_nav" aria-label="견적 단계">
+          <button type="button" data-go="route">운송 경로</button>
+          <button type="button" data-go="terms">인코텀즈</button>
+          <button type="button" data-go="cargo">화물 정보</button>
+          <button type="button" data-go="schedule">스케줄</button>
+          <button type="button" data-go="dashboard">최종 견적</button>
+        </nav>
+        <span class="prototype_badge">Flask</span>
+      </div>
+    </header>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <section class="page_panel home_panel" data-page="home">
+      <div class="hero">
+        <div class="hero_inner">
+          <div class="hero_copy">
+            <span class="eyebrow_pill">포워딩 견적을 한 흐름으로</span>
+            <h1>수출입 견적부터<br><span>운송 스케줄</span>까지 한 번에</h1>
+            <p>복잡한 물류 조건을 단계별로 입력하면 비용과 일정, 관세를 한눈에 비교할 수 있습니다.</p>
+            <button class="primary_button hero_button" type="button" data-go="route">견적 시작하기 <span>→</span></button>
+            <div class="trust_row">
+              <span>✓ 가입 없이 체험</span><span>✓ Mock 데이터 명시</span><span>✓ 원화 자동 환산</span>
+            </div>
+          </div>
+          <div class="route_preview">
+            <div class="preview_top"><div><small>ROUTE PREVIEW</small><strong>부산 → 로스앤젤레스</strong></div><span>해상 FCL</span></div>
+            <div class="preview_route"><div><b>KRPUS</b><span>대한민국</span></div><div class="route_line"><i>▰</i></div><div class="right"><b>USLAX</b><span>미국</span></div></div>
+            <div class="preview_stats"><div><small>예상 운송일</small><b>13일</b></div><div><small>정시 도착</small><b>98%</b></div><div class="right"><small>예상 운임</small><b>₩2.18M</b></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="feature_grid content_width">
+        <article class="feature_card"><span class="feature_icon">◎</span><h2>수출·수입 통합</h2><p>거래 방향에 따라 한국 출발지·도착지를 자동으로 고정합니다.</p></article>
+        <article class="feature_card"><span class="feature_icon">▣</span><h2>패킹별 화물 계산</h2><p>카톤, 팔레트, 목재 상자, 드럼까지 포장 형태를 함께 관리합니다.</p></article>
+        <article class="feature_card"><span class="feature_icon">＄</span><h2>상세 비용 명세</h2><p>운임, 서류비, 창고료, 통관비와 관세를 항목별로 확인합니다.</p></article>
+      </div>
+    </section>
+
+    <main class="app_main content_width" id="app_main" hidden>
+      <section class="progress_card" aria-label="견적 진행률">
+        <div class="progress_meta"><b>견적 진행률</b><strong id="progress_text">1 / 5</strong></div>
+        <div class="progress_track"><div id="progress_fill"></div></div>
+        <div class="progress_steps">
+          <button type="button" data-go="route">운송 경로</button><button type="button" data-go="terms">인코텀즈</button><button type="button" data-go="cargo">화물 정보</button><button type="button" data-go="schedule">스케줄</button><button type="button" data-go="dashboard">최종 견적</button>
+        </div>
+      </section>
+
+      <section class="page_panel" data-page="route">
+        <div class="page_heading"><span>STEP 1 · ROUTE</span><h1>어디에서 어디로 보내시나요?</h1><p>수출은 출발지가 대한민국으로, 수입은 도착지가 대한민국으로 자동 고정됩니다.</p></div>
+        <div class="two_column route_columns">
+          <article class="card form_card">
+            <label class="field_label" for="quote_name">견적명</label>
+            <input class="text_input" id="quote_name" value="2026 북미 화장품 1차 선적">
+            <fieldset><legend>무역 구분</legend><div class="choice_grid two"><button type="button" data-direction="export">수출 Export</button><button type="button" data-direction="import">수입 Import</button></div></fieldset>
+            <fieldset><legend>운송 방식</legend><div class="choice_grid three mode_choices"><button type="button" data-mode="fcl"><span>▰</span>해상 FCL</button><button type="button" data-mode="lcl"><span>▦</span>해상 LCL</button><button type="button" data-mode="air"><span>✈</span>항공 AIR</button></div></fieldset>
+          </article>
+          <article class="card route_card">
+            <div class="route_card_top"><small id="route_type_label">EXPORT ROUTE</small><div class="route_codes"><div><span class="pin">●</span><b id="origin_code">KRPUS</b><small id="origin_name">부산항</small></div><div class="route_arrow">────────→</div><div class="right"><span class="pin green">●</span><b id="destination_code">USLAX</b><small id="destination_name">로스앤젤레스항</small></div></div></div>
+            <div class="route_fields">
+              <div><div class="field_heading"><label for="origin_select">출발지</label><span id="origin_fixed_badge" class="fixed_badge">한국 고정</span></div><div id="origin_fixed" class="fixed_location"></div><select id="origin_select" class="select_input"></select></div>
+              <div><div class="field_heading"><label for="destination_select">도착지</label><span id="destination_fixed_badge" class="fixed_badge">한국 고정</span></div><div id="destination_fixed" class="fixed_location"></div><select id="destination_select" class="select_input"></select></div>
+              <div id="route_hint" class="info_box"></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page_panel" data-page="terms">
+        <div class="page_heading"><span>STEP 2 · INCOTERMS® 2020</span><h1>비용과 위험의 경계를 정해주세요</h1><p>조건별로 수출자와 수입자의 비용 부담 범위, 위험 이전 시점이 달라집니다.</p></div>
+        <div id="air_term_notice" class="warning_box" hidden>항공 운송에는 FOB·CFR·CIF를 사용할 수 없습니다. FCA·CPT·CIP 중 하나를 선택하세요.</div>
+        <div id="incoterm_grid" class="incoterm_grid"></div>
+        <article class="card term_detail"><div class="term_detail_header"><div><span id="term_name"></span><h2>비용 부담 범위</h2></div><span id="risk_badge" class="soft_badge"></span></div><div class="burden_labels"><b id="seller_label">수출자 45%</b><span id="buyer_label">수입자 55%</span></div><div class="burden_bar"><i id="seller_bar"></i><i id="buyer_bar"></i></div><div class="timeline_labels"><span>공장</span><span>수출통관</span><span>국제운송</span><span>수입통관</span><span>도착지</span></div></article>
+      </section>
+
+      <section class="page_panel" data-page="cargo">
+        <div class="page_heading"><span>STEP 3 · CARGO</span><h1>화물과 패킹 정보를 입력해주세요</h1><p>입력값으로 CBM, 운임톤과 항공 청구중량을 즉시 계산합니다.</p></div>
+        <div class="cargo_layout">
+          <div class="stack">
+            <article class="card form_card"><div class="section_title"><span class="feature_icon">▣</span><div><h2>패킹 종류</h2><p>실제 출고 형태를 선택하세요.</p></div></div><select id="packing_type" class="select_input"></select><p id="packing_note" class="selection_note"></p><div class="cargo_fields">
+              <label>가로<div class="input_unit"><input type="number" id="length_cm" value="60" min="0"><span>cm</span></div></label>
+              <label>세로<div class="input_unit"><input type="number" id="width_cm" value="45" min="0"><span>cm</span></div></label>
+              <label>높이<div class="input_unit"><input type="number" id="height_cm" value="40" min="0"><span>cm</span></div></label>
+              <label>수량<div class="input_unit"><input type="number" id="box_count" value="24" min="1"><span>개</span></div></label>
+              <label>개당 중량<div class="input_unit"><input type="number" id="weight_per_box_kg" value="18" min="0" step="0.1"><span>kg</span></div></label>
+              <label>신고가격<div class="input_unit"><input type="number" id="declared_value_usd" value="18000" min="0"><span>USD</span></div></label>
+            </div></article>
+            <article class="card hs_card"><div class="section_title"><span class="feature_icon violet">⌕</span><div><h2>HS CODE 추천</h2><p>샘플 후보 데이터 · 실제 API 연동 예정</p></div></div><div id="hs_code_list" class="hs_code_list"></div></article>
+          </div>
+          <div class="stack">
+            <article class="metric_card"><small>LIVE CALCULATION</small><h2>실시간 화물 지표</h2><div class="metric_grid"><div><span>Total CBM</span><b id="metric_cbm">-</b></div><div><span>Total Weight</span><b id="metric_weight">-</b></div><div><span>Revenue Ton</span><b id="metric_rt">-</b></div><div><span>Chargeable</span><b id="metric_chargeable">-</b></div></div><div id="container_load" class="container_load"><div><span>20GP 예상 적재율</span><b id="load_percent">0%</b></div><div class="load_track"><i id="load_fill"></i></div></div></article>
+            <article class="card option_card"><div class="switch_row"><div><b>적하보험</b><p id="insurance_help">운송 중 사고와 파손에 대비합니다.</p></div><label class="switch"><input type="checkbox" id="insurance_enabled"><span></span></label></div><label class="field_label" for="budget_krw">화주 예산</label><div class="input_unit"><input type="number" id="budget_krw" value="5500000" min="0"><span>KRW</span></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="page_panel" data-page="schedule">
+        <div class="schedule_heading"><div class="page_heading"><span>STEP 4 · SCHEDULE</span><h1>운송 스케줄을 비교해보세요</h1><p id="schedule_description"></p></div><select id="sort_schedule" class="select_input compact"><option value="recommended">추천순</option><option value="price">최저 운임순</option><option value="duration">최단 기간순</option></select></div>
+        <div id="schedule_list" class="schedule_list"></div>
+      </section>
+
+      <section class="page_panel" data-page="dashboard">
+        <div class="dashboard_heading"><div><span class="success_badge">견적 계산 완료</span><h1 id="dashboard_title"></h1><p id="dashboard_summary"></p></div><div class="exchange_chip">적용 환율 · <b id="exchange_rate"></b> <span>예상값</span></div></div>
+        <div id="kpi_grid" class="kpi_grid"></div>
+        <div class="dashboard_layout">
+          <article class="card quote_card"><div class="quote_header"><div><span>QUOTATION</span><h2>상세 견적 내역</h2></div><i>▧</i></div><div id="quote_items"></div><div class="quote_total"><span>총 예상비용</span><b id="quote_total"></b></div></article>
+          <div class="stack"><article class="card chart_card"><h2>비용 구성</h2><div class="donut_wrap"><div id="donut_chart" class="donut_chart"><span id="donut_total"></span></div></div><div id="donut_legend" class="donut_legend"></div></article><article class="insight_card"><small>✦ 운송 인사이트</small><p id="insight_one"></p><p id="insight_two"></p></article></div>
+        </div>
+        <div class="analysis_grid"><article class="card chart_card"><div class="chart_heading"><div><h2>최근 12개월 운임 추이</h2><p>Mock 운임 지수 · 100 기준</p></div><span class="success_badge">YoY -8.2%</span></div><div id="trend_chart" class="trend_chart"></div></article><article class="card scenario_card"><h2>시나리오 비교</h2><p>동일 화물 기준 예상 비교</p><div id="scenario_bars" class="scenario_bars"></div></article></div>
+      </section>
+
+      <footer class="step_actions"><button id="previous_button" class="ghost_button" type="button">← 이전</button><button id="next_button" class="primary_button" type="button">다음 단계 →</button></footer>
+    </main>
+
+    <script>window.FORWARDUS_DATA = {{ bootstrap_data | tojson }};</script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  </body>
+</html>
