@@ -1,0 +1,25 @@
+.eta_strip { display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: center; }
+.eta_strip > div { display: grid; gap: 2px; }
+.eta_strip small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.eta_strip b { font-size: 18px; }
+.eta_strip .late b { color: var(--amber); }
+.eta_strip .sources { margin-left: auto; display: flex; gap: 6px; }
+
+.tracking_layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+.tracking_layout > .card, .tracking_layout > .stack > .card { margin-bottom: 0; }
+.tracking_layout + .card { margin-top: 20px; }
+
+.timeline { list-style: none; margin: 16px 0 0; padding: 0; }
+.timeline li { position: relative; display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding-bottom: 18px; }
+.timeline li:not(:last-child)::after { content: ""; position: absolute; left: 15px; top: 30px; bottom: 0; width: 2px; background: var(--line); }
+.timeline li.done:not(:last-child)::after { background: var(--blue); }
+.timeline .dot { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; color: #94a3b8; font-weight: 900; font-size: 14px; position: relative; z-index: 1; }
+.timeline li.done .dot { background: var(--blue); color: #fff; }
+.timeline li.current .dot { background: #fff; color: var(--blue); box-shadow: 0 0 0 3px var(--blue); }
+.timeline li > div { display: grid; gap: 3px; justify-items: start; padding-top: 4px; }
+.timeline li.pending b { color: #94a3b8; }
+
+@media (max-width: 900px) {
+  .tracking_layout { grid-template-columns: 1fr; }
+  .eta_strip .sources { margin-left: 0; }
+}

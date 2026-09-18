@@ -1,0 +1,33 @@
+{% macro source_badge(source) -%}
+  {%- set labels = {"api": "API", "mock": "Mock", "manual": "Manual", "calculated": "Calculated", "imputed": "Imputed"} -%}
+  <span class="badge source_{{ source }}" title="Data Source">Data Source: {{ labels.get(source, source) }}</span>
+{%- endmacro %}
+
+{% macro status_badge(status, label) -%}
+  <span class="badge status_{{ status }}">{{ label or status }}</span>
+{%- endmacro %}
+
+{% macro doc_status(status) -%}
+  {%- set labels = {"draft": "Draft", "generated": "Generated", "validated": "Validated", "final": "Final"} -%}
+  <span class="badge doc_{{ status }}">{{ labels.get(status, status) }}</span>
+{%- endmacro %}
+
+{% macro shipment_tabs(shipment, active) -%}
+  <nav class="sub_tabs" aria-label="Shipment 메뉴">
+    <a href="{{ url_for('shipment.detail', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'detail' }}">요약</a>
+    <a href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'document' }}">서류·통관</a>
+    <a href="{{ url_for('tracking.detail', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'tracking' }}">Tracking</a>
+    <a href="{{ url_for('assistant.index', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'assistant' }}">AI Assistant</a>
+  </nav>
+{%- endmacro %}
+
+{% macro shipment_header(shipment) -%}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">{{ shipment.shipment_id }} · {{ shipment.mode_label }}</p>
+      <h1>{{ shipment.project_name }}</h1>
+      <p class="muted">{{ shipment.origin_name }} ({{ shipment.origin_code }}) → {{ shipment.destination_name }} ({{ shipment.destination_code }})</p>
+    </div>
+    {{ status_badge(shipment.status, shipment.status_label) }}
+  </div>
+{%- endmacro %}

@@ -1,0 +1,82 @@
+/* Stepper */
+.stepper { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 0 0 20px; padding: 0; }
+.stepper li { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--line); color: var(--muted); font-weight: 800; font-size: 14px; }
+.stepper li span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: #f1f5f9; font-size: 12px; }
+.stepper li.active { border-color: var(--blue); color: var(--blue_dark); }
+.stepper li.active span { background: var(--blue); color: #fff; }
+.stepper li.done { cursor: pointer; color: var(--ink); }
+.stepper li.done span { background: var(--green_soft); color: var(--green); }
+
+.step_actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+/* Route setup: calendar left, fields right */
+.route_layout { display: grid; grid-template-columns: 340px 1fr; gap: 32px; }
+.calendar { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 6px; }
+.cal_head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.cal_head button { border: 0; background: #f1f5f9; width: 32px; height: 32px; border-radius: 10px; font-size: 18px; }
+.cal_head button:disabled { opacity: .3; cursor: default; }
+.cal_week, .cal_grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.cal_week span { font-size: 12px; color: var(--muted); font-weight: 700; padding: 4px 0; }
+.cal_grid button { aspect-ratio: 1; border: 0; background: transparent; border-radius: 10px; font-weight: 700; font-size: 14px; }
+.cal_grid button:hover:not(:disabled) { background: var(--blue_soft); }
+.cal_grid button:disabled { color: #cbd5e1; cursor: default; }
+.cal_grid button.today { box-shadow: inset 0 0 0 1px var(--blue); }
+.cal_grid button.selected { background: var(--blue); color: #fff; }
+.selected_date { margin-top: 10px; color: var(--muted); }
+.selected_date b { color: var(--ink); }
+
+/* Autocomplete */
+.autocomplete { position: relative; }
+.ac_list { position: absolute; z-index: 20; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(15,23,42,.12); max-height: 300px; overflow-y: auto; }
+.ac_list li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 9px 11px; border-radius: 10px; cursor: pointer; }
+.ac_list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.ac_list li:hover { background: var(--blue_soft); }
+.ac_list li.empty { color: var(--muted); cursor: default; }
+
+/* Incoterms */
+.incoterm_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
+.incoterm_card { position: relative; display: grid; gap: 2px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; cursor: pointer; transition: .15s; }
+.incoterm_card input { position: absolute; opacity: 0; }
+.incoterm_card b { font-size: 18px; }
+.incoterm_card small { color: var(--muted); font-size: 12px; }
+.incoterm_card:has(input:checked) { border-color: var(--blue); background: var(--blue_soft); box-shadow: 0 0 0 2px rgba(43,102,246,.2); }
+.incoterm_card.disabled { opacity: .4; cursor: not-allowed; }
+
+/* Cargo */
+.cargo_layout { display: grid; grid-template-columns: 1fr 280px; gap: 24px; align-items: start; }
+.calc_panel { position: sticky; top: 80px; padding: 18px; border-radius: 16px; background: #f8fafc; border: 1px solid var(--line); }
+.calc_panel dl { margin: 10px 0; display: grid; gap: 8px; }
+.calc_panel dl > div { display: flex; justify-content: space-between; gap: 8px; }
+.calc_panel dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+.calc_panel dd { margin: 0; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+/* Schedules */
+.schedule_list { display: grid; gap: 12px; }
+.schedule_card { display: grid; grid-template-columns: 1fr 150px; gap: 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; cursor: pointer; transition: .15s; }
+.schedule_card input { position: absolute; opacity: 0; }
+.schedule_card:hover { border-color: #b7cbfb; }
+.schedule_card.selected { border-color: var(--blue); background: #f7faff; box-shadow: 0 0 0 2px rgba(43,102,246,.18); }
+.schedule_price { display: grid; align-content: center; justify-items: end; border-left: 1px dashed var(--line); padding-left: 16px; }
+.schedule_price small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.schedule_price b { font-size: 20px; color: var(--blue_dark); }
+
+/* Reverse planner */
+.reverse_layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+.reverse_steps { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--line); }
+.reverse_steps li { position: relative; display: flex; justify-content: space-between; gap: 12px; padding: 8px 0 8px 18px; }
+.reverse_steps li::before { content: ""; position: absolute; left: -6px; top: 15px; width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; }
+.reverse_steps li.milestone::before { background: var(--blue); }
+.reverse_steps li.milestone b { color: var(--ink); }
+.reverse_steps li.duration { color: var(--muted); font-size: 13px; }
+
+@media (max-width: 900px) {
+  .route_layout, .cargo_layout, .reverse_layout { grid-template-columns: 1fr; }
+  .calc_panel { position: static; }
+  .stepper { grid-template-columns: repeat(5, auto); overflow-x: auto; }
+}
+@media (max-width: 640px) {
+  .stepper li { font-size: 0; gap: 0; padding: 8px; justify-content: center; }
+  .stepper li span { font-size: 12px; }
+  .schedule_card { grid-template-columns: 1fr; }
+  .schedule_price { border-left: 0; border-top: 1px dashed var(--line); padding: 10px 0 0; justify-items: start; }
+}
