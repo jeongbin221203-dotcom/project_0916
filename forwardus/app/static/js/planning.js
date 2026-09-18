@@ -100,7 +100,7 @@
     document.querySelectorAll("[data-step-tab]").forEach((tab) => {
       const n = Number(tab.dataset.stepTab);
       tab.classList.toggle("active", n === step);
-      tab.classList.toggle("done", n < step);
+      tab.classList.toggle("done", n < 5 && !validateStep(n));
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -392,77 +392,101 @@
   }
 
   function handleServerError(response) {
-    showError(response.message || "요청을 처리하지 못했습니다.");
     const step = FIELD_STEP[response.field];
     if (step && step !== state.step) goToStep(step);
+    showError(response.message || "요청을 처리하지 못했습니다.");
   }
 
   function renderSummary() {
     const f = form.elements;
     const schedule = state.schedules.find((s) => s.schedule_id === state.schedule_id);
+    const incoterm = form.querySelector("input[name=incoterms]:checked");
     const m = state.metrics;
+    const missing = "— 미입력";
     const rows = [
-      ["Route", `${state.origin.name} (${state.origin.code}) → ${state.destination.name} (${state.destination.code})`],
+      ["Route", state.origin && state.destination
+        ? `${state.origin.name} (${state.origin.code}) → ${state.destination.name} (${state.destination.code})` : missing],
       ["Mode", state.transport_mode === "AIR" ? "AIR" : `SEA · ${state.sea_mode}`],
-      ["Incoterms", form.querySelector("input[name=incoterms]:checked").value],
-      ["Cargo", `${f.product_description.value} · ${f.quantity.value} pkg · ${formatNumber(m.total_cbm, 3)} CBM · ${formatNumber(m.total_weight_kg, 1)} kg`],
-      ["Invoice", `${f.currency.value} ${formatNumber(Number(f.invoice_value.value), 2)}`],
-      ["Schedule", `${schedule.carrier} ${schedule.vessel_or_flight} · ETD ${schedule.etd} → ETA ${schedule.eta}`],
-      ["Freight", `USD ${formatNumber(schedule.freight_usd, 0)} (${schedule.source})`],
+      ["Incoterms", incoterm ? incoterm.value : missing],
+      ["Cargo", m
+        ? `${f.product_description.value || "(품명 없음)"} · ${f.quantity.value} pkg · ${formatNumber(m.total_cbm, 3)} CBM · ${formatNumber(m.total_weight_kg, 1)} kg`
+        : missing],
+      ["Invoice", f.invoice_value.value ? `${f.currency.value} ${formatNumber(Number(f.invoice_value.value), 2)}` : missing],
+      ["Schedule", schedule ? `${schedule.carrier} ${schedule.vessel_or_flight} · ETD ${schedule.etd} → ETA ${schedule.eta}` : missing],
+      ["Freight", schedule ? `USD ${formatNumber(schedule.freight_usd, 0)} (${schedule.source})` : missing],
     ];
     document.querySelector("[data-summary]").innerHTML = rows
-      .map(([k, v]) => `<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join("");
+      .map(([k, v]) => `<div><dt>${k}</dt><dd class="${v === missing ? "missing" : ""}">${escapeHtml(v)}</dd></div>`).join("");
   }
 
-  form.addEventListener("click", async (event) => {
-    if (event.target.matches("[data-prev]")) {
-      showError("");
-      goToStep(state.step - 1);
-    }
-    if (event.target.matches("[data-next]")) {
-      const message = validateStep(state.step);
-      showError(message);
-      if (message) return;
-      if (state.step === 3) {
-        goToStep(4);
+  /* ----- Free navigation: any step can be opened at any time; validation happens on submit ----- */
+  async function openStep(step) {
+    showError("");
+    goToStep(step);
+    if (step === 4 && !state.schedules.length) {
+      const blocker = [1, 3].map(validateStep).find(Boolean);
+      if (blocker) {
+        scheduleMeta.textContent = "";
+        scheduleList.innerHTML = `<p class="muted">스케줄을 조회하려면 Route·Cargo 정보가 필요합니다: ${escapeHtml(blocker)}</p>`;
+      } else {
         await loadSchedules();
-        return;
       }
-      if (state.step === 4) renderSummary();
-      goToStep(state.step + 1);
     }
+    if (step === 5) renderSummary();
+  }
+
+  form.addEventListener("click", (event) => {
+    if (event.target.matches("[data-prev]")) openStep(state.step - 1);
+    if (event.target.matches("[data-next]")) openStep(state.step + 1);
   });
 
   document.querySelectorAll("[data-step-tab]").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const target = Number(tab.dataset.stepTab);
-      if (target < state.step) { showError(""); goToStep(target); }
-    });
+    tab.addEventListener("click", () => openStep(Number(tab.dataset.stepTab)));
   });
+
+  form.elements.buyer_required_date.addEventListener("change", invalidateSchedules);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    for (const step of [1, 2, 3, 4]) {
+      const message = validateStep(step);
+      if (message) {
+        await openStep(step);
+        showError(message);
+        return;
+      }
+    }
+
     const f = form.elements;
     const submit = form.querySelector("[data-submit]");
+    const label = submit.textContent;
     submit.disabled = true;
-    const response = await postJson(urls.create, {
-      ...routePayload(),
-      incoterms: form.querySelector("input[name=incoterms]:checked").value,
-      currency: f.currency.value,
-      invoice_value: f.invoice_value.value,
-      cargo: cargoPayload(),
-      schedule_id: state.schedule_id,
-      exporter_name: f.exporter_name.value,
-      exporter_address: f.exporter_address.value,
-      notify_party: f.notify_party.value,
-      buyer: {
-        name: f.buyer_name.value,
-        country: f.buyer_country.value,
-        address: f.buyer_address.value,
-        contact_email: f.buyer_email.value,
-      },
-    });
-    submit.disabled = false;
+    submit.textContent = "생성 중…";
+    let response;
+    try {
+      response = await postJson(urls.create, {
+        ...routePayload(),
+        incoterms: form.querySelector("input[name=incoterms]:checked").value,
+        currency: f.currency.value,
+        invoice_value: f.invoice_value.value,
+        cargo: cargoPayload(),
+        schedule_id: state.schedule_id,
+        exporter_name: f.exporter_name.value,
+        exporter_address: f.exporter_address.value,
+        notify_party: f.notify_party.value,
+        buyer: {
+          name: f.buyer_name.value,
+          country: f.buyer_country.value,
+          address: f.buyer_address.value,
+          contact_email: f.buyer_email.value,
+        },
+      });
+    } catch (error) {
+      response = { success: false, message: `요청 중 오류가 발생했습니다: ${error.message}` };
+    } finally {
+      submit.disabled = false;
+      submit.textContent = label;
+    }
     if (response.success) {
       window.location.href = response.data.url;
     } else {

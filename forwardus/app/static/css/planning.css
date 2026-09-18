@@ -4,7 +4,9 @@
 .stepper li span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: #f1f5f9; font-size: 12px; }
 .stepper li.active { border-color: var(--blue); color: var(--blue_dark); }
 .stepper li.active span { background: var(--blue); color: #fff; }
-.stepper li.done { cursor: pointer; color: var(--ink); }
+.stepper li { cursor: pointer; }
+.stepper li:hover { border-color: #b7cbfb; }
+.stepper li.done { color: var(--ink); }
 .stepper li.done span { background: var(--green_soft); color: var(--green); }
 
 .step_actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
@@ -59,6 +61,8 @@
 .schedule_price { display: grid; align-content: center; justify-items: end; border-left: 1px dashed var(--line); padding-left: 16px; }
 .schedule_price small { color: var(--muted); font-size: 12px; font-weight: 700; }
 .schedule_price b { font-size: 20px; color: var(--blue_dark); }
+
+.summary_list dd.missing { color: var(--red); }
 
 /* Reverse planner */
 .reverse_layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
