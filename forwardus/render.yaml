@@ -2,6 +2,7 @@ services:
   - type: web
     name: forwardus
     runtime: python
+    rootDir: forwardus
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn "app:create_app()"
     healthCheckPath: /health
