@@ -7,3 +7,5 @@ venv/
 coverage.xml
 htmlcov/
 
+instance/
+*.db
