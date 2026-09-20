@@ -26,13 +26,27 @@ def _all_locations() -> list[dict]:
     return load_mock("locations")
 
 
-@lru_cache(maxsize=1)
+def _data_version() -> int:
+    """Identifies the loaded data set so derived tables rebuild with it."""
+
+    return len(_all_locations())
+
+
 def _by_code() -> dict[str, dict]:
+    return _build_code_index(_data_version())
+
+
+@lru_cache(maxsize=2)
+def _build_code_index(_version: int) -> dict[str, dict]:
     return {item["code"]: item for item in _all_locations()}
 
 
-@lru_cache(maxsize=1)
 def _countries() -> dict[str, dict]:
+    return _build_countries(_data_version())
+
+
+@lru_cache(maxsize=2)
+def _build_countries(_version: int) -> dict[str, dict]:
     """Country code → name, region, and location counts."""
 
     countries: dict[str, dict] = {}

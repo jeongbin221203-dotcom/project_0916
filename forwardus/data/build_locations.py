@@ -381,6 +381,10 @@ def build() -> list[dict]:
         })
 
     promote_main_ports(locations)
+    # 항만 규모 정보가 없고 주요 항구도 아닌 곳은 제외합니다. 무역에 쓰이지 않는
+    # 소규모 선착장이 대부분이며, 필요하면 화면에서 "직접 입력"으로 지정합니다.
+    locations = [item for item in locations
+                 if item["kind"] == "airport" or item["harbor_size"] or item["major"]]
     class_rank = {"national": 0, "local": 1}
     locations.sort(key=lambda item: (
         item["kind"],

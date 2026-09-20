@@ -198,10 +198,14 @@
     const list = container.querySelector("[data-ac-list]");
     let items = [];
 
+    let overrideQuery = null;
+
     const search = debounce(async () => {
       list.innerHTML = `<li class="empty">검색 중…</li>`;
       list.hidden = false;
-      items = await fetchItems(input.value.trim());
+      const query = overrideQuery === null ? input.value.trim() : overrideQuery;
+      overrideQuery = null;
+      items = await fetchItems(query);
       if (!items.length) {
         list.innerHTML = `<li class="empty">검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.</li>`;
         return;
@@ -225,7 +229,12 @@
     }, 200);
 
     input.addEventListener("input", () => { onSelect(null, input); search(); });
-    input.addEventListener("focus", search);
+    // 이미 고른 항구가 있어도 다시 누르면 전체 목록을 보여줍니다.
+    input.addEventListener("focus", () => {
+      input.select();
+      overrideQuery = "";
+      search();
+    });
     input.addEventListener("blur", () => setTimeout(() => { list.hidden = true; }, 150));
     list.addEventListener("mousedown", (event) => {
       const li = event.target.closest("li[data-index]");
@@ -233,7 +242,13 @@
       onSelect(items[Number(li.dataset.index)], input);
       list.hidden = true;
     });
-    return { search };
+    return {
+      search,
+      showAll() {
+        overrideQuery = "";
+        search();
+      },
+    };
   }
 
   /* ----- Destination country filter and direct input ----- */
@@ -340,7 +355,7 @@
     if (countryFilter) {
       countryFilter.addEventListener("change", () => {
         container.querySelector("[data-ac-input]").focus();
-        locationSearch[role].search();
+        locationSearch[role].showAll();
       });
     }
   });

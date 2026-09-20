@@ -82,12 +82,19 @@ def request_json(method: str, url: str, *, required_fields: list[str] | None = N
 
 
 @lru_cache(maxsize=32)
-def _read_json(path: str) -> Any:
+def _read_json(path: str, mtime: float) -> Any:
+    """``mtime`` is part of the cache key so edited data is picked up."""
+
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def load_mock(name: str) -> Any:
-    """Load a JSON file from data/mock/. Results are cached per process."""
+    """Load a JSON file from data/mock/.
+
+    Results are cached per process, but the cache key includes the file's
+    modification time, so rebuilding the data does not need a server restart.
+    """
 
     mock_dir = Path(get_config("MOCK_DATA_DIR", Config.MOCK_DATA_DIR))
-    return _read_json(str(mock_dir / f"{name}.json"))
+    path = mock_dir / f"{name}.json"
+    return _read_json(str(path), path.stat().st_mtime)

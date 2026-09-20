@@ -100,6 +100,16 @@ def test_origin_lists_national_ports_before_local(app):
     assert by_code["KRPUS"]["note"] == ""
 
 
+def test_every_listed_port_is_classified(app):
+    """규모 정보가 없고 주요 항구도 아닌 항구는 목록에 두지 않습니다."""
+
+    from app.collectors import location_client
+
+    ports = [item for item in location_client.load_mock("locations") if item["kind"] == "port"]
+    assert ports
+    assert all(item["harbor_size"] or item["major"] for item in ports)
+
+
 def test_destination_countries_and_country_filter(app):
     countries = planning_service.list_countries("SEA", "destination")["data"]
     codes = {c["code"] for c in countries}
