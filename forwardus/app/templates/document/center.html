@@ -21,9 +21,10 @@
             <p class="origin_about">{{ row.about }}</p>
             {% if row.certificate %}
               <dl class="origin_detail">
-                {% if row.certificate.method %}<div><dt>발급방식</dt><dd>{{ row.certificate.method }}</dd></div>{% endif %}
+                {% if row.steps.what %}<div><dt>무엇을</dt><dd>{{ row.steps.what }}</dd></div>{% endif %}
+                {% if row.steps.where %}<div class="wide"><dt>어디서</dt><dd>{{ row.steps.where }}</dd></div>{% endif %}
                 {% if row.certificate.issuer %}<div><dt>발급자</dt><dd>{{ row.certificate.issuer }}</dd></div>{% endif %}
-                {% if row.certificate.form %}<div><dt>서식</dt><dd>{{ row.certificate.form }}</dd></div>{% endif %}
+                {% if row.certificate.form %}<div><dt>어떤 서식으로</dt><dd>{{ row.certificate.form }}</dd></div>{% endif %}
                 {% if row.certificate.valid_for %}<div><dt>유효기간</dt><dd>{{ row.certificate.valid_for }}</dd></div>{% endif %}
               </dl>
             {% endif %}

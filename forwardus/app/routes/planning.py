@@ -65,6 +65,15 @@ def api_exchange_rate():
     return jsonify(planning_service.exchange_rates())
 
 
+@planning_bp.get("/api/tariff-summary")
+def api_tariff_summary():
+    """HS 후보별로 도착국에 쓸 수 있는 협정을 한 줄로 요약합니다."""
+
+    codes = [code.strip() for code in request.args.get("hs", "").split(",")]
+    return jsonify({"success": True, "data": planning_service.tariff_summaries(
+        codes, request.args.get("country", ""))})
+
+
 @planning_bp.get("/api/tariff")
 def api_tariff():
     """고른 품목과 도착국에 적용되는 협정·세율."""

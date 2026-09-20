@@ -119,6 +119,37 @@ def exchange_rates() -> dict:
     return {"success": result["success"], "data": result["data"], "source": result["source"]}
 
 
+def tariff_summaries(hs_codes: list[str], country_code: str) -> dict:
+    """HS 후보 여러 개에 대해 "도착국에 쓸 수 있는 협정"을 한 줄씩 요약합니다.
+
+    HS 검색 목록에서 어느 부호를 고를지 판단하는 데 씁니다. 후보마다 관세청을
+    한 번씩 불러야 하므로 동시에 조회합니다.
+    """
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    codes = [code for code in dict.fromkeys(hs_codes) if code][:MAX_TARIFF_SUMMARIES]
+    if not codes or not country_code:
+        return {}
+
+    def summarize(code: str) -> tuple[str, dict]:
+        guide = tariff_guide(code, country_code)
+        if not guide.get("available"):
+            return code, {"status": "unknown", "text": "세율 정보 없음"}
+        if guide["agreements"]:
+            best = guide["agreements"][0]
+            others = len(guide["agreements"]) - 1
+            text = f"{best['agreement']} {best['rate']}%" + (f" 외 {others}건" if others else "")
+            return code, {"status": "agreement", "text": text, "rate": best["rate"],
+                          "agreement": best["agreement"]}
+        base = next((row for row in guide["general"] if row["code"] == "A"), None)
+        text = f"협정 없음 · 기본세율 {base['rate']}%" if base else "협정 없음"
+        return code, {"status": "none", "text": text}
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        return dict(pool.map(summarize, codes))
+
+
 def tariff_guide(hs_code: str, country_code: str) -> dict:
     """고른 품목과 도착국에 맞는 협정·세율을 정리합니다.
 
@@ -153,6 +184,8 @@ def tariff_guide(hs_code: str, country_code: str) -> dict:
                             "agreement": fta_guide.agreement_label(row["name"]),
                             "about": fta_guide.describe(row["code"], row["name"], countries, by_code),
                             "certificate": fta_guide.certificate_for(row["code"], row["name"]),
+                            "steps": fta_guide.certificate_steps(
+                                fta_guide.certificate_for(row["code"], row["name"])),
                             "proof": fta_guide.proof_for(row["code"], row["name"])})
 
     # 같은 협정에서 선택1·선택2가 함께 오면 세율이 낮은 쪽만 남깁니다.
@@ -455,6 +488,8 @@ def transit_summary(origin_code: str, destination_code: str) -> dict:
 
 
 MODE_LABELS = {"SEA": "해상", "AIR": "항공"}
+# HS 검색 목록 한 번에 협정을 요약해 줄 최대 후보 수
+MAX_TARIFF_SUMMARIES = 12
 
 # FCL·LCL을 고르면 실제로 무엇이 달라지는지. 소요일은 항로마다 계산해 채웁니다.
 SEA_MODE_FACTS = {

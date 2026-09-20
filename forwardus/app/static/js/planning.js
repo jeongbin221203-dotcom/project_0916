@@ -402,6 +402,8 @@
         });
       }
       list.innerHTML = html;
+      // 목록을 그린 뒤 덧붙일 것이 있으면 (예: HS 후보별 협정) 이어서 채웁니다.
+      if (options.afterRender) options.afterRender(items, list);
     }, 200);
 
     input.addEventListener("input", () => { onSelect(null, input); search(); });
@@ -734,14 +736,11 @@
           <span class="tariff_period">${escapeHtml(period(row))}</span>
           <span class="tariff_about">${escapeHtml(row.about || "")}</span>
           <span class="tariff_proof">${escapeHtml(row.proof)}</span>
+          ${row.steps && row.steps.where ? `<span class="tariff_where">어디서: ${escapeHtml(row.steps.where)}</span>` : ""}
         </div>`).join("");
     }
-    if (data.without_rate && data.without_rate.length) {
-      html += `<p class="tariff_plain">발효 중이지만 이 품목에는 협정세율이 없습니다:`
-        + ` ${escapeHtml(data.without_rate.join(" · "))}</p>`;
-    }
-    if (!data.in_force || !data.in_force.length) {
-      html += `<p class="tariff_plain">${escapeHtml(data.country)}와(과) 발효된 FTA가 없습니다.`
+    if (!data.agreements || !data.agreements.length) {
+      html += `<p class="tariff_plain">${escapeHtml(data.country)}와(과) 이 품목에 적용할 협정세율이 없습니다.`
         + ` 일반 세율이 적용됩니다.</p>`;
     }
     if (data.general && data.general.length) {
@@ -783,6 +782,23 @@
       refreshTariff();     // 고른 품목의 협정세율을 아래에 보여줍니다.
     },
     {
+      // 도착국을 골랐으면 후보마다 그 나라에 쓸 수 있는 협정을 한 줄씩 붙입니다.
+      // 어느 부호를 골라야 유리한지 목록에서 바로 비교할 수 있습니다.
+      afterRender: async (items, list) => {
+        if (!state.destination || !items.length) return;
+        const codes = items.map((item) => item.code.replace(/[.\-\s]/g, "")).filter(Boolean);
+        const response = await getJson(`${urls.tariffSummary}?${new URLSearchParams({
+          hs: codes.join(","), country: state.destination.country_code })}`);
+        if (!response.success) return;
+        list.querySelectorAll("li[data-index]").forEach((li) => {
+          const item = items[Number(li.dataset.index)];
+          const summary = item && response.data[item.code.replace(/[.\-\s]/g, "")];
+          if (!summary) return;
+          li.insertAdjacentHTML("beforeend",
+            `<small class="ac_tariff ${escapeHtml(summary.status)}">`
+            + `${escapeHtml(state.destination.country)} · ${escapeHtml(summary.text)}</small>`);
+        });
+      },
       emptyMessage: () => {
         const digits = lastHsQuery.replace(/[.\-\s]/g, "");
         if (/^\d+$/.test(digits) && digits.length !== 10) {

@@ -124,6 +124,41 @@ def certificate_for(rate_code: str, rate_name: str) -> dict:
     return {}
 
 
+# 발급 방식별로 어디에 가서 무엇을 해야 하는지. (관세청·대한상공회의소 공식 창구)
+WHERE_AUTHORITY = ("세관(관세청 UNI-PASS 전자통관 → 원산지증명서 발급신청) 또는"
+                   " 대한상공회의소 무역인증서비스센터(cert.korcham.net)에서 발급받습니다.")
+WHERE_SELF = "수출자가 협정이 정한 서식(또는 송장 등 상업서류)에 원산지 문안을 적고 서명합니다."
+
+
+def where_to_get(method: str) -> str:
+    """발급방식 문구("기관발급", "자율발급", "자율/기관발급")로 발급처를 정합니다."""
+
+    text = method or ""
+    has_authority = "기관" in text
+    has_self = "자율" in text
+    if has_authority and has_self:
+        return f"둘 다 가능합니다. 기관발급은 {WHERE_AUTHORITY} 자율발급은 {WHERE_SELF}"
+    if has_authority:
+        return WHERE_AUTHORITY
+    if has_self:
+        return WHERE_SELF
+    return ""
+
+
+def certificate_steps(info: dict) -> dict:
+    """무엇을 · 어디서 · 어떤 서식으로 · 얼마 동안. 화면과 서류에서 같이 씁니다."""
+
+    if not info:
+        return {}
+    return {
+        "what": f"{info.get('method', '')} 원산지증명서".strip(),
+        "where": where_to_get(info.get("method", "")),
+        "issuer": info.get("issuer", ""),
+        "form": info.get("form", ""),
+        "valid_for": info.get("valid_for", ""),
+    }
+
+
 def proof_for(rate_code: str, rate_name: str = "") -> str:
     """원산지증명을 어떻게 받아야 하는지 한 줄로 알려줍니다."""
 

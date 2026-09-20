@@ -1129,3 +1129,36 @@ def test_origin_certificate_guide_uses_portal_data(app):
     # HS부호나 도착국이 없으면 확인할 수 없다고 알립니다.
     shipment.cargos[0].hs_code = ""
     assert document_service.origin_certificate_guide(shipment)["available"] is False
+
+
+def test_tariff_summaries_for_hs_candidates(app):
+    """HS 후보마다 도착국에 쓸 수 있는 협정을 한 줄로 요약합니다."""
+
+    result = planning_service.tariff_summaries(
+        ["3304991000", "4206000000", "3304991000", ""], "CA")
+    # 빈 값과 중복은 빼고, 후보마다 한 줄씩입니다.
+    assert set(result) == {"3304991000", "4206000000"}
+    assert result["3304991000"]["status"] == "agreement"
+    assert "한·캐나다 FTA" in result["3304991000"]["text"]
+    # 협정이 없는 나라는 기본세율로 안내합니다.
+    russia = planning_service.tariff_summaries(["3304991000"], "RU")["3304991000"]
+    assert russia["status"] == "none" and "기본세율" in russia["text"]
+    # 도착국이 없으면 아무것도 조회하지 않습니다.
+    assert planning_service.tariff_summaries(["3304991000"], "") == {}
+
+
+def test_where_to_get_origin_certificate(app):
+    """발급방식에 따라 어디서 받는지 알려줍니다."""
+
+    from app.processors import fta_guide
+
+    assert "세관" in fta_guide.where_to_get("기관발급") and "상공회의소" in fta_guide.where_to_get("기관발급")
+    assert "수출자가" in fta_guide.where_to_get("자율발급")
+    both = fta_guide.where_to_get("자율/기관발급")
+    assert "둘 다" in both and "세관" in both and "수출자가" in both
+    assert fta_guide.where_to_get("") == ""
+
+    steps = fta_guide.certificate_steps({"method": "기관발급", "form": "통일서식(AK)", "valid_for": "1년"})
+    assert steps["what"] == "기관발급 원산지증명서"
+    assert steps["where"] and steps["form"] == "통일서식(AK)" and steps["valid_for"] == "1년"
+    assert fta_guide.certificate_steps({}) == {}

@@ -260,6 +260,7 @@ def origin_certificate_guide(shipment) -> dict:
         "rate": row["rate"],
         "about": row.get("about", ""),
         "certificate": row.get("certificate") or {},
+        "steps": row.get("steps") or {},
     } for row in guide["agreements"]]
 
     return {
