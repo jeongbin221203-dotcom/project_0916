@@ -55,6 +55,8 @@
         <form method="post" action="{{ url_for('document.validate', shipment_id=shipment.shipment_id) }}">
           <button class="button ghost">서류 간 검증</button>
         </form>
+        <a class="button ghost" href="{{ url_for('document.requirements', shipment_id=shipment.shipment_id) }}">수출요건 확인</a>
+        <a class="button ghost" href="{{ url_for('document.customs_filing', shipment_id=shipment.shipment_id) }}">관세사 전달용 신고자료</a>
       </div>
     </div>
 

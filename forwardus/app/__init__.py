@@ -52,6 +52,28 @@ def migrate_cargo_lines(database) -> None:
                 connection.execute(text(f"ALTER TABLE cargos ADD COLUMN {name} {spec}"))
 
 
+def migrate_shipment_columns(database) -> None:
+    """수출신고 자료용 칸을 기존 DB에 덧붙입니다."""
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "shipments" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("shipments")}
+    added = {
+        "exporter_business_no": "VARCHAR(20) NOT NULL DEFAULT ''",
+        "customs_trade_kind": "VARCHAR(4) NOT NULL DEFAULT '11'",
+        "customs_payment_method": "VARCHAR(4) NOT NULL DEFAULT 'TT'",
+        "country_of_origin": "VARCHAR(60) NOT NULL DEFAULT 'KR'",
+    }
+    missing = {name: spec for name, spec in added.items() if name not in columns}
+    if missing:
+        with database.engine.begin() as connection:
+            for name, spec in missing.items():
+                connection.execute(text(f"ALTER TABLE shipments ADD COLUMN {name} {spec}"))
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     """Create and configure the Flask application."""
 
@@ -72,6 +94,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     with flask_app.app_context():
         db.create_all()
         migrate_cargo_lines(db)
+        migrate_shipment_columns(db)
 
     @flask_app.get("/health")
     def health():

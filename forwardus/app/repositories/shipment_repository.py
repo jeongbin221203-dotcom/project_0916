@@ -62,5 +62,11 @@ def delete_payment(shipment: Shipment, payment_id: int) -> bool:
     return False
 
 
+def delete(record) -> None:
+    """어떤 레코드든 지웁니다. (업로드한 증빙 서류 등)"""
+
+    db.session.delete(record)
+
+
 def commit() -> None:
     db.session.commit()

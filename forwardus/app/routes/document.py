@@ -5,7 +5,8 @@ from __future__ import annotations
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.routes import load_shipment
-from app.services import ServiceError, document_service
+from app.services import (ServiceError, customs_filing_service, document_service,
+                          requirement_service)
 from app.validators import ValidationError
 
 document_bp = Blueprint("document", __name__, url_prefix="/documents")
@@ -21,6 +22,81 @@ def center(shipment_id: str):
         validation=document_service.check_documents(shipment),
         origin_certificate=document_service.origin_certificate_guide(shipment),
     )
+
+
+@document_bp.get("/<shipment_id>/requirements")
+def requirements(shipment_id: str):
+    """HS부호로 짚어 본 수출요건과 올려 둔 증빙 서류."""
+
+    shipment = load_shipment(shipment_id)
+    return render_template(
+        "document/requirements.html",
+        shipment=shipment,
+        check=requirement_service.requirements_for(shipment),
+    )
+
+
+@document_bp.post("/<shipment_id>/requirements/upload")
+def upload_requirement(shipment_id: str):
+    shipment = load_shipment(shipment_id)
+    try:
+        document = requirement_service.upload(
+            shipment, request.files.get("file"), request.form.get("requirement_key", ""))
+        # 올리자마자 읽어 이 건과 맞는지 봅니다. 키가 없으면 그렇다고 알려 줍니다.
+        requirement_service.analyze(shipment, document.id)
+        flash(f"{document.filename}을(를) 올렸습니다.", "success")
+    except ValidationError as error:
+        flash(str(error), "error")
+    return redirect(url_for("document.requirements", shipment_id=shipment_id))
+
+
+@document_bp.post("/<shipment_id>/requirements/<int:document_id>/analyze")
+def analyze_requirement(shipment_id: str, document_id: int):
+    shipment = load_shipment(shipment_id)
+    try:
+        requirement_service.analyze(shipment, document_id)
+    except ServiceError as error:
+        flash(str(error), "error")
+    return redirect(url_for("document.requirements", shipment_id=shipment_id))
+
+
+@document_bp.post("/<shipment_id>/requirements/<int:document_id>/delete")
+def delete_requirement(shipment_id: str, document_id: int):
+    shipment = load_shipment(shipment_id)
+    try:
+        requirement_service.delete_upload(shipment, document_id)
+        flash("올린 서류를 지웠습니다.", "success")
+    except ServiceError as error:
+        flash(str(error), "error")
+    return redirect(url_for("document.requirements", shipment_id=shipment_id))
+
+
+@document_bp.get("/<shipment_id>/customs-filing")
+def customs_filing(shipment_id: str):
+    """관세사에게 넘길 수출신고 자료."""
+
+    shipment = load_shipment(shipment_id)
+    sheet = customs_filing_service.filing_sheet(shipment)
+    return render_template(
+        "document/customs_filing.html",
+        shipment=shipment,
+        sheet=sheet,
+        sheet_text=customs_filing_service.as_text(sheet),
+        missing_summary=customs_filing_service.describe_missing(sheet),
+    )
+
+
+@document_bp.post("/<shipment_id>/customs-filing")
+def save_customs_filing(shipment_id: str):
+    """신고 자료에만 쓰는 칸(사업자등록번호·거래구분·결제방법·원산지)을 저장합니다."""
+
+    shipment = load_shipment(shipment_id)
+    try:
+        customs_filing_service.update_filing_fields(shipment, request.form)
+        flash("신고 자료를 저장했습니다.", "success")
+    except ValidationError as error:
+        flash(str(error), "error")
+    return redirect(url_for("document.customs_filing", shipment_id=shipment_id))
 
 
 @document_bp.post("/<shipment_id>/generate")

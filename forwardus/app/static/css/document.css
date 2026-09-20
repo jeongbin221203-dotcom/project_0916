@@ -79,3 +79,56 @@
 .doc_role_sample { background: #f1f5f9; color: #475569; }
 .doc_role_note { margin: 0; line-height: 1.55; }
 .doc_card.role_sample { border-style: dashed; }
+
+/* 관세사 전달용 수출신고 자료 */
+.filing_section_title { margin: 20px 0 8px; font-size: 14px; font-weight: 800; color: var(--blue_dark); }
+.filing_rows { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.filing_rows > div { padding: 10px 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.filing_rows > div.blank { border-style: dashed; background: #fffbeb; }
+.filing_rows dt { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 3px; }
+.filing_rows dd { margin: 0; font-size: 13.5px; font-weight: 700; }
+.filing_rows dd small { display: block; margin-top: 4px; font-weight: 600; line-height: 1.5; }
+.filing_rows > div.blank dd { color: #b45309; }
+.filing_form { margin-top: 16px; }
+.filing_text { margin: 0; padding: 16px; border-radius: 14px; background: #0f172a; color: #e2e8f0;
+  font-size: 12.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
+.table_scroll { overflow-x: auto; }
+
+/* 수출요건 확인 */
+.req_item { padding: 11px 14px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; }
+.req_item p { margin: 5px 0 0; }
+.req_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; margin-top: 14px; }
+.req_card { display: grid; gap: 9px; align-content: start; padding: 16px;
+  border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.req_card.has_upload { border-color: var(--green); }
+.req_why { margin: 0; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+.req_meta { margin: 0; display: grid; gap: 6px; }
+.req_meta > div { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: baseline; }
+.req_meta dt { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.req_meta dd { margin: 0; font-size: 12.5px; font-weight: 600; line-height: 1.6; }
+.req_link { font-size: 12.5px; font-weight: 800; color: var(--blue); text-decoration: none; }
+.req_link:hover { text-decoration: underline; }
+.req_upload { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding-top: 10px; border-top: 1px solid var(--line); }
+.req_upload input[type=file] { flex: 1 1 150px; min-width: 0; font-size: 12px; }
+
+/* 올린 서류와 AI 분석 결과 */
+.upload_list { display: grid; gap: 12px; margin-top: 12px; }
+.upload_card { display: grid; gap: 9px; padding: 16px; border: 1px solid var(--line);
+  border-radius: 16px; background: #fff; }
+.upload_card.status_ok { border-left: 4px solid var(--green); }
+.upload_card.status_check { border-left: 4px solid var(--amber); }
+.upload_card.status_mismatch, .upload_card.status_failed { border-left: 4px solid #dc2626; }
+.upload_card b { display: block; }
+.upload_summary { margin: 0; font-size: 13px; line-height: 1.7; }
+.badge.review_ok { background: var(--green_soft); color: var(--green); }
+.badge.review_check { background: var(--amber_soft); color: #8a4f00; }
+.badge.review_mismatch, .badge.review_failed { background: #fee2e2; color: #b91c1c; }
+.badge.review_pending { background: #f1f5f9; color: #475569; }
+.finding_list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.finding_list li { display: grid; gap: 2px; padding: 9px 12px; border-radius: 11px; background: #f8fafc;
+  font-size: 12.5px; line-height: 1.65; border-left: 3px solid #cbd5e1; }
+.finding_list li.verdict_match { border-left-color: var(--green); }
+.finding_list li.verdict_missing { border-left-color: var(--amber); }
+.finding_list li.verdict_differs { border-left-color: #dc2626; }
+.finding_list li b { font-size: 12px; }

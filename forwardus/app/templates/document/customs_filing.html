@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shipment_tabs, shipment_header %}
+{% block title %}수출신고 자료 · {{ shipment.shipment_id }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
+{% block content %}
+  {{ shipment_header(shipment) }}
+  {{ shipment_tabs(shipment, 'document') }}
+
+  <section class="card">
+    <div class="row_between wrap">
+      <div>
+        <h2>관세사 전달용 수출신고 자료</h2>
+        <p class="muted">{{ sheet.note }}</p>
+      </div>
+      <a class="button ghost" href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}">서류 센터로</a>
+    </div>
+
+    {% if sheet.missing %}
+      <div class="alert warn">{{ missing_summary }}
+        아래에서 채운 뒤 넘기면 관세사가 다시 묻지 않습니다.</div>
+    {% else %}
+      <div class="alert ok">✓ {{ missing_summary }}</div>
+    {% endif %}
+
+    <form method="post" class="filing_form"
+          action="{{ url_for('document.save_customs_filing', shipment_id=shipment.shipment_id) }}">
+      <div class="form_grid">
+        <label class="field">
+          <span class="field_label">수출자 사업자등록번호</span>
+          <input class="text_input" type="text" name="exporter_business_no"
+                 value="{{ shipment.exporter_business_no }}" placeholder="000-00-00000" maxlength="20">
+          <small class="muted small">숫자 10자리. 수출신고서에 반드시 들어갑니다.</small>
+        </label>
+        <label class="field">
+          <span class="field_label">거래구분</span>
+          <select name="customs_trade_kind">
+            {% for code, label in sheet.trade_kinds.items() %}
+              <option value="{{ code }}" {{ 'selected' if code == sheet.trade_kind }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <small class="muted small">대부분의 유상 수출은 11입니다.</small>
+        </label>
+        <label class="field">
+          <span class="field_label">결제방법</span>
+          <select name="customs_payment_method">
+            {% for code, label in sheet.payment_methods.items() %}
+              <option value="{{ code }}" {{ 'selected' if code == sheet.payment_method }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <small class="muted small">대금을 어떻게 받는지입니다. Incoterms와 다른 항목입니다.</small>
+        </label>
+        <label class="field">
+          <span class="field_label">원산지</span>
+          <input class="text_input" type="text" name="country_of_origin"
+                 value="{{ shipment.country_of_origin }}" maxlength="60">
+        </label>
+      </div>
+      <div class="button_row">
+        <button class="button primary">저장</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>신고 자료</h2>
+    {% for section in sheet.sections %}
+      <h3 class="filing_section_title">{{ section.title }}</h3>
+      <dl class="filing_rows">
+        {% for row in section.rows %}
+          <div class="{{ 'blank' if not row.value }}">
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.value or '미입력' }}{% if row.hint %}<small class="muted">{{ row.hint }}</small>{% endif %}</dd>
+          </div>
+        {% endfor %}
+      </dl>
+    {% endfor %}
+
+    <h3 class="filing_section_title">품목 ({{ sheet.lines|length }}건)</h3>
+    <div class="table_scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th><th>HS CODE</th><th>품명</th><th>규격</th>
+            <th>수량</th><th>순중량</th><th>총중량</th><th>단가</th><th>금액</th><th>위험물</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in sheet.lines %}
+            <tr>
+              <td>{{ item.line_no }}</td>
+              <td class="mono">{{ item.hs_code or '미입력' }}</td>
+              <td>{{ item.product_description }}</td>
+              <td class="muted small">{{ item.spec }}</td>
+              <td>{{ '{:,}'.format(item.quantity) }} {{ item.unit }}</td>
+              <td>{{ '{:,.2f} kg'.format(item.net_weight_kg) if item.net_weight_kg is not none else '-' }}</td>
+              <td>{{ '{:,.2f} kg'.format(item.gross_weight_kg) }}</td>
+              <td>{{ '{:,.4f}'.format(item.unit_price) if item.unit_price is not none else '-' }}</td>
+              <td>{{ '{:,.2f}'.format(item.amount) if item.amount is not none else '-' }}</td>
+              <td class="mono small">{{ item.dangerous or '-' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row_between wrap">
+      <h2>그대로 보내기</h2>
+      <button type="button" class="button ghost" data-copy-filing>복사</button>
+    </div>
+    <p class="muted">메일이나 메신저에 붙여 넣으면 됩니다.</p>
+    <pre class="filing_text" data-filing-text>{{ sheet_text }}</pre>
+  </section>
+
+  <script>
+    document.querySelector("[data-copy-filing]")?.addEventListener("click", async (event) => {
+      const text = document.querySelector("[data-filing-text]").textContent;
+      const button = event.currentTarget;
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "복사했습니다";
+      } catch (error) {
+        // 클립보드를 막아 둔 환경에서는 사람이 직접 고르도록 선택해 줍니다.
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector("[data-filing-text]"));
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        button.textContent = "직접 복사해주세요";
+      }
+      setTimeout(() => { button.textContent = "복사"; }, 2000);
+    });
+  </script>
+{% endblock %}
