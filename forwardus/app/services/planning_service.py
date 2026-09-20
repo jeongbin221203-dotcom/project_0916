@@ -75,10 +75,21 @@ def list_countries(transport_mode: str, role: str | None = None) -> dict:
     return result
 
 
-def search_unlocode(query: str, role: str | None = None, country: str | None = None) -> dict:
-    """직접 입력 칸의 후보 목록. 출발지는 국내(KR)로 한정합니다."""
+def search_unlocode(query: str, role: str | None = None, country: str | None = None,
+                    transport_mode: str = "SEA") -> dict:
+    """직접 입력 칸의 후보 목록.
 
-    return location_client.search_unlocode("KR" if role == "origin" else country, query)
+    항공은 공항 목록에서, 해상은 UN/LOCODE 전체 항구 색인에서 찾습니다.
+    출발지는 국내(KR)로 한정합니다.
+    """
+
+    country = "KR" if role == "origin" else country
+    if transport_mode.upper() == "AIR":
+        result = location_client.search_locations(query, "airport", country)
+        if result["success"] and role == "destination":
+            result["data"] = [item for item in result["data"] if item["country_code"] != "KR"]
+        return result
+    return location_client.search_unlocode(country, query)
 
 
 def search_hs_codes(query: str) -> dict:
@@ -128,6 +139,9 @@ def _build_custom_location(code: str, custom: dict, role: str, kind: str) -> dic
     if not name:
         raise ValidationError("항구·공항 이름을 입력해주세요.", f"{role}_name")
 
+    if kind == "airport":
+        return _build_custom_airport(code, name, country_code, country)
+
     # 서류에 찍히는 코드이므로 실제 UN/LOCODE만 사용합니다.
     if code:
         official = location_client.lookup_unlocode(code)
@@ -162,6 +176,26 @@ def _build_custom_location(code: str, custom: dict, role: str, kind: str) -> dic
         "major": False,
         "source": "manual",
     }
+
+
+def _build_custom_airport(code: str, name: str, country_code: str, country: dict) -> dict:
+    """직접 입력한 공항. IATA 코드 또는 이름으로 실제 공항을 찾습니다."""
+
+    known = location_client.find_location(code) if code else None
+    if not known:
+        matches = [item for item in location_client.search_locations(name, "airport", country_code)["data"]]
+        if not matches:
+            raise ValidationError(
+                f"'{name}'에 해당하는 공항을 찾지 못했습니다. 공항 이름이나 IATA 코드(예: ICN)를 확인해주세요.",
+                "origin_name" if country_code == "KR" else "destination_name")
+        known = matches[0]
+
+    if known["kind"] != "airport":
+        raise ValidationError(f"{known['code']}은(는) 공항 코드가 아닙니다.", "destination_code")
+    if known["country_code"] != country_code:
+        raise ValidationError(
+            f"{known['code']}은(는) {known['country']} 공항입니다. 국가를 확인해주세요.", "destination_country")
+    return known
 
 
 def _resolve_locations(route: dict, payload: dict) -> tuple[dict, dict]:

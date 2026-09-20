@@ -235,9 +235,42 @@ def test_direct_input_resolves_real_unlocode(app, shipment_payload):
     assert shipment.destination_country == "CN"
 
 
+def test_direct_input_finds_airports_in_air_mode(app):
+    """항공 모드에서는 직접 입력이 공항을 찾습니다."""
+
+    for query, code in [("대구", "TAE"), ("TAE", "TAE"), ("Incheon", "ICN")]:
+        items = planning_service.search_unlocode(query, role="origin", transport_mode="AIR")["data"]
+        assert items and items[0]["code"] == code
+        assert all(item["kind"] == "airport" for item in items)
+
+    china = planning_service.search_unlocode("광저우", country="CN", transport_mode="AIR")["data"]
+    assert china[0]["code"] == "CAN"
+    # 해상 모드는 기존대로 UN/LOCODE 항구를 찾습니다.
+    sea = planning_service.search_unlocode("구룡포", role="origin")["data"]
+    assert sea[0]["code"] == "KRGRP"
+
+
+def test_direct_input_airport_used_for_shipment(app, shipment_payload, cargo_input):
+    """공항 이름만 입력해도 스케줄 조회·생성이 됩니다."""
+
+    payload = {
+        **shipment_payload,
+        "transport_mode": "AIR", "sea_mode": None, "incoterms": "CPT",
+        "origin_code": "", "origin_custom": {"name": "대구"},
+        "destination_code": "", "destination_custom": {"name": "광저우", "country_code": "CN"},
+    }
+    schedules = planning_service.search_schedules(payload)
+    assert schedules["items"][0]["origin_code"] == "TAE"
+    assert schedules["items"][0]["destination_code"] == "CAN"
+
+    payload["schedule_id"] = schedules["items"][0]["schedule_id"]
+    shipment = planning_service.create_shipment(payload)
+    assert (shipment.origin_code, shipment.destination_code) == ("TAE", "CAN")
+
+
 @pytest.mark.parametrize("name,code", [
     ("Guryongpo", "KRGRP"),
-    ("구룡포항", "KRGRP"),   # 목록에 없는 국내 항구도 한글 이름으로 찾습니다.
+    ("구룡포항", "KRGRP"),
     ("후포항", "KRHPO"),
 ])
 def test_direct_input_finds_korean_ports(app, shipment_payload, name, code):

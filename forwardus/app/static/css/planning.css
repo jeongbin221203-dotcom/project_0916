@@ -30,7 +30,8 @@
 /* Autocomplete */
 .autocomplete { position: relative; }
 .ac_list { position: absolute; z-index: 20; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(15,23,42,.12); max-height: 300px; overflow-y: auto; }
-.ac_list li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 9px 11px; border-radius: 10px; cursor: pointer; }
+.ac_list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 11px; border-radius: 10px; cursor: pointer; align-items: baseline; }
+.ac_list .ac_title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .ac_list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
 .ac_list li:hover { background: var(--blue_soft); }
 .ac_list li.empty { color: var(--muted); cursor: default; }

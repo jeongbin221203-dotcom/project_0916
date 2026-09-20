@@ -43,7 +43,10 @@ def api_unlocode():
     """직접 입력 칸에서 실제 UN/LOCODE 후보를 찾습니다."""
 
     result = planning_service.search_unlocode(
-        request.args.get("q", ""), request.args.get("role"), request.args.get("country")
+        request.args.get("q", ""),
+        request.args.get("role"),
+        request.args.get("country"),
+        request.args.get("mode", "SEA"),
     )
     return jsonify(result), (200 if result["success"] else 502)
 

@@ -441,17 +441,20 @@
         suggestList.hidden = true;
         return;
       }
-      const params = new URLSearchParams({ q: query, role });
+      const params = new URLSearchParams({ q: query, role, mode: state.transport_mode });
       if (countrySelect && countrySelect.value) params.set("country", countrySelect.value);
       const response = await getJson(`${urls.unlocode}?${params}`);
       suggestions = response.success ? response.data : [];
       suggestList.innerHTML = suggestions.length
         ? suggestions.map((item, index) => `<li role="option" data-index="${index}">`
-          + `<b>${escapeHtml(item.name)}</b>`
-          + (item.major ? `<em class="ac_note">주요 항구</em>` : "")
-          + ` <span class="mono">${escapeHtml(item.code)}</span>`
+          + `<span class="ac_title"><b>${escapeHtml(item.name)}</b>`
+          + (item.major && item.kind !== "airport" ? `<em class="ac_note">주요 항구</em>` : "")
+          + (item.direct_from_korea ? `<em class="ac_note direct">직항</em>` : "")
+          + `</span><span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)}</small></li>`).join("")
-        : `<li class="empty">UN/LOCODE에서 찾지 못했습니다. 나라 이름(예: 베트남)이나 항구 이름을 입력해보세요.</li>`;
+        : `<li class="empty">${state.transport_mode === "AIR"
+            ? "공항을 찾지 못했습니다. 공항 이름(예: 대구)이나 IATA 코드(예: TAE)를 입력해보세요."
+            : "UN/LOCODE에서 찾지 못했습니다. 나라 이름(예: 베트남)이나 항구 이름을 입력해보세요."}</li>`;
       suggestList.hidden = false;
     }, 200);
 
@@ -522,7 +525,8 @@
           ? `<small class="ac_via">${viaLabel}: ${item.transfer_via
               .map(([code, name]) => `${escapeHtml(name)}(${escapeHtml(code)})`).join(" · ")}</small>`
           : "";
-        return `<b>${escapeHtml(item.name)}</b>${note}${cargo}${direct} <span class="mono">${escapeHtml(item.code)}</span>`
+        return `<span class="ac_title"><b>${escapeHtml(item.name)}</b>${note}${cargo}${direct}</span>`
+          + `<span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`
           + via;
       },
