@@ -490,6 +490,7 @@ def build() -> list[dict]:
             "status": row["Status"],
             "harbor_size": harbor_size,
             "direct_from_korea": None,
+            "direct_from": [],
             "cargo_hub": False,
             "korean_air_cargo": False,
             "transfer_via": [],
@@ -534,16 +535,21 @@ def build() -> list[dict]:
 MAX_TRANSFER_HUBS = 3
 
 
-def load_route_data() -> tuple[set[str], dict[str, list[str]]]:
-    """국내 직항 공항 목록과, 환승 공항별 경유 후보를 만듭니다.
+def load_route_data() -> tuple[set[str], dict[str, list[str]], dict[str, list[str]]]:
+    """국내 직항 목록, 출발 공항별 직항 노선, 환승 공항별 경유 후보를 만듭니다.
 
     경유 후보는 "국내에서 직항으로 갈 수 있고, 그곳에서 목적 공항까지
     다시 직항편이 있는" 공항입니다. 운항 항공사 수가 많은 곳을 먼저 둡니다.
     """
 
     data = json.loads(download(ROUTES_URL, "airline_routes.json"))
-    direct = {route["iata"] for code in KOREA_AIRPORTS
-              for route in data.get(code, {}).get("routes", [])} - KOREA_AIRPORTS
+    # 목적 공항 -> 직항편이 있는 국내 출발 공항 목록
+    direct_from: dict[str, list[str]] = {}
+    for code in KOREA_AIRPORTS:
+        for route in data.get(code, {}).get("routes", []):
+            if route["iata"] not in KOREA_AIRPORTS:
+                direct_from.setdefault(route["iata"], []).append(code)
+    direct = set(direct_from)
 
     transfers: dict[str, list[str]] = {}
     for iata, airport in data.items():
@@ -554,7 +560,7 @@ def load_route_data() -> tuple[set[str], dict[str, list[str]]]:
         hubs.sort(key=lambda item: (-item[0], item[1]))
         if hubs:
             transfers[iata] = [code for _, code in hubs[:MAX_TRANSFER_HUBS]]
-    return direct, transfers
+    return direct, direct_from, transfers
 
 
 def build_airports(country_info: dict[str, dict]) -> list[dict]:
@@ -566,7 +572,9 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
 
     rows = list(csv.DictReader(io.StringIO(
         download(AIRPORTS_URL, "ourairports_airports.csv").decode("utf-8", "replace"))))
-    direct_routes, transfer_hubs = load_route_data()
+    direct_routes, direct_from, transfer_hubs = load_route_data()
+    # 정기 국제선이 실제로 있는 국내 공항. 없는 곳은 출발지 목록에서 안내합니다.
+    korea_outbound = {code for codes in direct_from.values() for code in codes}
 
     airports = []
     seen = set()
@@ -601,7 +609,8 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "status": "",
             "harbor_size": None,
             "port_class": None,
-            "note": "",
+            "note": ("" if country_code != "KR" or iata in korea_outbound
+                     else "정기 국제선 없음 · 인천·김해 이용"),
             "cargo_volume_mt": None,
             "is_terminal": False,
             "port_group": iata,
@@ -612,6 +621,8 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             # 국내 공항에서 직항편이 있는지. 없으면 경유 후보를 함께 보여줍니다.
             # 국내 공항은 출발지이므로 판정 대상이 아닙니다(None).
             "direct_from_korea": None if country_code == "KR" else iata in direct_routes,
+            # 어느 국내 공항에서 직항편이 오는지 (예: ["ICN", "PUS"])
+            "direct_from": [] if country_code == "KR" else sorted(direct_from.get(iata, [])),
             "cargo_hub": iata in CARGO_HUBS,
             "korean_air_cargo": iata in KOREAN_AIR_CARGO,
             "transfer_via": ([] if country_code == "KR" or iata in direct_routes
