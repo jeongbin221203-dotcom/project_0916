@@ -603,6 +603,8 @@ def search_schedules(payload: dict) -> dict:
         "items": _sort_schedules(items, sort_by),
         "sort": sort_by,
         "source": result["source"],
+        # 실데이터인지 예시인지, 예시라면 무엇이 없어서인지 화면에 그대로 적습니다.
+        "note": result.get("note", ""),
         "metrics": metrics,
     }
 

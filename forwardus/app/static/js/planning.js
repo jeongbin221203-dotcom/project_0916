@@ -1179,13 +1179,16 @@
               <div><small title="Estimated Time of Arrival">ETA <i>도착 예정</i></small><b>${s.eta}</b></div>
             </div>
             <div class="row_between wrap">
-              <span class="muted small">정시율 ${s.reliability}% · ${escapeHtml(s.freight_basis)}</span>
+              <span class="muted small">${s.reliability ? `정시율 ${s.reliability}% · ` : ""}${escapeHtml(s.freight_basis)}${
+                s.transship_port ? ` · ${escapeHtml(s.transship_port)} 환적` : ""}${
+                s.cargo_cutoff ? ` · 화물 마감 ${escapeHtml(s.cargo_cutoff)}` : ""}</span>
               ${deadline}
             </div>
           </div>
           <div class="schedule_price"><small>Freight <i>운임</i></small>
             <b>USD ${formatNumber(s.freight_usd, 0)}</b>
-            <em>${escapeHtml(inKrw(s.freight_usd))}</em></div>
+            <em>${escapeHtml(inKrw(s.freight_usd))}</em>
+            ${s.freight_source === "estimate" ? `<em class="est">추정 운임</em>` : ""}</div>
         </label>`;
     }).join("");
   }
@@ -1208,8 +1211,9 @@
     }
     state.schedules = response.data.items;
     if (!state.schedules.some((s) => s.schedule_id === state.schedule_id)) state.schedule_id = null;
+    // 예시 스케줄이면 "무슨 키가 없어서인지"까지 서버가 적어 보냅니다.
     scheduleMeta.textContent = `${state.origin.name} → ${state.destination.name} · ${state.departure_date} 이후 출발 · ${state.schedules.length}건`
-      + (response.data.source === "mock" ? " · 실제 선사 API가 연결되지 않아 Mock 스케줄을 표시합니다." : "");
+      + (response.data.note ? ` · ${response.data.note}` : "");
     renderSchedules();
     return true;
   }

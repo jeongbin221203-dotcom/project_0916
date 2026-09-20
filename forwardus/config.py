@@ -80,6 +80,12 @@ class Config:
     EXCHANGE_RATE_USD_KRW = float(os.getenv("EXCHANGE_RATE_USD_KRW", "1380"))
     API_TIMEOUT_SECONDS = float(os.getenv("API_TIMEOUT_SECONDS", "8"))
 
+    # 선사·항공사 실스케줄. 둘 다 무료이고 따로 신청해야 합니다.
+    # HMM_API_KEY: apiportal.hmm21.com (해상 항구간 스케줄, 시간당 300회)
+    # DATA_GO_KR_SERVICE_KEY: data.go.kr 인천국제공항공사 화물기 운항 일정
+    HMM_API_KEY = os.getenv("HMM_API_KEY", "")
+    DATA_GO_KR_SERVICE_KEY = os.getenv("DATA_GO_KR_SERVICE_KEY", "")
+
     SCHEDULE_API_KEY = os.getenv("SCHEDULE_API_KEY", "")
     TRACKING_API_KEY = os.getenv("TRACKING_API_KEY", "")
     CUSTOMS_API_KEY = os.getenv("CUSTOMS_API_KEY", "")
