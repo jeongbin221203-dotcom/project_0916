@@ -24,7 +24,26 @@ def new():
 @planning_bp.get("/api/locations")
 def api_locations():
     result = planning_service.search_locations(
-        request.args.get("q", ""), request.args.get("mode", "SEA"), request.args.get("role")
+        request.args.get("q", ""),
+        request.args.get("mode", "SEA"),
+        request.args.get("role"),
+        request.args.get("country"),
+    )
+    return jsonify(result), (200 if result["success"] else 502)
+
+
+@planning_bp.get("/api/countries")
+def api_countries():
+    result = planning_service.list_countries(request.args.get("mode", "SEA"), request.args.get("role"))
+    return jsonify(result), (200 if result["success"] else 502)
+
+
+@planning_bp.get("/api/unlocode")
+def api_unlocode():
+    """직접 입력 칸에서 실제 UN/LOCODE 후보를 찾습니다."""
+
+    result = planning_service.search_unlocode(
+        request.args.get("q", ""), request.args.get("role"), request.args.get("country")
     )
     return jsonify(result), (200 if result["success"] else 502)
 

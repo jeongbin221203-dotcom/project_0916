@@ -9,3 +9,7 @@ htmlcov/
 
 instance/
 *.db
+
+# 빌드 스크립트가 내려받는 원본 데이터 (data/build_locations.py)
+data/raw/*
+!data/raw/.gitkeep

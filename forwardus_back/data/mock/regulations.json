@@ -1,0 +1,176 @@
+{
+ "common": [
+  {
+   "title": "수출신고",
+   "status": "confirmed",
+   "detail": "모든 수출 물품은 선적 전 수출신고가 필요합니다. (관세사 또는 UNI-PASS)"
+  },
+  {
+   "title": "전략물자 해당 여부",
+   "status": "check_required",
+   "detail": "이중용도 품목 여부를 전략물자관리원(Yestrade)에서 확인하세요."
+  },
+  {
+   "title": "FTA 원산지 요건",
+   "status": "check_required",
+   "detail": "특혜관세를 적용하려면 원산지 결정기준 충족 여부와 원산지증명서 발급 방식을 확인하세요."
+  }
+ ],
+ "by_chapter": {
+  "33": {
+   "US": [
+    {
+     "title": "FDA MoCRA 시설 등록·제품 리스팅",
+     "status": "check_required",
+     "detail": "화장품 제조·가공 시설 등록 및 제품 리스팅 대상인지 확인하세요."
+    },
+    {
+     "title": "영문 라벨 표시 요건",
+     "status": "check_required",
+     "detail": "성분표(INCI), 내용량, 책임 판매자 정보 등 라벨 요건을 확인하세요."
+    }
+   ],
+   "CN": [
+    {
+     "title": "NMPA 화장품 등록·신고",
+     "status": "check_required",
+     "detail": "일반/특수 화장품 구분에 따른 등록 또는 신고 대상 여부를 확인하세요."
+    }
+   ],
+   "JP": [
+    {
+     "title": "화장품 제조판매업 허가(수입자)",
+     "status": "check_required",
+     "detail": "일본 내 수입자가 화장품 제조판매업 허가를 보유했는지 확인하세요."
+    }
+   ],
+   "VN": [
+    {
+     "title": "화장품 공포(Notification)",
+     "status": "check_required",
+     "detail": "베트남 DAV 화장품 공포번호 발급 여부를 확인하세요."
+    }
+   ],
+   "DE": [
+    {
+     "title": "EU CPNP 등록·책임자(RP) 지정",
+     "status": "check_required",
+     "detail": "EU 역내 책임자 지정 및 CPNP 등록이 필요한지 확인하세요."
+    }
+   ],
+   "NL": [
+    {
+     "title": "EU CPNP 등록·책임자(RP) 지정",
+     "status": "check_required",
+     "detail": "EU 역내 책임자 지정 및 CPNP 등록이 필요한지 확인하세요."
+    }
+   ],
+   "GB": [
+    {
+     "title": "UK SCPN 등록",
+     "status": "check_required",
+     "detail": "영국 책임자 지정 및 SCPN 등록 대상 여부를 확인하세요."
+    }
+   ]
+  },
+  "21": {
+   "US": [
+    {
+     "title": "FDA 식품시설 등록",
+     "status": "check_required",
+     "detail": "제조시설의 FDA 등록 여부를 확인하세요."
+    },
+    {
+     "title": "FDA 사전통관신고(Prior Notice)",
+     "status": "check_required",
+     "detail": "식품은 도착 전 Prior Notice 제출이 필요한지 확인하세요."
+    }
+   ],
+   "CN": [
+    {
+     "title": "해외 식품 생산기업 등록(CIFER)",
+     "status": "check_required",
+     "detail": "GACC 해외 생산기업 등록 여부를 확인하세요."
+    }
+   ]
+  },
+  "19": {
+   "US": [
+    {
+     "title": "FDA 식품시설 등록",
+     "status": "check_required",
+     "detail": "제조시설의 FDA 등록 여부를 확인하세요."
+    },
+    {
+     "title": "FDA 사전통관신고(Prior Notice)",
+     "status": "check_required",
+     "detail": "식품은 도착 전 Prior Notice 제출이 필요한지 확인하세요."
+    }
+   ]
+  },
+  "85": {
+   "US": [
+    {
+     "title": "FCC 인증",
+     "status": "check_required",
+     "detail": "무선·전자기기의 FCC 인증 대상 여부를 확인하세요."
+    }
+   ],
+   "DE": [
+    {
+     "title": "CE 마킹",
+     "status": "check_required",
+     "detail": "EMC·LVD·RED 등 적용 지침에 따른 CE 적합성 확인이 필요한지 확인하세요."
+    }
+   ],
+   "NL": [
+    {
+     "title": "CE 마킹",
+     "status": "check_required",
+     "detail": "EMC·LVD·RED 등 적용 지침에 따른 CE 적합성 확인이 필요한지 확인하세요."
+    }
+   ],
+   "JP": [
+    {
+     "title": "PSE / 전파법(TELEC) 인증",
+     "status": "check_required",
+     "detail": "전기용품안전법 및 전파법 적용 여부를 확인하세요."
+    }
+   ]
+  },
+  "84": {
+   "US": [
+    {
+     "title": "FCC 인증",
+     "status": "check_required",
+     "detail": "무선 기능이 포함되면 FCC 인증 대상 여부를 확인하세요."
+    }
+   ]
+  },
+  "95": {
+   "US": [
+    {
+     "title": "CPSC 완구 안전 기준(CPC)",
+     "status": "check_required",
+     "detail": "아동용 제품은 CPSIA 시험 및 CPC 발행이 필요한지 확인하세요."
+    }
+   ],
+   "DE": [
+    {
+     "title": "EU 완구 안전 지침(CE)",
+     "status": "check_required",
+     "detail": "EN71 시험 및 CE 마킹 필요 여부를 확인하세요."
+    }
+   ]
+  },
+  "61": {
+   "US": [
+    {
+     "title": "섬유 라벨(혼용률·원산지)",
+     "status": "check_required",
+     "detail": "FTC 섬유 라벨 요건을 확인하세요."
+    }
+   ]
+  }
+ }
+}

@@ -177,6 +177,7 @@
       form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = "";
     });
     applyMode();
+    refreshCountryOptions();
     invalidateSchedules();
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
@@ -192,21 +193,57 @@
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); };
   }
 
-  function setupAutocomplete(container, fetchItems, renderItem, onSelect) {
+  function setupAutocomplete(container, fetchItems, renderItem, onSelect, options = {}) {
     const input = container.querySelector("[data-ac-input]");
     const list = container.querySelector("[data-ac-list]");
     let items = [];
 
+    let overrideQuery = null;
+
     const search = debounce(async () => {
-      items = await fetchItems(input.value.trim());
-      list.innerHTML = items.length
-        ? items.map((item, i) => `<li role="option" data-index="${i}">${renderItem(item)}</li>`).join("")
-        : `<li class="empty">검색 결과가 없습니다.</li>`;
+      list.innerHTML = `<li class="empty">검색 중…</li>`;
       list.hidden = false;
+      const query = overrideQuery === null ? input.value.trim() : overrideQuery;
+      overrideQuery = null;
+      items = await fetchItems(query);
+      if (!items.length) {
+        list.innerHTML = `<li class="empty">검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.</li>`;
+        return;
+      }
+      let html = "";
+      if (options.groupBy) {
+        // 같은 그룹을 한 번만 표시합니다. 서버가 보내는 순서가 섞여 있어도
+        // 머리글이 중복되지 않도록 그룹별로 모아서 그립니다.
+        const groups = new Map();
+        items.forEach((item, index) => {
+          const value = options.groupBy(item);
+          if (!groups.has(value)) groups.set(value, []);
+          groups.get(value).push({ item, index });
+        });
+        groups.forEach((entries, value) => {
+          const other = value === "환승 필요";
+          html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
+            + (other ? `<small>국내 공항발 직항편이 없어 환승이 필요합니다</small>` : "")
+            + `</li>`;
+          entries.forEach(({ item, index }) => {
+            html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
+          });
+        });
+      } else {
+        items.forEach((item, index) => {
+          html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
+        });
+      }
+      list.innerHTML = html;
     }, 200);
 
     input.addEventListener("input", () => { onSelect(null, input); search(); });
-    input.addEventListener("focus", search);
+    // 이미 고른 항구가 있어도 다시 누르면 전체 목록을 보여줍니다.
+    input.addEventListener("focus", () => {
+      input.select();
+      overrideQuery = "";
+      search();
+    });
     input.addEventListener("blur", () => setTimeout(() => { list.hidden = true; }, 150));
     list.addEventListener("mousedown", (event) => {
       const li = event.target.closest("li[data-index]");
@@ -214,24 +251,206 @@
       onSelect(items[Number(li.dataset.index)], input);
       list.hidden = true;
     });
+    return {
+      search,
+      showAll() {
+        overrideQuery = "";
+        search();
+      },
+    };
   }
 
+  /* ----- Destination country filter and direct input ----- */
+  const countryCache = {};
+
+  async function loadCountries(mode) {
+    if (!countryCache[mode]) {
+      const response = await getJson(`${urls.countries}?${new URLSearchParams({ mode, role: "destination" })}`);
+      countryCache[mode] = response.success ? response.data : [];
+    }
+    return countryCache[mode];
+  }
+
+  function countryOption(c) {
+    return `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${c.count.toLocaleString("ko-KR")})</option>`;
+  }
+
+  // 운임 구간(region)을 대륙 이름으로 묶어 보여줍니다.
+  const CONTINENTS = [
+    ["asia", "아시아"],
+    ["middle_east", "중동"],
+    ["europe", "유럽"],
+    ["americas", "북미·중미"],
+    ["south_america", "남미"],
+    ["africa", "아프리카"],
+    ["oceania", "오세아니아"],
+  ];
+
+  async function refreshCountryOptions() {
+    const countries = await loadCountries(state.transport_mode);
+    const place = state.transport_mode === "AIR" ? "공항" : "항만";
+    // 한국 교역액 상위 국가를 맨 위에, 나머지는 대륙별로 가나다순 정렬합니다.
+    const top = countries.filter((c) => c.trade_rank).sort((a, b) => a.trade_rank - b.trade_rank);
+    let optionsHtml = top.length
+      ? `<optgroup label="주요 무역국">${top.map(countryOption).join("")}</optgroup>`
+      : "";
+    CONTINENTS.forEach(([region, label]) => {
+      const group = countries
+        .filter((c) => c.region === region)
+        .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+      if (group.length) {
+        optionsHtml += `<optgroup label="${label} (${group.length}개국)">`
+          + group.map(countryOption).join("") + "</optgroup>";
+      }
+    });
+    const other = countries.filter((c) => !CONTINENTS.some(([region]) => region === c.region));
+    if (other.length) {
+      optionsHtml += `<optgroup label="기타">`
+        + other.sort((a, b) => a.name.localeCompare(b.name, "ko")).map(countryOption).join("")
+        + "</optgroup>";
+    }
+    const filter = form.querySelector("[data-country-filter]");
+    if (filter) {
+      const current = filter.value;
+      filter.innerHTML = `<option value="">국가 전체 (주요 ${place}만 표시)</option>${optionsHtml}`;
+      filter.value = current;
+    }
+    const customCountry = form.querySelector("[data-autocomplete=destination] [data-custom-country]");
+    if (customCountry) customCountry.innerHTML = `<option value="">국가 선택</option>${optionsHtml}`;
+  }
+
+  function setupCustomInput(role) {
+    const container = form.querySelector(`[data-autocomplete=${role}]`);
+    const box = container.querySelector("[data-custom]");
+    const input = container.querySelector("[data-ac-input]");
+    const codeInput = box.querySelector("[data-custom-code]");
+    const nameInput = box.querySelector("[data-custom-name]");
+    const suggestList = box.querySelector("[data-custom-list]");
+    const countrySelect = box.querySelector("[data-custom-country]");
+
+    // 이름을 입력하면 실제 UN/LOCODE 후보를 보여줍니다.
+    let suggestions = [];
+    const suggest = debounce(async () => {
+      const query = nameInput.value.trim();
+      if (!query) {
+        suggestList.hidden = true;
+        return;
+      }
+      const params = new URLSearchParams({ q: query, role });
+      if (countrySelect && countrySelect.value) params.set("country", countrySelect.value);
+      const response = await getJson(`${urls.unlocode}?${params}`);
+      suggestions = response.success ? response.data : [];
+      suggestList.innerHTML = suggestions.length
+        ? suggestions.map((item, index) => `<li role="option" data-index="${index}">`
+          + `<b>${escapeHtml(item.name)}</b>`
+          + (item.major ? `<em class="ac_note">주요 항구</em>` : "")
+          + ` <span class="mono">${escapeHtml(item.code)}</span>`
+          + `<small>${escapeHtml(item.name_en)}</small></li>`).join("")
+        : `<li class="empty">UN/LOCODE에서 찾지 못했습니다. 나라 이름(예: 베트남)이나 항구 이름을 입력해보세요.</li>`;
+      suggestList.hidden = false;
+    }, 200);
+
+    nameInput.addEventListener("input", suggest);
+    nameInput.addEventListener("focus", suggest);
+    nameInput.addEventListener("blur", () => setTimeout(() => { suggestList.hidden = true; }, 150));
+    suggestList.addEventListener("mousedown", (event) => {
+      const li = event.target.closest("li[data-index]");
+      if (!li) return;
+      const item = suggestions[Number(li.dataset.index)];
+      codeInput.value = item.code;
+      nameInput.value = item.name;
+      if (countrySelect) countrySelect.value = item.country_code;
+      suggestList.hidden = true;
+    });
+    if (countrySelect) countrySelect.addEventListener("change", suggest);
+
+    container.querySelector("[data-custom-toggle]").addEventListener("click", () => {
+      box.hidden = !box.hidden;
+      if (!box.hidden) nameInput.focus();
+    });
+
+    container.querySelector("[data-custom-apply]").addEventListener("click", () => {
+      const code = codeInput.value.trim().toUpperCase();
+      const name = nameInput.value.trim();
+      const countryCode = countrySelect ? countrySelect.value : "KR";
+      if (!name) {
+        showError("직접 입력하려면 항구·공항 이름을 입력해주세요.");
+        return;
+      }
+      if (!countryCode) {
+        showError("직접 입력하려면 국가를 선택해주세요.");
+        return;
+      }
+      showError("");
+      // 코드는 선택 사항입니다. 비우면 서버가 이름을 기준으로 임시 코드를 부여합니다.
+      state[role] = { code, name, country_code: countryCode, custom: true };
+      input.value = code ? `${name} (${code})` : name;
+      box.hidden = true;
+      invalidateSchedules();
+    });
+  }
+
+  const locationSearch = {};
   ["origin", "destination"].forEach((role) => {
-    setupAutocomplete(
-      form.querySelector(`[data-autocomplete=${role}]`),
+    const container = form.querySelector(`[data-autocomplete=${role}]`);
+    const countryFilter = container.querySelector("[data-country-filter]");
+    locationSearch[role] = setupAutocomplete(
+      container,
       async (q) => {
         const params = new URLSearchParams({ q, mode: state.transport_mode, role });
+        if (countryFilter && countryFilter.value) params.set("country", countryFilter.value);
         const response = await getJson(`${urls.locations}?${params}`);
         return response.success ? response.data : [];
       },
-      (item) => `<b>${escapeHtml(item.name)}</b> <span class="mono">${escapeHtml(item.code)}</span><small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}</small>`,
+      (item) => {
+        const size = item.kind === "airport"
+          ? ""
+          : ({ L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "");
+        const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
+        const direct = item.kind === "airport" && item.direct_from_korea
+          ? `<em class="ac_note direct">직항</em>` : "";
+        const cargo = item.korean_air_cargo
+          ? `<em class="ac_note cargo">KE 화물</em>`
+          : (item.cargo_hub ? `<em class="ac_note cargo">화물 거점</em>` : "");
+        const viaLabel = item.gateway_only ? "국제선 없음 · 대체 공항" : "경유";
+        const via = (item.transfer_via || []).length
+          ? `<small class="ac_via">${viaLabel}: ${item.transfer_via
+              .map(([code, name]) => `${escapeHtml(name)}(${escapeHtml(code)})`).join(" · ")}</small>`
+          : "";
+        return `<b>${escapeHtml(item.name)}</b>${note}${cargo}${direct} <span class="mono">${escapeHtml(item.code)}</span>`
+          + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`
+          + via;
+      },
       (item, input) => {
         state[role] = item;
         if (item) input.value = `${item.name} (${item.code})`;
         invalidateSchedules();
       },
+      {
+        // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
+        // 규모가 작은 항구는 맨 아래 "기타 항구"로 모읍니다.
+        groupBy: (item) => {
+          if (state.transport_mode === "AIR" && role === "destination") {
+            // 화물 노선이 있는 거점 -> 여객 직항 -> 환승 순으로 나눕니다.
+            if (item.cargo_hub && item.direct_from_korea) return "항공화물 거점 (직항)";
+            return item.direct_from_korea ? "여객 직항 노선" : "환승 필요";
+          }
+          if (role === "destination") return item.country;
+          if (item.port_class === "national") return "국가관리 무역항";
+          if (item.port_class === "local") return "지방관리 무역항";
+          return state.transport_mode === "AIR" ? "주요 공항" : "주요 항구";
+        },
+      },
     );
+    setupCustomInput(role);
+    if (countryFilter) {
+      countryFilter.addEventListener("change", () => {
+        container.querySelector("[data-ac-input]").focus();
+        locationSearch[role].showAll();
+      });
+    }
   });
+  refreshCountryOptions();
 
   setupAutocomplete(
     form.querySelector("[data-autocomplete=hs_code]"),
@@ -301,6 +520,11 @@
     state.schedule_id = null;
   }
 
+  function customPayload(role) {
+    const item = state[role];
+    return item && item.custom ? { name: item.name, country_code: item.country_code } : null;
+  }
+
   function routePayload() {
     return {
       project_name: form.elements.project_name.value,
@@ -308,6 +532,8 @@
       sea_mode: state.transport_mode === "SEA" ? state.sea_mode : null,
       origin_code: state.origin ? state.origin.code : "",
       destination_code: state.destination ? state.destination.code : "",
+      origin_custom: customPayload("origin"),
+      destination_custom: customPayload("destination"),
       requested_departure_date: state.departure_date,
       buyer_required_date: form.elements.buyer_required_date.value,
     };
