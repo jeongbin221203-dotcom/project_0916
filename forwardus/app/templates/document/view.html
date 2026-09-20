@@ -19,7 +19,7 @@
     <form class="card" method="post" action="{{ url_for('document.update', shipment_id=shipment.shipment_id, doc_type=document.doc_type) }}">
       <div class="form_grid">
         {% for f in fields %}
-          <label class="field {{ 'span2' if f.key in ('product_description', 'exporter_address', 'consignee_address', 'remarks') }}">
+          <label class="field {{ 'span2' if f.wide }}">
             <span class="field_label">{{ f.label }}</span>
             <input type="text" name="{{ f.key }}" value="{{ f.value if f.value is not none else '' }}">
           </label>
@@ -38,7 +38,7 @@
       </header>
       <dl class="paper_fields">
         {% for f in fields %}
-          <div class="{{ 'wide' if f.key in ('product_description', 'exporter_address', 'consignee_address', 'remarks') }}">
+          <div class="{{ 'wide' if f.wide }}">
             <dt>{{ f.label }}</dt>
             <dd>{% if f.value is number %}{{ f.value|num(3 if f.key == 'total_cbm' else (0 if f.key == 'quantity' else 2)) }}{% else %}{{ f.value or '—' }}{% endif %}</dd>
           </div>

@@ -41,6 +41,10 @@ EDITABLE_FIELDS = [
     "etd",
     "eta",
     "remarks",
+    "buyer", "lc_no", "other_references", "payment_terms", "shipping_marks", "signed_by", "validity_date",
+    "po_no", "final_destination", "carriage_by", "country_of_origin", "shipment_time", "bank_info",
+    "booking_no", "container_seal_no", "notify_party_2", "contact", "service_contract_no", "hs6",
+    "routing_remark", "reefer", "prepaid_at", "collect_at", "confirmation_to",
 ]
 
 
@@ -49,7 +53,8 @@ def clean_document_fields(form: dict, current: dict) -> dict:
 
     updated = dict(current)
     for key in EDITABLE_FIELDS:
-        if key not in form or key not in current:
+        # 서식에 칸이 새로 생겨 예전에 만든 문서에 없는 항목도 고칠 수 있게 form 기준으로 봅니다.
+        if key not in form:
             continue
         raw = form.get(key)
         if key in NUMERIC_FIELDS:

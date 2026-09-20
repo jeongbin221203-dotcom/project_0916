@@ -10,7 +10,7 @@ DOCUMENT_TYPES = {
     "commercial_invoice": "Commercial Invoice",
     "packing_list": "Packing List",
     "proforma_invoice": "Proforma Invoice",
-    "shipping_instruction": "Shipping Instruction",
+    "shipping_instruction": "Shipping Request (S/I)",
     "booking_request": "Booking Request",
     "bl_draft": "B/L Draft",
 }

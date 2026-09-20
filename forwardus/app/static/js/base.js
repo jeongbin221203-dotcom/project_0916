@@ -98,6 +98,20 @@
 
   document.querySelectorAll("input[data-number]").forEach(setupNumberInput);
 
+  // 우리 코드는 숫자 입력칸에 hidden을 붙이지 않습니다. 그런데도 붙는다면 브라우저
+  // 확장 프로그램 등 바깥 스크립트가 한 것이므로 곧바로 되돌리고 콘솔에 남깁니다.
+  const unhide = new MutationObserver((records) => {
+    records.forEach((record) => {
+      const input = record.target;
+      if (input.matches && input.matches("input[data-number]") && input.hidden) {
+        input.hidden = false;
+        console.warn(`[FORWARDUS] 외부 스크립트가 입력칸(${input.name || input.dataset.line})을 숨겨 다시 보이게 했습니다.`
+          + " 확장 프로그램을 끄거나 시크릿 창에서 확인해 주세요.");
+      }
+    });
+  });
+  unhide.observe(document.body, { attributes: true, attributeFilter: ["hidden"], subtree: true });
+
   window.Forwardus = { escapeHtml, getJson, postJson, formatNumber, toIsoDate,
                        plainNumber, groupDigits, setupNumberInput };
 

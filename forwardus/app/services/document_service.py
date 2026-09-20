@@ -15,33 +15,42 @@ from app.validators.document_validator import clean_document_fields
 
 PREPAID_INCOTERMS = {"CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"}
 
-# Fields each document carries, in display order.
+# Fields each document carries, in display order. 항목 구성은 실무에서 쓰는 표준 서식
+# (상업송장·포장명세서 관세청 권장 서식, Proforma Invoice, 선사 Booking Request,
+# Shipping Request)의 칸을 그대로 따릅니다.
 DOCUMENT_FIELDS = {
     "commercial_invoice": [
-        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party",
-        "incoterms", "pol", "pod", "carrier", "vessel_or_flight", "etd", "product_description", "hs_code",
-        "quantity", "package_type", "unit_price", "invoice_value", "currency", "gross_weight_kg", "net_weight_kg",
-        "remarks",
+        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "buyer",
+        "notify_party", "lc_no", "other_references", "incoterms", "payment_terms", "pol", "pod", "carrier",
+        "vessel_or_flight", "etd", "shipping_marks", "product_description", "hs_code", "quantity",
+        "package_type", "unit_price", "invoice_value", "currency", "gross_weight_kg", "net_weight_kg",
+        "remarks", "signed_by",
     ],
     "packing_list": [
-        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party",
-        "pol", "pod", "vessel_or_flight", "etd", "product_description", "hs_code", "quantity", "package_type",
-        "gross_weight_kg", "net_weight_kg", "total_cbm", "remarks",
+        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "buyer",
+        "notify_party", "other_references", "pol", "pod", "vessel_or_flight", "etd", "shipping_marks",
+        "product_description", "hs_code", "quantity", "package_type", "gross_weight_kg", "net_weight_kg",
+        "total_cbm", "remarks", "signed_by",
     ],
     "proforma_invoice": [
-        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "incoterms",
-        "pol", "pod", "etd", "product_description", "hs_code", "quantity", "package_type", "unit_price",
-        "invoice_value", "currency", "remarks",
+        "doc_no", "doc_date", "validity_date", "po_no", "exporter", "exporter_address", "consignee",
+        "consignee_address", "pol", "pod", "final_destination", "incoterms", "carriage_by",
+        "country_of_origin", "shipment_time", "product_description", "hs_code", "quantity", "package_type",
+        "unit_price", "invoice_value", "currency", "shipping_marks", "payment_terms", "bank_info", "remarks",
+        "signed_by",
     ],
     "shipping_instruction": [
-        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party",
-        "pol", "pod", "carrier", "vessel_or_flight", "etd", "product_description", "hs_code", "quantity",
-        "package_type", "gross_weight_kg", "total_cbm", "freight_term", "incoterms", "remarks",
+        "doc_no", "doc_date", "booking_no", "exporter", "exporter_address", "consignee", "consignee_address",
+        "notify_party", "pol", "pod", "carrier", "vessel_or_flight", "etd", "shipping_marks",
+        "product_description", "hs_code", "quantity", "package_type", "gross_weight_kg", "total_cbm",
+        "container_seal_no", "freight_term", "incoterms", "remarks", "signed_by",
     ],
     "booking_request": [
-        "doc_no", "doc_date", "exporter", "pol", "pod", "carrier", "vessel_or_flight", "etd", "eta",
-        "product_description", "quantity", "package_type", "gross_weight_kg", "total_cbm", "equipment",
-        "freight_term", "remarks",
+        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party",
+        "notify_party_2", "contact", "service_contract_no", "carrier", "vessel_or_flight", "pol", "etd", "pod",
+        "eta", "hs6", "routing_remark", "product_description", "quantity", "package_type", "gross_weight_kg",
+        "total_cbm", "equipment", "reefer", "freight_term", "prepaid_at", "collect_at", "confirmation_to",
+        "remarks",
     ],
     "bl_draft": [
         "doc_no", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party", "pol", "pod",
@@ -78,7 +87,36 @@ FIELD_LABELS = {
     "freight_term": "Freight Term",
     "equipment": "Equipment",
     "remarks": "Remarks",
+    # 표준 서식에 있는 칸. Shipment에 없는 값은 비워 두고 서류에서 직접 적습니다.
+    "buyer": "Buyer (if other than consignee)",
+    "lc_no": "L/C No. and date",
+    "other_references": "Other references",
+    "payment_terms": "Payment Terms",
+    "shipping_marks": "Shipping Marks",
+    "signed_by": "Signed by",
+    "validity_date": "Validity date of P/I",
+    "po_no": "Buyer's P/O Number",
+    "final_destination": "Final destination",
+    "carriage_by": "Carriage By",
+    "country_of_origin": "Country of Origin",
+    "shipment_time": "Shipment (Time of delivery)",
+    "bank_info": "Seller's Bank Information",
+    "booking_no": "Booking number",
+    "container_seal_no": "Container No. / Seal No.",
+    "notify_party_2": "2nd Notify Party",
+    "contact": "Information Contact",
+    "service_contract_no": "Service Contract Number",
+    "hs6": "HS6 Code",
+    "routing_remark": "Special Remark on Routing",
+    "reefer": "Reefer (Temperature / Humidity)",
+    "prepaid_at": "Prepaid at",
+    "collect_at": "Collect at",
+    "confirmation_to": "Booking Confirmation Deliver To",
 }
+
+# 칸이 넓어야 읽기 좋은 항목 (주소·품명·화인·비고 등)
+WIDE_FIELDS = {"product_description", "exporter_address", "consignee_address", "remarks", "shipping_marks",
+               "bank_info", "routing_remark", "payment_terms", "container_seal_no", "other_references"}
 
 DOC_PREFIX = {
     "commercial_invoice": "CI",
@@ -103,6 +141,8 @@ def build_reference(shipment) -> dict:
         equipment = "LCL"
     elif shipment.transport_mode == "AIR":
         equipment = "AIR CARGO"
+    prepaid = shipment.incoterms in PREPAID_INCOTERMS
+    hs_digits = "".join(ch for ch in (cargo.hs_code if cargo else "") or "" if ch.isdigit())
     return {
         "exporter": shipment.exporter_name,
         "exporter_address": shipment.exporter_address,
@@ -127,9 +167,24 @@ def build_reference(shipment) -> dict:
         # Net weight is only filled when the user entered it; never invented.
         "net_weight_kg": cargo.net_weight_kg if cargo and cargo.net_weight_kg is not None else "",
         "total_cbm": cargo.total_cbm if cargo else None,
-        "freight_term": "FREIGHT PREPAID" if shipment.incoterms in PREPAID_INCOTERMS else "FREIGHT COLLECT",
+        "freight_term": "FREIGHT PREPAID" if prepaid else "FREIGHT COLLECT",
         "equipment": equipment,
         "remarks": "",
+        # 표준 서식 칸 가운데 Shipment에서 바로 채울 수 있는 것
+        "country_of_origin": "THE REPUBLIC OF KOREA",
+        "carriage_by": "AIR" if shipment.transport_mode == "AIR" else "SEA",
+        "final_destination": f"{shipment.destination_name} ({shipment.destination_code})",
+        "hs6": f"{hs_digits[:4]}.{hs_digits[4:6]}" if len(hs_digits) >= 6 else "",
+        "shipment_time": f"ON OR ABOUT {shipment.etd.isoformat()}" if shipment.etd else "",
+        "signed_by": shipment.exporter_name,
+        # 운임 선불이면 출발항에서, 후불이면 도착항에서 냅니다.
+        "prepaid_at": shipment.origin_name if prepaid else "",
+        "collect_at": "" if prepaid else shipment.destination_name,
+        # 아래는 거래 조건에 따라 달라 서류에서 직접 적습니다.
+        "buyer": "", "lc_no": "", "other_references": "", "payment_terms": "", "shipping_marks": "",
+        "validity_date": "", "po_no": "", "bank_info": "", "booking_no": "", "container_seal_no": "",
+        "notify_party_2": "", "contact": "", "service_contract_no": "", "routing_remark": "", "reefer": "",
+        "confirmation_to": "",
     }
 
 
@@ -229,7 +284,8 @@ def finalize_document(shipment, doc_type: str):
 
 def document_view(document) -> list[dict]:
     return [
-        {"key": key, "label": FIELD_LABELS.get(key, key), "value": document.data.get(key, "")}
+        {"key": key, "label": FIELD_LABELS.get(key, key), "value": document.data.get(key, ""),
+         "wide": key in WIDE_FIELDS}
         for key in DOCUMENT_FIELDS[document.doc_type]
     ]
 
