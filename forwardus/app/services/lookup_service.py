@@ -76,6 +76,13 @@ LOOKUPS = {
         "field": "HS부호",
         "about": "이 품목을 어느 나라로 얼마나 내보내는지 봅니다. 시장을 고를 때 씁니다.",
     },
+    "busiest_ports": {
+        "label": "항구 물동량 (어디가 바쁜가)",
+        "hint": "값을 넣지 않아도 됩니다. 최근 6개월 컨테이너 처리량입니다.",
+        "example": "전체",
+        "field": "조회",
+        "about": "컨테이너를 많이 처리하는 항구일수록 배편이 많습니다. 출발항을 고를 때 씁니다.",
+    },
     "hs_code": {
         "label": "HS부호",
         "hint": "품명(한글)이나 HS부호 10자리로 찾습니다.",
@@ -98,7 +105,8 @@ KEY_NAMES = {
 }
 
 # 관세청이 아닌 곳에서 오는 조회. 키 이름이 다릅니다.
-OTHER_KEYS = {"trade_stats": "DATA_GO_KR_SERVICE_KEY"}
+OTHER_KEYS = {"trade_stats": "DATA_GO_KR_SERVICE_KEY",
+              "busiest_ports": "DATA_GO_KR_SERVICE_KEY"}
 
 # 결과 표의 칸. (키, 보여 줄 이름)
 COLUMNS = {
@@ -118,9 +126,12 @@ COLUMNS = {
                          ("spec", "규격"), ("deadline", "이행기한")],
     "hs_code": [("code", "HS부호"), ("name", "품명"),
                 ("quantity_unit", "수량단위"), ("weight_unit", "중량단위")],
-    "trade_stats": [("country", "나라"), ("export_usd_thousand", "수출액(천달러)"),
+    "busiest_ports": [("port", "항구"), ("total_teu", "총 처리량(TEU)"),
+                      ("full_teu", "적컨테이너(TEU)"), ("empty_teu", "공컨테이너(TEU)")],
+    "trade_stats": [("country", "나라"), ("product", "품목"),
+                    ("export_usd_thousand", "수출액(천달러)"),
                     ("export_weight_kg", "수출중량(kg)"),
-                    ("import_usd_thousand", "수입액(천달러)"), ("period", "기간")],
+                    ("import_usd_thousand", "수입액(천달러)")],
 }
 
 
@@ -142,13 +153,17 @@ def catalog() -> list[dict]:
     return rows
 
 
+# 값을 넣지 않아도 되는 조회.
+NO_QUERY_NEEDED = {"busiest_ports"}
+
+
 def run(kind: str, query: str) -> dict:
     """고른 종류로 관세청에 물어봅니다."""
 
     if kind not in LOOKUPS:
         raise ServiceError("조회 종류를 확인해주세요.", "VALIDATION_ERROR")
     text = (query or "").strip()
-    if not text:
+    if not text and kind not in NO_QUERY_NEEDED:
         raise ServiceError(f"{LOOKUPS[kind]['field']}을(를) 입력해주세요.", "VALIDATION_ERROR")
 
     callers = {
@@ -161,6 +176,7 @@ def run(kind: str, query: str) -> dict:
         "shortened_period": lambda: customs_extra_client.shortened_loading_period(text),
         "hs_code": lambda: customs_client.search_hs_codes(text),
         "trade_stats": lambda: _trade_rows(text),
+        "busiest_ports": lambda: _port_rows(),
     }
     result = callers[kind]()
     rows = result["data"] if result["success"] else []
@@ -174,6 +190,17 @@ def run(kind: str, query: str) -> dict:
         "columns": [{"key": key, "label": label} for key, label in COLUMNS[kind]],
         "rows": rows if isinstance(rows, list) else [rows],
     }
+
+
+def _port_rows() -> dict:
+    """항구 물동량은 결과가 dict로 와서 표에 맞게 줄 목록으로 폅니다."""
+
+    from app.collectors import port_stats_client
+
+    result = port_stats_client.busiest_ports()
+    if not result["success"]:
+        return result
+    return {**result, "data": result["data"]["rows"]}
 
 
 def _trade_rows(hs_code: str) -> dict:
@@ -248,10 +275,14 @@ def data_sources() -> dict:
                 {"label": "공공데이터포털 · 인천공항 화물기 정기운항",
                  "env": "DATA_GO_KR_SERVICE_KEY",
                  "ready": bool(get_config("DATA_GO_KR_SERVICE_KEY", "")), "used": True},
-                {"label": "공공데이터포털 · 관세청 수출입무역통계 (활용신청 필요)",
+                {"label": "공공데이터포털 · 관세청 수출입무역통계",
                  "env": "DATA_GO_KR_SERVICE_KEY", "used": True,
                  "ready": _trade_stats_ready(),
                  "signup": "https://www.data.go.kr/tcs/dss/selectDataSetList.do?keyword=수출입무역통계"},
+                {"label": "공공데이터포털 · 해양수산부 항만 통계 (입출항 · 컨테이너)",
+                 "env": "DATA_GO_KR_SERVICE_KEY", "used": True,
+                 "ready": _port_stats_ready(),
+                 "signup": "https://www.data.go.kr/tcs/dss/selectDataSetList.do?keyword=선박입출항실적"},
                 {"label": "세계은행 WITS · 미국 HTS · 영국 관세율표 (키 없이 씁니다)",
                  "env": "", "ready": True, "used": True},
             ],
@@ -299,7 +330,19 @@ def _trade_stats_ready() -> bool:
     return _TRADE_STATS_READY
 
 
+def _port_stats_ready() -> bool:
+    """항만 통계도 활용신청을 해야 열립니다. 결과를 기억해 한 번만 부릅니다."""
+
+    from app.collectors import port_stats_client
+
+    global _PORT_STATS_READY
+    if _PORT_STATS_READY is None:
+        _PORT_STATS_READY = bool(port_stats_client.busiest_ports()["success"])
+    return _PORT_STATS_READY
+
+
 _TRADE_STATS_READY: bool | None = None
+_PORT_STATS_READY: bool | None = None
 
 
 # 자가진단: 실제로 한 번씩 불러 보고 무엇이 살아 있는지 확인합니다.
@@ -335,7 +378,8 @@ def health_check() -> dict:
     많으면 잠시 막히기도 합니다. 그럴 때 무엇이 안 되는지 눈으로 봐야 합니다.
     """
 
-    from app.collectors import container_client, exchange_client, trade_stats_client
+    from app.collectors import (container_client, exchange_client,
+                                port_stats_client, trade_stats_client)
 
     checks = list(HEALTH_CHECKS) + [
         ("관세 고시환율", "UNIPASS_KEY_CUSTOMS_EXCHANGE_RATE",
@@ -348,6 +392,10 @@ def health_check() -> dict:
          lambda: _incheon_probe()),
         ("관세청 수출입무역통계", "DATA_GO_KR_SERVICE_KEY",
          lambda: trade_stats_client.item_trade("3305")),
+        ("해수부 항만 컨테이너 처리", "DATA_GO_KR_SERVICE_KEY",
+         lambda: port_stats_client.busiest_ports()),
+        ("해수부 항만별 선박입출항", "DATA_GO_KR_SERVICE_KEY",
+         lambda: port_stats_client.port_traffic()),
     ]
 
     # 하나씩 부르면 기관이 멈췄을 때 한 곳당 25초씩 기다려 화면이 몇 분 동안
