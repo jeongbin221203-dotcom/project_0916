@@ -4,6 +4,7 @@ Sources
 - UN/LOCODE code list (UNECE, mirrored by the Frictionless Data project)
 - World Port Index / NGA Pub 150 (harbour size, used to pick each country's
   main trade ports)
+- OurAirports (공항 IATA 코드·명칭·규모)
 - ISO 3166 country list with regions (for schedule region mapping)
 - Korean country names
 
@@ -34,6 +35,7 @@ UNLOCODE_URL = "https://raw.githubusercontent.com/datasets/un-locode/main/data/c
 ISO_URL = "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.json"
 KOREAN_COUNTRY_URL = "https://raw.githubusercontent.com/umpirsky/country-list/master/data/ko/country.json"
 WPI_URL = "https://msi.nga.mil/api/publications/world-port-index?output=json"
+AIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 
 # 내륙국(바다에 접하지 않는 국가)은 강·운하 항만만 있어 해상 수출 목적지가 될 수
 # 없으므로 제외합니다. 항공 목적지는 MAJOR_AIRPORTS에서 따로 관리합니다.
@@ -217,8 +219,10 @@ KOREAN_NAMES = {
 
 # Major cargo airports (IATA code → Korean name). UN/LOCODE airport rows are
 # noisy, so international airports used for air freight are curated here.
-# 주요 화물 공항. 값은 (한글명, 영문명, 국가코드, 국가 내 규모 순위).
-MAJOR_AIRPORTS = {
+# 한글 표기와 국가별 노출 순서를 지정하는 공항. 나머지 공항은 OurAirports의
+# 대형공항(large_airport) 전체를 그대로 싣습니다.
+# 값은 (한글명, 영문명 참고용, 국가코드, 국가 내 순위).
+AIRPORT_OVERRIDES = {
     "ICN": ("인천국제공항", "Incheon International Airport", "KR", 1),
     "PUS": ("김해국제공항", "Gimhae International Airport", "KR", 3),
     "GMP": ("김포국제공항", "Gimpo International Airport", "KR", 2),
@@ -424,35 +428,14 @@ def build() -> list[dict]:
             "major": code in display_names or harbor_size in MAIN_HARBOR_SIZES,
         })
 
-    for iata, (name_ko, name_en, country_code, rank) in MAJOR_AIRPORTS.items():
-        info = country_info.get(country_code)
-        locations.append({
-            "code": iata,
-            "name": name_ko,
-            "name_en": name_en,
-            "city": name_ko,
-            "city_en": name_en,
-            "country": info["name"],
-            "country_en": info["name_en"],
-            "country_code": country_code,
-            "region": info["region"],
-            "kind": "airport",
-            "status": "",
-            "harbor_size": None,
-            "port_class": None,
-            "note": "",
-            "cargo_volume_mt": None,
-            "is_terminal": False,
-            "port_group": iata,
-            "size_rank": rank,
-            "major": True,
-        })
+    locations.extend(build_airports(country_info))
 
     promote_main_ports(locations)
     # 항만 규모 정보가 없고 주요 항구도 아닌 곳은 제외합니다. 무역에 쓰이지 않는
     # 소규모 선착장이 대부분이며, 필요하면 화면에서 "직접 입력"으로 지정합니다.
     locations = [item for item in locations
                  if item["kind"] == "airport" or item["harbor_size"] or item["major"]]
+
     class_rank = {"national": 0, "local": 1}
     locations.sort(key=lambda item: (
         item["kind"],
@@ -467,6 +450,67 @@ def build() -> list[dict]:
         item["code"],
     ))
     return locations
+
+
+def build_airports(country_info: dict[str, dict]) -> list[dict]:
+    """정기편이 다니는 IATA 공항 목록 (OurAirports 기준).
+
+    대형공항(large_airport)은 모두 싣고, 중형공항은 화물 거점으로 직접 지정한
+    공항(AIRPORT_OVERRIDES)만 포함합니다.
+    """
+
+    rows = list(csv.DictReader(io.StringIO(
+        download(AIRPORTS_URL, "ourairports_airports.csv").decode("utf-8", "replace"))))
+
+    airports = []
+    seen = set()
+    for row in rows:
+        iata = row["iata_code"].strip().upper()
+        country_code = row["iso_country"].strip().upper()
+        info = country_info.get(country_code)
+        if not iata or iata in seen or not info:
+            continue
+        if row["scheduled_service"] != "yes":
+            continue
+        is_large = row["type"] == "large_airport"
+        override = AIRPORT_OVERRIDES.get(iata)
+        if not is_large and not override:
+            continue
+        seen.add(iata)
+
+        name_en = row["name"].strip()
+        city = (row["municipality"] or "").strip()
+        airports.append({
+            "code": iata,
+            "name": override[0] if override else name_en,
+            "name_en": name_en,
+            "city": city or name_en,
+            "city_en": city or name_en,
+            "country": info["name"],
+            "country_en": info["name_en"],
+            "country_code": country_code,
+            "region": info["region"],
+            "kind": "airport",
+            "status": "",
+            "harbor_size": None,
+            "port_class": None,
+            "note": "",
+            "cargo_volume_mt": None,
+            "is_terminal": False,
+            "port_group": iata,
+            # 직접 지정한 순서를 먼저 쓰고, 나머지는 대형 -> 중형 순입니다.
+            "size_rank": override[3] if override else (50 if is_large else 60),
+            "major": is_large or bool(override),
+        })
+
+    wrong_country = [code for code, value in AIRPORT_OVERRIDES.items()
+                     if code in seen and value[2] != next(a["country_code"] for a in airports if a["code"] == code)]
+    missing = sorted(set(AIRPORT_OVERRIDES) - seen)
+    if missing:
+        print(f"경고: OurAirports에 없는 공항 코드 {len(missing)}개 -> {', '.join(missing)}")
+    if wrong_country:
+        print(f"경고: 국가 코드가 다른 공항 {len(wrong_country)}개 -> {', '.join(wrong_country)}")
+    return airports
 
 
 def promote_main_ports(locations: list[dict]) -> None:
@@ -521,6 +565,8 @@ if __name__ == "__main__":
           f"(ports {len(ports):,} / airports {len(items) - len(ports):,}, "
           f"countries {len({item['country_code'] for item in items}):,})")
     print(f"{INDEX_OUTPUT}: 전체 UN/LOCODE 항구 색인 {index_size:,}개")
+    airports = [item for item in items if item["kind"] == "airport"]
+    print(f"  공항 {len(airports):,}곳 (국가 {len({a['country_code'] for a in airports})}개국)")
     print(f"  주요 항구 {len(mains):,}곳 / 기타 항구 {len(ports) - len(mains):,}곳 "
           f"(주요 항구 보유 국가 {len({item['country_code'] for item in mains}):,}개국)")
     without_main = {item["country_code"] for item in ports} - {item["country_code"] for item in mains}

@@ -230,6 +230,25 @@ def test_direct_input_suggestions(app):
     assert planning_service.search_unlocode("", role="origin")["data"] == []
 
 
+def test_airports_cover_major_countries(app):
+    """주요 국가의 국제공항이 모두 들어 있습니다 (OurAirports 대형공항 기준)."""
+
+    from app.collectors import location_client
+
+    airports = [item for item in location_client.load_mock("locations") if item["kind"] == "airport"]
+    assert len(airports) > 1000
+    assert len({item["country_code"] for item in airports}) > 200
+    codes = {item["code"] for item in airports}
+    # 한국 국제공항과 주요 화물 거점
+    assert {"ICN", "GMP", "PUS", "CJU", "TAE", "CJJ", "KWJ", "MWX", "YNY"} <= codes
+    assert {"PVG", "PEK", "CAN", "SZX", "TAO", "CGO", "HGH"} <= codes   # 중국
+    assert {"LAX", "JFK", "ORD", "MIA", "ATL", "DFW", "SFO", "SEA"} <= codes  # 미국
+    assert {"NRT", "KIX", "HND", "NGO", "FUK", "CTS"} <= codes          # 일본
+    assert {"FRA", "MUC", "BER", "CGN", "DUS", "HAM"} <= codes          # 독일
+    assert {"SGN", "HAN", "DAD", "HPH"} <= codes                        # 베트남
+    assert all(item["name_en"] and item["city"] for item in airports)
+
+
 def test_airports_sorted_by_size(app):
     """공항은 국가 안에서 규모가 큰 곳부터 보여줍니다."""
 
