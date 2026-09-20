@@ -200,8 +200,8 @@
         classes.push("in_range", `range_${marginLevel}`);
       }
       // 출발일은 요청일보다 뒤로, 요청일은 출발일보다 앞으로 갈 수 없습니다.
-      const blocked = (pickTarget === "departure" && buyerDate && iso > buyerDate)
-        || (pickTarget === "buyer" && departure && iso < departure);
+      // Buyer 요청일을 고를 때만 출발일 이전 날짜를 막습니다.
+      const blocked = pickTarget === "buyer" && departure && iso < departure;
       if (blocked) classes.push("blocked");
       cells += `<button type="button" data-date="${iso}" ${date < today || blocked ? "disabled" : ""}`
         + ` class="${classes.join(" ")}">${day}</button>`;
@@ -227,7 +227,8 @@
         <span class="legend_buyer">Buyer 요청 도착일</span>
         <span class="legend_range range_${marginLevel}">운송 기간</span>
       </p>
-      <p class="cal_hint">날짜를 누를 때마다 출발 예정일 → Buyer 요청일 순서로 지정됩니다.</p>`;
+      <p class="cal_hint">날짜를 누를 때마다 출발 예정일 → Buyer 요청일 순서로 지정됩니다.
+        출발 예정일을 다시 고르면 Buyer 요청일은 지워집니다.</p>`;
   }
 
   calendarEl.addEventListener("click", (event) => {
@@ -239,11 +240,9 @@
       const iso = target.dataset.date;
       const buyerInput = form.elements.buyer_required_date;
       if (pickTarget === "departure") {
-        if (buyerInput.value && iso > buyerInput.value) {
-          showError("출발 예정일은 Buyer 요청 도착일보다 늦을 수 없습니다.");
-          return;
-        }
+        // 새 일정을 고르는 것이므로 Buyer 요청일을 비워 선택 상태를 분명히 합니다.
         state.departure_date = iso;
+        buyerInput.value = "";
         pickTarget = "buyer";
       } else {
         if (state.departure_date && iso < state.departure_date) {
@@ -618,6 +617,7 @@
     if (draft.step && draft.step > 1) await openStep(draft.step);
   }
 
+  updateSelectedDates();   // 임시저장이 없을 때도 날짜 표시를 채웁니다.
   restoreDraft();
 
   setupAutocomplete(
@@ -885,8 +885,9 @@
 
   function updateSelectedDates() {
     const buyerDate = form.elements.buyer_required_date.value;
-    selectedDateEl.innerHTML = `${state.departure_date || "-"}`
-      + (buyerDate ? ` <span class="buyer_date">Buyer 요청 ${buyerDate}</span>` : "");
+    selectedDateEl.innerHTML =
+      `<span class="date_item departure"><i></i>Seller 예정일 ${state.departure_date || "미선택"}</span>`
+      + `<span class="date_item buyer"><i></i>Buyer 요청일 ${buyerDate || "미선택"}</span>`;
     checkDeparture();
   }
 
