@@ -15,6 +15,8 @@ MAX_MAIN_RESULTS = 40
 MAX_OTHER_RESULTS = 12
 # World Port Index harbour size, biggest first.
 HARBOR_SIZE_RANK = {"L": 0, "M": 1, "S": 2, "V": 3}
+# 국내 무역항은 국가관리 -> 지방관리 순으로 보여줍니다.
+PORT_CLASS_RANK = {"national": 0, "local": 1}
 CODE_MIN_LENGTH = 3
 CODE_MAX_LENGTH = 10
 
@@ -103,6 +105,7 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         return (
             item["code"].lower() != keyword,
             not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
+            PORT_CLASS_RANK.get(item.get("port_class"), 0),
             HARBOR_SIZE_RANK.get(item.get("harbor_size"), 9),
             len(item["name"]),
             item["name"],

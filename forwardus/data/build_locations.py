@@ -93,40 +93,55 @@ DEFAULT_REGION = "asia"
 
 # 해외 주요 항만의 한글 표기. build_locations.py 실행 시 UN/LOCODE에 없는 코드는
 # 경고로 알려줍니다.
-# 「항만법」상 무역항 31곳과 그 소속 부두·터미널. 국내 출발지는 이 목록만 노출하고
-# 어항·연안항(구룡포·후포·주문진·홍도 등)은 제외합니다.
+# 「항만법」상 무역항 31곳과 그 소속 부두·터미널.
+# 값은 (한글명, 관리 주체). national = 국가관리무역항, local = 지방관리무역항.
+# 국내 출발지는 이 목록만 노출하고 어항·연안항(구룡포·후포·주문진·홍도 등)은 제외합니다.
 KOREA_TRADE_PORTS = {
-    # 국가관리무역항
-    "KRGIN": "경인항",
-    "KRINC": "인천항",
-    "KRPTK": "평택항", "KRTJI": "당진항",
-    "KRTSN": "대산항",
-    "KRCHG": "장항항",
-    "KRKUV": "군산항",
-    "KRMOK": "목포항", "KRDBL": "대불부두(목포)",
-    "KRYOS": "여수항", "KRYOC": "여천부두(여수)",
-    "KRKAN": "광양항",
-    "KRPUS": "부산항", "KRBNP": "부산신항", "KRKCN": "감천부두(부산)",
-    "KRUSN": "울산항", "KRONS": "온산부두(울산)", "KRMIP": "미포부두(울산)",
-    "KRKPO": "포항항", "KRSHG": "포항신항",
-    "KRTGH": "동해항", "KRMUK": "묵호항",
-    "KRMAS": "마산항",
+    # 국가관리무역항과 소속 부두
+    "KRGIN": ("경인항", "national"),
+    "KRINC": ("인천항", "national"),
+    "KRTSN": ("대산항", "national"),
+    "KRCHG": ("장항항", "national"),
+    "KRKUV": ("군산항", "national"),
+    "KRMOK": ("목포항", "national"),
+    "KRDBL": ("대불부두(목포)", "national"),
+    "KRYOS": ("여수항", "national"),
+    "KRYOC": ("여천부두(여수)", "national"),
+    "KRKAN": ("광양항", "national"),
+    "KRPUS": ("부산항", "national"),
+    "KRBNP": ("부산신항", "national"),
+    "KRKCN": ("감천부두(부산)", "national"),
+    "KRMAS": ("마산항", "national"),
+    "KRUSN": ("울산항", "national"),
+    "KRONS": ("온산부두(울산)", "national"),
+    "KRMIP": ("미포부두(울산)", "national"),
+    "KRKPO": ("포항항", "national"),
+    "KRSHG": ("포항신항", "national"),
+    "KRTGH": ("동해항", "national"),
+    "KRMUK": ("묵호항", "national"),
     # 지방관리무역항
-    "KRSEL": "서울항",
-    "KRTAN": "태안항",
-    "KRBOR": "보령항",
-    "KRCHA": "제주항",
-    "KRSPO": "서귀포항",
-    "KRWND": "완도항",
-    "KRSCP": "삼천포항",
-    "KRTYG": "통영항",
-    "KROKP": "옥포항",
-    "KRKHN": "고현항",
-    "KRCHF": "진해항",
-    "KRSUK": "삼척항",
-    "KRSHO": "속초항",
-    "KROKK": "옥계항",
-    "KRHAS": "호산항",
+    "KRPTK": ("평택항", "local"),
+    "KRTJI": ("당진항", "local"),
+    "KRBOR": ("보령항", "local"),
+    "KRTAN": ("태안항", "local"),
+    "KRSEL": ("서울항", "local"),
+    "KRCHA": ("제주항", "local"),
+    "KRSPO": ("서귀포항", "local"),
+    "KRWND": ("완도항", "local"),
+    "KRSCP": ("삼천포항", "local"),
+    "KRTYG": ("통영항", "local"),
+    "KROKP": ("옥포항", "local"),
+    "KRKHN": ("고현항", "local"),
+    "KRCHF": ("진해항", "local"),
+    "KRSUK": ("삼척항", "local"),
+    "KRSHO": ("속초항", "local"),
+    "KROKK": ("옥계항", "local"),
+    "KRHAS": ("호산항", "local"),
+}
+
+# 목록에서 함께 보여줄 안내 문구.
+PORT_NOTES = {
+    "KRSEL": "법적 무역항",
 }
 
 KOREAN_NAMES = {
@@ -326,7 +341,7 @@ def build() -> list[dict]:
         seen.add(code)
         name_en = title_case(row["NameWoDiacritics"] or row["Name"])
         harbor_size = harbor_sizes.get(code)
-        display_names = {**KOREAN_NAMES, **KOREA_TRADE_PORTS}
+        display_names = {**KOREAN_NAMES, **{code: name for code, (name, _) in KOREA_TRADE_PORTS.items()}}
         locations.append({
             "code": code,
             "name": display_names.get(code, name_en),
@@ -340,6 +355,8 @@ def build() -> list[dict]:
             "kind": "port",
             "status": row["Status"],
             "harbor_size": harbor_size,
+            "port_class": KOREA_TRADE_PORTS.get(code, (None, None))[1],
+            "note": PORT_NOTES.get(code, ""),
             "major": code in display_names or harbor_size in MAIN_HARBOR_SIZES,
         })
 
@@ -358,14 +375,18 @@ def build() -> list[dict]:
             "kind": "airport",
             "status": "",
             "harbor_size": None,
+            "port_class": None,
+            "note": "",
             "major": True,
         })
 
     promote_main_ports(locations)
+    class_rank = {"national": 0, "local": 1}
     locations.sort(key=lambda item: (
         item["kind"],
         item["country_code"],
         not item["major"],
+        class_rank.get(item["port_class"], 0),
         HARBOR_SIZE_RANK.get(item["harbor_size"], 9),
         item["code"],
     ))
@@ -403,7 +424,7 @@ def promote_main_ports(locations: list[dict]) -> None:
 
 if __name__ == "__main__":
     items = build()
-    unmatched = sorted((set(KOREAN_NAMES) | set(KOREA_TRADE_PORTS)) - {item["code"] for item in items})
+    unmatched = sorted((set(KOREAN_NAMES) | set(KOREA_TRADE_PORTS) | set(PORT_NOTES)) - {item["code"] for item in items})
     if unmatched:
         print(f"경고: UN/LOCODE에 없는 코드 {len(unmatched)}개 -> {', '.join(unmatched)}")
     OUTPUT.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

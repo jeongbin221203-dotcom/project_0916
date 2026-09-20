@@ -84,6 +84,22 @@ def test_origin_lists_only_korean_trade_ports(app):
                if item["country_code"] == "KR" and item["kind"] == "port")
 
 
+def test_origin_lists_national_ports_before_local(app):
+    """국가관리 무역항이 위, 지방관리 무역항이 아래에 오도록 정렬합니다."""
+
+    ports = planning_service.search_locations("", "SEA", "origin")["data"]
+    classes = [item["port_class"] for item in ports]
+    assert set(classes) == {"national", "local"}
+    # 국가관리가 모두 앞쪽에 모여 있어야 합니다.
+    assert classes.index("local") > max(i for i, c in enumerate(classes) if c == "national")
+    assert ports[0]["code"] == "KRPUS"
+
+    by_code = {item["code"]: item for item in ports}
+    assert by_code["KRSEL"]["port_class"] == "local"
+    assert by_code["KRSEL"]["note"] == "법적 무역항"
+    assert by_code["KRPUS"]["note"] == ""
+
+
 def test_destination_countries_and_country_filter(app):
     countries = planning_service.list_countries("SEA", "destination")["data"]
     codes = {c["code"] for c in countries}

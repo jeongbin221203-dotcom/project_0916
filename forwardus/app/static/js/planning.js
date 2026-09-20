@@ -310,7 +310,8 @@
       },
       (item) => {
         const size = { L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "";
-        return `<b>${escapeHtml(item.name)}</b> <span class="mono">${escapeHtml(item.code)}</span>`
+        const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
+        return `<b>${escapeHtml(item.name)}</b>${note} <span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`;
       },
       (item, input) => {
@@ -319,10 +320,15 @@
         invalidateSchedules();
       },
       {
-        // 주요 수출입 항구를 먼저 보여주고, 나머지는 맨 아래 "기타 항구"로 모읍니다.
-        groupBy: (item) => (item.major
-          ? (role === "destination" ? item.country : "주요 항구")
-          : "기타 항구"),
+        // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
+        // 규모가 작은 항구는 맨 아래 "기타 항구"로 모읍니다.
+        groupBy: (item) => {
+          if (!item.major) return "기타 항구";
+          if (role === "destination") return item.country;
+          if (item.port_class === "national") return "국가관리 무역항";
+          if (item.port_class === "local") return "지방관리 무역항";
+          return "주요 항구";
+        },
       },
     );
     setupCustomInput(role);
