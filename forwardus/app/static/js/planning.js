@@ -266,18 +266,44 @@
     return `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${c.count.toLocaleString("ko-KR")})</option>`;
   }
 
+  // 운임 구간(region)을 대륙 이름으로 묶어 보여줍니다.
+  const CONTINENTS = [
+    ["asia", "아시아"],
+    ["middle_east", "중동"],
+    ["europe", "유럽"],
+    ["americas", "북미·중미"],
+    ["south_america", "남미"],
+    ["africa", "아프리카"],
+    ["oceania", "오세아니아"],
+  ];
+
   async function refreshCountryOptions() {
     const countries = await loadCountries(state.transport_mode);
-    // 한국 교역액 상위 국가를 맨 위 그룹으로 먼저 보여줍니다.
+    const place = state.transport_mode === "AIR" ? "공항" : "항만";
+    // 한국 교역액 상위 국가를 맨 위에, 나머지는 대륙별로 가나다순 정렬합니다.
     const top = countries.filter((c) => c.trade_rank).sort((a, b) => a.trade_rank - b.trade_rank);
-    const optionsHtml = (top.length
+    let optionsHtml = top.length
       ? `<optgroup label="주요 무역국">${top.map(countryOption).join("")}</optgroup>`
-        + `<optgroup label="전체 국가 (가나다순)">${countries.map(countryOption).join("")}</optgroup>`
-      : countries.map(countryOption).join(""));
+      : "";
+    CONTINENTS.forEach(([region, label]) => {
+      const group = countries
+        .filter((c) => c.region === region)
+        .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+      if (group.length) {
+        optionsHtml += `<optgroup label="${label} (${group.length}개국)">`
+          + group.map(countryOption).join("") + "</optgroup>";
+      }
+    });
+    const other = countries.filter((c) => !CONTINENTS.some(([region]) => region === c.region));
+    if (other.length) {
+      optionsHtml += `<optgroup label="기타">`
+        + other.sort((a, b) => a.name.localeCompare(b.name, "ko")).map(countryOption).join("")
+        + "</optgroup>";
+    }
     const filter = form.querySelector("[data-country-filter]");
     if (filter) {
       const current = filter.value;
-      filter.innerHTML = `<option value="">국가 전체 (주요 항만 표시)</option>${optionsHtml}`;
+      filter.innerHTML = `<option value="">국가 전체 (주요 ${place}만 표시)</option>${optionsHtml}`;
       filter.value = current;
     }
     const customCountry = form.querySelector("[data-autocomplete=destination] [data-custom-country]");
