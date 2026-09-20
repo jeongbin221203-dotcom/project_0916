@@ -682,9 +682,16 @@
     form.querySelector("[data-autocomplete=hs_code]"),
     async (q) => {
       const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q })}`);
-      return response.success ? response.data : [];
+      if (!response.success) return [];
+      // 관세청 조회인지 예시 목록인지 함께 표시합니다.
+      return response.data.map((item) => ({ ...item, source: response.source }));
     },
-    (item) => `<span class="mono">${escapeHtml(item.code)}</span> <b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.name_en)} · Mock</small>`,
+    (item) => {
+      const sub = [item.name_en, item.weight_unit ? `중량단위 ${item.weight_unit}` : "",
+        item.source === "api" ? "관세청 HS부호" : "예시 목록"].filter(Boolean).join(" · ");
+      return `<span class="mono">${escapeHtml(item.code)}</span>`
+        + ` <b>${escapeHtml(item.name || item.name_en)}</b><small>${escapeHtml(sub)}</small>`;
+    },
     (item, input) => { if (item) input.value = item.code; },
   );
 
