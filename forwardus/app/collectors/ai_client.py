@@ -49,6 +49,31 @@ def available() -> bool:
     return bool(get_config("AI_API_KEY", ""))
 
 
+def chat(messages: list[dict], *, max_tokens: int = 700) -> dict:
+    """대화 한 번. 답은 글자 그대로 돌려줍니다. (고객상담 창에서 씁니다)"""
+
+    key = get_config("AI_API_KEY", "")
+    if not key:
+        return fail("API_AUTH_FAILED", "api",
+                    "AI 상담 키(AI_API_KEY)가 없습니다. .env에 키를 넣으면 바로 동작합니다.")
+
+    result = request_text("POST", OPENAI_URL, timeout=60,
+                          headers={"Authorization": f"Bearer {key}",
+                                   "Content-Type": "application/json"},
+                          json={"model": MODEL, "temperature": 0.2,
+                                "max_tokens": max_tokens, "messages": messages})
+    if not result["success"]:
+        return result
+    try:
+        body = json.loads(result["data"])
+        answer = body["choices"][0]["message"]["content"].strip()
+    except (ValueError, KeyError, IndexError):
+        return fail("API_INVALID_RESPONSE", "api", "AI 응답을 해석하지 못했습니다.")
+    if not answer:
+        return fail("API_NO_DATA", "api", "답변이 비어 있습니다. 다시 물어봐 주세요.")
+    return ok(answer, "api")
+
+
 def review_document(document_text: str, context: dict) -> dict:
     """서류 텍스트와 수출 건 정보를 대조합니다."""
 

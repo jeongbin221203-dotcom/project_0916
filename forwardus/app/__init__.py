@@ -141,7 +141,11 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     @flask_app.context_processor
     def inject_globals():
-        return {"nav_active": request.blueprint or "", "static_url": static_url}
+        # 고객상담 창은 모든 화면에 붙으므로 여기서 한 번만 준비합니다.
+        from app.services import support_chat_service
+
+        return {"nav_active": request.blueprint or "", "static_url": static_url,
+                "support_chat_intro": support_chat_service.intro()}
 
     def static_url(filename: str) -> str:
         """정적 파일 URL에 수정 시각을 붙입니다.

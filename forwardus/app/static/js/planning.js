@@ -250,13 +250,13 @@
       </div>
       <div class="cal_months">${monthHtml(viewMonth, 0)}${monthHtml(viewMonth, 1)}</div>
       <p class="cal_legend">
-        <span class="legend_departure">Seller 예상일</span>
+        <span class="legend_departure">Seller 발송 예상일</span>
         <span class="legend_buyer">Buyer 요청 도착일</span>
         <span class="legend_range">예상 운송 기간</span>
       </p>
-      <p class="cal_hint">다음 선택: <b>${pickTarget === "departure" ? "Seller 예상일" : "Buyer 요청 도착일"}</b>
-        · 날짜를 누를 때마다 Seller 예상일 → Buyer 요청일 순서로 지정되고,
-        Seller 예상일을 다시 고르면 Buyer 요청일은 지워집니다.</p>`;
+      <p class="cal_hint">다음 선택: <b>${pickTarget === "departure" ? "Seller 발송 예상일" : "Buyer 요청 도착일"}</b>
+        · 날짜를 누를 때마다 Seller 발송 예상일 → Buyer 요청일 순서로 지정되고,
+        Seller 발송 예상일을 다시 고르면 Buyer 요청일은 지워집니다.</p>`;
   }
 
   calendarEl.addEventListener("click", (event) => {
@@ -274,7 +274,7 @@
         pickTarget = "buyer";
       } else {
         if (state.departure_date && iso < state.departure_date) {
-          showError("Buyer 요청 도착일은 Seller 예상일보다 빠를 수 없습니다.");
+          showError("Buyer 요청 도착일은 Seller 발송 예상일보다 빠를 수 없습니다.");
           return;
         }
         buyerInput.value = iso;
@@ -714,20 +714,55 @@
 
   updateSelectedDates();   // 임시저장이 없을 때도 날짜 표시를 채웁니다.
 
-  /* ----- 도착국에 적용되는 협정·세율 ----- */
+  /* ----- 도착국에 적용되는 협정·세율 (품목마다 따로) ----- */
+  // 품목마다 HS부호가 다르면 세율도 다릅니다. 품목별로 한 덩어리씩 보여줍니다.
+  function tariffTargets() {
+    const targets = [{
+      no: 1,
+      name: form.elements.product_description.value.trim(),
+      hs: form.elements.hs_code.value.trim(),
+    }];
+    document.querySelectorAll("[data-cargo-lines] .cargo_item").forEach((row, index) => {
+      targets.push({
+        no: index + 2,
+        name: (row.querySelector('[data-line="product_description"]')?.value || "").trim(),
+        hs: (row.querySelector('[data-line="hs_code"]')?.value || "").trim(),
+      });
+    });
+    return targets.filter((target) => target.hs);
+  }
+
   async function refreshTariff() {
     const box = document.querySelector("[data-tariff]");
     if (!box) return;
-    const hs = form.elements.hs_code.value.trim();
     const country = state.destination ? state.destination.country_code : "";
-    if (!hs || !country) {
+    const targets = tariffTargets();
+    if (!country || !targets.length) {
       box.hidden = true;
+      box.innerHTML = "";
       return;
     }
+    const many = targets.length > 1;
+    box.innerHTML = targets.map((target) => `
+      <section class="tariff_item" data-tariff-item="${target.no}">
+        ${many ? `<p class="tariff_item_title">품목 ${target.no}`
+          + (target.name ? ` <small>${escapeHtml(target.name)}</small>` : "")
+          + `</p>` : ""}
+        <div data-tariff-body><p class="tariff_note">협정세율을 조회하는 중…</p></div>
+      </section>`).join("");
+    box.hidden = false;
+    await Promise.all(targets.map((target) => renderTariffFor(
+      target.hs, country,
+      box.querySelector(`[data-tariff-item="${target.no}"] [data-tariff-body]`))));
+  }
+
+  async function renderTariffFor(hs, country, slot) {
+    if (!slot) return;
     const response = await getJson(`${urls.tariff}?${new URLSearchParams({ hs, country })}`);
+    if (!slot.isConnected) return;
     const data = response.success ? response.data : null;
     if (!data) {
-      box.hidden = true;
+      slot.innerHTML = `<p class="tariff_note">협정세율을 받지 못했습니다.</p>`;
       return;
     }
 
@@ -764,17 +799,20 @@
       html += `<p class="tariff_plain">${escapeHtml(data.message)}</p>`;
     }
     html += `<div class="dest" data-dest-tariff><p class="tariff_note">도착국 관세율표를 조회하는 중…</p></div>`;
-    box.innerHTML = html;
-    box.hidden = false;
-    refreshDestinationTariff(hs, country, box.querySelector("[data-dest-tariff]"));
+    slot.innerHTML = html;
+    refreshDestinationTariff(hs, country, slot.querySelector("[data-dest-tariff]"));
   }
 
   /* ----- 도착국이 실제로 매기는 관세와 그 나라의 세분 부호 ----- */
-  let destinationRequest = 0;
+  // 품목이 여러 개면 동시에 조회하므로 순번은 칸마다 따로 셉니다.
+  // (하나로 세면 나중 응답이 먼저 온 품목의 결과를 지웁니다)
+  const destinationTokens = new WeakMap();
   async function refreshDestinationTariff(hs, country, slot) {
-    const token = ++destinationRequest;
+    if (!slot) return;
+    const token = (destinationTokens.get(slot) || 0) + 1;
+    destinationTokens.set(slot, token);
     const response = await getJson(`${urls.destinationTariff}?${new URLSearchParams({ hs, country })}`);
-    if (token !== destinationRequest || !slot.isConnected) return;   // 그 사이 다른 품목을 골랐습니다.
+    if (destinationTokens.get(slot) !== token || !slot.isConnected) return;
     const data = response.success ? response.data : null;
     if (!data || !data.available) {
       slot.innerHTML = `<p class="tariff_note">${escapeHtml((data && data.message) || "도착국 관세율 자료를 받지 못했습니다.")}</p>`;
@@ -1159,8 +1197,17 @@
     row.querySelectorAll("[data-line]").forEach((input) => {
       if (values[input.dataset.line] !== undefined) input.value = values[input.dataset.line];
       if (input.dataset.number !== undefined) setupNumberInput(input);
-      input.addEventListener("input", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
-      input.addEventListener("change", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
+      const changed = () => {
+        recalc();
+        invalidateSchedules();
+        saveDraftSoon();
+        // 품목마다 HS부호가 다르면 도착국 세율도 다릅니다.
+        if (input.dataset.line === "hs_code" || input.dataset.line === "product_description") {
+          refreshTariff();
+        }
+      };
+      input.addEventListener("input", changed);
+      input.addEventListener("change", changed);
     });
     // 이 줄의 품명을 기준으로 HS부호를 찾습니다.
     const nameInput = row.querySelector('[data-line="product_description"]');
@@ -1169,7 +1216,7 @@
       hsBox,
       (q) => fetchHsCodes(q, nameInput.value),
       renderHsItem,
-      (item, input) => { if (item) input.value = item.code; },
+      (item, input) => { if (item) { input.value = item.code; refreshTariff(); } },
       { emptyMessage: hsEmptyMessage },
     );
     const suggest = debounce(() => {
@@ -1209,6 +1256,7 @@
   cargoLinesBox?.addEventListener("click", (event) => {
     if (!event.target.closest("[data-remove-cargo]")) return;
     event.target.closest(".cargo_item").remove();
+    refreshTariff();
     renumberCargoLines();
     recalc();
     invalidateSchedules();
@@ -1313,6 +1361,7 @@
   }, 250);
 
   form.querySelectorAll("[data-calc]").forEach((input) => input.addEventListener("input", () => { recalc(); invalidateSchedules(); }));
+  form.elements.hs_code.addEventListener("change", () => refreshTariff());
   form.elements.package_type.addEventListener("change", () => {
     const note = document.querySelector("[data-package-note]");
     if (note) note.textContent = form.elements.package_type.selectedOptions[0]?.dataset.note || "";
@@ -1617,7 +1666,7 @@
   function updateSelectedDates() {
     const buyerDate = form.elements.buyer_required_date.value;
     selectedDateEl.innerHTML =
-      `<span class="date_item departure"><i></i>Seller 예상일 ${state.departure_date || "미선택"}</span>`
+      `<span class="date_item departure"><i></i>Seller 발송 예상일 ${state.departure_date || "미선택"}</span>`
       + `<span class="date_item buyer"><i></i>Buyer 요청일 ${buyerDate || "미선택"}</span>`;
     // 달력과 표시가 항상 같은 값을 보여주도록 여기서 한 번에 다시 그립니다.
     renderCalendar();
@@ -1630,7 +1679,7 @@
   form.elements.buyer_required_date.addEventListener("change", () => {
     const value = form.elements.buyer_required_date.value;
     if (value && state.departure_date && value < state.departure_date) {
-      showError("Buyer 요청 도착일은 Seller 예상일보다 빠를 수 없습니다.");
+      showError("Buyer 요청 도착일은 Seller 발송 예상일보다 빠를 수 없습니다.");
       form.elements.buyer_required_date.value = "";
       updateSelectedDates();
       return;
@@ -1696,6 +1745,54 @@
     }
   });
 
+  /* ----- 5단계: Buyer 국가 검색과 Notify Party ----- */
+  // Buyer 국가는 나라 이름을 몰라도 고를 수 있게 검색을 붙입니다.
+  const buyerCountryBox = document.querySelector("[data-buyer-country]");
+  if (buyerCountryBox) {
+    setupAutocomplete(
+      buyerCountryBox,
+      async (q) => {
+        const list = await loadCountries(state.transport_mode);
+        const query = q.trim().toLowerCase();
+        if (!query) return list.slice(0, 30);
+        return list.filter((c) => c.name.includes(q.trim())
+          || (c.name_en || "").toLowerCase().includes(query)
+          || c.code.toLowerCase() === query).slice(0, 30);
+      },
+      (c) => `<span class="ac_title"><b>${escapeHtml(c.name)}</b>`
+        + `<small>${escapeHtml(c.name_en || "")} · ${escapeHtml(c.code)}</small></span>`,
+      (item, input) => { if (item) input.value = item.name; saveDraftSoon(); },
+      { emptyMessage: () => "그 이름의 나라를 찾지 못했습니다. 직접 적어도 됩니다." },
+    );
+  }
+
+  // Notify Party는 대개 Buyer와 같습니다. 체크돼 있으면 Buyer 이름을 그대로 씁니다.
+  const notifySame = document.querySelector("[data-notify-same]");
+  function syncNotifyParty() {
+    if (!notifySame) return;
+    const box = form.elements.notify_party;
+    if (notifySame.checked) {
+      box.value = form.elements.buyer_name.value.trim() || "SAME AS CONSIGNEE";
+      box.readOnly = true;
+      box.classList.add("is_locked");
+    } else {
+      box.readOnly = false;
+      box.classList.remove("is_locked");
+    }
+  }
+  if (notifySame) {
+    notifySame.addEventListener("change", () => { syncNotifyParty(); saveDraftSoon(); });
+    form.elements.buyer_name.addEventListener("input", syncNotifyParty);
+    // 불러온 초안에 Buyer와 다른 값이 들어 있으면 체크를 풀어 둡니다.
+    const restored = form.elements.notify_party.value.trim();
+    if (restored && restored !== "SAME AS CONSIGNEE"
+        && restored !== form.elements.buyer_name.value.trim()) {
+      notifySame.checked = false;
+    }
+    syncNotifyParty();
+  }
+
   // 복원은 recalc·openStep까지 모두 선언된 뒤에 실행해야 합니다.
   restoreDraft();
+  syncNotifyParty();
 })();

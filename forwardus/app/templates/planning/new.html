@@ -293,15 +293,53 @@
     {# Step 5 — Parties & Confirm #}
     <section class="card step" data-step="5" hidden>
       <h2>수출자·Buyer 정보</h2>
-      <div class="form_grid">
-        <label class="field"><span class="field_label">수출자(Exporter)명</span><input class="text_input" type="text" name="exporter_name" maxlength="200"></label>
-        <label class="field"><span class="field_label">수출자 주소</span><input class="text_input" type="text" name="exporter_address" maxlength="500"></label>
-        <label class="field"><span class="field_label">Buyer(Consignee)명</span><input class="text_input" type="text" name="buyer_name" maxlength="200"></label>
-        <label class="field"><span class="field_label">Buyer 국가</span><input class="text_input" type="text" name="buyer_country" maxlength="100" placeholder="비워두면 도착지 국가"></label>
-        <label class="field"><span class="field_label">Buyer 주소</span><input class="text_input" type="text" name="buyer_address" maxlength="500"></label>
-        <label class="field"><span class="field_label">Buyer 이메일</span><input type="email" name="buyer_email" maxlength="200"></label>
-        <label class="field span2"><span class="field_label">Notify Party</span><input class="text_input" type="text" name="notify_party" maxlength="300" placeholder="SAME AS CONSIGNEE"></label>
-      </div>
+
+      {# 세 가지는 서류에서 각각 다른 칸에 들어갑니다. 블록을 나눠 헷갈리지 않게 합니다. #}
+      <section class="party_block">
+        <h3 class="party_title">수출자 정보</h3>
+        <p class="party_note">상업송장의 Seller, 선적서류의 Shipper 칸에 들어갑니다.</p>
+        <div class="form_grid">
+          <label class="field"><span class="field_label">수출자(Exporter)명</span>
+            <input class="text_input" type="text" name="exporter_name" maxlength="200"></label>
+          <label class="field"><span class="field_label">수출자 주소</span>
+            <input class="text_input" type="text" name="exporter_address" maxlength="500"></label>
+        </div>
+      </section>
+
+      <section class="party_block">
+        <h3 class="party_title">Buyer 정보</h3>
+        <p class="party_note">상업송장의 Consignee 칸에 들어갑니다. 물건을 받는 쪽입니다.</p>
+        <div class="form_grid">
+          <label class="field"><span class="field_label">Buyer(Consignee)명</span>
+            <input class="text_input" type="text" name="buyer_name" maxlength="200"></label>
+          <div class="field autocomplete" data-buyer-country>
+            <span class="field_label">Buyer 국가</span>
+            <input class="text_input" type="text" name="buyer_country" maxlength="100"
+                   autocomplete="off" data-ac-input placeholder="비워두면 도착지 국가">
+            <ul class="ac_list" data-ac-list hidden></ul>
+          </div>
+          <label class="field"><span class="field_label">Buyer 주소</span>
+            <input class="text_input" type="text" name="buyer_address" maxlength="500"></label>
+          <label class="field"><span class="field_label">Buyer 이메일</span>
+            <input class="text_input" type="email" name="buyer_email" maxlength="200"></label>
+        </div>
+      </section>
+
+      <section class="party_block">
+        <h3 class="party_title">Notify Party <small class="muted">착하통지처</small></h3>
+        <p class="party_note">화물이 도착하면 연락받는 곳입니다. 대개 Buyer와 같습니다.</p>
+        <label class="party_same">
+          <input type="checkbox" data-notify-same checked>
+          <span>Buyer와 동일</span>
+        </label>
+        <div class="form_grid">
+          <label class="field span2"><span class="field_label">Notify Party 명</span>
+            <input class="text_input" type="text" name="notify_party" maxlength="300"
+                   placeholder="SAME AS CONSIGNEE">
+          </label>
+        </div>
+      </section>
+
       <h3>요약</h3>
       <dl class="summary_list" data-summary></dl>
       <div class="step_actions">

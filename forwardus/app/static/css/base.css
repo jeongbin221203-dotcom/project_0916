@@ -230,3 +230,51 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 }
 /* 표준단가 표에서 뽑은 추정값. Mock(가짜)과 구분합니다. */
 .badge.source_tariff { background: #ede9fe; color: #6d28d9; }
+/* 자동으로 채워져 고칠 수 없는 칸 (Notify Party = Buyer와 동일 등) */
+.text_input.is_locked { background: #f1f5f9; color: var(--muted); }
+
+/* 고객 상담 — 화면 오른쪽 아래에 떠 있는 버튼과 상담창 */
+.support_fab { position: fixed; right: 26px; bottom: 26px; z-index: 60;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 15px 26px; border: 0; border-radius: 999px;
+  background: var(--blue); color: #fff; font-size: 15px; font-weight: 800;
+  box-shadow: 0 12px 30px rgba(43,102,246,.35); cursor: pointer; transition: .15s; }
+.support_fab:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(43,102,246,.42); }
+.support_fab.is_open { background: var(--ink); box-shadow: 0 12px 30px rgba(15,23,42,.3); }
+
+.support_panel { position: fixed; right: 26px; bottom: 96px; z-index: 61;
+  display: flex; flex-direction: column; width: 380px; max-width: calc(100vw - 32px);
+  height: 540px; max-height: calc(100vh - 140px);
+  border-radius: 20px; background: #fff; border: 1px solid var(--line);
+  box-shadow: 0 26px 60px rgba(15,23,42,.24); overflow: hidden; }
+.support_head { display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 18px; background: var(--blue); color: #fff; }
+.support_head b { display: block; font-size: 15px; }
+.support_head small { display: block; margin-top: 2px; font-size: 12px; opacity: .85; }
+.support_close { border: 0; background: rgba(255,255,255,.18); color: #fff;
+  width: 30px; height: 30px; border-radius: 9px; font-size: 20px; line-height: 1; cursor: pointer; }
+.support_close:hover { background: rgba(255,255,255,.3); }
+
+.support_log { flex: 1; overflow-y: auto; padding: 16px; display: flex;
+  flex-direction: column; gap: 10px; background: #f8fafc; }
+.support_msg { max-width: 86%; padding: 11px 14px; border-radius: 14px;
+  font-size: 13.5px; line-height: 1.7; word-break: break-word; }
+.support_bot { align-self: flex-start; background: #fff; border: 1px solid var(--line); }
+.support_user { align-self: flex-end; background: var(--blue); color: #fff; font-weight: 600; }
+.support_waiting { color: var(--muted); font-style: italic; }
+.support_offline { background: var(--amber_soft); border-color: #fcd34d; color: #8a4f00; }
+
+.support_chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; background: #f8fafc; }
+.support_chips:empty { display: none; }
+.support_chip { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: #fff; font-size: 12px; font-weight: 700; color: var(--blue_dark); cursor: pointer; }
+.support_chip:hover { border-color: var(--blue); background: var(--blue_soft); }
+
+.support_form { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.support_form .text_input { flex: 1; min-width: 0; }
+.support_form button { white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .support_fab { right: 16px; bottom: 16px; padding: 13px 20px; font-size: 14px; }
+  .support_panel { right: 16px; left: 16px; bottom: 80px; width: auto; }
+}

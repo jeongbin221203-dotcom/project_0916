@@ -290,3 +290,22 @@
 .calc_line dd { font-size: 12.5px; }
 .calc_total_title { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line);
   font-size: 12px; font-weight: 800; color: var(--ink); }
+
+/* 5단계: 수출자 / Buyer / Notify Party 를 블록으로 나눕니다. */
+.party_block { padding: 18px; margin-bottom: 16px; border: 1px solid var(--line);
+  border-radius: 16px; background: #fff; }
+.party_block:last-of-type { margin-bottom: 4px; }
+.party_title { margin: 0 0 4px; font-size: 15px; font-weight: 900; color: var(--blue_dark); }
+.party_title small { margin-left: 6px; font-size: 12px; font-weight: 700; }
+.party_note { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.party_block .form_grid { margin-bottom: 0; }
+.party_block .field:last-child { margin-bottom: 0; }
+.party_same { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 14px;
+  padding: 8px 13px; border-radius: 11px; background: var(--blue_soft); cursor: pointer; }
+.party_same input { width: 17px; height: 17px; accent-color: var(--blue); }
+.party_same span { font-size: 13px; font-weight: 800; color: var(--blue_dark); }
+
+/* 품목별 도착국 관세 (품목이 둘 이상일 때 제목이 붙습니다) */
+.tariff_item + .tariff_item { margin-top: 16px; padding-top: 16px; border-top: 2px solid #c7d7fd; }
+.tariff_item_title { margin: 0 0 8px; font-size: 13px; font-weight: 900; color: var(--blue_dark); }
+.tariff_item_title small { margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }

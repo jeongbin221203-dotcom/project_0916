@@ -812,7 +812,7 @@ def schedule_outlook(payload: dict) -> dict:
     기준으로 등급을 매기고, 가장 빠른 스케줄 기준 여유도 함께 돌려줍니다.
     """
 
-    departure = parse_date(payload.get("requested_departure_date"), "Seller 예상일", required=False,
+    departure = parse_date(payload.get("requested_departure_date"), "Seller 발송 예상일", required=False,
                            field="requested_departure_date")
     buyer_required = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", required=False,
                                 field="buyer_required_date")
