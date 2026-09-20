@@ -45,6 +45,8 @@
       <div>
         <h2>Trade Document Center</h2>
         <p class="muted">Shipment에 이미 입력된 Exporter·Consignee·Incoterms·POL/POD·품명·수량·중량·금액을 재사용해 작성합니다.</p>
+        <p class="muted small">수출자가 직접 작성해 내는 서류는 <b>Commercial Invoice</b>와
+          <b>Packing List</b> 두 개입니다. 나머지는 참고용이거나 선사·포워더 양식입니다.</p>
       </div>
       <div class="button_row">
         <form method="post" action="{{ url_for('document.generate', shipment_id=shipment.shipment_id) }}">
@@ -63,6 +65,8 @@
             <b>{{ item.title }}</b>
             {% if item.document %}{{ doc_status(item.document.status) }}{% else %}<span class="badge muted_badge">미작성</span>{% endif %}
           </div>
+          <span class="doc_role doc_role_{{ item.role }}">{{ item.role_label }}</span>
+          <p class="muted small doc_role_note">{{ item.role_note }}</p>
           {% if item.document %}
             <span class="muted small">{{ item.document.data.get('doc_no', '') }} · 수정 {{ item.document.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
             <div class="button_row">

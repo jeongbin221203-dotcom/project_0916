@@ -120,6 +120,10 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         "warnings": [{"line_no": index, "message": line["net_weight_warning"]}
                      for index, line in enumerate(lines, start=1) if line.get("net_weight_warning")],
         "quantity": sum(line["quantity"] for line in lines),
+        # 품목별 금액을 모두 적었으면 그 합이 송장 금액입니다.
+        # 하나라도 비어 있으면 지어내지 않고 None을 돌려줍니다.
+        "amount": (round(sum(line["amount"] for line in lines), 2)
+                   if lines and all(line.get("amount") is not None for line in lines) else None),
         "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
         "total_cbm": round(total_cbm, 4),
         "total_weight_kg": round(total_weight_kg, 2),

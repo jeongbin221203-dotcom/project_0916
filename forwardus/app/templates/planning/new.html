@@ -211,8 +211,14 @@
             <span class="field_label">총 순중량 Net Weight (kg) <small class="muted">(선택)</small></span>
             <input class="text_input" type="text" name="net_weight_kg" inputmode="decimal" autocomplete="off" data-number data-step="10" data-min="0">
           </label>
+          <label class="field">
+            <span class="field_label">품목 1 금액 Amount <small class="muted">(선택)</small></span>
+            <input class="text_input" type="text" name="amount" inputmode="decimal" autocomplete="off" data-number data-step="100" data-min="0" data-calc>
+            <small class="muted small">품목별로 적으면 아래 Invoice Value가 자동으로 더해집니다.</small>
+          </label>
+
           <div class="field">
-            <span class="field_label">Invoice Value</span>
+            <span class="field_label">Invoice Value <small class="muted" data-invoice-auto hidden>품목 금액 합계</small></span>
             <div class="input_group">
               <select name="currency">
                 <optgroup label="주요 결제 통화">
@@ -275,6 +281,7 @@
         </div>
       </div>
       <p class="muted" data-schedule-meta></p>
+      <p class="muted small">카드를 한 번 누르면 선택, 두 번 누르면 바로 다음 단계로 넘어갑니다.</p>
       <div class="schedule_list" data-schedule-list></div>
       <div class="step_actions">
         <button type="button" class="button ghost" data-prev>이전</button>

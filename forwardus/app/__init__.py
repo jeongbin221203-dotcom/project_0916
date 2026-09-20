@@ -41,7 +41,10 @@ def migrate_cargo_lines(database) -> None:
              "un_number": "VARCHAR(10) NOT NULL DEFAULT ''",
              "dg_class": "VARCHAR(5) NOT NULL DEFAULT ''",
              "packing_group": "VARCHAR(5) NOT NULL DEFAULT ''",
-             "proper_shipping_name": "VARCHAR(200) NOT NULL DEFAULT ''"}
+             "proper_shipping_name": "VARCHAR(200) NOT NULL DEFAULT ''",
+             # 품목별 금액도 나중에 더해졌습니다.
+             "unit_price": "FLOAT",
+             "amount": "FLOAT"}
     missing = {name: spec for name, spec in added.items() if name not in columns}
     if missing:
         with database.engine.begin() as connection:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.models.document import DOCUMENT_TYPES
+from app.models.document import DOCUMENT_TYPES, document_role
 from app.services import planning_service
 from app.processors.document_validator import validate_documents
 from app.repositories import document_repository, shipment_repository
@@ -27,12 +27,14 @@ DOCUMENT_FIELDS = {
         "hs_code", "quantity", "package_type", "unit_price", "invoice_value", "currency",
         "gross_weight_kg", "net_weight_kg", "remarks", "signed_by",
     ],
-    # 포장명세서(PACKING LIST) 표준 서식 ①Seller ~ ⑯Signed by
+    # 포장명세서(PACKING LIST): 사용자가 지정한 주문 서식
+    # (ORDER # / SHIPPED TO / 품목표 / Comments / PACKED BY)
     "packing_list": [
-        "exporter", "exporter_address", "consignee", "consignee_address", "etd", "vessel_or_flight",
-        "pol", "pod", "doc_no", "doc_date", "buyer", "other_references", "shipping_marks",
-        "product_description", "quantity", "package_type", "net_weight_kg", "gross_weight_kg",
-        "total_cbm", "signed_by",
+        "order_no", "doc_date", "consignee", "consignee_address", "consignee_city_zip",
+        "date_ordered", "customer_order_no", "date_shipped", "attention",
+        "shipped_via", "container_no", "invoice_no",
+        "product_description", "quantity", "package_type",
+        "net_weight_kg", "gross_weight_kg", "total_cbm", "comments", "packed_by",
     ],
     "proforma_invoice": [
         "doc_no", "doc_date", "validity_date", "po_no", "exporter", "exporter_address", "consignee",
@@ -110,6 +112,18 @@ FIELD_LABELS = {
     "prepaid_at": "Prepaid at",
     "collect_at": "Collect at",
     "confirmation_to": "Booking Confirmation Deliver To",
+    # 포장명세서(주문 서식)의 칸
+    "order_no": "ORDER #",
+    "consignee_city_zip": "CITY, STATE, ZIP",
+    "date_ordered": "DATE ORDERED",
+    "customer_order_no": "CUSTOMER ORDER NUMBER",
+    "date_shipped": "DATE SHIPPED",
+    "attention": "ATTENTION",
+    "shipped_via": "SHIPPED VIA",
+    "container_no": "CONTAINER NUMBER",
+    "invoice_no": "OUR INVOICE NUMBER",
+    "comments": "Comments",
+    "packed_by": "PACKED BY",
 }
 
 # 같은 값이라도 서식마다 인쇄된 칸 이름이 다릅니다. 서식에 적힌 이름을 그대로 씁니다.
@@ -123,11 +137,8 @@ DOC_FIELD_LABELS = {
         "signed_by": "⑱ Signed by",
     },
     "packing_list": {
-        "exporter": "① Seller", "consignee": "② Consignee", "etd": "③ Departure date",
-        "vessel_or_flight": "④ Vessel / flight", "pol": "⑤ From", "pod": "⑥ To",
-        "doc_no": "⑦ Invoice No.", "doc_date": "⑦ Invoice date",
-        "buyer": "⑧ Buyer (if other than consignee)", "other_references": "⑨ Other references",
-        "signed_by": "⑯ Signed by",
+        "consignee": "NAME", "consignee_address": "ADDRESS", "doc_date": "DATE",
+        "product_description": "DESCRIPTION (합계)", "quantity": "QUANTITY (합계)",
     },
 }
 
@@ -142,12 +153,11 @@ DOCUMENT_ITEM_FIELDS = {
         ("description", "Goods description"), ("quantity", "Quantity"),
         ("unit_price", "Unit price"), ("amount", "Amount"),
     ],
-    # ⑩Shipping Marks ⑪No.&kind of packages ⑫Goods description
-    # ⑬Quantity or net weight ⑭Gross Weight ⑮Measurement
+    # 첨부 서식의 표 머리글. 품목을 넣은 만큼 줄이 생깁니다.
     "packing_list": [
-        ("shipping_marks", "Shipping Marks"), ("packages", "No. & kind of packages"),
-        ("description", "Goods description"), ("net_quantity", "Quantity or net weight"),
-        ("total_weight", "Gross Weight"), ("measurement", "Measurement"),
+        ("item_number", "ITEM NUMBER"), ("quantity", "QUANTITY"), ("shipped", "SHIPPED"),
+        ("backordered", "BACKORDERED"), ("description", "DESCRIPTION"),
+        ("unit_weight", "UNIT WEIGHT"), ("total_weight", "TOTAL WEIGHT"),
     ],
     "proforma_invoice": [
         ("description", "Item"), ("quantity", "Quantity"), ("unit", "UNIT"),
@@ -166,24 +176,24 @@ DOCUMENT_ITEM_FIELDS = {
 }
 
 # 서식에 인쇄된 고정 문구
-PACKING_LIST_NOTE = "포장명세서는 상업송장과 같은 건이어야 합니다. 품명·수량·포장 수는 송장과 일치시켜 주세요."
+PACKING_LIST_NOTE = ("NOTE: When referring to this shipment be sure to give order # and shipping date. "
+                     "품명·수량·포장 수는 상업송장과 일치시켜 주세요.")
 
 # 실제 서식처럼 칸을 묶어 보여줍니다. cols는 그 줄에 나란히 놓을 칸 수이고,
 # {"items": True}는 품목 표가 들어갈 자리입니다.
 DOCUMENT_SECTIONS = {
-    # 표준 서식은 왼쪽 칸(①~⑥)과 오른쪽 칸(⑦~⑪)이 나란히 인쇄됩니다.
-    # cols=2는 왼쪽·오른쪽 순서로 채우므로 두 줄씩 짝지어 적습니다.
     "packing_list": [
-        {"cols": 2, "fields": ["exporter", "doc_no",
-                               "exporter_address", "doc_date",
-                               "consignee", "buyer",
-                               "consignee_address", "other_references"]},
-        {"cols": 4, "fields": ["etd", "vessel_or_flight", "pol", "pod"]},
-        {"items": True, "note": PACKING_LIST_NOTE},
+        {"cols": 2, "fields": ["order_no", "doc_date"]},
+        {"title": "SHIPPED TO", "cols": 1,
+         "fields": ["consignee", "consignee_address", "consignee_city_zip"],
+         "note": PACKING_LIST_NOTE},
+        {"cols": 4, "fields": ["date_ordered", "customer_order_no", "date_shipped", "attention"]},
+        {"cols": 3, "fields": ["shipped_via", "container_no", "invoice_no"]},
+        {"items": True},
         {"cols": 3, "fields": ["net_weight_kg", "gross_weight_kg", "total_cbm"]},
         {"title": "합계 (송장과 대조되는 값)", "cols": 3,
          "fields": ["product_description", "quantity", "package_type"]},
-        {"cols": 2, "fields": ["shipping_marks", "signed_by"]},
+        {"cols": 2, "fields": ["comments", "packed_by"]},
     ],
     "commercial_invoice": [
         {"cols": 2, "fields": ["exporter", "doc_no",
@@ -326,6 +336,18 @@ def build_reference(shipment) -> dict:
         "validity_date": "", "po_no": "", "bank_info": "", "booking_no": "", "container_seal_no": "",
         "notify_party_2": "", "contact": "", "service_contract_no": "", "routing_remark": "", "reefer": "",
         "confirmation_to": "",
+        # 포장명세서(주문 서식)의 칸. 사람이 고쳐 쓸 수 있게 알 수 있는 값만 채웁니다.
+        "order_no": shipment.shipment_id,
+        "consignee_city_zip": "",
+        "date_ordered": "",
+        "customer_order_no": "",
+        "date_shipped": shipment.etd.isoformat() if shipment.etd else "",
+        "attention": buyer.contact_email if buyer else "",
+        "shipped_via": " / ".join(part for part in [shipment.carrier, shipment.vessel_or_flight] if part),
+        "container_no": "",
+        "invoice_no": f"CI-{shipment.shipment_id}",
+        "comments": "",
+        "packed_by": shipment.exporter_name,
     }
 
 
@@ -341,6 +363,8 @@ def build_items(shipment, doc_type: str) -> list[dict]:
         return []
 
     cargos = list(shipment.cargos)
+    # 품목마다 금액을 적었으면 그 값을 씁니다. 안 적었고 품목이 하나뿐이면
+    # 송장 금액이 곧 그 품목의 금액입니다. 여러 개인데 안 적었으면 비워 둡니다.
     single = len(cargos) == 1
     rows = []
     for cargo in cargos:
@@ -348,6 +372,10 @@ def build_items(shipment, doc_type: str) -> list[dict]:
         dangerous = (f"{cargo.un_number} · {cargo.proper_shipping_name}"
                      if cargo.is_dangerous and cargo.un_number else "")
         row = {
+            "item_number": cargo.hs_code or "",
+            "shipped": cargo.quantity,
+            "backordered": 0,
+            "unit_weight": cargo.weight_per_package_kg,
             "description": " / ".join(part for part in [cargo.product_description, dangerous] if part),
             "quantity": cargo.quantity,
             # 포장명세서 ⑬칸은 "수량 또는 순중량"입니다. 순중량을 적었으면 그 값을 씁니다.
@@ -359,9 +387,11 @@ def build_items(shipment, doc_type: str) -> list[dict]:
             "total_weight": cargo.total_weight_kg,
             "measurement": cargo.total_cbm,
             "shipping_marks": "",
-            "unit_price": (round(shipment.invoice_value / cargo.quantity, 4)
-                           if single and cargo.quantity else ""),
-            "amount": shipment.invoice_value if single else "",
+            "unit_price": (cargo.unit_price if cargo.unit_price is not None
+                           else (round(shipment.invoice_value / cargo.quantity, 4)
+                                 if single and cargo.quantity else "")),
+            "amount": (cargo.amount if cargo.amount is not None
+                       else (shipment.invoice_value if single else "")),
         }
         rows.append({key: row.get(key, "") for key, _ in columns})
     return rows
@@ -390,7 +420,9 @@ def _require_document_type(doc_type: str) -> None:
 
 def list_documents(shipment) -> list[dict]:
     existing = {doc.doc_type: doc for doc in document_repository.list_for_shipment(shipment)}
-    return [{"doc_type": key, "title": title, "document": existing.get(key)} for key, title in DOCUMENT_TYPES.items()]
+    return [{"doc_type": key, "title": title, "document": existing.get(key),
+             **document_role(key)}
+            for key, title in DOCUMENT_TYPES.items()]
 
 
 def is_outdated(document) -> bool:

@@ -990,7 +990,7 @@ def test_number_fields_accept_thousands_separators(app, client):
     html = client.get("/planning/new").get_data(as_text=True)
     # 쉼표를 넣으려면 숫자 전용 칸으로는 안 되므로 글자 칸으로 바꿨습니다.
     assert 'type="number"' not in html
-    assert html.count("data-number") == 7
+    assert html.count("data-number") == 8
     # 화살표로 올리고 내릴 단위는 칸마다 다릅니다.
     assert 'name="quantity"' in html and 'data-step="1"' in html
     assert 'name="weight_per_package_kg" inputmode="decimal" autocomplete="off" data-number data-step="10"' in html

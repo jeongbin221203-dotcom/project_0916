@@ -48,6 +48,8 @@ EDITABLE_FIELDS = [
     "booking_no", "container_seal_no", "notify_party_2", "contact", "service_contract_no", "hs6",
     "routing_remark", "reefer", "prepaid_at", "collect_at", "confirmation_to",
     "dangerous_goods",
+    "order_no", "consignee_city_zip", "date_ordered", "customer_order_no", "date_shipped",
+    "attention", "shipped_via", "container_no", "invoice_no", "comments", "packed_by",
 ]
 
 # 품목 표의 칸은 "item-<줄번호>-<칸이름>" 이름으로 들어옵니다.

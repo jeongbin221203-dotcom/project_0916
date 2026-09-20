@@ -983,11 +983,15 @@ def create_shipment(payload: dict) -> Shipment:
 
     route = validate_route(payload)
     origin, destination = _resolve_locations(route, payload)
-    terms = validate_trade_terms(payload, route["transport_mode"])
     parties = validate_parties(payload)
 
     items = cargo_items(payload)
     metrics = calculate_cargo_lines(items)
+    # 품목별 금액을 모두 적었으면 그 합을 송장 금액으로 씁니다.
+    # 화면이 보낸 합계는 믿지 않고 서버에서 다시 더합니다.
+    if metrics["amount"] is not None:
+        payload = {**payload, "invoice_value": metrics["amount"]}
+    terms = validate_trade_terms(payload, route["transport_mode"])
     cargo_payload = items[0]
     product_description = optional_text(cargo_payload.get("product_description"), max_length=300)
     if not product_description:
@@ -1080,6 +1084,9 @@ def create_shipment(payload: dict) -> Shipment:
             weight_per_package_kg=line["weight_per_package_kg"],
             # 품목마다 순중량을 따로 적습니다.
             net_weight_kg=line["net_weight_kg"],
+            # 품목마다 단가·금액을 따로 적습니다. (송장의 Unit price / Amount 칸)
+            unit_price=line["unit_price"],
+            amount=line["amount"],
             total_cbm=line["total_cbm"],
             total_weight_kg=line["total_weight_kg"],
             revenue_ton=line["revenue_ton"],

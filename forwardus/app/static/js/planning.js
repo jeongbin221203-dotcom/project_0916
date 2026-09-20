@@ -1121,6 +1121,7 @@
     ["height_cm", "높이 Height (cm)", "number", "", { step: 1, min: 0 }],
     ["weight_per_package_kg", "포장당 총중량 (kg)", "number", "", { step: 10, min: 0 }],
     ["net_weight_kg", "총 순중량 Net Weight (kg)", "number", "", { step: 10, min: 0 }],
+    ["amount", "금액 Amount", "number", "", { step: 100, min: 0 }],
   ];
 
   function lineFieldHtml([key, label, kind, span, opts = {}]) {
@@ -1230,12 +1231,14 @@
       height_cm: plainNumber(f.height_cm.value),
       weight_per_package_kg: plainNumber(f.weight_per_package_kg.value),
       net_weight_kg: plainNumber(f.net_weight_kg.value),
+      amount: plainNumber(f.amount.value),
     };
     const extras = extraCargoEntries();
     lastCargoBoxes = [mainDgBox, ...extras.map(({ box }) => box)];
     return { items: [first, ...extras.map(({ item }) => item)] };
   }
 
+  const currencyCode = () => form.elements.currency.value || "USD";
   const calcLinesBox = document.querySelector("[data-calc-lines]");
   const calcTotalTitle = document.querySelector("[data-calc-total-title]");
 
@@ -1253,6 +1256,8 @@
         <dl>
           <div><dt>CBM</dt><dd>${formatNumber(line.total_cbm, 3)} CBM</dd></div>
           <div><dt>중량</dt><dd>${formatNumber(line.total_weight_kg, 1)} kg</dd></div>
+          ${line.amount === null || line.amount === undefined ? "" :
+            `<div><dt>금액</dt><dd>${currencyCode()} ${formatNumber(line.amount, 2)}</dd></div>`}
         </dl>
       </div>`).join("");
   }
@@ -1270,6 +1275,22 @@
     set("container", `${metrics.container_quantity} × ${metrics.container_type}`);
     set("volume_weight_kg", `${formatNumber(metrics.volume_weight_kg, 1)} kg`);
     set("chargeable_weight_kg", `${formatNumber(metrics.chargeable_weight_kg, 1)} kg`);
+    syncInvoiceValue(metrics.amount);
+  }
+
+  // 품목별 금액을 모두 적었으면 Invoice Value를 그 합으로 맞춥니다.
+  // 한 건이라도 비어 있으면 손대지 않아 직접 적은 값이 남습니다.
+  const invoiceAutoTag = document.querySelector("[data-invoice-auto]");
+  function syncInvoiceValue(amount) {
+    const box = form.elements.invoice_value;
+    if (amount === null || amount === undefined) {
+      box.readOnly = false;
+      if (invoiceAutoTag) invoiceAutoTag.hidden = true;
+      return;
+    }
+    box.value = formatNumber(amount, 2);
+    box.readOnly = true;
+    if (invoiceAutoTag) invoiceAutoTag.hidden = false;
   }
 
   const recalc = debounce(async () => {
@@ -1371,6 +1392,20 @@
       renderSchedules();
       saveDraftSoon();
     }
+  });
+
+  // 스케줄 카드를 두 번 누르면 그 스케줄로 고르고 다음 단계로 넘어갑니다.
+  scheduleList.addEventListener("dblclick", (event) => {
+    const card = event.target.closest(".schedule_card");
+    if (!card) return;
+    const radio = card.querySelector('input[name="schedule_id"]');
+    if (!radio) return;
+    if (state.schedule_id !== radio.value) {
+      state.schedule_id = radio.value;
+      renderSchedules();
+      saveDraftSoon();
+    }
+    openStep(state.step + 1);
   });
 
   async function loadSchedules() {

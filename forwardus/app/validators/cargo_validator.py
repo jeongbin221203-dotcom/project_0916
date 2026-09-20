@@ -195,4 +195,28 @@ def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
             field="weight_per_package_kg",
         ),
         "package_type": package_type,
+        # 품목별 단가·금액은 선택입니다. 둘 중 하나만 적어도 나머지를 채워 줍니다.
+        **_validate_money(payload),
     }
+
+
+def _validate_money(payload: dict) -> dict:
+    """단가와 금액. 한쪽만 있으면 수량으로 나머지를 구합니다."""
+
+    def optional(value, label, field):
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return parse_number(value, label, max_value=MAX_INVOICE_VALUE, field=field)
+
+    unit_price = optional(payload.get("unit_price"), "단가(Unit Price)", "unit_price")
+    amount = optional(payload.get("amount"), "금액(Amount)", "amount")
+    try:
+        quantity = parse_integer(payload.get("quantity"), "수량(Quantity)",
+                                 max_value=MAX_QUANTITY, field="quantity")
+    except ValidationError:
+        quantity = 0
+    if amount is None and unit_price is not None and quantity:
+        amount = round(unit_price * quantity, 2)
+    elif unit_price is None and amount is not None and quantity:
+        unit_price = round(amount / quantity, 4)
+    return {"unit_price": unit_price, "amount": amount}
