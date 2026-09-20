@@ -87,6 +87,20 @@
   const draftStore = window.sessionStorage;
   // 예전에 localStorage에 남아 있던 임시 저장본은 더 이상 쓰지 않으므로 지웁니다.
   try { window.localStorage.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
+
+  // 메뉴를 오갈 때는 입력을 그대로 두고, 새로고침하면 처음부터 시작합니다.
+  function isReload() {
+    const entry = (window.performance && window.performance.getEntriesByType)
+      ? window.performance.getEntriesByType("navigation")[0] : null;
+    return entry ? entry.type === "reload" : false;
+  }
+  if (isReload()) {
+    try { draftStore.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
+  }
+  // 로고(홈)를 누르면 처음부터 다시 작성하는 것으로 봅니다.
+  document.querySelector(".brand")?.addEventListener("click", () => {
+    try { draftStore.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
+  });
   const DRAFT_FIELDS = [
     "project_name", "buyer_required_date", "product_description", "hs_code", "package_type",
     "quantity", "length_cm", "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg",
@@ -636,7 +650,6 @@
   }
 
   updateSelectedDates();   // 임시저장이 없을 때도 날짜 표시를 채웁니다.
-  restoreDraft();
 
   setupAutocomplete(
     form.querySelector("[data-autocomplete=hs_code]"),
@@ -894,9 +907,20 @@
         : `여유 ${mode.margin_worst}~${mode.margin_best}일`;
     };
     const icon = { SEA: "🚢", AIR: "✈️" };
+    const km = (value) => `${formatNumber(value)}km`;
+    // 항구를 골랐는데 항공을 보여줄 때처럼, 실제로 계산한 구간을 함께 적습니다.
+    const legOf = (mode) => (mode.mode === "SEA" ? data.sea_route : data.air_route);
+    const detail = (mode) => {
+      const leg = legOf(mode) || {};
+      const parts = [];
+      if (leg.origin) parts.push(`${leg.origin} → ${leg.destination} ${km(leg.distance_km)}`);
+      if (mode.note) parts.push(mode.note);
+      return parts.join(" · ");
+    };
 
     box.innerHTML = `<p class="outlook_head">${escapeHtml(state.origin ? state.origin.name : "출발지")}`
-      + ` → ${escapeHtml(data.destination)} 예상 일정 <em>Data Source: Mock</em></p>`
+      + ` → ${escapeHtml(data.destination)} 예상 일정`
+      + ` <em>실제 항로 기준</em></p>`
       + data.modes.map((mode) => `
         <div class="outlook_row level_${mode.level}">
           <span class="outlook_mode">${icon[mode.mode]} ${escapeHtml(mode.label)}</span>
@@ -905,7 +929,7 @@
             mode.eta_slowest !== mode.eta_fastest ? ` ~ ${mode.eta_slowest}` : ""}</span>
           <span class="outlook_margin">${escapeHtml(margin(mode))}</span>
           <span class="outlook_level">${escapeHtml(LEVEL_TEXT[mode.level] || "")}</span>
-          ${mode.note ? `<span class="outlook_note">${escapeHtml(mode.note)}</span>` : ""}
+          <span class="outlook_note">${escapeHtml(detail(mode))}</span>
         </div>`).join("");
     box.hidden = false;
   }
@@ -996,4 +1020,7 @@
       handleServerError(response);
     }
   });
+
+  // 복원은 recalc·openStep까지 모두 선언된 뒤에 실행해야 합니다.
+  restoreDraft();
 })();
