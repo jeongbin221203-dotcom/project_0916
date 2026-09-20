@@ -88,7 +88,9 @@
 /* Country filter and direct input */
 .link_button.inline { font-size: 12px; margin-left: 6px; padding: 0; }
 .autocomplete select[data-country-filter] { margin-bottom: 6px; }
-.ac_list .ac_group { padding: 6px 11px 2px; color: var(--muted); font-size: 12px; font-weight: 800; cursor: default; background: none; }
+.ac_list .ac_group { display: block; padding: 8px 11px 3px; color: var(--muted); font-size: 12px; font-weight: 800; cursor: default; background: none; }
+.ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #94a3b8; }
+.ac_list .ac_group_other small { font-weight: 600; margin-left: 6px; }
 .custom_box { display: grid; grid-template-columns: 110px 1fr 130px auto; gap: 6px; align-items: center; margin-top: 6px; padding: 10px; border: 1px dashed var(--line); border-radius: 12px; background: #f8fafc; }
 .custom_box input, .custom_box select { min-height: 36px; font-size: 13px; padding: 0 9px; border-radius: 10px; }
 .custom_country { font-size: 13px; font-weight: 700; color: var(--muted); }

@@ -213,7 +213,10 @@
           const value = options.groupBy(item);
           if (value !== group) {
             group = value;
-            html += `<li class="ac_group">${escapeHtml(value)}</li>`;
+            const other = value === "기타 항구";
+            html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
+              + (other ? `<small>규모가 작거나 분류 정보가 없는 항구</small>` : "")
+              + `</li>`;
           }
         }
         html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
@@ -298,13 +301,22 @@
         const response = await getJson(`${urls.locations}?${params}`);
         return response.success ? response.data : [];
       },
-      (item) => `<b>${escapeHtml(item.name)}</b> <span class="mono">${escapeHtml(item.code)}</span><small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}</small>`,
+      (item) => {
+        const size = { L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "";
+        return `<b>${escapeHtml(item.name)}</b> <span class="mono">${escapeHtml(item.code)}</span>`
+          + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`;
+      },
       (item, input) => {
         state[role] = item;
         if (item) input.value = `${item.name} (${item.code})`;
         invalidateSchedules();
       },
-      { groupBy: role === "destination" ? (item) => item.country : null },
+      {
+        // 주요 수출입 항구를 먼저 보여주고, 나머지는 맨 아래 "기타 항구"로 모읍니다.
+        groupBy: (item) => (item.major
+          ? (role === "destination" ? item.country : "주요 항구")
+          : "기타 항구"),
+      },
     );
     setupCustomInput(role);
     if (countryFilter) {

@@ -10,7 +10,11 @@ from functools import lru_cache
 
 from app.collectors.base_client import fail, load_mock, ok
 
-MAX_RESULTS = 30
+# Main trade ports are listed first; the rest follow under "기타 항구".
+MAX_MAIN_RESULTS = 40
+MAX_OTHER_RESULTS = 12
+# World Port Index harbour size, biggest first.
+HARBOR_SIZE_RANK = {"L": 0, "M": 1, "S": 2, "V": 3}
 CODE_MIN_LENGTH = 3
 CODE_MAX_LENGTH = 10
 
@@ -93,13 +97,17 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
                 continue
         results.append(item)
 
-    # Exact code, then names starting with the keyword, then well-known ports.
+    # Exact code, then names starting with the keyword, then harbour size.
     # Shorter names win so that "부산" lists 부산항 before 부산신항.
-    results.sort(key=lambda item: (
-        item["code"].lower() != keyword,
-        not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
-        not item["major"],
-        len(item["name"]),
-        item["name"],
-    ))
-    return ok(deepcopy(results[:MAX_RESULTS]), "mock")
+    def rank(item: dict) -> tuple:
+        return (
+            item["code"].lower() != keyword,
+            not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
+            HARBOR_SIZE_RANK.get(item.get("harbor_size"), 9),
+            len(item["name"]),
+            item["name"],
+        )
+
+    main_ports = sorted((item for item in results if item["major"]), key=rank)[:MAX_MAIN_RESULTS]
+    other_ports = sorted((item for item in results if not item["major"]), key=rank)[:MAX_OTHER_RESULTS]
+    return ok(deepcopy(main_ports + other_ports), "mock")

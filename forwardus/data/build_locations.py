@@ -2,6 +2,8 @@
 
 Sources
 - UN/LOCODE code list (UNECE, mirrored by the Frictionless Data project)
+- World Port Index / NGA Pub 150 (harbour size, used to pick each country's
+  main trade ports)
 - ISO 3166 country list with regions (for schedule region mapping)
 - Korean country names
 
@@ -29,10 +31,22 @@ OUTPUT = DATA_DIR / "mock" / "locations.json"
 UNLOCODE_URL = "https://raw.githubusercontent.com/datasets/un-locode/main/data/code-list.csv"
 ISO_URL = "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.json"
 KOREAN_COUNTRY_URL = "https://raw.githubusercontent.com/umpirsky/country-list/master/data/ko/country.json"
+WPI_URL = "https://msi.nga.mil/api/publications/world-port-index?output=json"
 
 # UN/LOCODE function codes: 1 = seaport, 4 = airport.
 PORT_FUNCTION = "1"
 AIRPORT_FUNCTION = "4"
+
+# World Port Index harbour size: L(arge), M(edium), S(mall), V(ery small).
+HARBOR_SIZE_RANK = {"L": 0, "M": 1, "S": 2, "V": 3}
+MAIN_HARBOR_SIZES = {"L", "M"}
+# Countries without a large or medium harbour still need suggestions, so their
+# biggest harbours are promoted until this many main ports exist.
+MIN_MAIN_PORTS_PER_COUNTRY = 5
+
+# UN/LOCODE status codes set by a national authority or customs. Used only for
+# countries the World Port Index does not cover (e.g. Bulgaria, Barbados).
+APPROVED_STATUSES = {"AA", "AC", "AI", "AS"}
 
 # ISO sub-region → schedule region used by data/mock/schedules.json.
 SUB_REGION_TO_REGION = {
@@ -191,10 +205,52 @@ def title_case(name: str) -> str:
     return " ".join(word if word.isupper() and len(word) <= 3 else word.title() for word in name.split())
 
 
+def normalize_name(name: str) -> str:
+    return "".join(ch for ch in (name or "").lower() if ch.isalnum())
+
+
+def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
+    """UN/LOCODE → World Port Index harbour size (L/M/S/V).
+
+    Some World Port Index entries carry no UN/LOCODE, so those are matched by
+    port name within the same country.
+    """
+
+    by_name: dict[tuple[str, str], str] = {}
+    for row in unlocode_rows:
+        if PORT_FUNCTION not in (row["Function"] or ""):
+            continue
+        key = (row["Country"], normalize_name(row["NameWoDiacritics"] or row["Name"]))
+        by_name.setdefault(key, f"{row['Country']}{row['Location']}")
+
+    ports = json.loads(download(WPI_URL, "world_port_index.json"))["ports"]
+    sizes: dict[str, str] = {}
+    for port in ports:
+        size = port.get("harborSize")
+        if not size:
+            continue
+        # Container terminals count as main ports regardless of harbour size.
+        if port.get("loContainer") == "Y":
+            size = "L"
+        code = (port.get("unloCode") or "").replace(" ", "").upper()
+        if not code:
+            country = (port.get("countryCode") or "").upper()
+            for name in (port.get("portName"), port.get("alternateName")):
+                code = by_name.get((country, normalize_name(name)), "")
+                if code:
+                    break
+        if not code:
+            continue
+        if HARBOR_SIZE_RANK.get(size, 9) < HARBOR_SIZE_RANK.get(sizes.get(code), 9):
+            sizes[code] = size
+    return sizes
+
+
 def build() -> list[dict]:
     unlocode = list(csv.DictReader(io.StringIO(download(UNLOCODE_URL, "unlocode_code_list.csv").decode("utf-8", "replace"))))
     iso = json.loads(download(ISO_URL, "iso_3166_regions.json"))
     korean_country = json.loads(download(KOREAN_COUNTRY_URL, "country_names_ko.json"))
+    harbor_sizes = load_harbor_sizes(unlocode)
 
     country_info = {
         row["alpha-2"]: {
@@ -221,6 +277,7 @@ def build() -> list[dict]:
             continue
         seen.add(code)
         name_en = title_case(row["NameWoDiacritics"] or row["Name"])
+        harbor_size = harbor_sizes.get(code)
         locations.append({
             "code": code,
             "name": KOREAN_NAMES.get(code, name_en),
@@ -232,7 +289,9 @@ def build() -> list[dict]:
             "country_code": country_code,
             "region": info["region"],
             "kind": "port",
-            "major": code in KOREAN_NAMES,
+            "status": row["Status"],
+            "harbor_size": harbor_size,
+            "major": code in KOREAN_NAMES or harbor_size in MAIN_HARBOR_SIZES,
         })
 
     for iata, (name_ko, name_en, country_code) in MAJOR_AIRPORTS.items():
@@ -248,11 +307,49 @@ def build() -> list[dict]:
             "country_code": country_code,
             "region": info["region"],
             "kind": "airport",
+            "status": "",
+            "harbor_size": None,
             "major": True,
         })
 
-    locations.sort(key=lambda item: (item["kind"], item["country_code"], not item["major"], item["code"]))
+    promote_main_ports(locations)
+    locations.sort(key=lambda item: (
+        item["kind"],
+        item["country_code"],
+        not item["major"],
+        HARBOR_SIZE_RANK.get(item["harbor_size"], 9),
+        item["code"],
+    ))
     return locations
+
+
+def promote_main_ports(locations: list[dict]) -> None:
+    """Ensure every country offers a few main ports, even without an L/M harbour."""
+
+    by_country: dict[str, list[dict]] = {}
+    for item in locations:
+        if item["kind"] == "port":
+            by_country.setdefault(item["country_code"], []).append(item)
+
+    for ports in by_country.values():
+        mains = [port for port in ports if port["major"]]
+        if len(mains) >= MIN_MAIN_PORTS_PER_COUNTRY:
+            continue
+        # Prefer harbours the World Port Index knows about, biggest first.
+        rest = sorted(
+            (port for port in ports if not port["major"] and port["harbor_size"]),
+            key=lambda port: (HARBOR_SIZE_RANK[port["harbor_size"]], port["name_en"]),
+        )
+        if not rest and not mains:
+            # No World Port Index data for this country: fall back to the codes
+            # a national authority or customs approved, skipping XXX placeholders.
+            rest = sorted(
+                (port for port in ports
+                 if port["status"] in APPROVED_STATUSES and not port["code"].endswith("XXX")),
+                key=lambda port: port["name_en"],
+            )
+        for port in rest[:MIN_MAIN_PORTS_PER_COUNTRY - len(mains)]:
+            port["major"] = True
 
 
 if __name__ == "__main__":
@@ -262,6 +359,9 @@ if __name__ == "__main__":
         print(f"경고: UN/LOCODE에 없는 코드 {len(unmatched)}개 -> {', '.join(unmatched)}")
     OUTPUT.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     ports = [item for item in items if item["kind"] == "port"]
+    mains = [item for item in ports if item["major"]]
     print(f"{OUTPUT}: {len(items):,} locations "
           f"(ports {len(ports):,} / airports {len(items) - len(ports):,}, "
           f"countries {len({item['country_code'] for item in items}):,})")
+    print(f"  주요 항구 {len(mains):,}곳 / 기타 항구 {len(ports) - len(mains):,}곳 "
+          f"(주요 항구 보유 국가 {len({item['country_code'] for item in mains}):,}개국)")
