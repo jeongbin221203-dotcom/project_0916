@@ -23,10 +23,6 @@
 .cal_legend .legend_departure::before { background: var(--blue); }
 .cal_legend .legend_buyer::before { background: #f5c518; }
 .cal_legend .legend_range::before { background: #bae6fd; }
-.cal_legend .legend_range.range_ok::before { background: #86efac; }
-.cal_legend .legend_range.range_tight::before { background: #fcd34d; }
-.cal_legend .legend_range.range_late::before { background: #fca5a5; }
-.cal_legend .legend_range.range_none { display: none; }
 .cal_hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 .cal_head button:disabled { opacity: .3; cursor: default; }
 .cal_week, .cal_grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
@@ -37,12 +33,8 @@
 .cal_grid button.today { box-shadow: inset 0 0 0 1px var(--blue); }
 .cal_grid button.selected { background: var(--blue); color: #fff; }
 .cal_grid button.buyer { background: #fde68a; color: #7c4a03; font-weight: 900; }
-/* 출발일과 요청일 사이(운송 기간). 여유 등급에 따라 색이 달라집니다. */
+/* Seller 예상일과 Buyer 요청일 사이(예상 운송 기간) */
 .cal_grid button.in_range { background: #e0f2fe; color: #0369a1; }
-.cal_grid button.in_range.range_ok { background: #dcfce7; color: #15803d; }
-.cal_grid button.in_range.range_caution { background: #e0f2fe; color: #0369a1; }
-.cal_grid button.in_range.range_tight { background: #fef3c7; color: #b45309; }
-.cal_grid button.in_range.range_late { background: #fee2e2; color: #b91c1c; }
 .cal_grid button.blocked { color: #cbd5e1; text-decoration: line-through; }
 .cal_grid button.buyer.selected { background: var(--blue); color: #fff; box-shadow: inset 0 0 0 2px #f5c518; }
 .selected_date { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }

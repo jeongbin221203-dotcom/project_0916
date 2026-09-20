@@ -175,8 +175,6 @@
   const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
   // 달력을 누를 때마다 출발 예정일 -> Buyer 요청일 -> 출발 예정일 … 순으로 채웁니다.
   let pickTarget = "departure";
-  // 출발일 여유 등급(ok/caution/tight/late). 두 날짜 사이를 칠하는 색으로 씁니다.
-  let marginLevel = "none";
 
   function monthHtml(base, offset) {
     const year = base.getFullYear();
@@ -197,7 +195,7 @@
       if (date.getTime() === today.getTime()) classes.push("today");
       // 출발일과 요청일 사이는 여유 등급에 따라 색을 달리합니다.
       if (departure && buyerDate && iso > departure && iso < buyerDate) {
-        classes.push("in_range", `range_${marginLevel}`);
+        classes.push("in_range");
       }
       // 출발일은 요청일보다 뒤로, 요청일은 출발일보다 앞으로 갈 수 없습니다.
       // Buyer 요청일을 고를 때만 출발일 이전 날짜를 막습니다.
@@ -218,17 +216,18 @@
     calendarEl.innerHTML = `
       <div class="cal_head">
         <button type="button" data-cal-prev ${canGoBack ? "" : "disabled"} aria-label="이전 달">‹</button>
-        <b>${pickTarget === "departure" ? "출발 예정일 선택" : "Buyer 요청 도착일 선택"}</b>
+        <b>일정 선택</b>
         <button type="button" data-cal-next aria-label="다음 달">›</button>
       </div>
       <div class="cal_months">${monthHtml(viewMonth, 0)}${monthHtml(viewMonth, 1)}</div>
       <p class="cal_legend">
-        <span class="legend_departure">출발 예정일</span>
+        <span class="legend_departure">Seller 예상일</span>
         <span class="legend_buyer">Buyer 요청 도착일</span>
-        <span class="legend_range range_${marginLevel}">운송 기간</span>
+        <span class="legend_range">예상 운송 기간</span>
       </p>
-      <p class="cal_hint">날짜를 누를 때마다 출발 예정일 → Buyer 요청일 순서로 지정됩니다.
-        출발 예정일을 다시 고르면 Buyer 요청일은 지워집니다.</p>`;
+      <p class="cal_hint">다음 선택: <b>${pickTarget === "departure" ? "Seller 예상일" : "Buyer 요청 도착일"}</b>
+        · 날짜를 누를 때마다 Seller 예상일 → Buyer 요청일 순서로 지정되고,
+        Seller 예상일을 다시 고르면 Buyer 요청일은 지워집니다.</p>`;
   }
 
   calendarEl.addEventListener("click", (event) => {
@@ -246,7 +245,7 @@
         pickTarget = "buyer";
       } else {
         if (state.departure_date && iso < state.departure_date) {
-          showError("Buyer 요청 도착일은 출발 예정일보다 빠를 수 없습니다.");
+          showError("Buyer 요청 도착일은 Seller 예상일보다 빠를 수 없습니다.");
           return;
         }
         buyerInput.value = iso;
@@ -863,7 +862,6 @@
     });
     if (!response.success || !response.data.available) {
       marginBox.hidden = true;
-      marginLevel = "none";
       return;
     }
     const data = response.data;
@@ -877,16 +875,12 @@
     marginBox.className = `margin_box level_${data.level}`;
     marginBox.innerHTML = text;
     marginBox.hidden = false;
-    if (data.level !== marginLevel) {
-      marginLevel = data.level;
-      renderCalendar();
-    }
   }
 
   function updateSelectedDates() {
     const buyerDate = form.elements.buyer_required_date.value;
     selectedDateEl.innerHTML =
-      `<span class="date_item departure"><i></i>Seller 예정일 ${state.departure_date || "미선택"}</span>`
+      `<span class="date_item departure"><i></i>Seller 예상일 ${state.departure_date || "미선택"}</span>`
       + `<span class="date_item buyer"><i></i>Buyer 요청일 ${buyerDate || "미선택"}</span>`;
     checkDeparture();
   }
@@ -894,7 +888,7 @@
   form.elements.buyer_required_date.addEventListener("change", () => {
     const value = form.elements.buyer_required_date.value;
     if (value && state.departure_date && value < state.departure_date) {
-      showError("Buyer 요청 도착일은 출발 예정일보다 빠를 수 없습니다.");
+      showError("Buyer 요청 도착일은 Seller 예상일보다 빠를 수 없습니다.");
       form.elements.buyer_required_date.value = "";
       updateSelectedDates();
       renderCalendar();
