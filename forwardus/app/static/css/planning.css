@@ -131,6 +131,7 @@
 .outlook_eta { color: inherit; opacity: .8; font-weight: 600; font-size: 12px; }
 .outlook_margin { font-weight: 800; }
 .outlook_level { grid-column: 4; font-size: 12px; font-weight: 800; }
+.outlook_note { grid-column: 1 / -1; font-size: 12px; font-weight: 700; opacity: .9; }
 .outlook_row.level_ok { background: var(--green_soft); color: #07694f; }
 .outlook_row.level_caution { background: #e8f3ff; color: var(--blue_dark); }
 .outlook_row.level_tight { background: var(--amber_soft); color: #8a4f00; }

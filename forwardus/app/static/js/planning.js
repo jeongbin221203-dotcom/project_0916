@@ -81,7 +81,12 @@
   const errorBox = document.querySelector("[data-form-error]");
 
   /* ----- 입력값 임시 저장: 다른 메뉴에 다녀와도 내용이 남습니다 ----- */
+  // 탭을 새로 열면 빈 화면에서 시작하고, 메뉴를 오갈 때만 입력이 유지되도록
+  // sessionStorage를 씁니다. (브라우저를 닫으면 사라집니다)
   const DRAFT_KEY = "forwardus:planning-draft";
+  const draftStore = window.sessionStorage;
+  // 예전에 localStorage에 남아 있던 임시 저장본은 더 이상 쓰지 않으므로 지웁니다.
+  try { window.localStorage.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
   const DRAFT_FIELDS = [
     "project_name", "buyer_required_date", "product_description", "hs_code", "package_type",
     "quantity", "length_cm", "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg",
@@ -111,7 +116,7 @@
       fields,
     };
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      draftStore.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch (error) {
       /* 저장 공간이 없으면 그냥 넘어갑니다. */
     }
@@ -119,13 +124,13 @@
 
   function clearDraft() {
     try {
-      localStorage.removeItem(DRAFT_KEY);
+      draftStore.removeItem(DRAFT_KEY);
     } catch (error) { /* 무시 */ }
   }
 
   function loadDraft() {
     try {
-      return JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+      return JSON.parse(draftStore.getItem(DRAFT_KEY) || "null");
     } catch (error) {
       return null;
     }
@@ -525,6 +530,8 @@
       async (q) => {
         const params = new URLSearchParams({ q, mode: state.transport_mode, role });
         if (countryFilter && countryFilter.value) params.set("country", countryFilter.value);
+        // 출발 공항을 알면 그 공항 기준으로 직항 여부를 판정합니다.
+        if (role === "destination" && state.origin) params.set("origin", state.origin.code);
         const response = await getJson(`${urls.locations}?${params}`);
         return response.success ? response.data : [];
       },
@@ -551,6 +558,10 @@
       (item, input) => {
         state[role] = item;
         if (item) input.value = `${item.name} (${item.code})`;
+        if (role === "origin") {
+          // 출발지가 바뀌면 도착지의 직항 표시가 달라집니다.
+          locationSearch.destination?.search();
+        }
         invalidateSchedules();
         saveDraftSoon();
         updateSelectedDates();
@@ -862,6 +873,7 @@
       return;
     }
     const response = await postJson(urls.scheduleOutlook, {
+      origin_code: state.origin ? state.origin.code : "",
       destination_code: state.destination.code,
       requested_departure_date: state.departure_date,
       buyer_required_date: form.elements.buyer_required_date.value,
@@ -893,6 +905,7 @@
             mode.eta_slowest !== mode.eta_fastest ? ` ~ ${mode.eta_slowest}` : ""}</span>
           <span class="outlook_margin">${escapeHtml(margin(mode))}</span>
           <span class="outlook_level">${escapeHtml(LEVEL_TEXT[mode.level] || "")}</span>
+          ${mode.note ? `<span class="outlook_note">${escapeHtml(mode.note)}</span>` : ""}
         </div>`).join("");
     box.hidden = false;
   }
