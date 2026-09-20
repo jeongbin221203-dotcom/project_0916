@@ -283,6 +283,46 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
     return ok(items, "mock")
 
 
+# 지금 정기편이 뜨지 않는 국내 공항. 여기서 출발한다고 소요일을 내면
+# 예약할 수 없는 일정을 알려 주는 셈이 됩니다.
+# 확인: 한국공항공사 운항스케줄 페이지 (출발·도착 표가 모두 비어 있음)
+SUSPENDED_AIRPORTS = {
+    "MWX": {
+        "reason": "무안국제공항은 정기편 운항이 멈춰 있습니다.",
+        "detail": "한국공항공사 운항스케줄에 등록된 정기편이 없습니다. "
+                  "재개 시점이 정해지지 않아 인천·김해에서 보내야 합니다.",
+        "checked_on": "2026-09-20",
+        "source": "한국공항공사 무안국제공항 운항스케줄",
+    },
+}
+
+
+@lru_cache(maxsize=1)
+def korean_air_gateways() -> tuple[str, ...]:
+    """국제선이 실제로 뜨는 국내 공항. 직항 목적지가 많은 곳을 먼저 둡니다.
+
+    수출 화물을 보낼 공항을 고를 때 씁니다. 거리만 보면 무안·제주처럼
+    국제 화물을 보낼 수 없는 공항이 뽑힙니다.
+    """
+
+    counts: dict[str, int] = {}
+    for item in _all_locations():
+        if item["kind"] != "airport":
+            continue
+        for code in item.get("direct_from") or []:
+            counts[code] = counts.get(code, 0) + 1
+    ordered = sorted((code for code in counts if code not in SUSPENDED_AIRPORTS),
+                     key=lambda code: -counts[code])
+    return tuple(ordered)
+
+
+def airport_service_status(code: str) -> dict:
+    """그 공항이 지금 정기편을 띄우는지. 모르면 운항 중으로 봅니다."""
+
+    stopped = SUSPENDED_AIRPORTS.get((code or "").strip().upper())
+    return {"operating": False, **stopped} if stopped else {"operating": True}
+
+
 def sea_links() -> dict:
     """국내 항구별로 실제 항로가 이어진 나라 목록.
 
@@ -347,7 +387,13 @@ def nearest(location: dict, kind: str, country_code: str | None = None) -> dict 
     here = (location["lat"], location["lon"])
     candidates = [item for item in _all_locations()
                   if item["kind"] == kind and item["country_code"] == country_code
-                  and item["lat"] is not None and item.get("major")]
+                  and item["lat"] is not None and item.get("major")
+                  and (kind != "airport" or item["code"] not in SUSPENDED_AIRPORTS)]
+    if kind == "airport" and country_code == "KR":
+        # 국제선이 뜨는 공항만 고릅니다. 무안·제주처럼 화물을 보낼 수 없는
+        # 공항이 거리만으로 뽑히면 예약할 수 없는 일정을 알려 주게 됩니다.
+        gateways = set(korean_air_gateways())
+        candidates = [item for item in candidates if item["code"] in gateways] or candidates
     # 한국에서 실제로 직기항·직항이 있는 곳을 먼저 고릅니다.
     key = "sea_direct" if kind == "port" else "direct_from_korea"
     candidates = [item for item in candidates if item.get(key)] or candidates

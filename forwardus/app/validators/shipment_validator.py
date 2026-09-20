@@ -75,14 +75,27 @@ def validate_route(payload: dict) -> dict:
     }
 
 
+# 항공에 해상 전용 조건을 쓰는 것은 틀린 일이지만, 바이어가 계약서에 그렇게
+# 적어 오는 일이 실제로 있습니다. 막지 않고 한 번 더 확인만 받습니다.
+AIR_INCOTERMS_MESSAGE = ("항공 운송에는 FOB, CFR, CIF 대신 FCA, CPT, CIP를 씁니다. "
+                         "FOB·CFR·CIF는 '본선에 적재된 때' 위험이 넘어간다고 정한 "
+                         "해상 전용 조건이라 항공에는 넘어가는 시점이 없습니다.")
+AIR_INCOTERMS_CONFIRM = "그래도 이 조건으로 진행하시려면 [다음]을 한 번 더 눌러주세요."
+
+
 def validate_trade_terms(payload: dict, transport_mode: str) -> dict:
     """Validate Incoterms, currency, and invoice value."""
 
     incoterms = str(payload.get("incoterms") or "").upper()
     if incoterms not in INCOTERMS:
         raise ValidationError("Incoterms를 선택해주세요.", "incoterms")
+
+    warning = ""
     if transport_mode == "AIR" and incoterms in AIR_INVALID_INCOTERMS:
-        raise ValidationError("항공 운송에는 FOB, CFR, CIF 대신 FCA, CPT, CIP를 사용합니다.", "incoterms")
+        if not _truthy(payload.get("incoterms_confirmed")):
+            raise ValidationError(f"{AIR_INCOTERMS_MESSAGE} {AIR_INCOTERMS_CONFIRM}",
+                                  "incoterms", code="INCOTERMS_CONFIRM")
+        warning = AIR_INCOTERMS_MESSAGE
 
     currency = str(payload.get("currency") or "USD").upper()
     if currency not in CURRENCIES:
@@ -91,10 +104,15 @@ def validate_trade_terms(payload: dict, transport_mode: str) -> dict:
     return {
         "incoterms": incoterms,
         "currency": currency,
+        "incoterms_warning": warning,
         "invoice_value": parse_number(
             payload.get("invoice_value"), "Invoice Value", max_value=MAX_INVOICE_VALUE, field="invoice_value"
         ),
     }
+
+
+def _truthy(value) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def validate_parties(payload: dict) -> dict:

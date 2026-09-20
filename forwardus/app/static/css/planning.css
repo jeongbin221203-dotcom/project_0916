@@ -309,3 +309,6 @@
 .tariff_item + .tariff_item { margin-top: 16px; padding-top: 16px; border-top: 2px solid #c7d7fd; }
 .tariff_item_title { margin: 0 0 8px; font-size: 13px; font-weight: 900; color: var(--blue_dark); }
 .tariff_item_title small { margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+
+/* 막는 오류가 아니라 "한 번 더 확인"인 안내 */
+.form_error.is_confirm { background: var(--amber_soft); border-color: #fcd34d; color: #8a4f00; }

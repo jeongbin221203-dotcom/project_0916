@@ -178,7 +178,16 @@
   function showError(message) {
     errorBox.textContent = message;
     errorBox.hidden = !message;
+    errorBox.classList.remove("is_confirm");
     if (message) errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  // 막는 것이 아니라 한 번 더 확인받는 안내. 같은 자리에 다른 색으로 보여줍니다.
+  function showConfirm(message) {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+    errorBox.classList.add("is_confirm");
+    errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function goToStep(step) {
@@ -409,6 +418,8 @@
           html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
         });
       }
+      // 목록 맨 위에 덧붙일 안내가 있으면 함께 그립니다. (예: 영문을 한글로 바꿔 찾음)
+      if (options.leadRow) html = options.leadRow() + html;
       list.innerHTML = html;
       // 목록을 그린 뒤 덧붙일 것이 있으면 (예: HS 후보별 협정) 이어서 채웁니다.
       if (options.afterRender) options.afterRender(items, list);
@@ -870,20 +881,32 @@
   /* ----- HS부호 찾기 (첫 품목과 추가 품목이 같은 방식을 씁니다) ----- */
   let lastHsQuery = "";
   let lastHsError = "";
+  let lastHsSearchedAs = "";
 
   // 품명(한글·영문)이나 HS부호로 관세청에서 찾습니다.
   async function fetchHsCodes(query, fallback) {
     const text = (query || "").trim() || (fallback || "").trim();
     lastHsQuery = text;
     lastHsError = "";
+    lastHsSearchedAs = "";
     if (!text) return [];
     const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: text })}`);
+    // 영문·오타로 적어 다른 낱말로 바꿔 찾았으면 그 사실을 알려 줍니다.
+    if (response.searched_as) lastHsSearchedAs = response.searched_as;
     if (!response.success) {
       // 결과가 없는 것과 조회가 안 된 것은 다릅니다. 섞어서 알리면 안 됩니다.
       lastHsError = response.message || "관세청 조회에 실패했습니다. 잠시 후 다시 시도해주세요.";
       return [];
     }
     return response.data.map((item) => ({ ...item, source: response.source }));
+  }
+
+  // 영문·오타를 다른 낱말로 바꿔 찾았으면 목록 맨 위에 그 사실을 적습니다.
+  function hsSearchedAsRow() {
+    if (!lastHsSearchedAs) return "";
+    return `<li class="ac_group">"${escapeHtml(lastHsQuery)}"를 `
+      + `<b>${escapeHtml(lastHsSearchedAs)}</b>로 보고 찾았습니다`
+      + `<small>관세청은 관세율표에 적힌 한글 품명으로만 찾습니다</small></li>`;
   }
 
   function renderHsItem(item) {
@@ -900,7 +923,8 @@
       return "HS부호는 10자리를 모두 입력해야 조회됩니다. 품명으로 찾아보세요.";
     }
     if (!lastHsQuery) return "품명(예: 립스틱, 샴푸) 또는 HS부호 10자리를 입력하세요.";
-    return `"${lastHsQuery}"로 찾은 품목이 없습니다. 더 일반적인 낱말로 찾아보세요.`;
+    return `"${lastHsQuery}" 검색 결과가 없습니다.`
+      + " 한글·영문 모두 됩니다. 더 일반적인 낱말로 적어보세요. (예: 가죽 가방 → 가방)";
   }
 
   const hsSearch = setupAutocomplete(
@@ -913,6 +937,7 @@
       refreshTariff();     // 고른 품목의 협정세율을 아래에 보여줍니다.
     },
     {
+      leadRow: hsSearchedAsRow,
       // 도착국을 골랐으면 후보마다 그 나라에 쓸 수 있는 협정을 한 줄씩 붙입니다.
       // 어느 부호를 골라야 유리한지 목록에서 바로 비교할 수 있습니다.
       afterRender: async (items, list) => {
@@ -1200,8 +1225,10 @@
         <button type="button" class="link_button danger" data-remove-cargo>삭제</button>
       </div>
       <div class="form_grid">
-        ${LINE_LAYOUT.map(lineFieldHtml).join("")}
-        <div class="tariff span2" data-line-tariff hidden></div>
+        ${LINE_LAYOUT.map((field) => lineFieldHtml(field)
+          // 관세 안내는 HS부호 바로 아래에 붙습니다. 첫 품목과 자리를 맞춥니다.
+          + (field[0] === "hs_code" ? `<div class="tariff span2" data-line-tariff hidden></div>` : "")
+        ).join("")}
         <div class="field span2 dg_box" data-dg-box>${dgBoxHtml()}</div>
       </div>`;
     cargoLinesBox.appendChild(row);
@@ -1228,7 +1255,7 @@
       (q) => fetchHsCodes(q, nameInput.value),
       renderHsItem,
       (item, input) => { if (item) { input.value = item.code; refreshTariff(); } },
-      { emptyMessage: hsEmptyMessage },
+      { emptyMessage: hsEmptyMessage, leadRow: hsSearchedAsRow },
     );
     const suggest = debounce(() => {
       if (hsBox.querySelector("[data-ac-input]").value.trim()) return;
@@ -1519,9 +1546,19 @@
     return "";
   }
 
+  // 막는 오류가 아니라 "한 번 더 확인"인 것들. 다시 누르면 그대로 진행합니다.
+  const CONFIRMABLE = { INCOTERMS_CONFIRM: "incoterms_confirmed" };
+  const confirmed = {};
+
   function handleServerError(response) {
     const step = FIELD_STEP[response.field];
     if (step && step !== state.step) goToStep(step);
+    const flag = CONFIRMABLE[response.error_code];
+    if (flag) {
+      confirmed[flag] = true;
+      showConfirm(response.message);
+      return;
+    }
     showError(response.message || "요청을 처리하지 못했습니다.");
   }
 
@@ -1654,7 +1691,7 @@
 
     box.innerHTML = `<p class="outlook_head">${escapeHtml(state.origin ? state.origin.name : "출발지")}`
       + ` → ${escapeHtml(data.destination)} 예상 일정`
-      + ` <em title="거리는 실제 바닷길·대권거리로 구했습니다. 직기항 여부는 운항 기록에서 모은 국가별 연결 자료로 판정합니다. 선사별 정기선 유무는 선사에 확인해야 합니다.">실제 바닷길 거리 기준 · 추정</em></p>`
+      + ` <em title="거리는 실제 바닷길·대권거리로 구했습니다. 직기항·직항 여부는 운항 기록에서 모은 연결 자료로 판정한 것이고, 나가는 편 기준입니다. 어느 선사·항공사가 그 구간에 정기편을 넣는지는 따로 확인해야 합니다.">항로망 거리 기반 추정 · 출발 기준</em></p>`
       + data.modes.map((mode) => `
         <div class="outlook_row level_${mode.level}${mode.selected ? " is_selected" : ""}">
           ${mode.selected ? `<span class="outlook_pick">선택</span>` : ""}
@@ -1732,6 +1769,7 @@
         invoice_value: plainNumber(f.invoice_value.value),
         cargo: cargoPayload(),
         schedule_id: state.schedule_id,
+        ...confirmed,
         exporter_name: f.exporter_name.value,
         exporter_address: f.exporter_address.value,
         notify_party: f.notify_party.value,

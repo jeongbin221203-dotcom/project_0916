@@ -12,7 +12,9 @@ def error_response(exc: Exception):
     """Convert a service or validation error into a normalized JSON response."""
 
     if isinstance(exc, ValidationError):
-        return jsonify({"success": False, "error_code": "VALIDATION_ERROR", "message": str(exc), "field": exc.field}), 400
+        return jsonify({"success": False,
+                        "error_code": getattr(exc, "code", "") or "VALIDATION_ERROR",
+                        "message": str(exc), "field": exc.field}), 400
     if isinstance(exc, ServiceError):
         return jsonify({"success": False, "error_code": exc.error_code, "message": str(exc)}), exc.status
     raise exc

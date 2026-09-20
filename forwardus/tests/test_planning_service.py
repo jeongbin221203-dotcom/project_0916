@@ -1292,3 +1292,75 @@ def test_outlook_says_which_korean_port_has_the_service(app):
     assert all(mode["direct"] is True for mode in busan_sea)
     # 환적이 빠지면 소요일도 줄어듭니다.
     assert busan_sea[0]["min_days"] < sea[0]["min_days"]
+
+
+def test_english_and_misspelled_product_names_find_the_hs_code(app, monkeypatch):
+    """관세청은 한글 품명으로만 찾습니다. 영문·오타는 바꿔서 다시 찾습니다."""
+
+    from app.collectors import customs_client
+
+    calls = []
+
+    def fake_search(query):
+        calls.append(query)
+        if query == "치약":
+            return {"success": True, "source": "api",
+                    "data": [{"code": "3306.10-0000", "name": "치약"}]}
+        return {"success": True, "source": "api", "data": []}
+
+    monkeypatch.setattr(customs_client, "search_hs_codes", fake_search)
+    monkeypatch.setattr(planning_service, "_hs_name_hints", lambda q: ["치약"])
+
+    with app.app_context():
+        result = planning_service.search_hs_codes("tooth paist")
+
+    assert result["data"][0]["code"] == "3306.10-0000"
+    # 무슨 낱말로 바꿔 찾았는지 화면에 알릴 수 있어야 합니다.
+    assert result["searched_as"] == "치약"
+    assert result["original_query"] == "tooth paist"
+    assert calls == ["tooth paist", "치약"]
+
+
+def test_korean_names_are_not_sent_through_the_rewrite(app, monkeypatch):
+    """한글로 바로 찾히면 AI를 부르지 않습니다. 괜히 느려지지 않게 합니다."""
+
+    from app.collectors import customs_client
+
+    monkeypatch.setattr(customs_client, "search_hs_codes", lambda q: {
+        "success": True, "source": "api", "data": [{"code": "3306.10-0000", "name": "치약"}]})
+
+    called = []
+    monkeypatch.setattr(planning_service, "_hs_name_hints", lambda q: called.append(q) or [])
+
+    with app.app_context():
+        result = planning_service.search_hs_codes("치약")
+
+    assert called == []
+    assert "searched_as" not in result
+
+
+def test_air_incoterms_warn_once_then_let_the_user_through(app):
+    """항공에 해상 전용 조건을 쓰면 막지 않고 한 번 더 확인만 받습니다.
+
+    바이어가 계약서에 FOB로 적어 오는 일이 실제로 있습니다.
+    """
+
+    from app.validators import ValidationError
+    from app.validators.shipment_validator import validate_trade_terms
+
+    terms = {"incoterms": "FOB", "currency": "USD", "invoice_value": "3000"}
+    with app.app_context():
+        with pytest.raises(ValidationError) as caught:
+            validate_trade_terms(terms, "AIR")
+        assert caught.value.code == "INCOTERMS_CONFIRM"
+        assert "다음" in str(caught.value)
+
+        # 한 번 더 누르면 그대로 진행하되 경고는 남깁니다.
+        passed = validate_trade_terms({**terms, "incoterms_confirmed": True}, "AIR")
+        assert passed["incoterms"] == "FOB"
+        assert passed["incoterms_warning"]
+
+        # 해상이면 애초에 문제가 아닙니다.
+        assert validate_trade_terms(terms, "SEA")["incoterms_warning"] == ""
+        # 항공에 맞는 조건도 경고가 없습니다.
+        assert validate_trade_terms({**terms, "incoterms": "FCA"}, "AIR")["incoterms_warning"] == ""

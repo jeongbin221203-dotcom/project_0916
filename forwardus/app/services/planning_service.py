@@ -132,8 +132,59 @@ def search_unlocode(query: str, role: str | None = None, country: str | None = N
     return location_client.search_unlocode(country, query)
 
 
+# 관세청 HS부호검색은 관세율표에 적힌 한글 품명으로만 찾습니다.
+# 영문이나 오타로 적으면 한 건도 안 나옵니다. 그래서 못 찾으면 AI에게
+# "관세율표에서는 이 물건을 뭐라고 부르나"를 물어 그 낱말로 다시 찾습니다.
+HS_HINT_PROMPT = """사용자가 수출할 물건의 이름을 적었습니다.
+한국 관세율표(HS)에서 그 물건을 가리키는 한국어 품명 후보를 최대 3개 고르세요.
+
+규칙
+- 관세율표에 실제로 쓰이는 낱말로만 답하세요. (예: 치약, 샴푸, 화장비누, 가죽제 가방)
+- 영문이나 오타로 적혀 있어도 무슨 물건인지 알아내세요. (toothpaste, tooth paist -> 치약)
+- 상표명이나 광고 문구는 빼고 물건 자체의 이름만 남기세요.
+- 무슨 물건인지 알 수 없으면 빈 목록을 주세요. 지어내지 마세요.
+
+JSON만 답하세요: {"names": ["치약"]}"""
+
+
+def _hs_name_hints(query: str) -> list[str]:
+    """영문·오타로 적힌 품명을 관세율표 한글 품명으로 바꿔 봅니다."""
+
+    import json
+
+    from app.collectors import ai_client
+
+    if not ai_client.available():
+        return []
+    result = ai_client.chat([
+        {"role": "system", "content": HS_HINT_PROMPT},
+        {"role": "user", "content": query[:200]},
+    ], max_tokens=120)
+    if not result["success"]:
+        return []
+    try:
+        names = json.loads(result["data"]).get("names") or []
+    except ValueError:
+        return []
+    return [str(name).strip()[:40] for name in names[:3] if str(name).strip()]
+
+
 def search_hs_codes(query: str) -> dict:
-    return customs_client.search_hs_codes(query)
+    """관세청 HS부호검색. 못 찾으면 품명을 바꿔 한 번 더 찾습니다."""
+
+    text = (query or "").strip()
+    found = customs_client.search_hs_codes(text)
+    if not found["success"] or found["data"] or not text:
+        return found
+
+    for name in _hs_name_hints(text):
+        if name == text:
+            continue
+        retry = customs_client.search_hs_codes(name)
+        if retry["success"] and retry["data"]:
+            # 무슨 낱말로 바꿔 찾았는지 화면에서 밝혀 줍니다.
+            return {**retry, "searched_as": name, "original_query": text}
+    return found
 
 
 def exchange_rates() -> dict:
@@ -691,11 +742,22 @@ def _sea_leg(origin: dict | None, destination: dict | None) -> dict | None:
 def _air_leg(origin: dict | None, destination: dict | None) -> dict | None:
     """항공 구간: 고른 곳이 항구면 같은 나라의 가장 가까운 공항으로 바꿔 계산합니다."""
 
+    picked = origin is not None and origin["kind"] == "airport"
     origin = _korean_origin(origin, "airport")
     destination = (destination if destination and destination["kind"] == "airport"
                    else location_client.nearest(destination, "airport"))
     if not origin or not destination or origin["lat"] is None or destination["lat"] is None:
         return None
+
+    # 항구를 골라서 공항을 대신 정한 경우에는, 그 목적지로 직항이 있는 공항을
+    # 먼저 씁니다. 거리만 보면 제주처럼 그 노선이 없는 공항이 뽑힙니다.
+    if not picked:
+        direct_from = destination.get("direct_from") or []
+        if origin["code"] not in direct_from:
+            better = next((location_client.find_location(code)
+                           for code in location_client.korean_air_gateways()
+                           if code in direct_from), None)
+            origin = better or location_client.find_location(DEFAULT_ORIGIN["airport"]) or origin
     distance = great_circle_km((origin["lat"], origin["lon"]), (destination["lat"], destination["lon"]))
     direct = origin["code"] in (destination.get("direct_from") or [])
     # 직항이면 공표 시간표의 실제 운항 시간을 씁니다.
@@ -836,10 +898,15 @@ def schedule_outlook(payload: dict) -> dict:
                              air_route.get("destination_code", destination_code))
     air_origin = air_route.get("origin_code") or origin_code
     air_note = ""
-    if route.get("known") and not route.get("direct"):
+    # 정기편이 멈춘 공항이면 소요일보다 그 사실을 먼저 알려야 합니다.
+    stopped = location_client.airport_service_status(air_origin)
+    if not stopped["operating"]:
+        air_note = f"{stopped['reason']} {stopped['detail']}"
+    elif route.get("known") and not route.get("direct"):
         # 직항이 없으면 어디서 출발하거나 어디를 경유해야 하는지 알려줍니다.
         if route["korea_alternatives"]:
-            air_note = f"{air_origin} 직항 없음 · {', '.join(route['korea_alternatives'])} 출발은 직항"
+            air_note = (f"{air_origin} 출발 직항 없음 · "
+                        f"{', '.join(route['korea_alternatives'])} 출발은 직항")
         elif route["transfer_via"]:
             air_note = f"직항 없음 · {', '.join(route['transfer_via'])} 경유"
         else:
