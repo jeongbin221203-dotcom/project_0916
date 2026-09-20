@@ -223,6 +223,36 @@ KOREAN_NAMES = {
 
 # Major cargo airports (IATA code → Korean name). UN/LOCODE airport rows are
 # noisy, so international airports used for air freight are curated here.
+# 항공화물 거점 공항.
+# - KE: 대한항공 화물이 취항한다고 공식 소개 페이지에 밝힌 도시
+#   (cargo.koreanair.com, 2025.08 기준 25개국 44개 도시)
+# - HUB: 전 세계 항공화물 처리량 상위 공항과 특송사 허브
+# 여객 노선만 있는 공항과 구분해 목록 위에 표시합니다.
+KOREAN_AIR_CARGO = {
+    "LAX", "JFK", "ORD", "SFO",              # 북미
+    "GDL",                                    # 중남미
+    "LHR", "FRA", "AMS", "VIE", "OSL", "ZAZ", "BUD",  # 유럽
+    "NRT", "KIX", "CGO",                      # 동북아
+    "SIN", "SGN", "HAN",                      # 동남아
+}
+GLOBAL_CARGO_HUBS = {
+    # 북미
+    "MEM", "SDF", "ANC", "CVG", "MIA", "ATL", "DFW", "IAH", "YYZ", "MEX",
+    # 중남미
+    "GRU", "VCP", "BOG", "LIM", "SCL", "PTY",
+    # 유럽
+    "LUX", "LGG", "HHN", "EMA", "STN", "CDG", "BRU", "MXP", "MAD", "ZRH", "IST", "LEJ", "CGN",
+    # 중동·아프리카
+    "DXB", "DWC", "DOH", "AUH", "RUH", "JED", "BAH", "SHJ", "CAI", "JNB", "NBO", "ADD", "LOS", "CMN",
+    # 아시아
+    "HKG", "PVG", "PEK", "CAN", "SZX", "TAO", "TSN", "XIY", "HGH", "NKG", "WUH", "CKG", "TFU",
+    "TPE", "KHH", "HND", "NGO", "FUK", "KKJ", "KUL", "BKK", "CGK", "MNL", "CEB", "PNH",
+    "DEL", "BOM", "BLR", "MAA", "DAC", "CMB",
+    # 오세아니아
+    "SYD", "MEL", "BNE", "AKL",
+}
+CARGO_HUBS = KOREAN_AIR_CARGO | GLOBAL_CARGO_HUBS
+
 # 국내 공항. 이 공항들에서 직항편이 있는 해외 공항을 "직항 연결"로 표시합니다.
 KOREA_AIRPORTS = {"ICN", "GMP", "PUS", "CJU", "TAE", "CJJ", "MWX", "YNY"}
 
@@ -446,7 +476,10 @@ def build() -> list[dict]:
             "status": row["Status"],
             "harbor_size": harbor_size,
             "direct_from_korea": None,
+            "cargo_hub": False,
+            "korean_air_cargo": False,
             "transfer_via": [],
+            "gateway_only": False,
             "port_class": KOREA_TRADE_PORTS.get(code, (None, None))[1],
             "note": PORT_NOTES.get(code, ""),
             "size_rank": None,
@@ -471,6 +504,7 @@ def build() -> list[dict]:
         item["country_code"],
         not item["major"],
         class_rank.get(item["port_class"], 0),
+        not (item["kind"] == "airport" and item["cargo_hub"] and item["direct_from_korea"]),
         item["direct_from_korea"] is False,
         item["size_rank"] or 99,
         -(item["cargo_volume_mt"] or 0),
@@ -563,7 +597,10 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
                           else 50 if is_large else 60),
             # 국내 공항에서 직항편이 있는지. 없으면 경유 후보를 함께 보여줍니다.
             "direct_from_korea": iata in direct_routes,
+            "cargo_hub": iata in CARGO_HUBS,
+            "korean_air_cargo": iata in KOREAN_AIR_CARGO,
             "transfer_via": [] if iata in direct_routes else transfer_hubs.get(iata, []),
+            "gateway_only": False,
             "major": is_large or bool(override),
         })
 
@@ -581,14 +618,33 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
 
 
 def attach_transfer_hub_names(locations: list[dict]) -> None:
-    """경유 후보 코드를 화면에 쓸 [코드, 이름] 형태로 바꿉니다."""
+    """경유 후보 코드를 [코드, 이름] 형태로 바꾸고, 국제선이 없는 공항은
+    같은 나라의 관문 공항을 안내합니다. (예: 상파울루 콩고냐스 -> 과룰류스)"""
 
-    names = {item["code"]: item["name"] for item in locations if item["kind"] == "airport"}
-    for item in locations:
-        if item["kind"] != "airport" or not item["transfer_via"]:
+    airports = [item for item in locations if item["kind"] == "airport"]
+    names = {item["code"]: item["name"] for item in airports}
+
+    # 나라별 대체 관문: 직항 > 화물 거점 > 경유 안내가 있는 공항 순.
+    gateways: dict[str, dict] = {}
+    for item in airports:
+        current = gateways.get(item["country_code"])
+        score = (item["direct_from_korea"], item["cargo_hub"], bool(item["transfer_via"]),
+                 -(item["size_rank"] or 99))
+        if not current or score > current["score"]:
+            gateways[item["country_code"]] = {"score": score, "item": item}
+
+    for item in airports:
+        if item["transfer_via"]:
+            item["transfer_via"] = [[code, names.get(code, code)] for code in item["transfer_via"]
+                                    if code in names]
             continue
-        item["transfer_via"] = [[code, names.get(code, code)] for code in item["transfer_via"]
-                                if code in names]
+        if item["direct_from_korea"]:
+            continue
+        # 국제선 노선 자체가 없는 공항: 같은 나라 관문 공항을 이용합니다.
+        gateway = gateways.get(item["country_code"], {}).get("item")
+        if gateway and gateway["code"] != item["code"]:
+            item["transfer_via"] = [[gateway["code"], gateway["name"]]]
+            item["gateway_only"] = True
 
 
 def promote_main_ports(locations: list[dict]) -> None:
@@ -646,8 +702,9 @@ if __name__ == "__main__":
     airports = [item for item in items if item["kind"] == "airport"]
     direct = [a for a in airports if a["direct_from_korea"]]
     with_hub = [a for a in airports if a["transfer_via"]]
+    cargo = [a for a in airports if a["cargo_hub"]]
     print(f"  공항 {len(airports):,}곳 (국가 {len({a['country_code'] for a in airports})}개국) "
-          f"· 국내 직항 연결 {len(direct)}곳 · 경유 안내 {len(with_hub)}곳")
+          f"· 국내 직항 연결 {len(direct)}곳 · 화물 거점 {len(cargo)}곳 · 경유 안내 {len(with_hub)}곳")
     print(f"  주요 항구 {len(mains):,}곳 / 기타 항구 {len(ports) - len(mains):,}곳 "
           f"(주요 항구 보유 국가 {len({item['country_code'] for item in mains}):,}개국)")
     without_main = {item["country_code"] for item in ports} - {item["country_code"] for item in mains}

@@ -400,11 +400,15 @@
         const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
         const direct = item.kind === "airport" && item.direct_from_korea
           ? `<em class="ac_note direct">직항</em>` : "";
+        const cargo = item.korean_air_cargo
+          ? `<em class="ac_note cargo">KE 화물</em>`
+          : (item.cargo_hub ? `<em class="ac_note cargo">화물 거점</em>` : "");
+        const viaLabel = item.gateway_only ? "국제선 없음 · 대체 공항" : "경유";
         const via = (item.transfer_via || []).length
-          ? `<small class="ac_via">경유: ${item.transfer_via
+          ? `<small class="ac_via">${viaLabel}: ${item.transfer_via
               .map(([code, name]) => `${escapeHtml(name)}(${escapeHtml(code)})`).join(" · ")}</small>`
           : "";
-        return `<b>${escapeHtml(item.name)}</b>${note}${direct} <span class="mono">${escapeHtml(item.code)}</span>`
+        return `<b>${escapeHtml(item.name)}</b>${note}${cargo}${direct} <span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`
           + via;
       },
@@ -418,8 +422,9 @@
         // 규모가 작은 항구는 맨 아래 "기타 항구"로 모읍니다.
         groupBy: (item) => {
           if (state.transport_mode === "AIR" && role === "destination") {
-            // 국내 공항에서 직항으로 갈 수 있는지로 나눕니다.
-            return item.direct_from_korea ? "국내 직항 노선" : "환승 필요";
+            // 화물 노선이 있는 거점 -> 여객 직항 -> 환승 순으로 나눕니다.
+            if (item.cargo_hub && item.direct_from_korea) return "항공화물 거점 (직항)";
+            return item.direct_from_korea ? "여객 직항 노선" : "환승 필요";
           }
           if (role === "destination") return item.country;
           if (item.port_class === "national") return "국가관리 무역항";

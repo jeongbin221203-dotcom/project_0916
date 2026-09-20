@@ -235,7 +235,8 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         return (
             item["code"].lower() != keyword,
             not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
-            # 공항은 국내 직항편이 있는 곳을 먼저 보여줍니다.
+            # 항공화물 거점 -> 직항 -> 나머지 순으로 보여줍니다.
+            not (item.get("cargo_hub") and item.get("direct_from_korea")),
             item.get("direct_from_korea") is False,
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
             # 공항은 국가 안에서 규모가 큰 곳부터.

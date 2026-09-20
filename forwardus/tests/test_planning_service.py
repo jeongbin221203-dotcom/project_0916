@@ -272,12 +272,44 @@ def test_transfer_airports_suggest_hub(app):
 
     for item in transfers:
         for code, name in item["transfer_via"]:
-            assert code in direct, f"{item['code']} 경유지 {code}는 국내 직항이 아닙니다"
             assert name
+            if item.get("gateway_only"):
+                continue  # 국제선이 없는 공항은 같은 나라 관문 공항을 안내합니다.
+            assert code in direct, f"{item['code']} 경유지 {code}는 국내 직항이 아닙니다"
 
     by_code = {item["code"]: item for item in airports}
     assert by_code["MIA"]["transfer_via"]           # 마이애미는 미국 내 환승
     assert not by_code["LAX"]["transfer_via"]       # 직항 공항에는 경유 안내가 없습니다
+
+
+def test_cargo_hubs_listed_first(app):
+    """항공화물 거점이 목록 맨 위에 옵니다."""
+
+    items = planning_service.search_locations("", "AIR", "destination", country="US")["data"]
+    assert items[0]["cargo_hub"] and items[0]["direct_from_korea"]
+    ke = [item["code"] for item in items if item["korean_air_cargo"]]
+    assert {"LAX", "JFK", "ORD", "SFO"} <= set(ke)   # 대한항공 화물 취항지
+
+    flags = [item["cargo_hub"] and item["direct_from_korea"] for item in items]
+    assert flags.index(False) > max(i for i, v in enumerate(flags) if v)
+
+
+def test_domestic_only_airport_suggests_gateway(app):
+    """국제선이 없는 공항은 같은 나라 관문 공항을 안내합니다."""
+
+    from app.collectors import location_client
+
+    airports = {item["code"]: item for item in location_client.load_mock("locations")
+                if item["kind"] == "airport"}
+    congonhas = airports["CGH"]            # 상파울루 콩고냐스 (국내선 전용)
+    assert congonhas["gateway_only"] is True
+    assert congonhas["transfer_via"][0][0] == "GRU"
+
+    # 모든 대체 공항 안내는 같은 나라 안에서 이뤄집니다.
+    for item in airports.values():
+        if item.get("gateway_only"):
+            gateway = airports[item["transfer_via"][0][0]]
+            assert gateway["country_code"] == item["country_code"]
 
 
 def test_direct_input_suggestions(app):
