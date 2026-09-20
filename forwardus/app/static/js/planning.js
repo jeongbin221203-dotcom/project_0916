@@ -211,20 +211,29 @@
         return;
       }
       let html = "";
-      let group = null;
-      items.forEach((item, index) => {
-        if (options.groupBy) {
+      if (options.groupBy) {
+        // 같은 그룹을 한 번만 표시합니다. 서버가 보내는 순서가 섞여 있어도
+        // 머리글이 중복되지 않도록 그룹별로 모아서 그립니다.
+        const groups = new Map();
+        items.forEach((item, index) => {
           const value = options.groupBy(item);
-          if (value !== group) {
-            group = value;
-            const other = value === "환승 필요";
-            html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
-              + (other ? `<small>국내 공항발 직항편이 없어 환승이 필요합니다</small>` : "")
-              + `</li>`;
-          }
-        }
-        html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
-      });
+          if (!groups.has(value)) groups.set(value, []);
+          groups.get(value).push({ item, index });
+        });
+        groups.forEach((entries, value) => {
+          const other = value === "환승 필요";
+          html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
+            + (other ? `<small>국내 공항발 직항편이 없어 환승이 필요합니다</small>` : "")
+            + `</li>`;
+          entries.forEach(({ item, index }) => {
+            html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
+          });
+        });
+      } else {
+        items.forEach((item, index) => {
+          html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
+        });
+      }
       list.innerHTML = html;
     }, 200);
 
