@@ -294,6 +294,27 @@ def test_cargo_hubs_listed_first(app):
     assert flags.index(False) > max(i for i, v in enumerate(flags) if v)
 
 
+def test_korean_names_listed_first(app):
+    """한글 표기가 있는 항구·공항을 위에, 영문 표기만 있는 곳을 아래에 둡니다."""
+
+    items = planning_service.search_locations("", "SEA", "destination", country="US")["data"]
+    korean = [i for i, item in enumerate(items) if item["name"] != item["name_en"]]
+    english = [i for i, item in enumerate(items) if item["name"] == item["name_en"]]
+    assert korean and english
+    assert max(korean) < min(english)
+
+
+def test_korean_airports_have_no_transfer_notice(app):
+    """국내 공항은 출발지이므로 직항·환승 판정을 하지 않습니다."""
+
+    items = planning_service.search_locations("", "AIR", "origin")["data"]
+    assert items
+    for item in items:
+        assert item["direct_from_korea"] is None
+        assert item["transfer_via"] == []
+        assert not item.get("gateway_only")
+
+
 def test_domestic_only_airport_suggests_gateway(app):
     """국제선이 없는 공항은 같은 나라 관문 공항을 안내합니다."""
 

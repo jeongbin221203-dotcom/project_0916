@@ -239,6 +239,8 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
             not (item.get("cargo_hub") and item.get("direct_from_korea")),
             item.get("direct_from_korea") is False,
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
+            # 한글 이름이 있는 곳을 먼저, 영문 이름만 있는 곳을 뒤에 둡니다.
+            item["name"] == item["name_en"],
             # 공항은 국가 안에서 규모가 큰 곳부터.
             item.get("size_rank") or 99,
             # 물동량이 많은 항만부터, 같은 항만의 부두는 모항 다음에 표시합니다.

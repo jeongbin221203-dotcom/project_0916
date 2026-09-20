@@ -76,6 +76,66 @@
   };
 
   const errorBox = document.querySelector("[data-form-error]");
+
+  /* ----- 입력값 임시 저장: 다른 메뉴에 다녀와도 내용이 남습니다 ----- */
+  const DRAFT_KEY = "forwardus:planning-draft";
+  const DRAFT_FIELDS = [
+    "project_name", "buyer_required_date", "product_description", "hs_code", "package_type",
+    "quantity", "length_cm", "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg",
+    "currency", "invoice_value", "exporter_name", "exporter_address", "notify_party",
+    "buyer_name", "buyer_country", "buyer_address", "buyer_email",
+  ];
+
+  function saveDraft() {
+    const fields = {};
+    DRAFT_FIELDS.forEach((name) => {
+      const input = form.elements[name];
+      if (input) fields[name] = input.value;
+    });
+    const incoterm = form.querySelector("input[name=incoterms]:checked");
+    const draft = {
+      savedAt: Date.now(),
+      step: state.step,
+      transport_mode: state.transport_mode,
+      sea_mode: state.sea_mode,
+      departure_date: state.departure_date,
+      origin: state.origin,
+      destination: state.destination,
+      schedule_id: state.schedule_id,
+      sort: state.sort,
+      incoterms: incoterm ? incoterm.value : "",
+      country: (form.querySelector("[data-country-filter]") || {}).value || "",
+      fields,
+    };
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (error) {
+      /* 저장 공간이 없으면 그냥 넘어갑니다. */
+    }
+  }
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch (error) { /* 무시 */ }
+  }
+
+  function loadDraft() {
+    try {
+      return JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+    } catch (error) {
+      return null;
+    }
+  }
+
+  const saveDraftSoon = (() => {
+    let timer;
+    return () => { clearTimeout(timer); timer = setTimeout(saveDraft, 400); };
+  })();
+
+  form.addEventListener("input", saveDraftSoon);
+  form.addEventListener("change", saveDraftSoon);
+  window.addEventListener("beforeunload", saveDraft);
   const FIELD_STEP = {
     project_name: 1, transport_mode: 1, sea_mode: 1, origin_code: 1, destination_code: 1,
     requested_departure_date: 1, buyer_required_date: 1,
@@ -147,6 +207,7 @@
       state.departure_date = target.dataset.date;
       selectedDateEl.textContent = state.departure_date;
       invalidateSchedules();
+      saveDraftSoon();
     }
     renderCalendar();
   });
@@ -178,6 +239,50 @@
     });
     applyMode();
     refreshCountryOptions();
+
+  async function restoreDraft() {
+    const draft = loadDraft();
+    if (!draft) return;
+
+    DRAFT_FIELDS.forEach((name) => {
+      const input = form.elements[name];
+      if (input && draft.fields && draft.fields[name] !== undefined) input.value = draft.fields[name];
+    });
+    if (draft.incoterms) {
+      const radio = form.querySelector(`input[name=incoterms][value="${draft.incoterms}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (draft.transport_mode && draft.transport_mode !== state.transport_mode) {
+      const button = form.querySelector(`[data-toggle=transport_mode] [data-value=${draft.transport_mode}]`);
+      if (button) button.click();
+    }
+    if (draft.sea_mode && draft.sea_mode !== state.sea_mode) {
+      const button = form.querySelector(`[data-toggle=sea_mode] [data-value=${draft.sea_mode}]`);
+      if (button) button.click();
+    }
+    ["origin", "destination"].forEach((role) => {
+      const item = draft[role];
+      if (!item) return;
+      state[role] = item;
+      form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = `${item.name} (${item.code})`;
+    });
+    if (draft.departure_date) {
+      state.departure_date = draft.departure_date;
+      selectedDateEl.textContent = draft.departure_date;
+      const [year, month] = draft.departure_date.split("-").map(Number);
+      viewMonth = new Date(year, month - 1, 1);
+      renderCalendar();
+    }
+    const filter = form.querySelector("[data-country-filter]");
+    if (filter && draft.country) filter.value = draft.country;
+    state.sort = draft.sort || state.sort;
+    state.schedule_id = draft.schedule_id || null;
+
+    recalc();
+    if (draft.step && draft.step > 1) await openStep(draft.step);
+  }
+
+  restoreDraft();
     invalidateSchedules();
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
@@ -425,6 +530,7 @@
         state[role] = item;
         if (item) input.value = `${item.name} (${item.code})`;
         invalidateSchedules();
+        saveDraftSoon();
       },
       {
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
@@ -451,6 +557,50 @@
     }
   });
   refreshCountryOptions();
+
+  async function restoreDraft() {
+    const draft = loadDraft();
+    if (!draft) return;
+
+    DRAFT_FIELDS.forEach((name) => {
+      const input = form.elements[name];
+      if (input && draft.fields && draft.fields[name] !== undefined) input.value = draft.fields[name];
+    });
+    if (draft.incoterms) {
+      const radio = form.querySelector(`input[name=incoterms][value="${draft.incoterms}"]`);
+      if (radio) radio.checked = true;
+    }
+    if (draft.transport_mode && draft.transport_mode !== state.transport_mode) {
+      const button = form.querySelector(`[data-toggle=transport_mode] [data-value=${draft.transport_mode}]`);
+      if (button) button.click();
+    }
+    if (draft.sea_mode && draft.sea_mode !== state.sea_mode) {
+      const button = form.querySelector(`[data-toggle=sea_mode] [data-value=${draft.sea_mode}]`);
+      if (button) button.click();
+    }
+    ["origin", "destination"].forEach((role) => {
+      const item = draft[role];
+      if (!item) return;
+      state[role] = item;
+      form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = `${item.name} (${item.code})`;
+    });
+    if (draft.departure_date) {
+      state.departure_date = draft.departure_date;
+      selectedDateEl.textContent = draft.departure_date;
+      const [year, month] = draft.departure_date.split("-").map(Number);
+      viewMonth = new Date(year, month - 1, 1);
+      renderCalendar();
+    }
+    const filter = form.querySelector("[data-country-filter]");
+    if (filter && draft.country) filter.value = draft.country;
+    state.sort = draft.sort || state.sort;
+    state.schedule_id = draft.schedule_id || null;
+
+    recalc();
+    if (draft.step && draft.step > 1) await openStep(draft.step);
+  }
+
+  restoreDraft();
 
   setupAutocomplete(
     form.querySelector("[data-autocomplete=hs_code]"),
@@ -577,6 +727,7 @@
     if (event.target.name === "schedule_id") {
       state.schedule_id = event.target.value;
       renderSchedules();
+      saveDraftSoon();
     }
   });
 
@@ -714,6 +865,7 @@
       submit.textContent = label;
     }
     if (response.success) {
+      clearDraft();
       window.location.href = response.data.url;
     } else {
       handleServerError(response);

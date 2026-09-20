@@ -596,10 +596,12 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
                           else 10 if iata in PRIMARY_AIRPORTS
                           else 50 if is_large else 60),
             # 국내 공항에서 직항편이 있는지. 없으면 경유 후보를 함께 보여줍니다.
-            "direct_from_korea": iata in direct_routes,
+            # 국내 공항은 출발지이므로 판정 대상이 아닙니다(None).
+            "direct_from_korea": None if country_code == "KR" else iata in direct_routes,
             "cargo_hub": iata in CARGO_HUBS,
             "korean_air_cargo": iata in KOREAN_AIR_CARGO,
-            "transfer_via": [] if iata in direct_routes else transfer_hubs.get(iata, []),
+            "transfer_via": ([] if country_code == "KR" or iata in direct_routes
+                             else transfer_hubs.get(iata, [])),
             "gateway_only": False,
             "major": is_large or bool(override),
         })
@@ -634,6 +636,8 @@ def attach_transfer_hub_names(locations: list[dict]) -> None:
             gateways[item["country_code"]] = {"score": score, "item": item}
 
     for item in airports:
+        if item["direct_from_korea"] is None:
+            continue  # 국내 공항(출발지)에는 환승 안내를 붙이지 않습니다.
         if item["transfer_via"]:
             item["transfer_via"] = [[code, names.get(code, code)] for code in item["transfer_via"]
                                     if code in names]

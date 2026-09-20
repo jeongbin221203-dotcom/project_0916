@@ -64,6 +64,21 @@
     });
   }
 
+  // 날짜 칸은 어디를 눌러도 달력이 열리게 합니다. (기본 동작은 달력 아이콘만)
+  document.querySelectorAll('input[type="date"]').forEach((input) => {
+    const open = () => {
+      if (typeof input.showPicker === "function") {
+        try {
+          input.showPicker();
+        } catch (error) {
+          /* 브라우저가 막으면 기본 동작을 씁니다. */
+        }
+      }
+    };
+    input.addEventListener("click", open);
+    input.addEventListener("focus", open);
+  });
+
   document.querySelectorAll(".flash_stack .flash").forEach((el) => {
     setTimeout(() => el.classList.add("fade"), 6000);
   });
