@@ -58,7 +58,9 @@ def test_full_flow(client, shipment_payload):
 
     assert client.get(f"/assistant/{shipment_id}").status_code == 200
     answer = client.post(f"/assistant/{shipment_id}/api/ask", json={"question": "물류비가 왜 이렇게 나와?"}).get_json()
-    assert answer["success"] and answer["data"]["intent"] == "cost"
+    # AI가 답하면 source가 ai, 키가 없거나 실패하면 규칙 기반으로 돌아갑니다.
+    assert answer["success"] and answer["data"]["lines"]
+    assert answer["data"]["source"] in ("ai", "rule")
     assert client.post(f"/assistant/{shipment_id}/payments", data={"preset": "logistics"}).status_code == 302
     assert client.post(f"/assistant/{shipment_id}/payments", data={
         "label": "Buyer 잔금", "direction": "in", "amount_krw": "30000000", "due_date": "2026-12-01",

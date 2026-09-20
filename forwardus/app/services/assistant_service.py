@@ -239,4 +239,111 @@ def answer_question(shipment, question: str) -> dict:
         }
     title, handler = handlers[intent]
     result = handler(shipment)
-    return {"intent": intent, "title": title, "lines": result.get("lines", []), "actions": result.get("actions", [])}
+    return {"intent": intent, "title": title, "lines": result.get("lines", []),
+            "actions": result.get("actions", []), "source": "rule"}
+
+
+# --- AI 답변 -------------------------------------------------------------------
+
+AI_SYSTEM_PROMPT = """당신은 한국 중소 수출기업의 담당자를 돕는 상담원입니다.
+지금 보고 있는 수출 건(Shipment)의 계산 결과를 함께 받습니다.
+
+반드시 지킬 것
+- 숫자는 주어진 자료에 있는 값만 쓰세요. 없는 숫자를 만들지 마세요.
+  자료에 없으면 "그 값은 아직 계산되지 않았습니다"라고 하세요.
+- "수출 가능합니다", "인증이 면제됩니다" 같은 단정을 하지 마세요.
+  최종 판단은 세관과 수입국이 합니다.
+- 한국어로, 짧은 문장으로 씁니다. 무역 용어는 처음 쓸 때 우리말로 풀어 주세요.
+- 결론부터 말하고 이유를 덧붙이세요. 6문장을 넘기지 마세요.
+- 자료에서 위험해 보이는 것(납기 초과, 적재기한 임박, 요건 미확인)이 있으면 먼저 말하세요."""
+
+
+def ai_context(shipment) -> dict:
+    """AI에게 넘길 이 건의 사실. 전부 우리가 계산했거나 기관에서 받은 값입니다."""
+
+    from app.processors import export_requirements
+
+    cargo = shipment.cargo
+    buyer = shipment.buyer
+    cost = cost_explanation(shipment)
+    exception = exception_guide(shipment)
+    flow = cash_flow(shipment)
+
+    requirements = []
+    for item in shipment.cargos:
+        for rule in export_requirements.check(item.hs_code, is_dangerous=item.is_dangerous):
+            requirements.append({"품목": item.product_description, "확인할 것": rule["title"],
+                                 "필요한 서류": rule["documents"], "어디서": rule["agency"]})
+
+    return {
+        "건번호": shipment.shipment_id,
+        "상태": shipment.status_label,
+        "구간": f"{shipment.origin_name} ({shipment.origin_code}) → "
+                f"{shipment.destination_name} ({shipment.destination_code})",
+        "운송수단": f"{shipment.transport_mode} {shipment.sea_mode or ''}".strip(),
+        "인도조건": shipment.incoterms,
+        "송장금액": f"{shipment.currency} {shipment.invoice_value:,.2f}" if shipment.invoice_value else "",
+        "구매자": buyer.name if buyer else "",
+        "출항예정": shipment.etd.isoformat() if shipment.etd else "",
+        "도착예정": shipment.eta.isoformat() if shipment.eta else "",
+        "최초계획도착": shipment.planned_eta.isoformat() if shipment.planned_eta else "",
+        "지연일수": shipment.delay_days,
+        "구매자_요청도착일": (shipment.buyer_required_date.isoformat()
+                             if shipment.buyer_required_date else ""),
+        "선사_선박": " · ".join(part for part in [shipment.carrier, shipment.vessel_or_flight] if part),
+        "화물": [{
+            "품명": item.product_description, "HS부호": item.hs_code,
+            "수량": item.quantity, "CBM": item.total_cbm, "총중량_kg": item.total_weight_kg,
+            "순중량_kg": item.net_weight_kg, "금액": item.amount,
+            "위험물": (f"{item.un_number} CLASS {item.dg_class}"
+                       if item.is_dangerous and item.un_number else ""),
+        } for item in shipment.cargos],
+        "컨테이너": (f"{cargo.container_quantity} x {cargo.container_type}"
+                    if cargo and cargo.container_quantity else ""),
+        "물류비_총액_원": shipment.total_cost_krw,
+        "물류비_설명": cost.get("lines", []),
+        "수출자부담_원": cost.get("exporter_cost_krw"),
+        "지연_설명": exception.get("lines", []),
+        "납기": exception.get("deadline"),
+        "자금흐름_설명": flow.get("lines", []),
+        "확인해야_할_수출요건": requirements,
+        "B_L번호": shipment.bl_no or "",
+        "수출신고번호": shipment.export_declaration_no or "",
+    }
+
+
+def ai_answer(shipment, question: str) -> dict:
+    """AI가 이 건의 계산 결과를 보고 답합니다.
+
+    키가 없거나 호출이 실패하면 예전의 규칙 기반 답으로 돌아갑니다.
+    그래야 키가 없어도 화면이 죽지 않습니다.
+    """
+
+    import json
+
+    from app.collectors import ai_client
+
+    text = (question or "").strip()
+    if not text:
+        raise ValidationError("질문을 입력해주세요.", "question")
+
+    if not ai_client.available():
+        fallback = answer_question(shipment, text)
+        fallback["note"] = ("AI 상담 키(AI_API_KEY)가 없어 규칙 기반으로 답했습니다. "
+                            ".env에 키를 넣으면 자유롭게 물어볼 수 있습니다.")
+        return fallback
+
+    result = ai_client.chat([
+        {"role": "system", "content": AI_SYSTEM_PROMPT},
+        {"role": "system", "content": "이 건의 자료입니다.\n"
+                                      + json.dumps(ai_context(shipment), ensure_ascii=False,
+                                                   default=str)},
+        {"role": "user", "content": text[:1000]},
+    ])
+    if not result["success"]:
+        fallback = answer_question(shipment, text)
+        fallback["note"] = f"AI 답변을 받지 못해 규칙 기반으로 답했습니다. ({result['message']})"
+        return fallback
+
+    return {"intent": None, "title": "답변", "source": "ai", "actions": [],
+            "lines": [line.strip() for line in result["data"].splitlines() if line.strip()]}

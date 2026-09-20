@@ -732,28 +732,38 @@
     return targets.filter((target) => target.hs);
   }
 
+  // 품목별 관세 안내는 그 품목 바로 아래에 붙입니다.
+  // 첫 품목은 HS부호 칸 아래, 추가 품목은 그 품목 상자 안입니다.
+  function tariffSlotFor(no) {
+    if (no === 1) return document.querySelector("[data-tariff]");
+    const row = document.querySelectorAll("[data-cargo-lines] .cargo_item")[no - 2];
+    return row ? row.querySelector("[data-line-tariff]") : null;
+  }
+
   async function refreshTariff() {
-    const box = document.querySelector("[data-tariff]");
-    if (!box) return;
     const country = state.destination ? state.destination.country_code : "";
     const targets = tariffTargets();
-    if (!country || !targets.length) {
-      box.hidden = true;
-      box.innerHTML = "";
-      return;
-    }
-    const many = targets.length > 1;
-    box.innerHTML = targets.map((target) => `
-      <section class="tariff_item" data-tariff-item="${target.no}">
-        ${many ? `<p class="tariff_item_title">품목 ${target.no}`
-          + (target.name ? ` <small>${escapeHtml(target.name)}</small>` : "")
-          + `</p>` : ""}
-        <div data-tariff-body><p class="tariff_note">협정세율을 조회하는 중…</p></div>
-      </section>`).join("");
-    box.hidden = false;
-    await Promise.all(targets.map((target) => renderTariffFor(
-      target.hs, country,
-      box.querySelector(`[data-tariff-item="${target.no}"] [data-tariff-body]`))));
+    const wanted = new Map(targets.map((target) => [target.no, target]));
+
+    // 모든 칸을 먼저 비웁니다. 품목을 지우거나 HS부호를 지운 자리가 남지 않게 합니다.
+    const slots = [document.querySelector("[data-tariff]"),
+                   ...document.querySelectorAll("[data-cargo-lines] [data-line-tariff]")];
+    slots.forEach((slot, index) => {
+      if (!slot) return;
+      if (!country || !wanted.has(index + 1)) {
+        slot.hidden = true;
+        slot.innerHTML = "";
+      }
+    });
+    if (!country || !targets.length) return;
+
+    await Promise.all(targets.map((target) => {
+      const slot = tariffSlotFor(target.no);
+      if (!slot) return null;
+      slot.hidden = false;
+      slot.innerHTML = `<p class="tariff_note">협정세율을 조회하는 중…</p>`;
+      return renderTariffFor(target.hs, country, slot);
+    }));
   }
 
   async function renderTariffFor(hs, country, slot) {
@@ -1191,6 +1201,7 @@
       </div>
       <div class="form_grid">
         ${LINE_LAYOUT.map(lineFieldHtml).join("")}
+        <div class="tariff span2" data-line-tariff hidden></div>
         <div class="field span2 dg_box" data-dg-box>${dgBoxHtml()}</div>
       </div>`;
     cargoLinesBox.appendChild(row);

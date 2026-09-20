@@ -29,7 +29,7 @@ def api_ask(shipment_id: str):
     shipment = load_shipment(shipment_id)
     payload = request.get_json(silent=True) or {}
     try:
-        return jsonify({"success": True, "data": assistant_service.answer_question(shipment, payload.get("question", ""))})
+        return jsonify({"success": True, "data": assistant_service.ai_answer(shipment, payload.get("question", ""))})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
 

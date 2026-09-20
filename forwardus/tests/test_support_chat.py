@@ -97,3 +97,47 @@ def test_endpoint_returns_the_answer(client, monkeypatch):
     bad = client.post("/api/support-chat", json={"question": ""})
     assert bad.status_code == 400
     assert bad.get_json()["success"] is False
+
+
+def test_shipment_assistant_answers_from_our_own_numbers(app, create_shipment, monkeypatch):
+    """AI는 우리가 계산한 값만 보고 답합니다. 숫자를 지어내지 못하게 막습니다."""
+
+    from app.services import assistant_service
+
+    sent = {}
+    monkeypatch.setattr(assistant_service, "answer_question",
+                        lambda *a, **kw: {"intent": None, "title": "", "lines": [], "actions": []})
+
+    def fake_chat(messages, **kwargs):
+        sent["messages"] = messages
+        return {"success": True, "source": "api", "data": "총 물류비는 자료에 있는 값입니다."}
+
+    with app.app_context():
+        shipment = create_shipment()
+        from app.collectors import ai_client as client_module
+        monkeypatch.setattr(client_module, "available", lambda: True)
+        monkeypatch.setattr(client_module, "chat", fake_chat)
+
+        result = assistant_service.ai_answer(shipment, "물류비가 왜 이렇게 나와?")
+
+    assert result["source"] == "ai"
+    facts = "\n".join(m["content"] for m in sent["messages"] if m["role"] == "system")
+    assert "숫자는 주어진 자료에 있는 값만 쓰세요" in facts
+    assert shipment.shipment_id in facts          # 이 건의 자료가 함께 갑니다.
+    assert "단정을 하지 마세요" in facts
+
+
+def test_assistant_falls_back_when_the_key_is_missing(app, create_shipment, monkeypatch):
+    """키가 없어도 화면이 죽지 않고 규칙 기반 답을 냅니다."""
+
+    from app.collectors import ai_client as client_module
+    from app.services import assistant_service
+
+    monkeypatch.setattr(client_module, "available", lambda: False)
+    with app.app_context():
+        shipment = create_shipment()
+        result = assistant_service.ai_answer(shipment, "물류비가 왜 이렇게 나와?")
+
+    assert result["source"] == "rule"
+    assert result["lines"]
+    assert "AI_API_KEY" in result["note"]
