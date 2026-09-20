@@ -55,12 +55,14 @@ def get_form_options() -> dict:
     }
 
 
-def search_locations(query: str, transport_mode: str, role: str | None = None, country: str | None = None) -> dict:
+def search_locations(query: str, transport_mode: str, role: str | None = None, country: str | None = None,
+                     origin_code: str | None = None) -> dict:
     """Search ports or airports. Export flow: origin in Korea, destination abroad."""
 
     if role == "origin":
         country = "KR"
-    result = location_client.search_locations(query, location_kind(transport_mode.upper()), country)
+        origin_code = None
+    result = location_client.search_locations(query, location_kind(transport_mode.upper()), country, origin_code)
     if result["success"] and role == "destination":
         result["data"] = [item for item in result["data"] if item["country_code"] != "KR"]
     return result
@@ -303,6 +305,31 @@ def transit_summary(destination_code: str) -> dict:
 
 
 MODE_LABELS = {"SEA": "해상", "AIR": "항공"}
+# 환승 1회에 더해지는 일수 (연결편 대기·재적재)
+TRANSFER_EXTRA_DAYS = 1
+
+
+def air_route_status(origin_code: str, destination_code: str) -> dict:
+    """선택한 출발 공항에서 목적 공항까지 직항편이 있는지 확인합니다."""
+
+    destination = location_client.find_location(destination_code)
+    if not destination or destination["kind"] != "airport":
+        return {"known": False}
+
+    direct_from = destination.get("direct_from") or []
+    origin_code = (origin_code or "").strip().upper()
+    if origin_code and origin_code in direct_from:
+        return {"known": True, "direct": True, "origin": origin_code}
+
+    # 다른 국내 공항에서는 직항이 있는지, 없으면 경유 공항을 안내합니다.
+    alternatives = [code for code in direct_from if code != origin_code]
+    return {
+        "known": True,
+        "direct": False,
+        "origin": origin_code,
+        "korea_alternatives": alternatives,
+        "transfer_via": [code for code, _ in (destination.get("transfer_via") or [])],
+    }
 
 
 def schedule_outlook(payload: dict) -> dict:
@@ -320,14 +347,31 @@ def schedule_outlook(payload: dict) -> dict:
     if not departure or not summary.get("available"):
         return {"available": False}
 
+    origin_code = str(payload.get("origin_code") or "")
+    route = air_route_status(origin_code, str(payload.get("destination_code") or ""))
+
     modes = []
     for mode in ("SEA", "AIR"):
         days = summary["sea" if mode == "SEA" else "air"]
         if not days:
             continue
+        extra = 0
+        note = ""
+        if mode == "AIR" and route.get("known") and not route.get("direct"):
+            # 직항이 없으면 환승 시간을 더하고 경유지를 안내합니다.
+            extra = TRANSFER_EXTRA_DAYS
+            if route["korea_alternatives"]:
+                note = f"{origin_code} 직항 없음 · {', '.join(route['korea_alternatives'])} 출발은 직항"
+            elif route["transfer_via"]:
+                note = f"직항 없음 · {', '.join(route['transfer_via'])} 경유"
+            else:
+                note = "직항 없음 · 환승 필요"
+        days = {"min": days["min"] + extra, "max": days["max"] + extra}
         entry = {
             "mode": mode,
             "label": MODE_LABELS[mode],
+            "note": note,
+            "direct": route.get("direct") if mode == "AIR" else None,
             "min_days": days["min"],
             "max_days": days["max"],
             "eta_fastest": calculate_eta(departure, days["min"]).isoformat(),

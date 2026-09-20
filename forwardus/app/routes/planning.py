@@ -28,6 +28,7 @@ def api_locations():
         request.args.get("mode", "SEA"),
         request.args.get("role"),
         request.args.get("country"),
+        request.args.get("origin"),
     )
     return jsonify(result), (200 if result["success"] else 502)
 

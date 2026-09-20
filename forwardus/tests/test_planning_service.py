@@ -705,3 +705,54 @@ def test_required_parties_not_invented(app, shipment_payload):
     with pytest.raises(ValidationError) as info:
         planning_service.create_shipment(payload)
     assert info.value.field == "exporter_name"
+
+
+def test_air_route_status_uses_real_routes(app):
+    """출발 공항에서 목적 공항까지 실제 직항편이 있는지 확인합니다."""
+
+    # 인천에서는 두바이 직항이 있지만, 제주·김해에서는 없습니다.
+    assert planning_service.air_route_status("ICN", "DXB")["direct"] is True
+    jeju = planning_service.air_route_status("CJU", "DXB")
+    assert jeju["direct"] is False
+    assert "ICN" in jeju["korea_alternatives"]
+
+    # 나리타는 여러 국내 공항에서 직항이 있습니다.
+    assert planning_service.air_route_status("PUS", "NRT")["direct"] is True
+
+    # 항구 코드나 없는 코드는 판정하지 않습니다.
+    assert planning_service.air_route_status("ICN", "KRPUS") == {"known": False}
+    assert planning_service.air_route_status("ICN", "ZZZ") == {"known": False}
+
+
+def test_schedule_outlook_adds_transfer_time(app):
+    """직항이 없는 출발 공항은 환승 시간을 더하고 대체 공항을 안내합니다."""
+
+    today = date.today()
+
+    def air(origin):
+        result = planning_service.schedule_outlook({
+            "origin_code": origin,
+            "destination_code": "DXB",
+            "requested_departure_date": (today + timedelta(days=7)).isoformat(),
+            "buyer_required_date": (today + timedelta(days=40)).isoformat(),
+        })
+        return next(mode for mode in result["modes"] if mode["mode"] == "AIR")
+
+    direct, transfer = air("ICN"), air("CJU")
+    assert direct["direct"] is True and direct["note"] == ""
+    assert transfer["direct"] is False
+    assert transfer["max_days"] == direct["max_days"] + planning_service.TRANSFER_EXTRA_DAYS
+    assert "ICN" in transfer["note"]
+
+
+def test_search_destination_reflects_origin_airport(app):
+    """도착지 직항 표시는 고른 출발 공항 기준으로 계산합니다."""
+
+    def direct(code, origin=None):
+        result = planning_service.search_locations("두바이", "AIR", "destination", None, origin)
+        return next(item["direct_from_korea"] for item in result["data"] if item["code"] == code)
+
+    assert direct("DXB", "ICN") is True
+    assert direct("DXB", "CJU") is False
+    # 출발지를 고르기 전에는 국내 어디서든 직항이 있으면 직항으로 봅니다.
+    assert direct("DXB") is True
