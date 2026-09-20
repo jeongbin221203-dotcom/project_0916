@@ -25,6 +25,8 @@ from pathlib import Path
 
 import httpx
 
+from airport_names_ko import AIRPORT_NAMES_KO
+
 DATA_DIR = Path(__file__).resolve().parent
 RAW_DIR = DATA_DIR / "raw"
 OUTPUT = DATA_DIR / "mock" / "locations.json"
@@ -251,7 +253,7 @@ AIRPORT_OVERRIDES = {
     "HGH": ("항저우 샤오산 국제공항", "Hangzhou Xiaoshan International Airport", "CN", 5),
     "CGO": ("정저우 신정 국제공항", "Zhengzhou Xinzheng International Airport", "CN", 6),
     "CKG": ("충칭 장베이 국제공항", "Chongqing Jiangbei International Airport", "CN", 7),
-    "CTU": ("청두 톈푸 국제공항", "Chengdu Tianfu International Airport", "CN", 8),
+    "TFU": ("청두 톈푸 국제공항", "Chengdu Tianfu International Airport", "CN", 8),
     "TAO": ("칭다오 자오둥 국제공항", "Qingdao Jiaodong International Airport", "CN", 9),
     "SHA": ("상하이 훙차오 국제공항", "Shanghai Hongqiao International Airport", "CN", 10),
     "XMN": ("샤먼 가오치 국제공항", "Xiamen Gaoqi International Airport", "CN", 11),
@@ -489,9 +491,10 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
 
         name_en = row["name"].strip()
         city = (row["municipality"] or "").strip()
+        name_ko = override[0] if override else AIRPORT_NAMES_KO.get(iata, "")
         airports.append({
             "code": iata,
-            "name": override[0] if override else name_en,
+            "name": name_ko or name_en,
             "name_en": name_en,
             "city": city or name_en,
             "city_en": city or name_en,
@@ -519,6 +522,9 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
         print(f"경고: OurAirports에 없는 공항 코드 {len(missing)}개 -> {', '.join(missing)}")
     if wrong_country:
         print(f"경고: 국가 코드가 다른 공항 {len(wrong_country)}개 -> {', '.join(wrong_country)}")
+    unknown_ko = sorted(set(AIRPORT_NAMES_KO) - seen)
+    if unknown_ko:
+        print(f"경고: 한글 표기만 있고 데이터에 없는 공항 {len(unknown_ko)}개 -> {', '.join(unknown_ko)}")
     return airports
 
 

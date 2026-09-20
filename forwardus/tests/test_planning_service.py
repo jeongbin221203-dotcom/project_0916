@@ -251,6 +251,23 @@ def test_airports_cover_major_countries(app):
     assert all(item["name_en"] and item["city"] for item in airports)
 
 
+def test_top_trade_partner_airports_have_korean_names(app):
+    """주요 무역국 20개국 공항은 모두 한글 표기를 갖습니다."""
+
+    from app.collectors import location_client
+
+    airports = [item for item in location_client.load_mock("locations") if item["kind"] == "airport"]
+    targets = [item for item in airports if item["country_code"] in planning_service.TOP_TRADE_PARTNERS]
+    assert len(targets) > 400
+    missing = [item["code"] for item in targets if item["name"] == item["name_en"]]
+    assert not missing, f"한글 표기 누락: {missing[:10]}"
+
+    by_code = {item["code"]: item["name"] for item in airports}
+    # 청두는 솽류(CTU)와 톈푸(TFU)가 다른 공항입니다.
+    assert by_code["CTU"] == "청두 솽류 국제공항"
+    assert by_code["TFU"] == "청두 톈푸 국제공항"
+
+
 def test_airports_sorted_by_size(app):
     """공항은 국가 안에서 규모가 큰 곳부터 보여줍니다."""
 
