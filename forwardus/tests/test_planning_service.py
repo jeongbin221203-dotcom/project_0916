@@ -894,7 +894,7 @@ def test_all_incoterms_selectable_in_air_mode(app, client):
     assert "incoterm_warn" in html          # 항공일 때 뜨는 안내
 
 
-def test_currency_list_covers_customs_published_currencies(app):
+def test_currency_list_covers_customs_published_currencies(app, needs_customs_api):
     """송장 통화는 관세청이 고시하는 통화를 모두 보여줍니다."""
 
     currencies = planning_service.get_form_options()["currencies"]
@@ -914,7 +914,7 @@ def test_currency_list_covers_customs_published_currencies(app):
     assert all(c["name"] for c in currencies)
 
 
-def test_tariff_guide_matches_destination_country(app):
+def test_tariff_guide_matches_destination_country(app, needs_customs_api):
     """도착국에 맞는 협정만 골라서 보여줍니다."""
 
     netherlands = planning_service.tariff_guide("3304991000", "NL")
@@ -1102,7 +1102,7 @@ def test_schedule_shows_krw_and_explains_etd_eta(app, client):
     assert rates["data"]["KRW"] == 1.0
 
 
-def test_tariff_guide_explains_agreement_in_korean(app):
+def test_tariff_guide_explains_agreement_in_korean(app, needs_customs_api):
     """협정이 무엇인지 우리말로 풀어 주고, 여러 나라 협정은 대상국도 적습니다."""
 
     netherlands = planning_service.tariff_guide("3304991000", "NL")
@@ -1119,7 +1119,7 @@ def test_tariff_guide_explains_agreement_in_korean(app):
     assert "세계 공통" in netherlands["hs6_note"] and "네덜란드" in netherlands["hs6_note"]
 
 
-def test_english_hs_search_fills_korean_name(app, client):
+def test_english_hs_search_fills_korean_name(app, client, needs_customs_api):
     """영문으로 찾아도 한글 품명을 함께 보여줍니다."""
 
     result = client.get("/planning/api/hs-codes?q=skin").get_json()
@@ -1128,7 +1128,7 @@ def test_english_hs_search_fills_korean_name(app, client):
     assert any("화장" in item["name"] for item in result["data"])
 
 
-def test_origin_certificate_guide_uses_portal_data(app):
+def test_origin_certificate_guide_uses_portal_data(app, needs_customs_api):
     """서류 화면에서 협정별 원산지증명서를 어떻게 받는지 알려줍니다."""
 
     from app.services import document_service
@@ -1163,7 +1163,7 @@ def test_origin_certificate_guide_uses_portal_data(app):
     assert document_service.origin_certificate_guide(shipment)["available"] is False
 
 
-def test_tariff_summaries_for_hs_candidates(app):
+def test_tariff_summaries_for_hs_candidates(app, needs_customs_api):
     """HS 후보마다 도착국에 쓸 수 있는 협정을 한 줄로 요약합니다."""
 
     result = planning_service.tariff_summaries(

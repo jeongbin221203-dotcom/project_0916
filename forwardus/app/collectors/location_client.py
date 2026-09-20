@@ -180,11 +180,11 @@ def find_unlocode_by_name(country_code: str, name: str, limit: int = 5) -> list[
 
 
 def find_location(code: str) -> dict | None:
-    return deepcopy(_by_code().get((code or "").strip().upper()))
+    return deepcopy(_by_code().get(str(code or "").strip().upper()))
 
 
 def get_country(country_code: str) -> dict | None:
-    return deepcopy(_countries().get((country_code or "").strip().upper()))
+    return deepcopy(_countries().get(str(country_code or "").strip().upper()))
 
 
 def list_countries(kind: str, exclude: list[str] | None = None) -> dict:

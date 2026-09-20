@@ -178,6 +178,8 @@ def validate_dangerous_goods(payload: dict, *, strict: bool = True) -> dict:
 def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
     """Validate raw cargo dimensions and return typed values."""
 
+    if not isinstance(payload, dict):
+        raise ValidationError("화물 정보를 입력해주세요.", "cargo")
     package_type = str(payload.get("package_type") or "carton")
     if package_type not in PACKAGE_TYPES:
         raise ValidationError("포장 유형을 확인해주세요.", "package_type")

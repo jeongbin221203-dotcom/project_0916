@@ -10,7 +10,9 @@ tests/test_transit_calculator.py에서 주요 항로로 검증합니다.
 
 from __future__ import annotations
 
-from math import asin, cos, radians, sin, sqrt
+from math import asin, cos, isfinite, radians, sin, sqrt
+
+from app.validators import ValidationError
 
 KM_PER_NAUTICAL_MILE = 1.852
 
@@ -59,9 +61,35 @@ def great_circle_km(origin: tuple[float, float], destination: tuple[float, float
     return 2 * 6371.0088 * asin(sqrt(h))
 
 
-def to_range(days: float, min_spread: float = SEA_MIN_SPREAD_DAYS) -> dict:
-    """하루 단위로 올림·내림해 최소~최대 범위를 만듭니다."""
+# 지구 둘레보다 긴 항로는 없습니다. 이보다 크면 자료가 잘못된 것입니다.
+MAX_DISTANCE_KM = 45_000
 
+
+def _finite_km(distance_km) -> float:
+    """거리가 숫자가 아니거나 말이 안 되면 계산하지 않습니다.
+
+    0으로 두면 "오늘 도착한다"는 거짓이 되므로 막는 쪽이 맞습니다.
+    """
+
+    try:
+        km = float(distance_km)
+    except (TypeError, ValueError):
+        raise ValidationError("두 지점 사이 거리를 읽지 못했습니다.", "distance_km") from None
+    if not isfinite(km) or km <= 0 or km > MAX_DISTANCE_KM:
+        raise ValidationError("두 지점 사이 거리가 올바르지 않아 소요일을 낼 수 없습니다.",
+                              "distance_km")
+    return km
+
+
+def to_range(days: float, min_spread: float = SEA_MIN_SPREAD_DAYS) -> dict:
+    """하루 단위로 올림·내림해 최소~최대 범위를 만듭니다.
+
+    거리가 무한대이거나 숫자가 아니면 계산할 수 없습니다. 그럴 때 0으로 두면
+    "0일에 도착한다"는 거짓이 되므로, 위쪽에서 거리를 먼저 걸러야 합니다.
+    """
+
+    if not isfinite(days):
+        raise ValidationError("소요일을 계산할 수 없습니다.", "distance_km")
     spread = max(days * SPREAD_RATIO, min_spread)
     return {"min": max(1, round(days - spread)), "max": max(2, round(days + spread))}
 
@@ -74,6 +102,7 @@ def sea_transit(distance_km: float, passages: list[str], sea_mode: str = "FCL",
     직기항 선박이 관측되는 항구인지입니다. 직기항이 없으면 환적 일수를 더합니다.
     """
 
+    distance_km = _finite_km(distance_km)
     miles = distance_km / KM_PER_NAUTICAL_MILE
     # 운하를 지나지 않는 북미 항로는 태평양 횡단 급행 서비스입니다.
     canal = [p for p in passages if p in CANAL_WAIT_DAYS]
@@ -101,7 +130,7 @@ def air_transit(distance_km: float, *, transfers: int = 0, minutes: int | None =
     """
 
     flight_hours = (minutes / 60 if minutes
-                    else distance_km / AIR_CRUISE_KMH + AIR_TAKEOFF_LANDING_HOURS)
+                    else _finite_km(distance_km) / AIR_CRUISE_KMH + AIR_TAKEOFF_LANDING_HOURS)
     breakdown = {"비행": flight_hours / 24,
                  "수출 터미널": AIR_ORIGIN_DAYS,
                  "도착지 인도": AIR_DESTINATION_DAYS}

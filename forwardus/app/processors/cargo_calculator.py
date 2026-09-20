@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+from app.validators import ValidationError
 from app.validators.cargo_validator import validate_cargo_input
 
 # IATA standard volume factor (1 CBM = 166.67 kg, i.e. 6,000 cm3/kg).
@@ -20,6 +21,20 @@ CONTAINER_SPECS = {
     "40HC": {"max_cbm": 68.0, "max_weight_kg": 26_000},
 }
 DEFAULT_CONTAINER_TYPE = "40GP"
+
+
+def round_volume(value: float, digits: int = 4) -> float:
+    """부피를 반올림하되, 0보다 큰 값이 0이 되지는 않게 합니다.
+
+    3cm 정육면체는 0.000027 CBM입니다. 소수 넷째 자리에서 반올림하면 0이 되고,
+    그러면 "부피가 없는 화물"이 되어 운임 기준이 서지 않습니다.
+    작은 화물도 실제로 자리를 차지합니다.
+    """
+
+    rounded = round(value, digits)
+    if rounded == 0 and value > 0:
+        return round(value, 9) or value
+    return rounded
 
 
 def calculate_revenue_ton(total_cbm: float, total_weight_kg: float) -> float:
@@ -63,7 +78,6 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
 
     # 순중량은 품목마다 따로 적습니다. 그 품목의 총중량보다 클 수 없습니다.
     # 입력하는 도중(strict=False)에는 막지 않고 경고만 남깁니다.
-    from app.validators import ValidationError
     from app.validators.shipment_validator import validate_net_weight
 
     net_weight, net_warning = None, ""
@@ -80,7 +94,7 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
         "product_description": str(payload.get("product_description") or "").strip()[:300],
         "net_weight_kg": net_weight,
         "net_weight_warning": net_warning,
-        "total_cbm": round(total_cbm, 4),
+        "total_cbm": round_volume(total_cbm),
         "total_weight_kg": round(total_weight_kg, 2),
         "revenue_ton": round(revenue_ton, 3),
         "billable_revenue_ton": round(max(LCL_MIN_REVENUE_TON, revenue_ton), 3),
@@ -103,6 +117,9 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
     if container_type not in CONTAINER_SPECS:
         container_type = DEFAULT_CONTAINER_TYPE
 
+    items = [item for item in (items or []) if isinstance(item, dict)]
+    if not items:
+        raise ValidationError("화물 정보를 입력해주세요.", "cargo")
     lines = [calculate_cargo_metrics(item, container_type, strict=strict) for item in items]
     total_cbm = sum(line["total_cbm"] for line in lines)
     total_weight_kg = sum(line["total_weight_kg"] for line in lines)
@@ -125,7 +142,7 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         "amount": (round(sum(line["amount"] for line in lines), 2)
                    if lines and all(line.get("amount") is not None for line in lines) else None),
         "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
-        "total_cbm": round(total_cbm, 4),
+        "total_cbm": round_volume(total_cbm),
         "total_weight_kg": round(total_weight_kg, 2),
         "revenue_ton": round(revenue_ton, 3),
         "billable_revenue_ton": round(max(LCL_MIN_REVENUE_TON, revenue_ton), 3),

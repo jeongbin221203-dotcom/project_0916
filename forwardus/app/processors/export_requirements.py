@@ -198,7 +198,7 @@ ORIGIN_RULE = {
 
 
 def _digits(hs_code: str) -> str:
-    return "".join(ch for ch in (hs_code or "") if ch.isdigit())
+    return "".join(ch for ch in str(hs_code or "") if ch.isdigit())
 
 
 def check(hs_code: str, *, is_dangerous: bool = False,

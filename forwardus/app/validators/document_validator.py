@@ -73,7 +73,9 @@ def clean_document_items(form: dict, current: list) -> list:
 def clean_document_fields(form: dict, current: dict) -> dict:
     """Return a copy of ``current`` updated with validated form values."""
 
-    updated = dict(current)
+    if not isinstance(form, dict):
+        form = {}
+    updated = dict(current if isinstance(current, dict) else {})
     for key in EDITABLE_FIELDS:
         # 서식에 칸이 새로 생겨 예전에 만든 문서에 없는 항목도 고칠 수 있게 form 기준으로 봅니다.
         if key not in form:
@@ -88,6 +90,6 @@ def clean_document_fields(form: dict, current: dict) -> dict:
             updated[key] = number
         else:
             updated[key] = str(raw or "").strip()[:500]
-    if current.get("items"):
+    if isinstance(current, dict) and current.get("items"):
         updated["items"] = clean_document_items(form, current["items"])
     return updated

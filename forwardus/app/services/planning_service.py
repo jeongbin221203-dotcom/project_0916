@@ -832,6 +832,9 @@ def sea_mode_difference(summary: dict, selected: str) -> dict | None:
     sea = summary.get("sea") or {}
     if not sea.get("FCL") or not sea.get("LCL"):
         return None
+    # 화면이 보낸 값이 FCL·LCL이 아니면 비교할 것이 없습니다.
+    if selected not in SEA_MODE_FACTS:
+        return None
     other = "LCL" if selected == "FCL" else "FCL"
     gap_min = sea["LCL"]["min"] - sea["FCL"]["min"]
     gap_max = sea["LCL"]["max"] - sea["FCL"]["max"]
@@ -860,7 +863,7 @@ def air_route_status(origin_code: str, destination_code: str) -> dict:
         return {"known": False}
 
     direct_from = destination.get("direct_from") or []
-    origin_code = (origin_code or "").strip().upper()
+    origin_code = str(origin_code or "").strip().upper()
     if origin_code and origin_code in direct_from:
         return {"known": True, "direct": True, "origin": origin_code}
 
@@ -1051,12 +1054,17 @@ def cargo_items(payload: dict) -> list[dict]:
     화면에서 품목을 여러 개 보낼 수 있고, 예전처럼 한 건만 보내도 그대로 받습니다.
     """
 
-    cargo = payload.get("cargo") or {}
+    # 화면이 늘 올바른 모양을 보내리라 믿지 않습니다. 이상하면 빈 목록으로 둡니다.
+    cargo = (payload if isinstance(payload, dict) else {}).get("cargo") or {}
     if isinstance(cargo, list):
         items = cargo
-    else:
+    elif isinstance(cargo, dict):
         items = cargo.get("items")
-    return [item for item in (items or [cargo]) if item]
+    else:
+        return []
+    if not isinstance(items, list):
+        items = [cargo] if isinstance(cargo, dict) and cargo else []
+    return [item for item in items if isinstance(item, dict) and item]
 
 
 def cargo_metrics(payload: dict, *, strict: bool = False) -> dict:

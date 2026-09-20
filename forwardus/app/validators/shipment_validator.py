@@ -15,6 +15,11 @@ AIR_INVALID_INCOTERMS = {"FOB", "CFR", "CIF"}
 INCOTERMS = {"EXW", "FCA", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"}
 
 
+# 수출 일정에 쓸 수 있는 날짜 범위. 이 밖은 잘못 입력한 것으로 봅니다.
+# (9999-12-31 같은 값에 소요일을 더하면 날짜 계산 자체가 터집니다)
+MIN_YEAR, MAX_YEAR = 2000, 2100
+
+
 def parse_date(value: Any, field_name: str, *, required: bool = True, field: str | None = None) -> date | None:
     """Parse an ISO date string (YYYY-MM-DD)."""
 
@@ -23,11 +28,17 @@ def parse_date(value: Any, field_name: str, *, required: bool = True, field: str
             raise ValidationError(f"{field_name}을(를) 선택해주세요.", field)
         return None
     if isinstance(value, date):
-        return value
-    try:
-        return date.fromisoformat(str(value).strip())
-    except ValueError as exc:
-        raise ValidationError(f"{field_name} 형식이 올바르지 않습니다. (YYYY-MM-DD)", field) from exc
+        parsed = value
+    else:
+        try:
+            parsed = date.fromisoformat(str(value).strip())
+        except (ValueError, TypeError) as exc:
+            raise ValidationError(f"{field_name} 형식이 올바르지 않습니다. (YYYY-MM-DD)",
+                                  field) from exc
+    if not MIN_YEAR <= parsed.year <= MAX_YEAR:
+        raise ValidationError(
+            f"{field_name}은(는) {MIN_YEAR}년부터 {MAX_YEAR}년 사이여야 합니다.", field)
+    return parsed
 
 
 def require_text(value: Any, field_name: str, *, max_length: int = 200, field: str | None = None) -> str:
@@ -118,7 +129,10 @@ def _truthy(value) -> bool:
 def validate_parties(payload: dict) -> dict:
     """Validate exporter and buyer information."""
 
+    payload = payload if isinstance(payload, dict) else {}
     buyer = payload.get("buyer") or {}
+    if not isinstance(buyer, dict):
+        buyer = {}
     return {
         "exporter_name": require_text(payload.get("exporter_name"), "수출자(Exporter)명", field="exporter_name"),
         "exporter_address": optional_text(payload.get("exporter_address")),

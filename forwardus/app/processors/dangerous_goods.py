@@ -183,7 +183,7 @@ def classes() -> list[dict]:
 def guide(dg_class: str, transport_mode: str, country_name: str = "") -> dict:
     """고른 등급과 운송수단에 맞춰 무엇을 어떻게 준비할지 정리합니다."""
 
-    info = DG_CLASSES.get((dg_class or "").strip())
+    info = DG_CLASSES.get(str(dg_class or "").strip())
     if not info:
         return {"available": False,
                 "message": "위험물 등급을 고르면 보내는 방법을 안내합니다."}
@@ -284,7 +284,7 @@ UN_LOOKUP_STEPS = [
 def search_un_numbers(query: str, limit: int = 12) -> list[dict]:
     """UN번호·정식운송품명·우리말 품목으로 찾습니다."""
 
-    text = (query or "").strip().lower()
+    text = str(query or "").strip().lower()
     digits = "".join(ch for ch in text if ch.isdigit())
     rows = []
     for un, psn, dg_class, korean_name in COMMON_UN_NUMBERS:

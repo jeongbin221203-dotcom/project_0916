@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from app.validators import ValidationError
+
 # Default lead times in days. Kept as constants so they can be tuned per route later.
 LEAD_TIMES = {
     "SEA": {"final_delivery": 2, "import_customs": 2, "cut_off": 2, "export_customs": 2},
@@ -12,8 +14,28 @@ LEAD_TIMES = {
 DEFAULT_TRANSIT_DAYS = {"SEA": 14, "AIR": 2}
 
 
+# 날짜에 더할 수 있는 최대 소요일. 이보다 길면 자료가 잘못된 것입니다.
+MAX_TRANSIT_DAYS = 3_650
+
+
 def calculate_eta(etd: date, transit_days: int) -> date:
-    return etd + timedelta(days=transit_days)
+    """출항일에 소요일을 더해 도착일을 냅니다.
+
+    날짜 범위를 벗어나면 파이썬이 OverflowError를 냅니다. 그대로 두면 화면이
+    500으로 죽으므로, 우리 오류로 바꿔 사람이 읽을 수 있게 알려 줍니다.
+    """
+
+    try:
+        days = int(transit_days)
+    except (TypeError, ValueError):
+        raise ValidationError("소요일을 숫자로 읽지 못했습니다.", "transit_days") from None
+    if not 0 <= days <= MAX_TRANSIT_DAYS:
+        raise ValidationError("소요일이 올바르지 않습니다.", "transit_days")
+    try:
+        return etd + timedelta(days=days)
+    except (OverflowError, OSError) as error:
+        raise ValidationError("출발일이 너무 멀어 도착일을 낼 수 없습니다.",
+                              "requested_departure_date") from error
 
 
 def calculate_cargo_ready_date(etd: date, transport_mode: str) -> date:
