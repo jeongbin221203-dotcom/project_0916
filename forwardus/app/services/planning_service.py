@@ -115,10 +115,23 @@ def search_hs_codes(query: str) -> dict:
 
 
 def exchange_rates() -> dict:
-    """통화별 원화 환율. 관세청 고시 환율을 씁니다."""
+    """통화별 원화 환율. 관세청 고시 환율을 씁니다.
+
+    화면에 "무슨 환율로 얼마에 환산했는지"를 함께 보여주려고 기준일과 출처
+    문구를 같이 돌려줍니다.
+    """
 
     result = exchange_client.fetch_krw_rates()
-    return {"success": result["success"], "data": result["data"], "source": result["source"]}
+    applied = result.get("applied_date") or ""
+    live = result["source"] == "api"
+    return {
+        "success": result["success"],
+        "data": result["data"],
+        "source": result["source"],
+        "applied_date": applied,
+        "basis": (f"관세청 고시환율{f' · {applied} 적용' if applied else ''}" if live
+                  else "고시환율을 받지 못해 임시 환율로 환산했습니다"),
+    }
 
 
 def tariff_summaries(hs_codes: list[str], country_code: str) -> dict:
@@ -232,8 +245,8 @@ NATIONAL_TARIFF_SYSTEMS = {
     "JP": {"label": "일본 실행관세율표 통계부호", "digits": "9자리",
            "columns": [("general", "기본세율"), ("wto", "WTO세율"), ("korea", "한국산(RCEP)")]},
 }
-WITS_RATE_NOTE = ("세계은행 WITS(UNCTAD TRAINS) 자료입니다. HS 6자리 아래 세분 라인의 단순평균이라"
-                  " 최소·최대를 함께 적었습니다. 실제 적용세율은 그 나라 세분 부호로 확인하세요.")
+WITS_RATE_NOTE = ("세계은행 WITS(UNCTAD TRAINS)가 모은 각국 신고 세율입니다."
+                  " HS 6자리 아래 세분 부호가 여러 개면 그 평균이라 최소·최대를 함께 적었습니다.")
 
 
 def destination_tariff(hs_code: str, country_code: str) -> dict:
@@ -265,35 +278,64 @@ def destination_tariff(hs_code: str, country_code: str) -> dict:
         national = pool.submit(_national_tariff_lines, country, hs6)
         mfn, korea, national = mfn.result(), korea.result(), national.result()
 
+    mfn_row = mfn.get("data") if mfn["success"] else None
+    pref_row = korea.get("data") if korea["success"] else None
+
     rates = []
-    for label, result in (("MFN(최혜국) 세율", mfn), ("한국산 특혜세율", korea)):
-        row = result.get("data") if result["success"] else None
-        if row:
-            rates.append({"label": label, **row})
-    if korea["success"] and not korea.get("data") and rates:
-        mfn_free = rates[0]["rate"] == 0
-        # MFN이 이미 0%면 특혜세율이 있을 이유가 없습니다. 그 밖에는 협정이 없거나 미반영입니다.
+    if mfn_row:
+        rates.append({"label": "MFN(최혜국) 세율", **mfn_row})
+    if pref_row:
+        rates.append({"label": "한국산 특혜세율", **pref_row})
+    elif mfn_row:
+        # 특혜 자료가 없는 이유는 둘 중 하나입니다. MFN이 이미 0%면 특혜를 따로 둘 이유가 없습니다.
         rates.append({"label": "한국산 특혜세율", "rate": None,
-                      "note": ("MFN 세율이 0%라 특혜세율이 따로 없습니다." if mfn_free else
-                               "WITS에 한국산 특혜세율 자료가 없습니다. 협정이 없거나 아직 반영되지 않았습니다.")})
+                      "note": ("MFN 세율이 0%라 한국산에 따로 깎아 줄 세율이 없습니다." if mfn_row["rate"] == 0 else
+                               "이 자료에는 한국산 특혜세율이 없습니다."
+                               " 협정이 없거나 아직 반영되지 않았을 수 있어 아래 관세율표에서 확인하세요.")})
 
     return {
-        "available": bool(rates or national),
+        # 세율을 못 받아도 공식 관세율표 링크는 늘 안내합니다.
+        "available": True,
         "country": country_name,
         "country_code": country,
         "hs6": f"{hs6[:4]}.{hs6[4:]}",
         "in_eu": country in eu_members,
         "rates": rates,
-        "rate_note": WITS_RATE_NOTE if rates else "WITS에 이 나라·품목의 세율 자료가 없습니다.",
+        "advice": _tariff_advice(mfn_row, pref_row, country_name),
+        "rate_note": WITS_RATE_NOTE if rates else
+                     f"{country_name}의 이 품목 세율 자료가 없습니다. 아래 관세율표에서 직접 확인하세요.",
         "national": national,
         "national_note": (
             f"뒤 자리는 나라마다 달라 우리 부호 {customs_client.format_hs_code(digits)}와 1:1로"
             f" 맞지 않습니다. 품목 설명이 맞는 줄을 고르세요."
             if national else
-            f"{country_name}의 세분 부호는 공개 API가 없어 아래 공식 조회 페이지에서 확인합니다."),
+            f"{country_name}이(가) 쓰는 세분 부호와 확정 세율은 아래 공식 관세율표에서 확인합니다."),
         "link": tariff_client.lookup_page(country, hs6, eu_members),
         "source": "api",
     }
+
+
+def _tariff_advice(mfn: dict | None, pref: dict | None, country_name: str) -> dict | None:
+    """협정을 쓰는 게 유리한지 한 줄로 알려줍니다.
+
+    FTA 특혜세율은 "쓸 수 있는 선택지"이지 의무가 아닙니다. 단계적 철폐 중이라
+    특혜세율이 MFN보다 높은 구간도 실제로 있어(예: 한ㆍ중 FTA 일부 품목),
+    그럴 때는 원산지증명서 없이 MFN으로 보내는 편이 쌉니다.
+    """
+
+    if not mfn or not pref or pref.get("rate") is None:
+        return None
+    gap = round(mfn["rate"] - pref["rate"], 2)
+    if gap > 0:
+        return {"kind": "use_fta",
+                "text": f"협정을 쓰면 {gap}%p 낮습니다. 원산지증명서를 갖추면 {pref['rate']}%로 통관합니다."}
+    if gap < 0:
+        return {"kind": "use_mfn",
+                "text": f"한국산 특혜세율({pref['rate']}%)이 MFN({mfn['rate']}%)보다 높습니다."
+                        f" 특혜세율은 의무가 아니므로 원산지증명서 없이 MFN으로 보내는 편이 쌉니다."
+                        f" 관세 철폐가 진행 중인 품목일 수 있어 {country_name} 관세율표에서 올해 세율을 확인하세요."}
+    return {"kind": "same",
+            "text": f"협정을 써도 세율이 {mfn['rate']}%로 같습니다. 원산지증명서를 준비할 실익이 없습니다."}
 
 
 def _national_tariff_lines(country: str, hs6: str) -> dict | None:

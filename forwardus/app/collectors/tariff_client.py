@@ -97,19 +97,31 @@ def reporter_for(country_code: str, eu_members: tuple[str, ...] = ()) -> str:
 def _parse_wits(xml: str) -> dict | None:
     """SDMX generic XML에서 가장 최근 연도의 관측값 하나를 꺼냅니다."""
 
+    def rate_of(text: str | None) -> float | None:
+        # WITS는 세율을 32비트 실수로 줍니다. (1.7 → "1.70000004768372")
+        # 그대로 보여주면 잘못된 정밀도로 읽히므로 소수 둘째 자리에서 끊습니다.
+        try:
+            return round(float(text), 2)
+        except (TypeError, ValueError):
+            return None
+
     latest = None
     for obs in re.findall(r"<generic:Obs>.*?</generic:Obs>", xml, re.S):
         year = re.search(r'ObsDimension[^>]*value="(\d{4})"', obs)
         value = re.search(r'ObsValue[^>]*value="([^"]+)"', obs)
-        if not year or not value:
+        if not year or value is None or rate_of(value.group(1)) is None:
             continue
         attrs = dict(re.findall(r'<generic:Value id="(\w+)" value="([^"]*)"', obs))
+        try:
+            lines = int(attrs.get("TOTALNOOFLINES") or 0)
+        except ValueError:
+            lines = 0
         row = {
             "year": int(year.group(1)),
-            "rate": round(float(value.group(1)), 2),
-            "min": attrs.get("MIN_RATE"),
-            "max": attrs.get("MAX_RATE"),
-            "lines": attrs.get("TOTALNOOFLINES"),
+            "rate": rate_of(value.group(1)),
+            "min": rate_of(attrs.get("MIN_RATE")),
+            "max": rate_of(attrs.get("MAX_RATE")),
+            "lines": lines,
             "type": attrs.get("TARIFFTYPE", ""),
         }
         if latest is None or row["year"] > latest["year"]:

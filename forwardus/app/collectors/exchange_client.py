@@ -75,6 +75,7 @@ def fetch_unipass_rates(query_date: date | None = None) -> dict:
         return fail("API_INVALID_RESPONSE", "api")
 
     rates = {"KRW": 1.0}
+    applied = ""
     for row in root.iter("trifFxrtInfoQryRsltVo"):
         currency = (row.findtext("currSgn") or "").strip().upper()
         value = (row.findtext("fxrt") or "").strip()
@@ -85,14 +86,21 @@ def fetch_unipass_rates(query_date: date | None = None) -> dict:
         except ValueError:
             continue
         rates[currency] = rate / 100 if currency in UNIT_100_CURRENCIES else rate
+        # 관세환율은 주 단위로 고시됩니다. 적용 시작일을 함께 보여줍니다.
+        applied = applied or (row.findtext("aplyBgnDt") or "").strip()
 
     if "USD" not in rates:
         return fail("API_MISSING_FIELD", "api", "관세환율 응답에 USD 환율이 없습니다.")
-    return ok(rates, "api")
+    return {**ok(rates, "api"), "applied_date": _as_iso(applied)}
+
+
+def _as_iso(yyyymmdd: str) -> str:
+    return (f"{yyyymmdd[:4]}-{yyyymmdd[4:6]}-{yyyymmdd[6:8]}"
+            if len(yyyymmdd) == 8 and yyyymmdd.isdigit() else "")
 
 
 def fetch_krw_rates() -> dict:
-    """통화별 원화 환율. 관세청 API를 먼저 쓰고, 실패하면 Mock 값을 씁니다."""
+    """통화별 원화 환율. 관세청 고시 환율을 쓰고, 못 받으면 고정 환율로 버팁니다."""
 
     result = fetch_unipass_rates()
     if result["success"]:
@@ -101,7 +109,7 @@ def fetch_krw_rates() -> dict:
     rates = dict(load_mock("exchange_rates")["krw_per_unit"])
     rates["USD"] = float(get_config("EXCHANGE_RATE_USD_KRW", rates["USD"]))
     rates["KRW"] = 1.0
-    return ok(rates, "mock")
+    return {**ok(rates, "mock"), "applied_date": ""}
 
 
 def list_currencies() -> list[dict]:

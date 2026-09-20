@@ -56,8 +56,17 @@ def test_wits_parser_keeps_latest_year():
     """여러 해가 오면 가장 최근 연도의 값만 씁니다."""
 
     row = tariff_client._parse_wits(WITS_XML)
-    assert row == {"year": 2023, "rate": 3.25, "min": "0", "max": "6.5", "lines": "2", "type": "MFN"}
+    assert row == {"year": 2023, "rate": 3.25, "min": 0.0, "max": 6.5, "lines": 2, "type": "MFN"}
     assert tariff_client._parse_wits("<message:GenericData/>") is None
+
+
+def test_wits_rates_are_rounded_to_two_decimals():
+    """WITS는 세율을 32비트 실수로 줍니다. 1.70000004768372를 그대로 보여주면 안 됩니다."""
+
+    xml = WITS_XML.replace('ObsValue value="3.25"', 'ObsValue value="1.70000004768372"') \
+                  .replace('id="MAX_RATE" value="6.5"', 'id="MAX_RATE" value="3.90000009536743"')
+    row = tariff_client._parse_wits(xml)
+    assert row["rate"] == 1.7 and row["max"] == 3.9
 
 
 def test_wits_reporter_uses_un_numeric_codes():
@@ -131,7 +140,8 @@ def test_destination_tariff_combines_wits_and_national_codes(app, monkeypatch):
     assert us["available"] and us["country"] == "미국" and us["hs6"] == "3304.99"
     assert us["rates"][0]["label"].startswith("MFN") and us["rates"][0]["rate"] == 3.25
     # MFN이 0%가 아닌데 특혜 자료가 없으면 그렇게 알립니다.
-    assert us["rates"][1]["rate"] is None and "자료가 없습니다" in us["rates"][1]["note"]
+    assert us["rates"][1]["rate"] is None and "특혜세율이 없습니다" in us["rates"][1]["note"]
+    assert us["advice"] is None          # 비교할 특혜세율이 없으면 조언하지 않습니다.
     assert us["national"]["label"].startswith("미국 HTS")
     assert [line["code"] for line in us["national"]["lines"]] == ["3304.99.10.00", "3304.99.50.00"]
     assert us["national"]["lines"][1]["korea"] == "Free"
@@ -146,10 +156,28 @@ def test_destination_tariff_combines_wits_and_national_codes(app, monkeypatch):
     assert set(seen) == {tariff_client.EU_REPORTER}
     assert germany["in_eu"] is True and germany["national"] is None
     assert germany["link"]["label"] == "EU TARIC" and "Area=KR" in germany["link"]["url"]
-    assert germany["available"] is False          # 세율도 세분 부호도 못 받았습니다.
+    # 세율을 못 받아도 공식 관세율표 링크는 늘 안내합니다.
+    assert germany["available"] is True and germany["rates"] == []
 
     # 부호가 6자리에 못 미치면 조회하지 않습니다.
     assert planning_service.destination_tariff("3304", "US")["available"] is False
+
+
+def test_tariff_advice_tells_when_fta_is_not_worth_using():
+    """FTA 특혜세율은 의무가 아닙니다. MFN보다 높으면 쓰지 말라고 알려줘야 합니다."""
+
+    advice = planning_service._tariff_advice
+    mfn = {"rate": 10.0}
+    # 한ㆍ중 FTA처럼 단계적 철폐 중이라 특혜세율이 MFN보다 높은 구간이 실제로 있습니다.
+    worse = advice(mfn, {"rate": 14.6}, "중국")
+    assert worse["kind"] == "use_mfn" and "원산지증명서 없이" in worse["text"]
+
+    better = advice(mfn, {"rate": 0.0}, "독일")
+    assert better["kind"] == "use_fta" and "10.0%p 낮습니다" in better["text"]
+
+    assert advice(mfn, {"rate": 10.0}, "베트남")["kind"] == "same"
+    assert advice(mfn, None, "호주") is None
+    assert advice(mfn, {"rate": None}, "호주") is None
 
 
 def test_destination_tariff_api(client, monkeypatch):

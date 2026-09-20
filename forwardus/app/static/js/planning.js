@@ -81,9 +81,14 @@
 
   // 관세청 고시 환율. 운임을 원화로 함께 보여주는 데 씁니다.
   let krwRates = null;
+  let rateBasis = "";
   async function loadRates() {
     const response = await getJson(urls.exchangeRate);
-    if (response.success) krwRates = response.data;
+    if (!response.success) return;
+    krwRates = response.data;
+    rateBasis = response.basis || "";
+    // 이미 그려 둔 금액이 있으면 환율이 도착한 뒤 기준을 덧붙입니다.
+    document.querySelectorAll("[data-rate-basis]").forEach((el) => { el.textContent = rateBasis; });
   }
   loadRates();
 
@@ -773,28 +778,39 @@
 
     const pct = (value) => (value === null || value === undefined || value === "" ? "" : `${value}%`);
     const cell = (value) => (value ? escapeHtml(value) : "—");
-    let html = `<p class="tariff_head">${escapeHtml(data.country)}이(가) 실제로 매기는 관세`
+    // 세분 부호가 하나뿐이면 최소·최대가 세율과 같아 굳이 적지 않습니다.
+    const spread = (row) => (row.lines > 1 && row.min !== row.max
+      ? `${pct(row.min)}~${pct(row.max)} · 세분 ${row.lines}줄 · ` : "");
+
+    let html = `<p class="tariff_head">${escapeHtml(data.country)}에서 이 물품에 매기는 관세`
       + ` <span class="mono">HS ${escapeHtml(data.hs6)}</span></p>`;
 
-    html += `<div class="dest_rates">` + data.rates.map((row) => (row.rate === null
-      ? `<span class="dest_rate"><b>${escapeHtml(row.label)}</b> <i>${escapeHtml(row.note || "")}</i></span>`
-      : `<span class="dest_rate"><b>${escapeHtml(row.label)}</b> <strong>${escapeHtml(pct(row.rate))}</strong>`
-        + ` <i>최소 ${escapeHtml(pct(row.min))} · 최대 ${escapeHtml(pct(row.max))} · 세분 ${escapeHtml(row.lines)}줄 · ${escapeHtml(String(row.year))}년</i></span>`
-    )).join("") + `</div>`;
+    if (data.rates.length) {
+      html += `<div class="dest_rates">` + data.rates.map((row) => (row.rate === null
+        ? `<span class="dest_rate"><b>${escapeHtml(row.label)}</b> <i>${escapeHtml(row.note || "")}</i></span>`
+        : `<span class="dest_rate"><b>${escapeHtml(row.label)}</b> <strong>${escapeHtml(pct(row.rate))}</strong>`
+          + ` <i>${escapeHtml(spread(row))}${escapeHtml(String(row.year))}년 기준</i></span>`
+      )).join("") + `</div>`;
+    }
+    if (data.advice) {
+      html += `<p class="dest_advice ${escapeHtml(data.advice.kind)}">${escapeHtml(data.advice.text)}</p>`;
+    }
     html += `<p class="tariff_note">${escapeHtml(data.rate_note)}</p>`;
 
     if (data.national) {
       const n = data.national;
       html += `<p class="dest_sub">${escapeHtml(n.label)} <small>${escapeHtml(n.digits)}${n.edition ? ` · ${escapeHtml(n.edition)} 기준` : ""}</small></p>`;
-      html += `<table class="dest_table"><thead><tr><th>부호</th><th>품목</th>`
+      html += `<div class="dest_table_wrap"><table class="dest_table"><thead><tr><th>부호</th><th>품목</th>`
         + n.columns.map((c) => `<th>${escapeHtml(c.label)}</th>`).join("") + `</tr></thead><tbody>`
         + n.lines.map((line) => `<tr><td class="mono">${cell(line.code)}</td>`
           + `<td style="padding-left:${8 + (line.indent || 0) * 10}px">${escapeHtml(line.description)}</td>`
           + n.columns.map((c) => `<td>${cell(line[c.key])}</td>`).join("") + `</tr>`).join("")
-        + `</tbody></table>`;
+        + `</tbody></table></div>`;
     }
-    html += `<p class="tariff_note">${escapeHtml(data.national_note)}`
-      + ` <a class="dest_link" href="${escapeHtml(data.link.url)}" target="_blank" rel="noopener">${escapeHtml(data.link.label)}에서 직접 확인 ↗</a></p>`;
+    html += `<p class="tariff_note">${escapeHtml(data.national_note)}</p>`
+      + `<a class="dest_link" href="${escapeHtml(data.link.url)}" target="_blank" rel="noopener noreferrer">`
+      + `${escapeHtml(data.link.label)} 열기 <span aria-hidden="true">↗</span>`
+      + `<small>새 창에서 열립니다</small></a>`;
     slot.innerHTML = html;
   }
 
@@ -1092,12 +1108,16 @@
       ["Invoice", plainNumber(f.invoice_value.value)
         ? `${f.currency.value} ${formatNumber(Number(plainNumber(f.invoice_value.value)), 2)}` : missing],
       ["Schedule", schedule ? `${schedule.carrier} ${schedule.vessel_or_flight} · ETD ${schedule.etd} → ETA ${schedule.eta}` : missing],
+      // 운임 출처(선사 API인지 예시인지)는 금액이 아니라 환율 기준과 구분해 따로 적습니다.
       ["Freight", schedule
-        ? `USD ${formatNumber(schedule.freight_usd, 0)} ${inKrw(schedule.freight_usd)} (${schedule.source})`.trim()
+        ? `USD ${formatNumber(schedule.freight_usd, 0)} ${inKrw(schedule.freight_usd)}`.trim()
         : missing],
     ];
     document.querySelector("[data-summary]").innerHTML = rows
-      .map(([k, v]) => `<div><dt>${k}</dt><dd class="${v === missing ? "missing" : ""}">${escapeHtml(v)}</dd></div>`).join("");
+      .map(([k, v]) => `<div><dt>${k}</dt><dd class="${v === missing ? "missing" : ""}">${escapeHtml(v)}`
+        + (k === "Freight" && v !== missing
+          ? `<small class="rate_basis" data-rate-basis>${escapeHtml(rateBasis)}</small>` : "")
+        + `</dd></div>`).join("");
   }
 
   /* ----- Free navigation: any step can be opened at any time; validation happens on submit ----- */

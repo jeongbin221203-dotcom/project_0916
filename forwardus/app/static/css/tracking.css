@@ -5,7 +5,7 @@
 .eta_strip .late b { color: var(--amber); }
 .eta_strip .sources { margin-left: auto; display: flex; gap: 6px; }
 
-.tracking_layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+.tracking_layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
 .tracking_layout > .card, .tracking_layout > .stack > .card { margin-bottom: 0; }
 .tracking_layout + .card { margin-top: 20px; }
 
