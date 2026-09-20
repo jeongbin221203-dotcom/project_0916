@@ -27,7 +27,8 @@
         <div class="calendar_panel">
           <label class="field_label">출발 희망일</label>
           <div class="calendar" data-calendar></div>
-          <p class="selected_date">선택: <b data-selected-date>-</b></p>
+          <p class="selected_date">Seller 예정일: <b data-selected-date>-</b></p>
+          <p class="margin_box" data-margin hidden></p>
         </div>
         <div class="route_fields">
           <label class="field">
@@ -234,6 +235,7 @@
       locations: "{{ url_for('planning.api_locations') }}",
       countries: "{{ url_for('planning.api_countries') }}",
       unlocode: "{{ url_for('planning.api_unlocode') }}",
+      departureCheck: "{{ url_for('planning.api_departure_check') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",

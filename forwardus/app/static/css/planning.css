@@ -112,3 +112,11 @@
 .custom_search { position: relative; }
 .custom_search .ac_list { top: calc(100% + 2px); }
 @media (max-width: 640px) { .custom_box { grid-template-columns: 1fr 1fr; } }
+
+/* 출발일 여유 표시 */
+.margin_box { margin: 8px 0 0; padding: 9px 12px; border-radius: 12px; font-size: 13px; font-weight: 700; }
+.margin_box.level_ok { background: var(--green_soft); color: #07694f; }
+.margin_box.level_caution { background: #e8f3ff; color: var(--blue_dark); }
+.margin_box.level_tight { background: var(--amber_soft); color: #8a4f00; }
+.margin_box.level_late { background: var(--red_soft); color: var(--red); }
+.margin_box.level_none { background: #f1f5f9; color: var(--muted); }

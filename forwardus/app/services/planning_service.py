@@ -5,13 +5,17 @@ from __future__ import annotations
 from datetime import date
 
 from app.collectors import customs_client, exchange_client, location_client, schedule_client
+from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
 from app.processors.cargo_calculator import calculate_cargo_metrics
 from app.processors.cost_calculator import INCOTERMS_INFO, calculate_logistics_cost
 from app.processors.schedule_calculator import (
+    DEFAULT_TRANSIT_DAYS,
+    calculate_eta,
     calculate_cargo_ready_date,
     calculate_reverse_schedule,
     check_buyer_deadline,
+    check_departure_margin,
 )
 from app.repositories import buyer_repository, shipment_repository
 from app.services import ServiceError
@@ -254,6 +258,59 @@ def search_schedules(payload: dict) -> dict:
         "source": result["source"],
         "metrics": metrics,
     }
+
+
+def estimate_transit_days(transport_mode: str, sea_mode: str | None, destination: dict) -> int:
+    """구간별 최단 운송 소요일(Mock 스케줄 기준)."""
+
+    service = "AIR" if transport_mode == "AIR" else (sea_mode or "FCL")
+    region = destination.get("region", "asia")
+    try:
+        templates = load_mock("schedules")[service]
+    except (OSError, ValueError, KeyError):
+        return DEFAULT_TRANSIT_DAYS["AIR" if transport_mode == "AIR" else "SEA"]
+    days = [t["transit_days"][region] for t in templates if region in t["transit_days"]]
+    return min(days) if days else DEFAULT_TRANSIT_DAYS["AIR" if transport_mode == "AIR" else "SEA"]
+
+
+def check_departure_date(payload: dict) -> dict:
+    """출발 희망일이 Buyer 요청 도착일에 맞는지 확인합니다.
+
+    화면 왼쪽 달력 아래의 "Seller 예정일" 표시에 씁니다.
+    """
+
+    transport_mode = str(payload.get("transport_mode") or "SEA").upper()
+    departure = parse_date(payload.get("requested_departure_date"), "출발 희망일", required=False,
+                           field="requested_departure_date")
+    buyer_required = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", required=False,
+                                field="buyer_required_date")
+    if not departure:
+        return {"available": False, "reason": "출발 희망일을 선택해주세요."}
+
+    destination = location_client.find_location(str(payload.get("destination_code") or "")) or {}
+    transit_days = estimate_transit_days(transport_mode, payload.get("sea_mode"), destination)
+    eta = calculate_eta(departure, transit_days)
+    result = {
+        "available": True,
+        "departure_date": departure.isoformat(),
+        "transit_days": transit_days,
+        "eta": eta.isoformat(),
+        "destination": destination.get("name", ""),
+        "estimated": not destination,
+    }
+    if not buyer_required:
+        result.update({"level": "none", "label": "Buyer 요청일 미입력", "margin_days": None})
+        return result
+
+    margin = check_departure_margin(departure, buyer_required, transport_mode, transit_days)
+    result.update({
+        "buyer_required_date": buyer_required.isoformat(),
+        "latest_etd": margin["latest_etd"].isoformat(),
+        "margin_days": margin["margin_days"],
+        "level": margin["level"],
+        "label": margin["label"],
+    })
+    return result
 
 
 def reverse_schedule(payload: dict) -> dict:

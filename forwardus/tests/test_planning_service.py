@@ -44,6 +44,47 @@ def test_buyer_deadline_check():
     assert check_buyer_deadline(date(2026, 11, 19), None, "SEA") is None
 
 
+def test_departure_margin_levels(app):
+    """출발 희망일 여유를 구간별 소요일로 판정합니다."""
+
+    today = date.today()
+
+    def check(destination, departure_days, buyer_days, mode="SEA", sea_mode="FCL"):
+        return planning_service.check_departure_date({
+            "transport_mode": mode, "sea_mode": sea_mode, "destination_code": destination,
+            "requested_departure_date": (today + timedelta(days=departure_days)).isoformat(),
+            "buyer_required_date": (today + timedelta(days=buyer_days)).isoformat(),
+        })
+
+    # 같은 납기라도 먼 구간일수록 여유가 줄어듭니다.
+    close = check("VNSGN", 7, 45)
+    far = check("BRSSZ", 7, 45)
+    assert close["transit_days"] < far["transit_days"]
+    assert close["margin_days"] > far["margin_days"]
+    assert close["level"] == "ok" and far["level"] in ("tight", "late")
+
+    # 납기가 가까울수록 등급이 나빠집니다.
+    levels = [check("USLAX", 7, days)["level"] for days in (20, 30, 40, 60)]
+    assert levels[0] == "late" and levels[-1] == "ok"
+
+    # 항공은 소요일이 짧아 같은 납기에서 여유가 더 큽니다.
+    assert check("LAX", 7, 20, mode="AIR", sea_mode=None)["margin_days"] > check("USLAX", 7, 20)["margin_days"]
+
+
+def test_departure_check_without_buyer_date(app):
+    """Buyer 요청일이 없으면 도착 예정일만 알려줍니다."""
+
+    result = planning_service.check_departure_date({
+        "transport_mode": "SEA", "sea_mode": "FCL", "destination_code": "USLAX",
+        "requested_departure_date": (date.today() + timedelta(days=7)).isoformat(),
+    })
+    assert result["available"] and result["level"] == "none"
+    assert result["margin_days"] is None and result["eta"]
+
+    # 출발일이 없으면 계산하지 않습니다.
+    assert planning_service.check_departure_date({})["available"] is False
+
+
 def test_reverse_schedule_service_validation(app):
     with pytest.raises(ValidationError):
         planning_service.reverse_schedule({"buyer_required_date": "not-a-date"})

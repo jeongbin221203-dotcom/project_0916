@@ -258,6 +258,7 @@
     refreshCountryOptions();
     invalidateSchedules();
     saveDraftSoon();
+    updateSelectedDates();
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
     state.sea_mode = value;
@@ -800,10 +801,42 @@
     tab.addEventListener("click", () => openStep(Number(tab.dataset.stepTab)));
   });
 
+  const marginBox = document.querySelector("[data-margin]");
+
+  const checkDeparture = debounce(async () => {
+    if (!state.departure_date) {
+      marginBox.hidden = true;
+      return;
+    }
+    const response = await postJson(urls.departureCheck, {
+      transport_mode: state.transport_mode,
+      sea_mode: state.transport_mode === "SEA" ? state.sea_mode : null,
+      destination_code: state.destination ? state.destination.code : "",
+      requested_departure_date: state.departure_date,
+      buyer_required_date: form.elements.buyer_required_date.value,
+    });
+    if (!response.success || !response.data.available) {
+      marginBox.hidden = true;
+      return;
+    }
+    const data = response.data;
+    const where = data.destination ? `${escapeHtml(data.destination)}까지 ` : "";
+    let text = `${where}예상 ${data.transit_days}일 · 도착 예정 ${data.eta}`;
+    if (data.margin_days !== null && data.margin_days !== undefined) {
+      const days = data.margin_days;
+      text += ` · ${data.label}`
+        + (days >= 0 ? ` (여유 ${days}일)` : ` (${Math.abs(days)}일 부족)`);
+    }
+    marginBox.className = `margin_box level_${data.level}`;
+    marginBox.innerHTML = text;
+    marginBox.hidden = false;
+  }, 250);
+
   function updateSelectedDates() {
     const buyerDate = form.elements.buyer_required_date.value;
     selectedDateEl.innerHTML = `${state.departure_date || "-"}`
       + (buyerDate ? ` <span class="buyer_date">Buyer 요청 ${buyerDate}</span>` : "");
+    checkDeparture();
   }
 
   form.elements.buyer_required_date.addEventListener("change", () => {

@@ -73,6 +73,16 @@ def api_schedules():
         return error_response(exc)
 
 
+@planning_bp.post("/api/departure-check")
+def api_departure_check():
+    """출발 희망일 여유(Seller 예정일) 확인."""
+
+    try:
+        return jsonify({"success": True, "data": planning_service.check_departure_date(request.get_json(silent=True) or {})})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+
+
 @planning_bp.post("/api/reverse-schedule")
 def api_reverse_schedule():
     try:

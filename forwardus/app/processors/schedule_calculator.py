@@ -66,6 +66,48 @@ def calculate_reverse_schedule(
     }
 
 
+# 출발 희망일 여유(일) 구간. 촉박할수록 붉게, 여유로울수록 초록으로 표시합니다.
+MARGIN_LEVELS = [
+    (0, "late", "납기 초과"),
+    (3, "tight", "일정 촉박"),
+    (7, "caution", "여유 적음"),
+]
+MARGIN_OK = ("ok", "여유 있음")
+
+
+def grade_margin(margin_days: int) -> tuple[str, str]:
+    """여유 일수를 등급(late/tight/caution/ok)과 설명으로 바꿉니다."""
+
+    for limit, level, label in MARGIN_LEVELS:
+        if margin_days < limit:
+            return level, label
+    return MARGIN_OK
+
+
+def check_departure_margin(
+    departure_date: date,
+    buyer_required_date: date,
+    transport_mode: str,
+    transit_days: int,
+) -> dict:
+    """출발 희망일이 Buyer 납기에 맞는지 계산합니다."""
+
+    lead = LEAD_TIMES["AIR" if transport_mode == "AIR" else "SEA"]
+    eta = departure_date + timedelta(days=transit_days)
+    latest_eta = buyer_required_date - timedelta(days=lead["final_delivery"] + lead["import_customs"])
+    latest_etd = latest_eta - timedelta(days=transit_days)
+    margin_days = (latest_etd - departure_date).days
+    level, label = grade_margin(margin_days)
+    return {
+        "transit_days": transit_days,
+        "eta": eta,
+        "latest_etd": latest_etd,
+        "margin_days": margin_days,
+        "level": level,
+        "label": label,
+    }
+
+
 def check_buyer_deadline(eta: date, buyer_required_date: date | None, transport_mode: str) -> dict | None:
     """Return whether the ETA leaves enough time for import customs and delivery."""
 
