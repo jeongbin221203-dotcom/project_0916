@@ -66,6 +66,10 @@ def migrate_shipment_columns(database) -> None:
         "customs_trade_kind": "VARCHAR(4) NOT NULL DEFAULT '11'",
         "customs_payment_method": "VARCHAR(4) NOT NULL DEFAULT 'TT'",
         "country_of_origin": "VARCHAR(60) NOT NULL DEFAULT 'KR'",
+        # 컨테이너·통관 조회에 쓰는 번호
+        "bl_no": "VARCHAR(30) NOT NULL DEFAULT ''",
+        "export_declaration_no": "VARCHAR(20) NOT NULL DEFAULT ''",
+        "cargo_no": "VARCHAR(20) NOT NULL DEFAULT ''",
     }
     missing = {name: spec for name, spec in added.items() if name not in columns}
     if missing:

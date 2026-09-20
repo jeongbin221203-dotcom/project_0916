@@ -70,6 +70,11 @@ class Shipment(db.Model):
     customs_payment_method = db.Column(db.String(4), nullable=False, default="TT")
     country_of_origin = db.Column(db.String(60), nullable=False, default="KR · 대한민국")
 
+    # 부킹이 끝나면 받는 번호들. 컨테이너·통관 조회의 열쇠가 됩니다.
+    bl_no = db.Column(db.String(30), nullable=False, default="")
+    export_declaration_no = db.Column(db.String(20), nullable=False, default="")
+    cargo_no = db.Column(db.String(20), nullable=False, default="")
+
     carrier = db.Column(db.String(100), nullable=True)
     vessel_or_flight = db.Column(db.String(100), nullable=True)
     transit_days = db.Column(db.Integer, nullable=True)
