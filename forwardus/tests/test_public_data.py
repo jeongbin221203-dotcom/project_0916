@@ -162,3 +162,76 @@ def test_error_codes_from_the_portal_are_reported(app):
             result = ports.port_traffic()
     assert result["success"] is False
     assert "필수 요청변수" in result["message"]
+
+
+def test_trade_views_share_one_shape(app):
+    """총괄·대륙·세관·항구·종류가 모두 같은 모양으로 나와야 표에 담깁니다."""
+
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <response><header><resultCode>00</resultCode></header><body><items>
+      <item><statCdCntnKor1>아시아</statCdCntnKor1><expDlr>100</expDlr><expWgt>10</expWgt>
+        <expCnt>5</expCnt><impDlr>50</impDlr><impWgt>5</impWgt><impCnt>2</impCnt>
+        <year>2026.01</year></item>
+      <item><statCdCntnKor1>아시아</statCdCntnKor1><expDlr>200</expDlr><expWgt>20</expWgt>
+        <expCnt>7</expCnt><impDlr>60</impDlr><impWgt>6</impWgt><impCnt>3</impCnt>
+        <year>2026.02</year></item>
+      <item><statCdCntnKor1>북미</statCdCntnKor1><expDlr>50</expDlr><expWgt>5</expWgt>
+        <expCnt>1</expCnt><impDlr>10</impDlr><impWgt>1</impWgt><impCnt>1</impCnt>
+        <year>2026.01</year></item>
+    </items></body></response>"""
+
+    with app.app_context():
+        with patch("httpx.request", side_effect=_reply(xml)):
+            result = trade.trade_view("continent")
+
+    rows = result["data"]["rows"]
+    assert [row["name"] for row in rows] == ["아시아", "북미"]    # 많은 순
+    assert rows[0]["export_usd_thousand"] == 300                # 달을 더합니다
+    assert rows[0]["export_count"] == 12
+    assert rows[0]["months"] == 2
+    assert result["data"]["label"] == "대륙별"
+
+
+def test_kind_view_reads_its_own_field_names(app):
+    """종류별 통계만 dlr/wgt/cnt 한 벌로 옵니다."""
+
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <response><header><resultCode>00</resultCode></header><body><items>
+      <item><cnt>969623</cnt><dlr>35424098584</dlr><impexp>수출</impexp><statCd>A</statCd>
+        <statCdCntnKor1>일반수출</statCdCntnKor1><wgt>12408912221</wgt>
+        <year>202601</year></item>
+      <item><cnt>10</cnt><dlr>100</dlr><impexp>수입</impexp><statCd>Z</statCd>
+        <statCdCntnKor1>기타수입</statCdCntnKor1><wgt>5</wgt><year>202601</year></item>
+    </items></body></response>"""
+
+    with app.app_context():
+        with patch("httpx.request", side_effect=_reply(xml)):
+            result = trade.trade_view("kind")
+
+    rows = {row["name"]: row for row in result["data"]["rows"]}
+    assert rows["일반수출"]["export_usd_thousand"] == 35424098584
+    assert rows["일반수출"]["export_count"] == 969623
+    # 수입 줄은 수입 칸으로 들어가야 합니다.
+    assert rows["기타수입"]["import_usd_thousand"] == 100
+    assert rows["기타수입"]["export_usd_thousand"] == 0
+
+
+def test_unnamed_rows_are_dropped_from_views(app):
+    """이름이 '-'로 오는 합계·미상 줄은 표에서 뺍니다."""
+
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <response><header><resultCode>00</resultCode></header><body><items>
+      <item><statKor>-</statKor><expDlr>999</expDlr><year>202601</year></item>
+      <item><statKor>부산항</statKor><expDlr>100</expDlr><year>202601</year></item>
+    </items></body></response>"""
+
+    with app.app_context():
+        with patch("httpx.request", side_effect=_reply(xml)):
+            result = trade.trade_view("port")
+
+    assert [row["name"] for row in result["data"]["rows"]] == ["부산항"]
+
+
+def test_unknown_view_is_refused(app):
+    with app.app_context():
+        assert trade.trade_view("없는각도")["success"] is False

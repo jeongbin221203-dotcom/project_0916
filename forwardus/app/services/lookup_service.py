@@ -83,6 +83,13 @@ LOOKUPS = {
         "field": "조회",
         "about": "컨테이너를 많이 처리하는 항구일수록 배편이 많습니다. 출발항을 고를 때 씁니다.",
     },
+    "trade_view": {
+        "label": "무역 통계 (총괄 · 대륙 · 세관 · 항구 · 종류)",
+        "hint": "total · continent · customs · port · kind 가운데 하나를 넣습니다.",
+        "example": "port",
+        "field": "보는 각도",
+        "about": "어느 항구·공항으로 수출이 몰리는지, 어느 대륙으로 많이 나가는지 봅니다.",
+    },
     "hs_code": {
         "label": "HS부호",
         "hint": "품명(한글)이나 HS부호 10자리로 찾습니다.",
@@ -106,7 +113,8 @@ KEY_NAMES = {
 
 # 관세청이 아닌 곳에서 오는 조회. 키 이름이 다릅니다.
 OTHER_KEYS = {"trade_stats": "DATA_GO_KR_SERVICE_KEY",
-              "busiest_ports": "DATA_GO_KR_SERVICE_KEY"}
+              "busiest_ports": "DATA_GO_KR_SERVICE_KEY",
+              "trade_view": "DATA_GO_KR_SERVICE_KEY"}
 
 # 결과 표의 칸. (키, 보여 줄 이름)
 COLUMNS = {
@@ -126,6 +134,9 @@ COLUMNS = {
                          ("spec", "규격"), ("deadline", "이행기한")],
     "hs_code": [("code", "HS부호"), ("name", "품명"),
                 ("quantity_unit", "수량단위"), ("weight_unit", "중량단위")],
+    "trade_view": [("name", "구분"), ("export_usd_thousand", "수출액(천달러)"),
+                   ("export_weight_kg", "수출중량(kg)"), ("export_count", "수출 건수"),
+                   ("import_usd_thousand", "수입액(천달러)")],
     "busiest_ports": [("port", "항구"), ("total_teu", "총 처리량(TEU)"),
                       ("full_teu", "적컨테이너(TEU)"), ("empty_teu", "공컨테이너(TEU)")],
     "trade_stats": [("country", "나라"), ("product", "품목"),
@@ -177,6 +188,7 @@ def run(kind: str, query: str) -> dict:
         "hs_code": lambda: customs_client.search_hs_codes(text),
         "trade_stats": lambda: _trade_rows(text),
         "busiest_ports": lambda: _port_rows(),
+        "trade_view": lambda: _trade_view_rows(text),
     }
     result = callers[kind]()
     rows = result["data"] if result["success"] else []
@@ -198,6 +210,17 @@ def _port_rows() -> dict:
     from app.collectors import port_stats_client
 
     result = port_stats_client.busiest_ports()
+    if not result["success"]:
+        return result
+    return {**result, "data": result["data"]["rows"]}
+
+
+def _trade_view_rows(view: str) -> dict:
+    """무역통계를 다른 각도로. 결과가 dict로 와서 줄 목록으로 폅니다."""
+
+    from app.collectors import trade_stats_client
+
+    result = trade_stats_client.trade_view(view.strip().lower())
     if not result["success"]:
         return result
     return {**result, "data": result["data"]["rows"]}
@@ -279,6 +302,11 @@ def data_sources() -> dict:
                  "env": "DATA_GO_KR_SERVICE_KEY", "used": True,
                  "ready": _trade_stats_ready(),
                  "signup": "https://www.data.go.kr/tcs/dss/selectDataSetList.do?keyword=수출입무역통계"},
+                {"label": "공공데이터포털 · 관세청 무역통계 5종 "
+                          "(총괄 · 대륙 · 세관 · 항구 · 종류)",
+                 "env": "DATA_GO_KR_SERVICE_KEY", "used": True,
+                 "ready": _trade_stats_ready(),
+                 "signup": "https://www.data.go.kr/tcs/dss/selectDataSetList.do?keyword=수출입실적"},
                 {"label": "공공데이터포털 · 해양수산부 항만 통계 (입출항 · 컨테이너)",
                  "env": "DATA_GO_KR_SERVICE_KEY", "used": True,
                  "ready": _port_stats_ready(),

@@ -19,8 +19,23 @@ from datetime import date
 
 from app.collectors.base_client import fail, get_config, ok, request_text
 
-ITEM_URL = "https://apis.data.go.kr/1220000/Itemtrade/getItemtradeList"
-COUNTRY_URL = "https://apis.data.go.kr/1220000/nitemtrade/getNitemtradeList"
+BASE = "https://apis.data.go.kr/1220000"
+ITEM_URL = f"{BASE}/Itemtrade/getItemtradeList"
+COUNTRY_URL = f"{BASE}/nitemtrade/getNitemtradeList"
+
+# 같은 모양으로 답하는 관세청 무역통계들. 보는 각도만 다릅니다.
+#   (이름, 주소, 더 넣어야 하는 값, 줄에서 이름이 되는 칸)
+VIEWS = {
+    "total": ("수출입총괄", f"{BASE}/Newtrade/getNewtradeList", {}, "year"),
+    "continent": ("대륙별", f"{BASE}/continenttradet/getContinenttradeList", {},
+                  "statCdCntnKor1"),
+    "customs": ("세관별", f"{BASE}/customstrade/getCustomstradeList", {}, "center"),
+    "port": ("항구·공항별", f"{BASE}/porttrade/getPorttradeList", {}, "statKor"),
+    "kind": ("종류별", f"{BASE}/kindtrade/getKindtradeList", {"imexTpcd": "1"},
+             "statCdCntnKor1"),
+    "temper": ("성질별 국가별", f"{BASE}/ntempertrade/getNtempertradeList",
+               {"imexTpcd": "1"}, "statCdCntnKor1"),
+}
 
 # 이 API를 쓰려면 아래에서 "활용신청"을 한 번 해야 합니다. (대개 즉시 승인)
 SIGNUP = {
@@ -208,3 +223,66 @@ def sources() -> dict:
     return {"key": "trade_stats", "label": "관세청 수출입무역통계",
             "env": "DATA_GO_KR_SERVICE_KEY", "ready": available(),
             "signup": SIGNUP}
+
+
+def trade_view(view: str, year: int | None = None) -> dict:
+    """무역통계를 다른 각도로 봅니다. (총괄 · 대륙별 · 세관별 · 항구별 · 종류별)
+
+    모두 같은 모양으로 답하고, 조회 기간도 한 해 단위입니다.
+    """
+
+    if view not in VIEWS:
+        return fail("VALIDATION_ERROR", "api", "볼 수 있는 통계가 아닙니다.")
+    label, url, extra, name_field = VIEWS[view]
+
+    years = [year] if year else [date.today().year, date.today().year - 1]
+    for attempt in years:
+        start, end = _period(attempt)
+        result = _call(url, {"strtYymm": start, "endYymm": end, **extra}, label)
+        if not result["success"]:
+            return result
+        if result["data"]:
+            break
+
+    rows = []
+    for raw in result["data"]:
+        if not isinstance(raw, dict):
+            continue
+        row = _row(raw)
+        row["name"] = str(raw.get(name_field) or "").strip()
+        row["export_count"] = _number(raw.get("expCnt"))
+        row["import_count"] = _number(raw.get("impCnt"))
+        # 종류별 통계만 칸 이름이 다릅니다. (dlr/wgt/cnt 한 벌로 옵니다)
+        if raw.get("dlr") is not None and not row["export_usd_thousand"]:
+            outgoing = str(raw.get("impexp") or "").strip() != "수입"
+            amount, weight, count = (_number(raw.get("dlr")), _number(raw.get("wgt")),
+                                     _number(raw.get("cnt")))
+            if outgoing:
+                row["export_usd_thousand"], row["export_weight_kg"] = amount, weight
+                row["export_count"] = count
+            else:
+                row["import_usd_thousand"], row["import_weight_kg"] = amount, weight
+                row["import_count"] = count
+        rows.append(row)
+
+    # 이름 없이 오는 줄(합계·미상)은 빼고 봅니다.
+    rows = [row for row in rows if row["name"] not in ("-", "")]
+
+    # 달마다 나뉘어 오므로 이름별로 더해 한 줄씩 만듭니다.
+    merged: dict[str, dict] = {}
+    for row in rows:
+        key = row["name"] or row["period"]
+        found = merged.setdefault(key, {
+            "name": key, "export_usd_thousand": 0, "export_weight_kg": 0,
+            "import_usd_thousand": 0, "import_weight_kg": 0,
+            "export_count": 0, "import_count": 0, "months": 0})
+        for field in ("export_usd_thousand", "export_weight_kg", "import_usd_thousand",
+                      "import_weight_kg", "export_count", "import_count"):
+            found[field] += row[field]
+        found["months"] += 1
+
+    ordered = sorted(merged.values(), key=lambda row: -row["export_usd_thousand"])
+    return ok({
+        "view": view, "label": label, "from": start, "to": end, "rows": ordered,
+        "note": f"{start[:4]}년 {label} 실적입니다. 금액 단위는 천 달러입니다.",
+    }, "api")
