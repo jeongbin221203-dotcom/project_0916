@@ -805,3 +805,12 @@ def test_incoterms_help_is_rendered(app, client):
     assert html.count('class="incoterm_card"') == 11
     assert html.count("incoterm_help_") == 22            # 카드 11개 × (aria-describedby + id)
     assert "Free Alongside Ship" in html and "ICC A" in html
+
+
+def test_direct_call_guide_is_shown_for_sea(app, client):
+    """해상 모드에서 직기항·환적이 무엇인지 설명을 보여줍니다."""
+
+    html = client.get("/planning/new").get_data(as_text=True)
+    assert 'data-sea-only' in html
+    assert "배를 갈아타지 않고 곧바로 들어가는 정기 항로" in html
+    assert "다른 배로 옮겨 실어야" in html

@@ -404,6 +404,11 @@
         overrideQuery = "";
         search();
       },
+      // 목록이 열려 있을 때만 다시 그립니다. 닫혀 있는데 다시 검색하면
+      // 이미 고른 값("로테르담항 (NLRTM)")으로 검색해 빈 목록이 떠 버립니다.
+      refresh() {
+        if (!list.hidden) search();
+      },
     };
   }
 
@@ -560,9 +565,12 @@
           ? ""
           : ({ L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "");
         const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
-        const direct = item.kind === "airport"
-          ? (item.direct_from_korea ? `<em class="ac_note direct">직항</em>` : "")
-          : (item.sea_direct ? `<em class="ac_note direct">직기항</em>` : "");
+        // 직항·직기항은 "한국에서 그곳까지 갈아타지 않고 가는 편이 있는가"이므로
+        // 도착지에만 붙입니다.
+        const direct = role !== "destination" ? ""
+          : item.kind === "airport"
+            ? (item.direct_from_korea ? `<em class="ac_note direct">직항</em>` : "")
+            : (item.sea_direct ? `<em class="ac_note direct">직기항</em>` : "");
         const cargo = item.korean_air_cargo
           ? `<em class="ac_note cargo">KE 화물</em>`
           : (item.cargo_hub ? `<em class="ac_note cargo">화물 거점</em>` : "");
@@ -588,7 +596,7 @@
         if (item) input.value = `${item.name} (${item.code})`;
         if (role === "origin") {
           // 출발지가 바뀌면 도착지의 직항 표시가 달라집니다.
-          locationSearch.destination?.search();
+          locationSearch.destination?.refresh();
         }
         invalidateSchedules();
         saveDraftSoon();
