@@ -189,3 +189,38 @@ def fetch_tariff_rates(hs_code: str) -> dict:
     if not rows and notice:
         return fail("API_NO_DATA", "api", notice)
     return ok(rows, "api")
+
+
+# 관세청 "통계부호"(API019). 국가코드 부호는 statsSgnTp=A06 입니다.
+UNIPASS_STATS_URL = "https://unipass.customs.go.kr:38010/ext/rest/statsSgnQry/retrieveStatsSgnBrkd"
+COUNTRY_CODE_GROUP = "A06"
+
+
+def fetch_country_codes() -> dict:
+    """관세청이 쓰는 국가코드 목록. {한글 국가명: 2자리 코드}
+
+    협정세율 구분명("한ㆍ칠레FTA협정세율")에서 나라를 찾아내는 데 씁니다.
+    """
+
+    key = (get_config("UNIPASS_API_KEYS", {}) or {}).get("STATISTICS_CODE", "")
+    if not key:
+        return fail("API_AUTH_FAILED", "api", "통계부호 조회 API 키가 없습니다.")
+
+    result = request_text("GET", UNIPASS_STATS_URL,
+                          params={"crkyCn": key, "statsSgnTp": COUNTRY_CODE_GROUP})
+    if not result["success"]:
+        return result
+    try:
+        root = ET.fromstring(result["data"])
+    except ET.ParseError:
+        return fail("API_INVALID_RESPONSE", "api")
+
+    names = {}
+    for row in root.findall("statsSgnQryVo2"):
+        code = (row.findtext("cdValtVal") or "").strip().upper()
+        name = (row.findtext("cdValtValNm") or "").strip()
+        if len(code) == 2 and name:
+            names[name] = code
+    if not names:
+        return fail("API_NO_DATA", "api", (root.findtext("ntceInfo") or "").strip() or "국가코드를 받지 못했습니다.")
+    return ok(names, "api")

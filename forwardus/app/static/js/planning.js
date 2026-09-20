@@ -2,7 +2,7 @@
 (function () {
   "use strict";
 
-  const { escapeHtml, postJson, getJson, formatNumber, toIsoDate } = window.Forwardus;
+  const { escapeHtml, postJson, getJson, formatNumber, toIsoDate, plainNumber } = window.Forwardus;
 
   /* ---------- Shared: segmented toggles ---------- */
   function bindToggle(group, onChange) {
@@ -31,7 +31,7 @@
       const response = await postJson(reverseForm.dataset.url, {
         buyer_required_date: reverseForm.buyer_required_date.value,
         transport_mode: reverseMode,
-        transit_days: reverseForm.transit_days.value,
+        transit_days: plainNumber(reverseForm.transit_days.value),
       });
       if (!response.success) {
         errorBox.textContent = response.message;
@@ -764,12 +764,12 @@
       product_description: f.product_description.value,
       hs_code: f.hs_code.value,
       package_type: f.package_type.value,
-      quantity: f.quantity.value,
-      length_cm: f.length_cm.value,
-      width_cm: f.width_cm.value,
-      height_cm: f.height_cm.value,
-      weight_per_package_kg: f.weight_per_package_kg.value,
-      net_weight_kg: f.net_weight_kg.value,
+      quantity: plainNumber(f.quantity.value),
+      length_cm: plainNumber(f.length_cm.value),
+      width_cm: plainNumber(f.width_cm.value),
+      height_cm: plainNumber(f.height_cm.value),
+      weight_per_package_kg: plainNumber(f.weight_per_package_kg.value),
+      net_weight_kg: plainNumber(f.net_weight_kg.value),
     };
   }
 
@@ -905,7 +905,7 @@
     if (step === 3) {
       if (!f.product_description.value.trim()) return "품명을 입력해주세요.";
       if (!state.metrics) return "화물 치수·수량·중량을 올바르게 입력해주세요.";
-      if (!f.invoice_value.value) return "Invoice Value를 입력해주세요.";
+      if (!plainNumber(f.invoice_value.value)) return "Invoice Value를 입력해주세요.";
     }
     if (step === 4 && !state.schedule_id) return "스케줄을 선택해주세요.";
     return "";
@@ -931,7 +931,8 @@
       ["Cargo", m
         ? `${f.product_description.value || "(품명 없음)"} · ${f.quantity.value} pkg · ${formatNumber(m.total_cbm, 3)} CBM · ${formatNumber(m.total_weight_kg, 1)} kg`
         : missing],
-      ["Invoice", f.invoice_value.value ? `${f.currency.value} ${formatNumber(Number(f.invoice_value.value), 2)}` : missing],
+      ["Invoice", plainNumber(f.invoice_value.value)
+        ? `${f.currency.value} ${formatNumber(Number(plainNumber(f.invoice_value.value)), 2)}` : missing],
       ["Schedule", schedule ? `${schedule.carrier} ${schedule.vessel_or_flight} · ETD ${schedule.etd} → ETA ${schedule.eta}` : missing],
       ["Freight", schedule ? `USD ${formatNumber(schedule.freight_usd, 0)} (${schedule.source})` : missing],
     ];
@@ -1110,7 +1111,7 @@
         ...routePayload(),
         incoterms: form.querySelector("input[name=incoterms]:checked").value,
         currency: f.currency.value,
-        invoice_value: f.invoice_value.value,
+        invoice_value: plainNumber(f.invoice_value.value),
         cargo: cargoPayload(),
         schedule_id: state.schedule_id,
         exporter_name: f.exporter_name.value,

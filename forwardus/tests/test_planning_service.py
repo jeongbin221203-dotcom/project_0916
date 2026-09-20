@@ -887,48 +887,86 @@ def test_tariff_guide_matches_destination_country(app):
 
     netherlands = planning_service.tariff_guide("3304991000", "NL")
     assert netherlands["available"] and netherlands["country"] == "네덜란드"
-    names = [row["agreement"] for row in netherlands["agreements"]]
-    assert names == ["한·EU FTA"]
+    assert [row["agreement"] for row in netherlands["agreements"]] == ["한·EU FTA"]
     assert "인증수출자" in netherlands["agreements"][0]["proof"]
     # 기본세율·WTO세율은 참고로 함께 줍니다.
     assert {row["code"] for row in netherlands["general"]} == {"A", "C"}
 
-    # 베트남은 한·아세안, 한·베트남, RCEP이 모두 발효 중입니다.
+    # 베트남은 한·아세안, 한·베트남, RCEP이 모두 잡힙니다.
     vietnam = planning_service.tariff_guide("3304991000", "VN")
-    assert {"한·아세안 FTA", "한·베트남 FTA"} <= set(vietnam["in_force"])
+    names = [row["agreement"] for row in vietnam["agreements"]]
+    assert "한·아세안 FTA" in names and "한·베트남 FTA" in names
     # 세율이 낮은 협정을 먼저 보여줍니다.
     rates = [float(row["rate"]) for row in vietnam["agreements"]]
     assert rates == sorted(rates)
 
-    # 협정이 없는 나라는 발효 목록이 비어 있습니다.
-    assert planning_service.tariff_guide("3304991000", "RU")["in_force"] == []
+    # 협정이 없는 나라는 목록이 비어 있습니다.
+    assert planning_service.tariff_guide("3304991000", "RU")["agreements"] == []
 
 
-def test_tariff_guide_lists_agreements_without_rate_rows(app):
-    """이 품목에 협정세율이 없어도 발효 중인 협정은 알려줍니다."""
-
-    japan = planning_service.tariff_guide("3304991000", "JP")
-    assert japan["in_force"] == ["RCEP (일본)"]
-    assert japan["without_rate"] == ["RCEP (일본)"]
-
-
-def test_fta_country_mapping(app):
-    """협정 대상국 매핑이 협정별로 맞아야 합니다."""
+def test_agreement_country_comes_from_customs_names(app):
+    """협정 대상국은 관세청 관세율구분명과 국가코드 목록에서 읽어냅니다."""
 
     from app.processors import fta_guide
 
-    assert fta_guide.match_agreement("FEU1")[0] == "한·EU FTA"
-    assert fta_guide.match_agreement("FUS1")[1] == ("US",)
-    # 긴 코드를 먼저 맞춰 아세안과 상호대응세율을 구분합니다.
-    assert fta_guide.match_agreement("FASPH1")[0].startswith("한·아세안 FTA 상호대응")
-    assert fta_guide.match_agreement("FAS1")[0] == "한·아세안 FTA"
-    assert fta_guide.match_agreement("FRCJP1")[0] == "RCEP (일본)"
-    assert fta_guide.match_agreement("ZZZ") is None
+    codes = {"미국": "US", "칠레": "CL", "일본": "JP", "튀르키예": "TR",
+             "아랍에미리트 연합": "AE", "라오스": "LA"}
 
-    # 나라별로 발효 중인 협정을 찾습니다.
-    assert fta_guide.agreements_for("DE") == ["한·EU FTA"]
-    assert "RCEP (중국)" in fta_guide.agreements_for("CN")
-    assert "한·중국 FTA" in fta_guide.agreements_for("CN")
-    assert fta_guide.agreements_for("RU") == []
-    # EU 27개국과 아세안 10개국을 모두 담습니다.
-    assert len(fta_guide.EU_COUNTRIES) == 27 and len(fta_guide.ASEAN_COUNTRIES) == 10
+    def countries(code, name):
+        return fta_guide.countries_for(code, name, codes)
+
+    # 나라 하나짜리 협정은 이름에서 그대로 찾습니다.
+    assert countries("FUS1", "한ㆍ미 FTA 협정세율(선택1)") == ("US",)
+    assert countries("FCL1", "한ㆍ칠레FTA협정세율(선택1)") == ("CL",)
+    assert countries("FRCJP1", "RCEP협정세율_일본(선택1)") == ("JP",)
+    # 줄임말은 관세청 국가명으로 바꿔 맞춥니다.
+    assert countries("FTR1", "한ㆍ터키 FTA협정세율(선택1)") == ("TR",)
+    assert countries("FAE1", "한ㆍUAE CEPA(선택1)") == ("AE",)
+    assert countries("E3", "아시아ㆍ태평양 협정세율(라오스)") == ("LA",)
+
+    # 나라 하나로 특정되지 않는 협정만 회원국을 따로 둡니다.
+    assert "NL" in countries("FEU1", "한ㆍEU FTA협정세율(선택1)")
+    assert "CH" in countries("FEF1", "한ㆍEFTA FTA협정세율(선택1)")
+    assert "VN" in countries("FAS1", "한ㆍ아세안 FTA협정세율(선택1)")
+    assert len(fta_guide.BLOCS["EU"]) == 27 and len(fta_guide.BLOCS["아세안"]) == 10
+
+    # 협정이 아닌 세율은 나라를 따지지 않습니다.
+    assert countries("A", "기본세율") == ()
+    assert countries("C", "WTO협정세율") == ()
+    assert countries("R", "최빈국특혜관세") == ()
+
+    # 협정 이름은 "(선택1)" 같은 꼬리를 떼고 보여줍니다.
+    assert fta_guide.agreement_label("한ㆍ칠레FTA협정세율(선택1)") == "한·칠레FTA"
+    assert fta_guide.agreement_label("RCEP협정세율_일본(선택1)") == "RCEP 일본"
+    # 원산지증명 방식은 협정 종류에 따라 다릅니다.
+    assert "인증수출자" in fta_guide.proof_for("FEU1")
+    assert "자율발급" in fta_guide.proof_for("FUS1")
+    assert "기관발급" in fta_guide.proof_for("FAS1")
+
+
+def test_number_fields_accept_thousands_separators(app, client):
+    """숫자 입력칸은 1,000처럼 쉼표를 넣어 보여줍니다."""
+
+    html = client.get("/planning/new").get_data(as_text=True)
+    # 쉼표를 넣으려면 숫자 전용 칸으로는 안 되므로 글자 칸으로 바꿨습니다.
+    assert 'type="number"' not in html
+    assert html.count("data-number") == 7
+    # 화살표로 올리고 내릴 단위는 칸마다 다릅니다.
+    assert 'name="quantity"' in html and 'data-step="1"' in html
+    assert 'name="weight_per_package_kg" inputmode="decimal" autocomplete="off" data-number data-step="10"' in html
+    assert 'name="invoice_value" inputmode="decimal" autocomplete="off" data-number data-step="100"' in html
+
+    reverse = client.get("/planning").get_data(as_text=True)
+    assert 'type="number"' not in reverse and reverse.count("data-number") == 1
+
+
+def test_selected_date_chips_are_small(app):
+    """달력 아래 Seller·Buyer 날짜 표시만 작게 둡니다."""
+
+    from pathlib import Path
+
+    css = Path("app/static/css/planning.css").read_text(encoding="utf-8")
+    assert ".selected_date .date_item {" in css and "font-size: 11px" in css
+    # 화면 전체를 줄이는 설정은 두지 않습니다.
+    base = Path("app/static/css/base.css").read_text(encoding="utf-8")
+    assert "zoom" not in base

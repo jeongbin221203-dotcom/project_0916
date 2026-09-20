@@ -53,7 +53,53 @@
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   }
 
-  window.Forwardus = { escapeHtml, getJson, postJson, formatNumber, toIsoDate };
+  /* ----- 숫자 입력칸: 천 단위 쉼표 ----- */
+  // 화면에는 1,000처럼 보여주고 서버에는 쉼표를 뗀 값을 보냅니다.
+  function plainNumber(value) {
+    return String(value ?? "").replace(/,/g, "").trim();
+  }
+
+  function groupDigits(value) {
+    const text = plainNumber(value);
+    if (!text || !/^-?\d*\.?\d*$/.test(text)) return text;
+    const [whole, fraction] = text.split(".");
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return fraction === undefined ? grouped : `${grouped}.${fraction}`;
+  }
+
+  function setupNumberInput(input) {
+    const step = Number(input.dataset.step || 1);
+    const min = input.dataset.min === undefined ? null : Number(input.dataset.min);
+    const max = input.dataset.max === undefined ? null : Number(input.dataset.max);
+
+    const format = () => {
+      // 커서가 뒤에서 몇 번째인지 기억했다가 쉼표를 넣은 뒤 같은 자리로 돌려놓습니다.
+      const fromEnd = input.value.length - (input.selectionStart ?? input.value.length);
+      input.value = groupDigits(input.value);
+      const caret = Math.max(0, input.value.length - fromEnd);
+      try { input.setSelectionRange(caret, caret); } catch (error) { /* 무시 */ }
+    };
+
+    input.addEventListener("input", format);
+    input.addEventListener("blur", () => { input.value = groupDigits(input.value); });
+    // 위아래 화살표로 값을 올리고 내립니다. (숫자 입력칸의 화살표 대신)
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      const current = Number(plainNumber(input.value)) || 0;
+      let next = current + (event.key === "ArrowUp" ? step : -step);
+      if (min !== null) next = Math.max(min, next);
+      if (max !== null) next = Math.min(max, next);
+      input.value = groupDigits(String(Math.round(next * 1000) / 1000));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    input.value = groupDigits(input.value);
+  }
+
+  document.querySelectorAll("input[data-number]").forEach(setupNumberInput);
+
+  window.Forwardus = { escapeHtml, getJson, postJson, formatNumber, toIsoDate,
+                       plainNumber, groupDigits };
 
   const toggle = document.querySelector("[data-nav-toggle]");
   const nav = document.querySelector("[data-nav]");
