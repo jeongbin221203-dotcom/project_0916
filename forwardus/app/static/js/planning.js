@@ -95,7 +95,10 @@
     return entry ? entry.type === "reload" : false;
   }
   if (isReload()) {
+    // 새로고침은 처음부터 다시 시작한다는 뜻으로 보고 첫 화면으로 보냅니다.
     try { draftStore.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
+    window.location.replace(urls.home);
+    return;
   }
   // 로고(홈)를 누르면 처음부터 다시 작성하는 것으로 봅니다.
   document.querySelector(".brand")?.addEventListener("click", () => {
@@ -320,6 +323,7 @@
     applyMode();
     invalidateSchedules();
     saveDraftSoon();
+    refreshOutlook();   // FCL/LCL에 따라 소요일과 안내가 달라집니다.
   });
   applyMode();
 
@@ -894,6 +898,20 @@
     none: "Buyer 요청일을 입력하면 여유를 계산합니다",
   };
 
+  // FCL / LCL을 고르면 무엇이 달라지는지 달력 아래에 함께 적습니다.
+  function modeDiff(diff) {
+    if (!diff) return "";
+    const steps = diff.extra_steps.length
+      ? `<p class="diff_gap">LCL에만 드는 작업: ${diff.extra_steps.map(escapeHtml).join(" · ")}`
+        + ` <b>— FCL보다 ${escapeHtml(diff.gap_days)} 더 걸립니다</b></p>`
+      : "";
+    return `<div class="outlook_diff">`
+      + `<p class="diff_head"><b>${escapeHtml(diff.selected)}</b> 선택 시</p>`
+      + `<ul>${diff.facts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}</ul>`
+      + steps
+      + `</div>`;
+  }
+
   async function refreshOutlook() {
     const box = document.querySelector("[data-outlook]");
     if (!box) return;
@@ -903,6 +921,8 @@
     }
     const response = await postJson(urls.scheduleOutlook, {
       origin_code: state.origin ? state.origin.code : "",
+      transport_mode: state.transport_mode,
+      sea_mode: state.sea_mode,
       destination_code: state.destination.code,
       requested_departure_date: state.departure_date,
       buyer_required_date: form.elements.buyer_required_date.value,
@@ -924,6 +944,11 @@
     };
     const icon = { SEA: "🚢", AIR: "✈️" };
     const km = (value) => `${formatNumber(value)}km`;
+    // 출발일과 같은 해면 연도를 빼서 한 줄에 들어가게 합니다.
+    const short = (iso) => (iso.slice(0, 4) === data.departure_date.slice(0, 4) ? iso.slice(5) : iso);
+    const eta = (mode) => (mode.eta_slowest === mode.eta_fastest
+      ? `도착 ${short(mode.eta_fastest)}`
+      : `도착 ${short(mode.eta_fastest)}~${short(mode.eta_slowest)}`);
     // 항구를 골랐는데 항공을 보여줄 때처럼, 실제로 계산한 구간을 함께 적습니다.
     const legOf = (mode) => (mode.mode === "SEA" ? data.sea_route : data.air_route);
     const detail = (mode) => {
@@ -938,15 +963,16 @@
       + ` → ${escapeHtml(data.destination)} 예상 일정`
       + ` <em>실제 항로 기준</em></p>`
       + data.modes.map((mode) => `
-        <div class="outlook_row level_${mode.level}">
+        <div class="outlook_row level_${mode.level}${mode.selected ? " is_selected" : ""}">
+          ${mode.selected ? `<span class="outlook_pick">선택</span>` : ""}
           <span class="outlook_mode">${icon[mode.mode]} ${escapeHtml(mode.label)}</span>
           <span class="outlook_days">${days(mode)}</span>
-          <span class="outlook_eta">도착 ${mode.eta_fastest}${
-            mode.eta_slowest !== mode.eta_fastest ? ` ~ ${mode.eta_slowest}` : ""}</span>
-          <span class="outlook_margin">${escapeHtml(margin(mode))}</span>
-          <span class="outlook_level">${escapeHtml(LEVEL_TEXT[mode.level] || "")}</span>
+          <span class="outlook_eta">${eta(mode)}</span>
+          <span class="outlook_margin">${escapeHtml(margin(mode))}
+            <b>${escapeHtml(LEVEL_TEXT[mode.level] || "")}</b></span>
           <span class="outlook_note">${escapeHtml(detail(mode))}</span>
-        </div>`).join("");
+        </div>`).join("")
+      + modeDiff(data.sea_mode_diff);
     box.hidden = false;
   }
 

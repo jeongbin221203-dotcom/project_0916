@@ -61,7 +61,9 @@ def test_departure_margin_levels(app):
     far = check("BRSSZ", 7, 45)
     assert close["transit_days"] < far["transit_days"]
     assert close["margin_days"] > far["margin_days"]
-    assert close["level"] == "ok" and far["level"] in ("tight", "late")
+    # 실제 항로 기준 부산→호찌민 6일, 부산→산투스 29일이라 등급이 한 단계 이상 떨어집니다.
+    grade = ["ok", "caution", "tight", "late"]
+    assert close["level"] == "ok" and grade.index(far["level"]) > grade.index(close["level"])
 
     # 납기가 가까울수록 등급이 나빠집니다.
     levels = [check("USLAX", 7, days)["level"] for days in (20, 30, 40, 60)]
@@ -774,3 +776,32 @@ def test_search_destination_reflects_origin_airport(app):
     assert direct("DXB", "CJU") is False
     # 출발지를 고르기 전에는 국내 어디서든 직항이 있으면 직항으로 봅니다.
     assert direct("DXB") is True
+
+
+def test_incoterms_cover_all_2020_rules(app):
+    """Incoterms 2020 11개 규칙을 모두 담고, 처음 쓰는 분을 위한 설명을 붙입니다."""
+
+    from app.processors.cost_calculator import INCOTERMS_INFO
+
+    codes = [term["code"] for term in INCOTERMS_INFO]
+    assert codes == ["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]
+
+    # 해상·내수로 전용 조건은 네 가지입니다.
+    assert [t["code"] for t in INCOTERMS_INFO if t.get("sea_only")] == ["FAS", "FOB", "CFR", "CIF"]
+    # 판매자에게 보험 의무가 있는 조건은 CIF와 CIP뿐입니다.
+    assert [t["code"] for t in INCOTERMS_INFO if "보험" in t["seller_cost"]] == ["CIF", "CIP"]
+    # 양하 의무가 있는 조건은 DPU 하나입니다.
+    assert [t["code"] for t in INCOTERMS_INFO if "양하" in t["seller_cost"]] == ["DPU"]
+
+    for term in INCOTERMS_INFO:
+        assert term["detail"] and term["caution"], term["code"]
+        assert term["group"] in "EFCD"
+
+
+def test_incoterms_help_is_rendered(app, client):
+    """카드마다 마우스를 올렸을 때 보여줄 설명이 화면에 들어 있습니다."""
+
+    html = client.get("/planning/new").get_data(as_text=True)
+    assert html.count('class="incoterm_card"') == 11
+    assert html.count("incoterm_help_") == 22            # 카드 11개 × (aria-describedby + id)
+    assert "Free Alongside Ship" in html and "ICC A" in html

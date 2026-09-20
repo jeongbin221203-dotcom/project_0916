@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import pytest
 
 from app.collectors import location_client
@@ -153,3 +155,58 @@ def test_flight_minutes_come_from_route_data(app):
 
     # 국내 공항은 출발지라 판정 대상이 아닙니다.
     assert location_client.find_location("ICN")["flight_minutes"] == {}
+
+
+def test_sea_mode_choice_changes_every_estimate(app):
+    """FCL·LCL 선택은 예상 일정과 역산 소요일에 모두 반영됩니다."""
+
+    destination = location_client.find_location("NLRTM")
+    fcl = planning_service.estimate_transit_days("SEA", "FCL", destination, "KRPUS")
+    lcl = planning_service.estimate_transit_days("SEA", "LCL", destination, "KRPUS")
+    assert lcl > fcl
+
+    # 출발 희망일 판정도 고른 방식으로 계산합니다.
+    today = date.today()
+    def check(sea_mode):
+        return planning_service.check_departure_date({
+            "transport_mode": "SEA", "sea_mode": sea_mode,
+            "origin_code": "KRPUS", "destination_code": "NLRTM",
+            "requested_departure_date": (today + timedelta(days=7)).isoformat(),
+            "buyer_required_date": (today + timedelta(days=60)).isoformat(),
+        })
+    assert check("LCL")["margin_days"] < check("FCL")["margin_days"]
+
+
+def test_outlook_marks_selected_mode_and_explains_difference(app):
+    """고른 운송 방식을 표시하고 무엇이 달라지는지 알려줍니다."""
+
+    today = date.today()
+    result = planning_service.schedule_outlook({
+        "origin_code": "KRPUS", "destination_code": "NLRTM",
+        "transport_mode": "SEA", "sea_mode": "LCL",
+        "requested_departure_date": (today + timedelta(days=7)).isoformat(),
+    })
+    selected = [mode["label"] for mode in result["modes"] if mode["selected"]]
+    assert selected == ["해상 LCL"]
+
+    diff = result["sea_mode_diff"]
+    assert diff["selected"] == "LCL" and diff["facts"]
+    # LCL에만 붙는 CFS 작업을 소요일 내역에서 그대로 가져옵니다.
+    assert any("CFS" in step for step in diff["extra_steps"])
+    assert "FCL보다" in diff["summary"]
+
+    # 항공을 고르면 해상 방식 비교는 보여주지 않습니다.
+    air = planning_service.schedule_outlook({
+        "origin_code": "ICN", "destination_code": "FRA", "transport_mode": "AIR",
+        "requested_departure_date": (today + timedelta(days=7)).isoformat(),
+    })
+    assert air["sea_mode_diff"] is None
+    assert [m["label"] for m in air["modes"] if m["selected"]] == ["항공"]
+
+
+def test_estimates_use_main_gateway_before_origin_is_chosen(app):
+    """출발지를 고르기 전에는 대표 관문(부산항·인천공항)을 기준으로 계산합니다."""
+
+    summary = planning_service.transit_summary("", "NLRTM")
+    assert summary["sea_route"]["origin"] == "부산항"
+    assert summary["air_route"]["origin"] == "인천국제공항"

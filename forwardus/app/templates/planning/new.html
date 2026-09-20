@@ -113,15 +113,23 @@
     {# Step 2 — Incoterms #}
     <section class="card step" data-step="2" hidden>
       <h2>Incoterms 선택</h2>
-      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. 항공 운송에서는 FOB·CFR·CIF 대신 FCA·CPT·CIP를 사용합니다.</p>
+      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. Incoterms 2020 기준 11개 조건이며,
+        해상 전용 조건(FAS·FOB·CFR·CIF)은 항공에서 쓸 수 없어 FCA·CPT·CIP로 바꿔 씁니다.
+        <b>카드에 마우스를 올리면 자세한 설명이 나옵니다.</b></p>
       <div class="incoterm_grid">
         {% for term in options.incoterms %}
-          <label class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}>
+          <label class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}
+                 tabindex="0" aria-describedby="incoterm_help_{{ term.code }}">
             <input type="radio" name="incoterms" value="{{ term.code }}">
-            <b>{{ term.code }}</b>
+            <b>{{ term.code }}{% if term.sea_only %}<i class="incoterm_tag">해상 전용</i>{% endif %}</b>
             <span>{{ term.label }}</span>
             <small>위험 이전: {{ term.risk }}</small>
             <small>수출자 부담: {{ term.seller_cost }}</small>
+            <div class="incoterm_help" id="incoterm_help_{{ term.code }}" role="tooltip">
+              <b>{{ term.code }} · {{ term.name }}</b>
+              <p>{{ term.detail }}</p>
+              <p class="incoterm_caution"><i>짚고 갈 점</i> {{ term.caution }}</p>
+            </div>
           </label>
         {% endfor %}
       </div>
@@ -244,6 +252,7 @@
 {% block scripts %}
   <script>
     window.FORWARDUS_URLS = {
+      home: "{{ url_for('home.index') }}",
       locations: "{{ url_for('planning.api_locations') }}",
       countries: "{{ url_for('planning.api_countries') }}",
       unlocode: "{{ url_for('planning.api_unlocode') }}",

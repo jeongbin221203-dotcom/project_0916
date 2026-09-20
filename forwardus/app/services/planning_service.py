@@ -264,23 +264,45 @@ def search_schedules(payload: dict) -> dict:
     }
 
 
-def estimate_transit_days(transport_mode: str, sea_mode: str | None, destination: dict) -> int:
-    """구간별 최단 운송 소요일(Mock 스케줄 기준)."""
+def estimate_transit_days(transport_mode: str, sea_mode: str | None, destination: dict,
+                          origin_code: str = "") -> int:
+    """구간별 최단 운송 소요일. 실제 항로 거리로 계산합니다.
 
-    service = "AIR" if transport_mode == "AIR" else (sea_mode or "FCL")
-    region = destination.get("region", "asia")
-    try:
-        templates = load_mock("schedules")[service]
-    except (OSError, ValueError, KeyError):
-        return DEFAULT_TRANSIT_DAYS["AIR" if transport_mode == "AIR" else "SEA"]
-    days = [t["transit_days"][region] for t in templates if region in t["transit_days"]]
-    return min(days) if days else DEFAULT_TRANSIT_DAYS["AIR" if transport_mode == "AIR" else "SEA"]
+    해상은 FCL·LCL을 구분합니다. LCL은 CFS 혼재·적출 작업만큼 더 걸립니다.
+    """
+
+    fallback = DEFAULT_TRANSIT_DAYS["AIR" if transport_mode == "AIR" else "SEA"]
+    if not destination:
+        return fallback
+    summary = transit_summary(origin_code, destination["code"])
+    if transport_mode == "AIR":
+        return summary["air"]["min"] if summary.get("air") else fallback
+    days = (summary.get("sea") or {}).get(sea_mode or "FCL")
+    return days["min"] if days else fallback
+
+
+# 출발지를 아직 고르지 않았을 때 기준으로 삼는 대표 관문.
+DEFAULT_ORIGIN = {"port": "KRPUS", "airport": "ICN"}
+
+
+def _korean_origin(origin: dict | None, kind: str) -> dict | None:
+    """해상·항공 각각의 국내 출발 지점을 정합니다.
+
+    고른 곳이 같은 종류면 그대로 쓰고, 다른 종류면 가장 가까운 국내 지점으로
+    바꿉니다. 아직 아무것도 고르지 않았으면 대표 관문을 씁니다.
+    """
+
+    if origin and origin["kind"] == kind:
+        return origin
+    if origin:
+        return location_client.nearest(origin, kind, "KR")
+    return location_client.find_location(DEFAULT_ORIGIN[kind])
 
 
 def _sea_leg(origin: dict | None, destination: dict | None) -> dict | None:
     """해상 구간: 고른 곳이 공항이면 같은 나라의 가장 가까운 항구로 바꿔 계산합니다."""
 
-    origin = origin if origin and origin["kind"] == "port" else location_client.nearest(origin, "port", "KR")
+    origin = _korean_origin(origin, "port")
     destination = (destination if destination and destination["kind"] == "port"
                    else location_client.nearest(destination, "port"))
     if not origin or not destination:
@@ -294,7 +316,7 @@ def _sea_leg(origin: dict | None, destination: dict | None) -> dict | None:
 def _air_leg(origin: dict | None, destination: dict | None) -> dict | None:
     """항공 구간: 고른 곳이 항구면 같은 나라의 가장 가까운 공항으로 바꿔 계산합니다."""
 
-    origin = origin if origin and origin["kind"] == "airport" else location_client.nearest(origin, "airport", "KR")
+    origin = _korean_origin(origin, "airport")
     destination = (destination if destination and destination["kind"] == "airport"
                    else location_client.nearest(destination, "airport"))
     if not origin or not destination or origin["lat"] is None or destination["lat"] is None:
@@ -345,6 +367,40 @@ def transit_summary(origin_code: str, destination_code: str) -> dict:
 
 
 MODE_LABELS = {"SEA": "해상", "AIR": "항공"}
+
+# FCL·LCL을 고르면 실제로 무엇이 달라지는지. 소요일은 항로마다 계산해 채웁니다.
+SEA_MODE_FACTS = {
+    "FCL": ["컨테이너 한 대를 단독으로 씁니다. 다른 화주 화물과 섞이지 않습니다.",
+            "CY(컨테이너 야적장)에서 바로 반입·반출해 CFS 작업이 없습니다.",
+            "운임은 컨테이너 한 대 단위로 매깁니다."],
+    "LCL": ["다른 화주 화물과 한 컨테이너에 혼재합니다.",
+            "출발지 CFS에서 적입하고 도착지 CFS에서 적출·분류하는 시간이 더 듭니다.",
+            "운임은 CBM(부피)과 중량 중 큰 쪽으로 매기고, CFS 작업료가 따로 붙습니다."],
+}
+
+
+def sea_mode_difference(summary: dict, selected: str) -> dict | None:
+    """고른 해상 운송 방식이 반대쪽과 무엇이 다른지 정리합니다."""
+
+    sea = summary.get("sea") or {}
+    if not sea.get("FCL") or not sea.get("LCL"):
+        return None
+    other = "LCL" if selected == "FCL" else "FCL"
+    gap_min = sea["LCL"]["min"] - sea["FCL"]["min"]
+    gap_max = sea["LCL"]["max"] - sea["FCL"]["max"]
+    gap = f"{gap_min}일" if gap_min == gap_max else f"{gap_min}~{gap_max}일"
+    # LCL에만 붙는 작업을 소요일 내역에서 그대로 가져옵니다.
+    extra = [f"{name} {days:g}일" for name, days in sea["LCL"]["breakdown"].items()
+             if name not in sea["FCL"]["breakdown"]]
+    return {
+        "selected": selected,
+        "other": other,
+        "facts": SEA_MODE_FACTS[selected],
+        "gap_days": gap,
+        "extra_steps": extra,
+        "summary": (f"LCL은 {' · '.join(extra)}이 더해져 FCL보다 {gap} 깁니다."
+                    if extra else f"LCL이 FCL보다 {gap} 깁니다."),
+    }
 # 환승 1회에 더해지는 일수 (연결편 대기·재적재)
 TRANSFER_EXTRA_DAYS = 1
 
@@ -414,6 +470,10 @@ def schedule_outlook(payload: dict) -> dict:
         passed = [labels[p] for p in sea_route.get("passages", []) if p in labels]
         sea_note = f"{' · '.join(passed)} 경유" if passed else ""
 
+    # 화면에서 고른 운송 방식. 해당 줄을 강조하고 무엇이 달라지는지 안내합니다.
+    selected_mode = str(payload.get("transport_mode") or "").upper()
+    selected_sea = str(payload.get("sea_mode") or "FCL").upper()
+
     plans = []
     for sea_mode in ("FCL", "LCL"):
         days = (summary.get("sea") or {}).get(sea_mode)
@@ -427,6 +487,7 @@ def schedule_outlook(payload: dict) -> dict:
         entry = {
             "mode": mode,
             "sea_mode": sea_mode,
+            "selected": mode == selected_mode and (sea_mode is None or sea_mode == selected_sea),
             "label": f"{MODE_LABELS[mode]} {sea_mode}" if sea_mode else MODE_LABELS[mode],
             "note": note,
             "direct": route.get("direct") if mode == "AIR" else not sea_route.get("transship"),
@@ -459,6 +520,7 @@ def schedule_outlook(payload: dict) -> dict:
         "modes": modes,
         "sea_route": summary.get("sea_route"),
         "air_route": summary.get("air_route"),
+        "sea_mode_diff": sea_mode_difference(summary, selected_sea) if selected_mode == "SEA" else None,
         "source": summary["source"],
     }
 
@@ -478,7 +540,8 @@ def check_departure_date(payload: dict) -> dict:
         return {"available": False, "reason": "출발 희망일을 선택해주세요."}
 
     destination = location_client.find_location(str(payload.get("destination_code") or "")) or {}
-    transit_days = estimate_transit_days(transport_mode, payload.get("sea_mode"), destination)
+    transit_days = estimate_transit_days(transport_mode, payload.get("sea_mode"), destination,
+                                         str(payload.get("origin_code") or ""))
     eta = calculate_eta(departure, transit_days)
     result = {
         "available": True,
