@@ -51,19 +51,25 @@ def search_hs_codes_mock(query: str) -> dict:
 
 
 def search_hs_codes(query: str) -> dict:
-    """관세청 HS부호검색으로 품목을 찾습니다. 실패하면 예시 목록을 씁니다."""
+    """관세청 HS부호검색(API018)으로 품목을 찾습니다.
+
+    품명은 한글·영문 모두 부분일치로 찾고, HS부호는 10자리 완전일치만 됩니다.
+    API 키가 없거나 호출이 실패할 때만 예시 목록으로 되돌아갑니다.
+    """
 
     keyword = (query or "").strip()
     key = _hs_key()
-    if not keyword or not key:
+    if not key:
         return search_hs_codes_mock(keyword)
+    if not keyword:
+        return ok([], "api")
 
-    digits = keyword.replace(".", "").replace("-", "")
+    digits = keyword.replace(".", "").replace("-", "").replace(" ", "")
     korean = _has_hangul(keyword)
     if digits.isdigit():
-        # HS부호로는 10자리 완전일치만 조회됩니다. 그보다 짧으면 예시 목록에서 찾습니다.
+        # HS부호는 10자리 완전일치만 조회됩니다. (연계 가이드 3.2.18)
         if len(digits) != HS_CODE_LENGTH:
-            return search_hs_codes_mock(keyword)
+            return ok([], "api")
         params = {"hsSgn": digits, "koenTp": "1"}
     else:
         if len(keyword) < (MIN_KOREAN_LENGTH if korean else MIN_ENGLISH_LENGTH):
@@ -143,3 +149,43 @@ def fetch_regulations(hs_code: str, country_code: str) -> dict:
     for item in items:
         item["source"] = "mock"
     return ok({"hs_code": hs_code, "country_code": country_code, "items": items}, "mock")
+
+
+# 관세청 UNI-PASS "관세율 기본 조회"(API030). HS부호 10자리로 세율을 가져옵니다.
+UNIPASS_TARIFF_URL = "https://unipass.customs.go.kr:38010/ext/rest/trrtQry/retrieveTrrt"
+
+
+def fetch_tariff_rates(hs_code: str) -> dict:
+    """HS부호의 세율 목록을 조회합니다. (기본세율·WTO·FTA 협정세율)
+
+    응답의 루트 태그는 가이드 문서와 달리 소문자로 옵니다(trrtQryRtnVo).
+    """
+
+    digits = (hs_code or "").replace(".", "").replace("-", "").replace(" ", "")
+    if len(digits) != HS_CODE_LENGTH or not digits.isdigit():
+        return fail("VALIDATION_ERROR", "api", "HS부호 10자리를 입력해주세요.")
+
+    key = (get_config("UNIPASS_API_KEYS", {}) or {}).get("TARIFF_RATE", "")
+    if not key:
+        return fail("API_AUTH_FAILED", "api", "관세율 조회 API 키가 없습니다.")
+
+    result = request_text("GET", UNIPASS_TARIFF_URL, params={"crkyCn": key, "hsSgn": digits})
+    if not result["success"]:
+        return result
+    try:
+        root = ET.fromstring(result["data"])
+    except ET.ParseError:
+        return fail("API_INVALID_RESPONSE", "api")
+
+    notice = (root.findtext("ntceInfo") or "").strip()
+    rows = [{
+        "code": (row.findtext("trrtTpcd") or "").strip(),
+        "name": (row.findtext("trrtTpNm") or "").strip(),
+        "rate": (row.findtext("trrt") or "").strip(),
+        "unit_amount": (row.findtext("prutXamt") or "").strip(),
+        "start_date": (row.findtext("aplyStrtDt") or "").strip(),
+        "end_date": (row.findtext("aplyEndDt") or "").strip(),
+    } for row in root.findall("trrtQryRsltVo")]
+    if not rows and notice:
+        return fail("API_NO_DATA", "api", notice)
+    return ok(rows, "api")

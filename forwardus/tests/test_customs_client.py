@@ -68,12 +68,15 @@ def test_ten_digit_code_queries_by_code(with_key, monkeypatch):
     assert params["hsSgn"] == "3304101000" and "prnm" not in params
 
 
-def test_short_code_falls_back_to_examples(with_key, monkeypatch):
-    """부호는 10자리 완전일치만 조회되므로, 짧게 치면 예시 목록에서 찾습니다."""
+def test_short_code_is_not_sent(with_key, monkeypatch):
+    """HS부호는 10자리 완전일치만 조회되므로 짧게 치면 보내지 않습니다."""
 
-    _stub(monkeypatch, SAMPLE_XML)
+    called = []
+    monkeypatch.setattr(customs_client, "request_text",
+                        lambda *a, **k: called.append(1) or {"success": True, "data": SAMPLE_XML})
     result = customs_client.search_hs_codes("3304")
-    assert result["source"] == "mock" and result["data"]
+    assert result["source"] == "api" and result["data"] == []
+    assert not called
 
 
 def test_too_short_query_is_not_sent(with_key, monkeypatch):
@@ -109,3 +112,42 @@ def test_format_hs_code():
 
     assert customs_client.format_hs_code("3304991000") == "3304.99-1000"
     assert customs_client.format_hs_code("3304") == "3304"
+
+
+TARIFF_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<trrtQryRtnVo><ntceInfo></ntceInfo><tCnt>4</tCnt>
+  <trrtQryRsltVo><hsSgn>3304991000</hsSgn><trrtTpcd>A</trrtTpcd><trrtTpNm>기본세율</trrtTpNm>
+    <trrt>8</trrt><prutXamt/><basePrc/><aplyStrtDt>20260101</aplyStrtDt><aplyEndDt>20261231</aplyEndDt></trrtQryRsltVo>
+  <trrtQryRsltVo><hsSgn>3304991000</hsSgn><trrtTpcd>C</trrtTpcd><trrtTpNm>WTO협정세율</trrtTpNm>
+    <trrt>6.5</trrt><prutXamt/><basePrc/><aplyStrtDt>20260101</aplyStrtDt><aplyEndDt>20261231</aplyEndDt></trrtQryRsltVo>
+  <trrtQryRsltVo><hsSgn>3304991000</hsSgn><trrtTpcd>FEU1</trrtTpcd><trrtTpNm>한ㆍEU FTA협정세율(선택1)</trrtTpNm>
+    <trrt>0</trrt><prutXamt/><basePrc/><aplyStrtDt>20260101</aplyStrtDt><aplyEndDt>20261231</aplyEndDt></trrtQryRsltVo>
+  <trrtQryRsltVo><hsSgn>3304991000</hsSgn><trrtTpcd>FUS1</trrtTpcd><trrtTpNm>한ㆍ미 FTA 협정세율(선택1)</trrtTpNm>
+    <trrt>0</trrt><prutXamt/><basePrc/><aplyStrtDt>20260101</aplyStrtDt><aplyEndDt>20261231</aplyEndDt></trrtQryRsltVo>
+</trrtQryRtnVo>"""
+
+
+@pytest.fixture
+def with_tariff_key(app):
+    app.config["UNIPASS_API_KEYS"] = {**app.config.get("UNIPASS_API_KEYS", {}),
+                                      "TARIFF_RATE": "test-key"}
+    return app
+
+
+def test_tariff_rates_parse_lowercase_root(with_tariff_key, monkeypatch):
+    """응답 루트 태그가 소문자(trrtQryRtnVo)여도 읽습니다."""
+
+    params = {}
+    _stub(monkeypatch, TARIFF_XML, params)
+    result = customs_client.fetch_tariff_rates("3304.99-1000")
+
+    assert result["success"] and params["hsSgn"] == "3304991000"
+    assert [row["code"] for row in result["data"]] == ["A", "C", "FEU1", "FUS1"]
+    assert result["data"][0]["rate"] == "8"
+
+
+def test_tariff_requires_ten_digits(with_tariff_key):
+    """HS부호가 10자리가 아니면 조회하지 않습니다."""
+
+    result = customs_client.fetch_tariff_rates("3304")
+    assert result["success"] is False and "10자리" in result["message"]
