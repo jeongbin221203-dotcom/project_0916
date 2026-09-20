@@ -292,11 +292,10 @@
     document.querySelectorAll("[data-air-only]").forEach((el) => { el.hidden = !isAir; });
     document.querySelectorAll("[data-sea-only]").forEach((el) => { el.hidden = isAir; });
     document.querySelectorAll("[data-kind-label]").forEach((el) => { el.textContent = isAir ? "공항" : "항구"; });
+    // 해상 전용 조건도 고를 수는 있게 두고, 고른 운송수단과 맞지 않으면
+    // 아이콘으로만 알려줍니다. (막아 두면 왜 못 고르는지 알기 어렵습니다)
     document.querySelectorAll("[data-sea-only-term]").forEach((card) => {
-      const input = card.querySelector("input");
-      input.disabled = isAir;
-      card.classList.toggle("disabled", isAir);
-      if (isAir && input.checked) input.checked = false;
+      card.classList.toggle("mismatch", isAir);
     });
     document.querySelectorAll("[data-metric-sea]").forEach((el) => { el.hidden = isAir; });
     document.querySelectorAll("[data-metric-fcl]").forEach((el) => { el.hidden = isAir || state.sea_mode !== "FCL"; });

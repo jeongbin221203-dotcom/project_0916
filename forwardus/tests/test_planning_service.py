@@ -195,19 +195,22 @@ def test_origin_lists_only_korean_trade_ports(app):
                if item["country_code"] == "KR" and item["kind"] == "port")
 
 
-def test_origin_lists_national_ports_before_local(app):
-    """국가관리 무역항이 위, 지방관리 무역항이 아래에 오도록 정렬합니다."""
+def test_origin_lists_only_national_ports(app):
+    """목록에는 국가관리 무역항만 보여주고, 지방관리는 검색으로 찾습니다."""
 
     ports = planning_service.search_locations("", "SEA", "origin")["data"]
-    classes = [item["port_class"] for item in ports]
-    assert set(classes) == {"national", "local"}
-    # 국가관리가 모두 앞쪽에 모여 있어야 합니다.
-    assert classes.index("local") > max(i for i, c in enumerate(classes) if c == "national")
+    assert {item["port_class"] for item in ports} == {"national"}
     assert ports[0]["code"] == "KRPUS"
 
+    # 이름을 입력하면 지방관리 무역항도 나옵니다.
+    for query, code in (("고현", "KRKHN"), ("통영", "KRTYG"), ("제주", "KRCHA")):
+        found = planning_service.search_locations(query, "SEA", "origin")["data"]
+        assert code in {item["code"] for item in found}
+        assert next(i for i in found if i["code"] == code)["port_class"] == "local"
+
     by_code = {item["code"]: item for item in ports}
-    assert by_code["KRSEL"]["port_class"] == "local"
-    assert by_code["KRSEL"]["note"] == "법적 무역항"
+    seoul = planning_service.search_locations("서울", "SEA", "origin")["data"][0]
+    assert seoul["port_class"] == "local" and seoul["note"] == "법적 무역항"
     assert by_code["KRPUS"]["note"] == ""
     # 평택·당진항은 항만법 시행령상 국가관리무역항입니다.
     assert by_code["KRPTK"]["port_class"] == "national"
@@ -841,3 +844,39 @@ def test_origin_ports_carry_official_cargo_volume(app):
     for group in ("national", "local"):
         volumes = [item["cargo_volume_mt"] or 0 for item in items if item["port_class"] == group]
         assert volumes == sorted(volumes, reverse=True)
+
+
+def test_all_incoterms_selectable_in_air_mode(app, client):
+    """항공을 골라도 모든 Incoterms를 고를 수 있고, 적용 운송수단은 아이콘으로 알립니다."""
+
+    html = client.get("/planning/new").get_data(as_text=True)
+    # 선택을 막는 disabled 속성이 카드에 붙지 않습니다.
+    assert 'name="incoterms"' in html
+    assert html.count('name="incoterms"') == 11
+    assert "disabled" not in html.split('class="incoterm_grid"')[1].split("</div>")[0]
+    # 해상 전용은 배 아이콘만, 나머지는 배·비행기 아이콘을 함께 보여줍니다.
+    grid = html.split('class="incoterm_grid"')[1].split("</section>")[0]
+    assert grid.count("🚢✈️") == 7          # 전(全)운송수단 조건 7개
+    assert grid.count("incoterm_tag") == 11
+    assert "해상·내수로 운송에만 쓰는 조건입니다" in html
+    assert "incoterm_warn" in html          # 항공일 때 뜨는 안내
+
+
+def test_currency_list_covers_customs_published_currencies(app):
+    """송장 통화는 관세청이 고시하는 통화를 모두 보여줍니다."""
+
+    currencies = planning_service.get_form_options()["currencies"]
+    codes = [c["code"] for c in currencies]
+
+    # 주요 결제 통화가 맨 앞에 옵니다.
+    assert codes[:5] == ["USD", "EUR", "JPY", "CNY", "KRW"]
+    assert all(c["major"] for c in currencies[:5])
+    # 그 밖의 통화는 코드 알파벳순입니다.
+    rest = codes[5:]
+    assert rest == sorted(rest)
+    # 주요 무역국 통화가 들어 있어야 합니다.
+    assert {"VND", "THB", "INR", "AUD", "GBP", "SGD"} <= set(codes)
+    # 통화가 아닌 ISO 4217 X 코드는 제외합니다.
+    assert not [c for c in codes if c.startswith("X")]
+    # 이름이 비어 있는 통화는 없습니다.
+    assert all(c["name"] for c in currencies)

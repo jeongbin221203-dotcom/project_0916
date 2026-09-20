@@ -53,7 +53,7 @@ def get_form_options() -> dict:
         "incoterms": INCOTERMS_INFO,
         "package_types": PACKAGE_TYPES,
         "sort_options": SORT_OPTIONS,
-        "currencies": ["USD", "EUR", "JPY", "CNY", "KRW"],
+        "currencies": exchange_client.list_currencies(),
     }
 
 
@@ -65,8 +65,15 @@ def search_locations(query: str, transport_mode: str, role: str | None = None, c
         country = "KR"
         origin_code = None
     result = location_client.search_locations(query, location_kind(transport_mode.upper()), country, origin_code)
-    if result["success"] and role == "destination":
+    if not result["success"]:
+        return result
+    if role == "destination":
         result["data"] = [item for item in result["data"] if item["country_code"] != "KR"]
+    if role == "origin" and not query.strip():
+        # 목록을 펼치면 국가관리 무역항만 보여줍니다. 지방관리 무역항은
+        # 이름을 입력하면 찾을 수 있습니다. (수출 물량 대부분이 국가관리항입니다)
+        result["data"] = [item for item in result["data"]
+                          if item["kind"] == "airport" or item["port_class"] != "local"]
     return result
 
 

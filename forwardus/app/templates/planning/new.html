@@ -58,6 +58,8 @@
             </span>
             <input type="text" autocomplete="off" placeholder="부산, KRPUS, 인천…" data-ac-input>
             <ul class="ac_list" data-ac-list hidden></ul>
+            <small class="field_hint" data-sea-only>목록에는 국가관리 무역항만 보여줍니다.
+              지방관리 무역항(제주·통영·고현 등)은 이름을 입력하면 나옵니다.</small>
             <div class="custom_box" data-custom hidden>
               <input type="text" data-custom-code maxlength="10" placeholder="코드 (선택)" data-code-input>
               <div class="custom_search">
@@ -126,15 +128,20 @@
     {# Step 2 — Incoterms #}
     <section class="card step" data-step="2" hidden>
       <h2>Incoterms 선택</h2>
-      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. Incoterms 2020 기준 11개 조건이며,
-        해상 전용 조건(FAS·FOB·CFR·CIF)은 항공에서 쓸 수 없어 FCA·CPT·CIP로 바꿔 씁니다.
+      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. Incoterms 2020 기준 11개 조건입니다.
+        <b>🚢</b>는 해상·내수로 전용, <b>🚢✈️</b>는 모든 운송수단에 쓸 수 있는 조건입니다.
+        항공에서는 FAS·FOB·CFR·CIF 대신 FCA·CPT·CIP를 쓰는 것이 맞습니다.
         <b>카드에 마우스를 올리면 자세한 설명이 나옵니다.</b></p>
+      <p class="incoterm_warn" data-air-only hidden>
+        항공을 고르셨습니다. <b>🚢</b> 표시 조건은 해상 전용이라 항공 운송에는 맞지 않습니다.</p>
       <div class="incoterm_grid">
         {% for term in options.incoterms %}
           <label class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}
                  tabindex="0" aria-describedby="incoterm_help_{{ term.code }}">
             <input type="radio" name="incoterms" value="{{ term.code }}">
-            <b>{{ term.code }}{% if term.sea_only %}<i class="incoterm_tag">해상 전용</i>{% endif %}</b>
+            <b>{{ term.code }}
+              <i class="incoterm_tag" title="{% if term.sea_only %}해상·내수로 운송에만 쓰는 조건입니다{% else %}해상·항공 모두 쓸 수 있는 조건입니다{% endif %}">
+                {% if term.sea_only %}🚢{% else %}🚢✈️{% endif %}</i></b>
             <span>{{ term.label }}</span>
             <small>위험 이전: {{ term.risk }}</small>
             <small>수출자 부담: {{ term.seller_cost }}</small>
@@ -178,29 +185,40 @@
           </label>
           <label class="field">
             <span class="field_label">가로 Length (cm)</span>
-            <input type="number" name="length_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+            <input type="number" name="length_cm" min="0" step="1" inputmode="decimal" data-calc>
           </label>
           <label class="field">
             <span class="field_label">세로 Width (cm)</span>
-            <input type="number" name="width_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+            <input type="number" name="width_cm" min="0" step="1" inputmode="decimal" data-calc>
           </label>
           <label class="field">
             <span class="field_label">높이 Height (cm)</span>
-            <input type="number" name="height_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+            <input type="number" name="height_cm" min="0" step="1" inputmode="decimal" data-calc>
           </label>
           <label class="field">
             <span class="field_label">포장당 총중량 (kg)</span>
-            <input type="number" name="weight_per_package_kg" min="0" step="0.01" inputmode="decimal" data-calc>
+            <input type="number" name="weight_per_package_kg" min="0" step="10" inputmode="decimal" data-calc>
           </label>
           <label class="field">
             <span class="field_label">총 순중량 Net Weight (kg) <small class="muted">(선택)</small></span>
-            <input type="number" name="net_weight_kg" min="0" step="0.01" inputmode="decimal">
+            <input type="number" name="net_weight_kg" min="0" step="10" inputmode="decimal">
           </label>
           <div class="field">
             <span class="field_label">Invoice Value</span>
             <div class="input_group">
-              <select name="currency">{% for c in options.currencies %}<option>{{ c }}</option>{% endfor %}</select>
-              <input type="number" name="invoice_value" min="0" step="0.01" inputmode="decimal">
+              <select name="currency">
+                <optgroup label="주요 결제 통화">
+                  {% for c in options.currencies if c.major %}
+                    <option value="{{ c.code }}">{{ c.code }} · {{ c.name }}</option>
+                  {% endfor %}
+                </optgroup>
+                <optgroup label="그 밖의 관세청 고시 통화">
+                  {% for c in options.currencies if not c.major %}
+                    <option value="{{ c.code }}">{{ c.code }} · {{ c.name }}</option>
+                  {% endfor %}
+                </optgroup>
+              </select>
+              <input type="number" name="invoice_value" min="0" step="100" inputmode="decimal">
             </div>
           </div>
         </div>

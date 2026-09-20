@@ -61,8 +61,11 @@
 .incoterm_card b { font-size: 18px; }
 .incoterm_card small { color: var(--muted); font-size: 12px; }
 .incoterm_card:has(input:checked) { border-color: var(--blue); background: var(--blue_soft); box-shadow: 0 0 0 2px rgba(43,102,246,.2); }
-.incoterm_card.disabled { opacity: .4; cursor: not-allowed; }
-.incoterm_tag { margin-left: 6px; font-style: normal; font-size: 11px; font-weight: 800; color: var(--blue_dark); background: var(--blue_soft); padding: 2px 7px; border-radius: 999px; vertical-align: 3px; }
+.incoterm_card.mismatch { border-style: dashed; }
+.incoterm_card.mismatch b, .incoterm_card.mismatch span { opacity: .65; }
+.incoterm_card.mismatch:has(input:checked) { border-style: solid; border-color: var(--amber); background: var(--amber_soft); box-shadow: 0 0 0 2px rgba(245,197,24,.25); }
+.incoterm_warn { margin: 10px 0 0; padding: 9px 13px; border-radius: 11px; background: var(--amber_soft); color: #8a4f00; font-size: 12.5px; font-weight: 700; }
+.incoterm_tag { margin-left: 6px; font-style: normal; font-size: 12px; letter-spacing: -1px; vertical-align: 2px; cursor: help; }
 
 /* 카드에 마우스를 올리거나 키보드로 초점을 주면 자세한 설명을 보여줍니다. */
 .incoterm_help { position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translate(-50%, 4px); z-index: 20;
@@ -78,7 +81,6 @@
 .incoterm_card:hover .incoterm_help,
 .incoterm_card:focus-visible .incoterm_help,
 .incoterm_card:focus-within .incoterm_help { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
-.incoterm_card.disabled .incoterm_help { display: none; }
 /* 첫 줄 카드는 설명을 아래쪽에 띄워 화면 밖으로 나가지 않게 합니다. */
 .incoterm_grid > .incoterm_card:nth-child(-n+5) .incoterm_help { bottom: auto; top: calc(100% + 10px); }
 .incoterm_grid > .incoterm_card:nth-child(-n+5) .incoterm_help::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: var(--ink); }
@@ -179,3 +181,6 @@
 .badge_guide .ac_note { margin-right: 6px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-style: normal; font-weight: 800; background: var(--blue_soft); color: var(--blue_dark); }
 .badge_guide .ac_note.cargo { background: #fff1e6; color: #b45309; }
 .badge_guide .ac_note.direct { background: var(--green_soft); color: #07694f; }
+
+/* 입력칸 아래 작은 안내 */
+.field_hint { display: block; margin-top: 6px; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
