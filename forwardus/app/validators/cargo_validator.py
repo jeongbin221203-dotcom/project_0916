@@ -114,6 +114,29 @@ def parse_optional_number(value: Any, field_name: str, *, max_value: float | Non
     return parse_number(value, field_name, max_value=max_value, field=field)
 
 
+def validate_dangerous_goods(payload: dict) -> dict:
+    """위험물 표시를 확인합니다. 체크했으면 UN번호와 급이 함께 있어야 합니다."""
+
+    from app.processors.dangerous_goods import DG_CLASSES
+
+    flag = payload.get("is_dangerous")
+    is_dangerous = flag in (True, "true", "True", "on", "1", 1)
+    if not is_dangerous:
+        return {"is_dangerous": False, "un_number": "", "dg_class": ""}
+
+    # UN번호는 "UN1234" 또는 숫자 네 자리입니다. 모든 위험물 서류의 기준이라 필수입니다.
+    raw = str(payload.get("un_number") or "").strip().upper().replace(" ", "")
+    digits = raw[2:] if raw.startswith("UN") else raw
+    if not (digits.isdigit() and len(digits) == 4):
+        raise ValidationError("UN번호는 네 자리 숫자입니다. (예: UN1263)", "un_number")
+
+    dg_class = str(payload.get("dg_class") or "").strip()
+    if dg_class not in DG_CLASSES:
+        raise ValidationError("위험물 등급을 골라주세요.", "dg_class")
+
+    return {"is_dangerous": True, "un_number": f"UN{digits}", "dg_class": dg_class}
+
+
 def validate_cargo_input(payload: dict) -> dict:
     """Validate raw cargo dimensions and return typed values."""
 
@@ -122,6 +145,7 @@ def validate_cargo_input(payload: dict) -> dict:
         raise ValidationError("포장 유형을 확인해주세요.", "package_type")
 
     return {
+        **validate_dangerous_goods(payload),
         "length_cm": parse_number(payload.get("length_cm"), "가로(Length)", max_value=MAX_DIMENSION_CM, field="length_cm"),
         "width_cm": parse_number(payload.get("width_cm"), "세로(Width)", max_value=MAX_DIMENSION_CM, field="width_cm"),
         "height_cm": parse_number(payload.get("height_cm"), "높이(Height)", max_value=MAX_DIMENSION_CM, field="height_cm"),

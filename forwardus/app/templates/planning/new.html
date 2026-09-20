@@ -230,12 +230,14 @@
             </div>
           </div>
 
+          <div class="field span2" data-dg-main></div>
+
           <div class="field span2 cargo_lines">
             <div class="row_between">
               <span class="field_label">추가 품목 <small class="muted">(선택)</small></span>
               <button type="button" class="link_button" data-add-cargo>+ 품목 추가</button>
             </div>
-            <small class="field_hint">한 건에 여러 품목을 실을 때 아래에 더합니다.
+            <small class="field_hint">한 건에 여러 품목을 실을 때 아래에 더합니다. 위 품목과 같은 항목을 입력합니다.
               CBM·중량·컨테이너 수량은 모든 품목을 더해서 계산합니다.</small>
             <div data-cargo-lines></div>
           </div>
@@ -314,9 +316,12 @@
       tariffSummary: "{{ url_for('planning.api_tariff_summary') }}",
       exchangeRate: "{{ url_for('planning.api_exchange_rate') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
+      dangerousGoods: "{{ url_for('planning.api_dangerous_goods') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",
       create: "{{ url_for('planning.api_create_shipment') }}"
     };
+    // UN 위험물 등급 목록. 첫 품목과 추가 품목이 같은 목록을 씁니다.
+    window.FORWARDUS_DG_CLASSES = {{ options.dg_classes|tojson }};
   </script>
   <script src="{{ static_url('js/planning.js') }}"></script>
 {% endblock %}

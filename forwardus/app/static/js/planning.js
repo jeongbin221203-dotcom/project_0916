@@ -126,6 +126,7 @@
       transport_mode: state.transport_mode,
       sea_mode: state.sea_mode,
       departure_date: state.departure_date,
+      cargo_dg: dgValues(mainDgBox),
       cargo_lines: extraCargoLines(),
       origin: state.origin,
       destination: state.destination,
@@ -320,6 +321,8 @@
       card.classList.toggle("mismatch", isAir);
     });
     applyPackageTypes(isAir ? "AIR" : "SEA");
+    // 같은 위험물이라도 해상과 항공의 규정이 달라 안내를 다시 그립니다.
+    refreshAllDgGuides();
     document.querySelectorAll("[data-metric-sea]").forEach((el) => { el.hidden = isAir; });
     document.querySelectorAll("[data-metric-fcl]").forEach((el) => { el.hidden = isAir || state.sea_mode !== "FCL"; });
     document.querySelectorAll("[data-metric-air]").forEach((el) => { el.hidden = !isAir; });
@@ -630,6 +633,7 @@
         updateSelectedDates();
         refreshOutlook();
         refreshTariff();
+        refreshAllDgGuides();   // 도착국이 바뀌면 위험물 안내 문구도 바뀝니다.
       },
       {
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
@@ -689,6 +693,7 @@
       state[role] = item;
       form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = `${item.name} (${item.code})`;
     });
+    setDgValues(mainDgBox, draft.cargo_dg);
     (draft.cargo_lines || []).forEach((line) => addCargoLine(line));
     if (draft.departure_date) {
       state.departure_date = draft.departure_date;
@@ -882,18 +887,153 @@
       .join("");
   }
 
+  /* ----- 위험물(Dangerous Goods) ----- */
+  // 첫 품목과 추가 품목이 똑같은 상자를 씁니다.
+  const DG_CLASSES = window.FORWARDUS_DG_CLASSES || [];
+
+  function dgBoxHtml() {
+    const options = DG_CLASSES
+      .map((c) => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join("");
+    return `
+      <label class="dg_check">
+        <input type="checkbox" data-dg="is_dangerous">
+        <span>위험물(Dangerous Goods)입니다</span>
+        <small>인화성·가스·배터리·화학품 등은 부킹과 서류가 달라집니다.</small>
+      </label>
+      <div class="dg_fields" data-dg-fields hidden>
+        <label class="field">
+          <span class="field_label">UN 번호</span>
+          <input class="text_input" type="text" data-dg="un_number" maxlength="6" placeholder="예: UN1263" autocomplete="off">
+          <small class="field_hint">MSDS 14번 항목(운송 정보)에 적혀 있습니다.</small>
+        </label>
+        <label class="field">
+          <span class="field_label">위험물 등급 (UN Class)</span>
+          <select data-dg="dg_class"><option value="">등급 선택</option>${options}</select>
+          <small class="field_hint" data-dg-examples></small>
+        </label>
+      </div>
+      <div class="dg_guide" data-dg-guide hidden></div>`;
+  }
+
+  async function renderDgGuide(box) {
+    const guideBox = box.querySelector("[data-dg-guide]");
+    const dgClass = box.querySelector('[data-dg="dg_class"]').value;
+    const on = box.querySelector('[data-dg="is_dangerous"]').checked;
+    if (!on || !dgClass) {
+      guideBox.hidden = true;
+      return;
+    }
+    const country = state.destination ? state.destination.country_code : "";
+    const response = await getJson(`${urls.dangerousGoods}?${new URLSearchParams({
+      dg_class: dgClass, mode: state.transport_mode, country })}`);
+    const data = response.success ? response.data : null;
+    if (!data || !data.available) {
+      guideBox.hidden = true;
+      return;
+    }
+    guideBox.innerHTML = `
+      <p class="dg_head"><b>${escapeHtml(data.label)}</b>
+        <span class="dg_status ${escapeHtml(data.status)}">${escapeHtml(data.status_label)}</span></p>
+      <p class="dg_line"><b>이런 품목입니다</b> ${escapeHtml(data.examples)}</p>
+      <p class="dg_line"><b>적용 규정</b> ${escapeHtml(data.rule)} · ${escapeHtml(data.mode_note)}</p>
+      <p class="dg_sub">보내는 방법</p>
+      <ol class="dg_steps">${data.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
+      <p class="dg_line">${escapeHtml(data.destination_note)}</p>
+      <p class="dg_refs">${data.references.map((r) =>
+        `<a href="${escapeHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.label)} ↗</a>`
+      ).join("")}</p>`;
+    guideBox.hidden = false;
+  }
+
+  function wireDgBox(box) {
+    const toggle = box.querySelector('[data-dg="is_dangerous"]');
+    const fields = box.querySelector("[data-dg-fields]");
+    const select = box.querySelector('[data-dg="dg_class"]');
+    const examples = box.querySelector("[data-dg-examples]");
+
+    const sync = () => {
+      fields.hidden = !toggle.checked;
+      const info = DG_CLASSES.find((c) => c.code === select.value);
+      examples.textContent = info ? `예: ${info.examples}` : "";
+      renderDgGuide(box);
+      invalidateSchedules();
+      saveDraftSoon();
+    };
+    toggle.addEventListener("change", sync);
+    select.addEventListener("change", sync);
+    box.querySelector('[data-dg="un_number"]').addEventListener("input", saveDraftSoon);
+    box.refreshDg = sync;
+    return box;
+  }
+
+  function dgValues(box) {
+    if (!box) return { is_dangerous: false, un_number: "", dg_class: "" };
+    return {
+      is_dangerous: box.querySelector('[data-dg="is_dangerous"]').checked,
+      un_number: box.querySelector('[data-dg="un_number"]').value.trim(),
+      dg_class: box.querySelector('[data-dg="dg_class"]').value,
+    };
+  }
+
+  function setDgValues(box, values = {}) {
+    if (!box || !values) return;
+    box.querySelector('[data-dg="is_dangerous"]').checked = Boolean(values.is_dangerous);
+    box.querySelector('[data-dg="un_number"]').value = values.un_number || "";
+    box.querySelector('[data-dg="dg_class"]').value = values.dg_class || "";
+    box.refreshDg();
+  }
+
+  const mainDgBox = document.querySelector("[data-dg-main]");
+  if (mainDgBox) {
+    mainDgBox.className = "field span2 dg_box";
+    mainDgBox.innerHTML = dgBoxHtml();
+    wireDgBox(mainDgBox);
+  }
+
+  // 운송수단이나 도착지가 바뀌면 열려 있는 안내를 모두 다시 그립니다.
+  function refreshAllDgGuides() {
+    document.querySelectorAll("[data-dg-guide]").forEach((guide) => {
+      const box = guide.closest(".dg_box");
+      if (box && !guide.hidden) renderDgGuide(box);
+    });
+  }
+
+  /* ----- 추가 품목: 첫 품목과 같은 양식 ----- */
+  // 화면에 보이는 칸 = data-line 이름. 첫 품목의 name과 같게 맞춥니다.
+  const LINE_LAYOUT = [
+    ["product_description", "품명 (Product Description)", "text", "span2"],
+    ["hs_code", "HS CODE", "text", "span2"],
+    ["package_type", "포장 유형", "select", ""],
+    ["quantity", "수량 (Quantity)", "number", "", { step: 1, min: 1, mode: "numeric" }],
+    ["length_cm", "가로 Length (cm)", "number", "", { step: 1, min: 0 }],
+    ["width_cm", "세로 Width (cm)", "number", "", { step: 1, min: 0 }],
+    ["height_cm", "높이 Height (cm)", "number", "", { step: 1, min: 0 }],
+    ["weight_per_package_kg", "포장당 총중량 (kg)", "number", "", { step: 10, min: 0 }],
+  ];
+
+  function lineFieldHtml([key, label, kind, span, opts = {}]) {
+    const inner = kind === "select"
+      ? `<select data-line="${key}">${packageOptions()}</select>`
+      : `<input class="text_input" type="text" data-line="${key}" autocomplete="off"`
+        + (kind === "number"
+          ? ` inputmode="${opts.mode || "decimal"}" data-number data-step="${opts.step}" data-min="${opts.min}"`
+          : ` maxlength="300"`) + `>`;
+    return `<label class="field ${span}"><span class="field_label">${escapeHtml(label)}</span>${inner}</label>`;
+  }
+
   function addCargoLine(values = {}) {
     const row = document.createElement("div");
-    row.className = "cargo_line";
+    row.className = "cargo_item";
+    const number = cargoLinesBox.querySelectorAll(".cargo_item").length + 2;
     row.innerHTML = `
-      <input type="text" data-line="product_description" maxlength="300" placeholder="품명">
-      <select data-line="package_type">${packageOptions()}</select>
-      <input type="text" data-line="quantity" inputmode="numeric" data-number data-step="1" data-min="1" placeholder="수량">
-      <input type="text" data-line="length_cm" inputmode="decimal" data-number data-step="1" data-min="0" placeholder="가로">
-      <input type="text" data-line="width_cm" inputmode="decimal" data-number data-step="1" data-min="0" placeholder="세로">
-      <input type="text" data-line="height_cm" inputmode="decimal" data-number data-step="1" data-min="0" placeholder="높이">
-      <input type="text" data-line="weight_per_package_kg" inputmode="decimal" data-number data-step="10" data-min="0" placeholder="개당 kg">
-      <button type="button" class="link_button danger" data-remove-cargo aria-label="품목 삭제">삭제</button>`;
+      <div class="cargo_item_head">
+        <b>품목 ${number}</b>
+        <button type="button" class="link_button danger" data-remove-cargo>삭제</button>
+      </div>
+      <div class="form_grid">
+        ${LINE_LAYOUT.map(lineFieldHtml).join("")}
+        <div class="field span2 dg_box" data-dg-box>${dgBoxHtml()}</div>
+      </div>`;
     cargoLinesBox.appendChild(row);
     row.querySelectorAll("[data-line]").forEach((input) => {
       if (values[input.dataset.line] !== undefined) input.value = values[input.dataset.line];
@@ -901,12 +1041,20 @@
       input.addEventListener("input", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
       input.addEventListener("change", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
     });
+    const dgBox = wireDgBox(row.querySelector("[data-dg-box]"));
+    setDgValues(dgBox, values);
     return row;
   }
 
+  function renumberCargoLines() {
+    cargoLinesBox.querySelectorAll(".cargo_item").forEach((row, index) => {
+      row.querySelector(".cargo_item_head b").textContent = `품목 ${index + 2}`;
+    });
+  }
+
   function extraCargoLines() {
-    return Array.from(cargoLinesBox.querySelectorAll(".cargo_line")).map((row) => {
-      const item = {};
+    return Array.from(cargoLinesBox.querySelectorAll(".cargo_item")).map((row) => {
+      const item = { ...dgValues(row.querySelector("[data-dg-box]")) };
       row.querySelectorAll("[data-line]").forEach((input) => {
         item[input.dataset.line] = input.dataset.number === undefined
           ? input.value : plainNumber(input.value);
@@ -918,7 +1066,8 @@
   document.querySelector("[data-add-cargo]")?.addEventListener("click", () => addCargoLine());
   cargoLinesBox?.addEventListener("click", (event) => {
     if (!event.target.closest("[data-remove-cargo]")) return;
-    event.target.closest(".cargo_line").remove();
+    event.target.closest(".cargo_item").remove();
+    renumberCargoLines();
     recalc();
     invalidateSchedules();
     saveDraftSoon();
@@ -927,6 +1076,7 @@
   function cargoPayload() {
     const f = form.elements;
     const first = {
+      ...dgValues(mainDgBox),
       product_description: f.product_description.value,
       hs_code: f.hs_code.value,
       package_type: f.package_type.value,

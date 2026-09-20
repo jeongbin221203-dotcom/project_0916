@@ -92,6 +92,8 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
     return {
         "lines": lines,
         "line_count": len(lines),
+        # 한 건에 위험물이 섞여 있으면 부킹·서류가 통째로 달라집니다. 등급을 모아 둡니다.
+        "dangerous_classes": sorted({line["dg_class"] for line in lines if line["is_dangerous"]}),
         "quantity": sum(line["quantity"] for line in lines),
         "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
         "total_cbm": round(total_cbm, 4),

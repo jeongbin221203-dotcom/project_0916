@@ -11,7 +11,7 @@ from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
 from app.processors.cargo_calculator import calculate_cargo_lines, calculate_cargo_metrics
 from app.processors.cost_calculator import INCOTERMS_INFO, calculate_logistics_cost
-from app.processors import fta_guide
+from app.processors import dangerous_goods, fta_guide, korean
 from app.processors import transit_calculator
 from app.processors.transit_calculator import great_circle_km
 from app.processors.schedule_calculator import (
@@ -57,7 +57,21 @@ def get_form_options() -> dict:
         "package_types": PACKAGE_TYPE_INFO,
         "sort_options": SORT_OPTIONS,
         "currencies": exchange_client.list_currencies(),
+        "dg_classes": dangerous_goods.classes(),
     }
+
+
+def dangerous_goods_guide(dg_class: str, transport_mode: str, country_code: str = "") -> dict:
+    """고른 위험물 등급을 어떻게 보내야 하는지 정리합니다."""
+
+    country = (country_code or "").strip().upper()
+    location = location_client.find_location(country) if len(country) > 2 else None
+    if location:
+        country = location["country_code"]
+    country_name = location_client.country_name(country) if country else ""
+    # 도착국별 위험물 반입 기준을 모아 둔 공개 자료는 없습니다. 잘못된 곳을 가리키느니
+    # 규정 원문(IMDG·IATA)과 "선사·항공사에 확인" 안내만 둡니다.
+    return dangerous_goods.guide(dg_class, transport_mode, country_name or "")
 
 
 def search_locations(query: str, transport_mode: str, role: str | None = None, country: str | None = None,
@@ -309,7 +323,8 @@ def destination_tariff(hs_code: str, country_code: str) -> dict:
             f"뒤 자리는 나라마다 달라 우리 부호 {customs_client.format_hs_code(digits)}와 1:1로"
             f" 맞지 않습니다. 품목 설명이 맞는 줄을 고르세요."
             if national else
-            f"{country_name}이(가) 쓰는 세분 부호와 확정 세율은 아래 공식 관세율표에서 확인합니다."),
+            f"{korean.josa(country_name, '이')} 쓰는 세분 부호와 확정 세율은"
+            f" 아래 공식 관세율표에서 확인합니다."),
         "link": tariff_client.lookup_page(country, hs6, eu_members),
         "source": "api",
     }
@@ -1034,6 +1049,9 @@ def create_shipment(payload: dict) -> Shipment:
             or product_description,
             hs_code=optional_text(item.get("hs_code"), max_length=20) or hs_code,
             package_type=line["package_type"],
+            is_dangerous=line["is_dangerous"],
+            un_number=line["un_number"],
+            dg_class=line["dg_class"],
             length_cm=line["length_cm"],
             width_cm=line["width_cm"],
             height_cm=line["height_cm"],

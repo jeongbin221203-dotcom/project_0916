@@ -24,17 +24,27 @@ def migrate_cargo_lines(database) -> None:
     if "cargos" not in inspector.get_table_names():
         return
     columns = {column["name"] for column in inspector.get_columns("cargos")}
-    if "line_no" in columns:
-        return
 
-    old_columns = ", ".join(sorted(columns - {"id"}))
-    with database.engine.begin() as connection:
-        connection.execute(text("ALTER TABLE cargos RENAME TO cargos_old"))
-        database.metadata.tables["cargos"].create(connection)
-        connection.execute(text(
-            f"INSERT INTO cargos (id, line_no, {old_columns}) "
-            f"SELECT id, 1, {old_columns} FROM cargos_old"))
-        connection.execute(text("DROP TABLE cargos_old"))
+    if "line_no" not in columns:
+        old_columns = ", ".join(sorted(columns - {"id"}))
+        with database.engine.begin() as connection:
+            connection.execute(text("ALTER TABLE cargos RENAME TO cargos_old"))
+            database.metadata.tables["cargos"].create(connection)
+            connection.execute(text(
+                f"INSERT INTO cargos (id, line_no, {old_columns}) "
+                f"SELECT id, 1, {old_columns} FROM cargos_old"))
+            connection.execute(text("DROP TABLE cargos_old"))
+        columns |= {"line_no"}
+
+    # 위험물 칸은 뒤에 더해진 것이라 기존 행에는 없습니다. 칸만 덧붙이면 됩니다.
+    added = {"is_dangerous": "BOOLEAN NOT NULL DEFAULT 0",
+             "un_number": "VARCHAR(10) NOT NULL DEFAULT ''",
+             "dg_class": "VARCHAR(5) NOT NULL DEFAULT ''"}
+    missing = {name: spec for name, spec in added.items() if name not in columns}
+    if missing:
+        with database.engine.begin() as connection:
+            for name, spec in missing.items():
+                connection.execute(text(f"ALTER TABLE cargos ADD COLUMN {name} {spec}"))
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:

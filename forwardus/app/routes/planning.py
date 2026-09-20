@@ -90,6 +90,15 @@ def api_destination_tariff():
         request.args.get("hs", ""), request.args.get("country", ""))})
 
 
+@planning_bp.get("/api/dangerous-goods")
+def api_dangerous_goods():
+    """고른 위험물 등급을 어떻게 보내야 하는지 안내합니다."""
+
+    return jsonify({"success": True, "data": planning_service.dangerous_goods_guide(
+        request.args.get("dg_class", ""), request.args.get("mode", "SEA"),
+        request.args.get("country", ""))})
+
+
 @planning_bp.post("/api/cargo")
 def api_cargo():
     try:

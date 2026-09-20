@@ -24,6 +24,11 @@ class Cargo(db.Model):
     weight_per_package_kg = db.Column(db.Float, nullable=False)
     net_weight_kg = db.Column(db.Float, nullable=True)
 
+    # 위험물이면 UN번호와 급(class)이 모든 운송 서류의 기준이 됩니다.
+    is_dangerous = db.Column(db.Boolean, nullable=False, default=False)
+    un_number = db.Column(db.String(10), nullable=False, default="")
+    dg_class = db.Column(db.String(5), nullable=False, default="")
+
     total_cbm = db.Column(db.Float, nullable=False)
     total_weight_kg = db.Column(db.Float, nullable=False)
     revenue_ton = db.Column(db.Float, nullable=False)
@@ -38,6 +43,9 @@ class Cargo(db.Model):
             "product_description": self.product_description,
             "hs_code": self.hs_code,
             "package_type": self.package_type,
+            "is_dangerous": self.is_dangerous,
+            "un_number": self.un_number,
+            "dg_class": self.dg_class,
             "length_cm": self.length_cm,
             "width_cm": self.width_cm,
             "height_cm": self.height_cm,
