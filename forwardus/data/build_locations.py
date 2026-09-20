@@ -221,6 +221,16 @@ KOREAN_NAMES = {
 
 # Major cargo airports (IATA code → Korean name). UN/LOCODE airport rows are
 # noisy, so international airports used for air freight are curated here.
+# 국가별 대표 관문 공항. AIRPORT_OVERRIDES에 없는 국가에서 이 공항이 먼저
+# 보이도록 순서를 앞당깁니다.
+PRIMARY_AIRPORTS = {
+    "PRG", "BUD", "BTS", "OTP", "SOF", "ZAG", "BEG", "VIE", "ZRH", "DUB", "LIS", "ATH",
+    "ARN", "OSL", "HEL", "CPH", "LOS", "CMN", "ALG", "TUN", "ADD", "DAR", "EBB", "ACC",
+    "TLV", "AMM", "BGW", "IKA", "KWI", "BAH", "MCT", "KHI", "ISB", "DAC", "CMB", "KTM",
+    "RGN", "VTE", "KTI", "UBN", "GYD", "ALA", "NQZ", "TAS", "EZE", "SCL", "LIM", "BOG",
+    "PTY", "GUA", "SJO", "SDQ", "SAP", "NAN", "FCO", "LGW", "ORY", "CGH", "LED", "TAS",
+}
+
 # 한글 표기와 국가별 노출 순서를 지정하는 공항. 나머지 공항은 OurAirports의
 # 대형공항(large_airport) 전체를 그대로 싣습니다.
 # 값은 (한글명, 영문명 참고용, 국가코드, 국가 내 순위).
@@ -511,7 +521,9 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "is_terminal": False,
             "port_group": iata,
             # 직접 지정한 순서를 먼저 쓰고, 나머지는 대형 -> 중형 순입니다.
-            "size_rank": override[3] if override else (50 if is_large else 60),
+            "size_rank": (override[3] if override
+                          else 10 if iata in PRIMARY_AIRPORTS
+                          else 50 if is_large else 60),
             "major": is_large or bool(override),
         })
 

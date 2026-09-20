@@ -268,6 +268,40 @@ def test_top_trade_partner_airports_have_korean_names(app):
     assert by_code["TFU"] == "청두 톈푸 국제공항"
 
 
+# 한국 기업(중견기업 이상)의 해외 생산·판매 거점이 있는 주요 진출국
+KOREAN_BUSINESS_COUNTRIES = [
+    "BD", "KH", "MM", "LA", "LK", "PK", "UZ", "KZ", "MN", "NP", "AZ",
+    "BR", "CL", "PE", "CO", "AR", "PA", "GT", "DO", "HN", "CR",
+    "GB", "FR", "IT", "ES", "BE", "AT", "CZ", "HU", "SK", "RO", "RU", "RS", "TR",
+    "SE", "CH", "IE", "PT", "BG", "HR", "GR", "NO", "FI", "DK",
+    "QA", "KW", "OM", "BH", "IQ", "IR", "IL", "JO",
+    "EG", "ZA", "MA", "TN", "DZ", "NG", "KE", "ET", "TZ", "UG", "GH", "NZ", "FJ",
+]
+
+
+def test_business_country_airports_have_korean_names(app):
+    """국내 기업 진출국 공항도 모두 한글 표기를 갖습니다."""
+
+    from app.collectors import location_client
+
+    airports = [item for item in location_client.load_mock("locations") if item["kind"] == "airport"]
+    targets = [item for item in airports if item["country_code"] in KOREAN_BUSINESS_COUNTRIES]
+    assert len(targets) > 400
+    missing = [item["code"] for item in targets if item["name"] == item["name_en"]]
+    assert not missing, f"한글 표기 누락: {missing[:10]}"
+
+
+@pytest.mark.parametrize("country,gateway", [
+    ("CZ", "PRG"), ("HU", "BUD"), ("SE", "ARN"), ("KZ", "ALA"),
+    ("AR", "EZE"), ("OM", "MCT"), ("NP", "KTM"), ("BR", "GRU"),
+])
+def test_primary_gateway_listed_first(app, country, gateway):
+    """각 나라의 대표 관문 공항이 목록 맨 앞에 옵니다."""
+
+    items = planning_service.search_locations("", "AIR", "destination", country=country)["data"]
+    assert items[0]["code"] == gateway
+
+
 def test_airports_sorted_by_size(app):
     """공항은 국가 안에서 규모가 큰 곳부터 보여줍니다."""
 
