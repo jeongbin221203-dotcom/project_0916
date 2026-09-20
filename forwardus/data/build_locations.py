@@ -45,6 +45,9 @@ KOREAN_COUNTRY_URL = "https://raw.githubusercontent.com/umpirsky/country-list/ma
 WPI_URL = "https://msi.nga.mil/api/publications/world-port-index?output=json"
 AIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 ROUTES_URL = "https://raw.githubusercontent.com/Jonty/airline-route-data/main/airline_routes.json"
+# 국가물류통합정보센터 「항만별 물동량 통계」. 원자료는 해양수산부 통합 PORT-MIS입니다.
+PORT_VOLUME_URL = "https://www.nlic.go.kr/nlic/seaHarborGtqy.action"
+PORT_VOLUME_YEAR = 2025
 
 # 내륙국(바다에 접하지 않는 국가)은 강·운하 항만만 있어 해상 수출 목적지가 될 수
 # 없으므로 제외합니다. 항공 목적지는 MAJOR_AIRPORTS에서 따로 관리합니다.
@@ -164,24 +167,78 @@ KOREAN_PORT_ALIASES = {
     "KRDDO": "독도", "KRCGY": "청양", "KRANJ": "안정", "KRBUK": "부평(인천)",
 }
 
-# 국내 항만 연간 물동량 (만 톤). 목록을 물동량이 많은 항만부터 보여주는 데 씁니다.
-# 출처: 해양수산부 항만 물동량 통계 및 보도자료.
-#   부산 46,348 / 광양 27,200 / 인천 14,782 (2024년 연간)
-#   울산 19,260 / 평택·당진 10,036 (2025년 비컨테이너 기준)
-#   동해·묵호 2,812 (2025년 연간)
-#   대산 9,010 (대산지방해양수산청 항만소개)
-# 나머지 국가관리무역항(포항·군산·목포·마산·여수·경인·장항)은 공개된 연간 수치를
-# 확인하지 못해 비워 둡니다. 값이 없으면 목록에서 뒤쪽에 표시됩니다.
-KOREA_PORT_VOLUME_MT = {
-    "KRPUS": 46348,
-    "KRKAN": 27200,
-    "KRUSN": 19260,
-    "KRINC": 14782,
-    "KRPTK": 10036,
-    "KRTSN": 9010,
-    "KRTGH": 2812,
-    "KRMUK": 2812,
+# 통계에 쓰는 항만 이름과 우리가 쓰는 UN/LOCODE의 대응.
+# 평택·당진과 동해·묵호는 통계에서 합산 집계되므로 두 코드에 같은 값이 들어갑니다.
+PORT_VOLUME_NAMES = {
+    "부산": ["KRPUS"], "광양": ["KRKAN"], "울산": ["KRUSN"], "인천": ["KRINC"],
+    "평택.당진": ["KRPTK", "KRTJI"], "대산": ["KRTSN"], "포항": ["KRKPO"],
+    "마산": ["KRMAS"], "동해.묵호": ["KRTGH", "KRMUK"], "목포": ["KRMOK"],
+    "보령": ["KRBOR"], "군산": ["KRKUV"], "제주": ["KRCHA"], "호산": ["KRHAS"],
+    "태안": ["KRTAN"], "삼천포": ["KRSCP"], "고현": ["KRKHN"], "옥포": ["KROKP"],
+    "옥계": ["KROKK"], "완도": ["KRWND"], "삼척": ["KRSUK"], "여수": ["KRYOS"],
+    "진해": ["KRCHF"], "경인항": ["KRGIN"], "장항": ["KRCHG"], "서귀포": ["KRSPO"],
+    "속초": ["KRSHO"], "통영": ["KRTYG"],
+    # "하동"·"장승포"·"기타"는 법정 무역항 목록에 없어 쓰지 않습니다.
 }
+
+# 통계 사이트에 닿지 못할 때 쓰는 값 (2025년 연간 확정치, 만 톤).
+# 아래 load_port_volumes()가 받아오는 값과 같습니다.
+KOREA_PORT_VOLUME_FALLBACK = {
+    "KRPUS": 46753, "KRKAN": 26416, "KRUSN": 19730, "KRINC": 14377,
+    "KRPTK": 11497, "KRTJI": 11497, "KRTSN": 9072, "KRKPO": 4668,
+    "KRMAS": 3042, "KRTGH": 2812, "KRMUK": 2812, "KRMOK": 2482,
+    "KRBOR": 2447, "KRKUV": 2161, "KRCHA": 2151, "KRHAS": 1036,
+    "KRTAN": 1022, "KRSCP": 903, "KRKHN": 773, "KROKP": 697,
+    "KROKK": 560, "KRWND": 542, "KRSUK": 537, "KRYOS": 249,
+    "KRCHF": 126, "KRGIN": 66, "KRCHG": 53, "KRSPO": 35,
+    "KRSHO": 14, "KRTYG": 10,
+    # 서울항(KRSEL)은 화물 집계 대상이 아니라 값이 없습니다.
+}
+
+
+def load_port_volumes() -> dict[str, int]:
+    """국내 항만의 연간 물동량(만 톤)을 받아옵니다.
+
+    출처: 국가물류통합정보센터 「항만별 물동량 통계」(원자료 해양수산부 통합 PORT-MIS).
+    단위는 R/T(Revenue Ton)이며, 화면에서는 항만을 물동량이 많은 순으로 보여주는
+    데만 씁니다. 기준월을 12월로 두면 그 해 연간 확정치가 나옵니다.
+
+    여수항은 여수·광양 통합 물동량이 대부분 '광양'으로 잡혀 단독 실적만 반영됩니다.
+    """
+
+    try:
+        html = download_post(PORT_VOLUME_URL, f"port_volume_{PORT_VOLUME_YEAR}.html",
+                             {"command": "LIST", "S_HARBOR_CODE": "",
+                              "S_YEAR": str(PORT_VOLUME_YEAR), "S_MONTH": "12"}).decode("utf-8", "replace")
+    except httpx.HTTPError as error:
+        print(f"경고: 항만 물동량 통계를 받지 못해 보관된 값을 씁니다 ({error})")
+        return dict(KOREA_PORT_VOLUME_FALLBACK)
+
+    volumes: dict[str, int] = {}
+    total = 0
+    # 항만 이름 블록마다 "합계" 행이 있고, 그 두 번째 숫자가 연간 누계입니다.
+    for chunk in re.split(r'<li class="con_list2"[^>]*>', html)[1:]:
+        name = re.sub(r"<[^>]+>", "", chunk.split("</li>")[0]).strip()
+        row = re.search(r'<li class="list_num_03"[^>]*>\s*합계\s*</li>(.{0,2000}?)'
+                        r'(?=<li class="list_num_03"|<li class="con_list2"|$)', chunk, re.S)
+        if not row:
+            continue
+        numbers = re.findall(r'<li class="list_num_02"[^>]*>\s*([\-\d,.]+)\s*</li>', row.group(1))
+        if len(numbers) < 2:
+            continue
+        tons = int(numbers[1].replace(",", ""))
+        if name == "합계":
+            total = tons
+            continue
+        for code in PORT_VOLUME_NAMES.get(name, []):
+            volumes[code] = round(tons / 10_000)
+
+    if not volumes:
+        print("경고: 항만 물동량 표를 읽지 못해 보관된 값을 씁니다")
+        return dict(KOREA_PORT_VOLUME_FALLBACK)
+    print(f"  {PORT_VOLUME_YEAR}년 항만 물동량 {len(volumes)}개 코드 · 전국 합계 {total:,} t")
+    return volumes
+
 
 # 부두·터미널과 모항의 관계. 물동량은 모항 값을 따르고, 목록에서는 모항 다음에 옵니다.
 KOREA_PORT_PARENT = {
@@ -194,6 +251,8 @@ KOREA_PORT_PARENT = {
 # 목록에서 함께 보여줄 안내 문구.
 PORT_NOTES = {
     "KRSEL": "법적 무역항",
+    # 통계상 여수·광양 물동량이 대부분 광양항으로 잡혀 순서가 뒤로 밀립니다.
+    "KRYOS": "수출 물량은 광양항으로 집계",
 }
 
 KOREAN_NAMES = {
@@ -368,6 +427,18 @@ AIRPORT_OVERRIDES = {
 }
 
 
+def download_post(url: str, filename: str, data: dict) -> bytes:
+    """POST로만 받을 수 있는 자료를 한 번만 받아 data/raw/에 담아 둡니다."""
+
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    cached = RAW_DIR / filename
+    if cached.exists():
+        return cached.read_bytes()
+    content = httpx.post(url, data=data, timeout=120, follow_redirects=True).content
+    cached.write_bytes(content)
+    return content
+
+
 def download(url: str, filename: str) -> bytes:
     """Download once and cache under data/raw/."""
 
@@ -539,6 +610,7 @@ def build() -> list[dict]:
     korean_country = json.loads(download(KOREAN_COUNTRY_URL, "country_names_ko.json"))
     harbor_sizes = load_harbor_sizes(unlocode)
     sea_network = load_sea_network()
+    port_volumes = load_port_volumes()
     sea_index = [(d["y"], d["x"], d) for d in sea_network.values()]
     sea_transfers = build_sea_transfers(sea_network)
 
@@ -613,7 +685,7 @@ def build() -> list[dict]:
             "port_class": KOREA_TRADE_PORTS.get(code, (None, None))[1],
             "note": PORT_NOTES.get(code, ""),
             "size_rank": None,
-            "cargo_volume_mt": KOREA_PORT_VOLUME_MT.get(KOREA_PORT_PARENT.get(code, code)),
+            "cargo_volume_mt": port_volumes.get(KOREA_PORT_PARENT.get(code, code)),
             "is_terminal": code in KOREA_PORT_PARENT,
             "port_group": KOREA_PORT_PARENT.get(code, code),
             "major": code in display_names or harbor_size in MAIN_HARBOR_SIZES,

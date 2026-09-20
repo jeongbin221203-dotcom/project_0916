@@ -814,3 +814,30 @@ def test_direct_call_guide_is_shown_for_sea(app, client):
     assert 'data-sea-only' in html
     assert "배를 갈아타지 않고 곧바로 들어가는 정기 항로" in html
     assert "다른 배로 옮겨 실어야" in html
+
+
+def test_origin_ports_carry_official_cargo_volume(app):
+    """출발 항구는 공식 물동량 통계 순서로 보여줍니다."""
+
+    items = planning_service.search_locations("", "SEA", "origin")["data"]
+    volume = {item["code"]: item["cargo_volume_mt"] for item in items}
+
+    # 국가관리 무역항은 모두 물동량이 채워져 있어야 순서가 어긋나지 않습니다.
+    # (서울항은 화물 집계 대상이 아니라 값이 없습니다.)
+    missing = [item["code"] for item in items
+               if item["port_class"] == "national" and not item["cargo_volume_mt"]]
+    assert missing == []
+
+    # 목포항(2,482만톤)은 경인항(66만톤)보다 위에 옵니다.
+    assert volume["KRMOK"] > volume["KRGIN"]
+    codes = [item["code"] for item in items]
+    assert codes.index("KRMOK") < codes.index("KRGIN")
+
+    # 부두는 모항의 물동량을 따라 모항 바로 뒤에 붙습니다.
+    assert volume["KRSHG"] == volume["KRKPO"]
+    assert codes.index("KRSHG") == codes.index("KRKPO") + 1
+
+    # 같은 관리주체 안에서는 물동량이 많은 항만부터입니다.
+    for group in ("national", "local"):
+        volumes = [item["cargo_volume_mt"] or 0 for item in items if item["port_class"] == group]
+        assert volumes == sorted(volumes, reverse=True)
