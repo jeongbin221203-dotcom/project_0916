@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Reverse Schedule Planner{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/planning.css') }}">{% endblock %}
 {% block content %}
   <div class="page_head">
     <div>
@@ -37,4 +37,4 @@
     </section>
   </div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/planning.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('js/planning.js') }}"></script>{% endblock %}

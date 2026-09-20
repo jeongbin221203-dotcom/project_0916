@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}새 운송 계획{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/planning.css') }}">{% endblock %}
 {% block content %}
   <div class="page_head">
     <div>
@@ -257,5 +257,5 @@
       create: "{{ url_for('planning.api_create_shipment') }}"
     };
   </script>
-  <script src="{{ url_for('static', filename='js/planning.js') }}"></script>
+  <script src="{{ static_url('js/planning.js') }}"></script>
 {% endblock %}

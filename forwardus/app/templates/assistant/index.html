@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import source_badge, shipment_tabs, shipment_header %}
 {% block title %}AI Assistant · {{ shipment.shipment_id }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/assistant.css') }}">{% endblock %}
 {% block content %}
   {{ shipment_header(shipment) }}
   {{ shipment_tabs(shipment, 'assistant') }}
@@ -100,4 +100,4 @@
     </section>
   </div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/assistant.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('js/assistant.js') }}"></script>{% endblock %}

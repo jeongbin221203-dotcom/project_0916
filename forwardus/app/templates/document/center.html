@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import doc_status, shipment_tabs, shipment_header %}
 {% block title %}Document Center · {{ shipment.shipment_id }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/document.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
 {% block content %}
   {{ shipment_header(shipment) }}
   {{ shipment_tabs(shipment, 'document') }}

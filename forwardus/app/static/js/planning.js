@@ -255,6 +255,7 @@
       updateSelectedDates();
       invalidateSchedules();
       saveDraftSoon();
+      return;
     }
     renderCalendar();
   });
@@ -610,7 +611,6 @@
       viewMonth = new Date(year, month - 1, 1);
     }
     updateSelectedDates();
-    renderCalendar();
     refreshTransitSummary();
     const filter = form.querySelector("[data-country-filter]");
     if (filter && draft.country) filter.value = draft.country;
@@ -911,14 +911,13 @@
     selectedDateEl.innerHTML =
       `<span class="date_item departure"><i></i>Seller 예상일 ${state.departure_date || "미선택"}</span>`
       + `<span class="date_item buyer"><i></i>Buyer 요청일 ${buyerDate || "미선택"}</span>`;
+    // 달력과 표시가 항상 같은 값을 보여주도록 여기서 한 번에 다시 그립니다.
+    renderCalendar();
     checkDeparture();
   }
 
   // 날짜 칸을 직접 고쳐도 달력이 바로 다시 그려지도록 input 이벤트도 받습니다.
-  form.elements.buyer_required_date.addEventListener("input", () => {
-    updateSelectedDates();
-    renderCalendar();
-  });
+  form.elements.buyer_required_date.addEventListener("input", updateSelectedDates);
 
   form.elements.buyer_required_date.addEventListener("change", () => {
     const value = form.elements.buyer_required_date.value;
@@ -926,7 +925,6 @@
       showError("Buyer 요청 도착일은 Seller 예상일보다 빠를 수 없습니다.");
       form.elements.buyer_required_date.value = "";
       updateSelectedDates();
-      renderCalendar();
       return;
     }
     showError("");
@@ -938,7 +936,6 @@
       viewMonth = target < earliest ? earliest : target;
     }
     updateSelectedDates();
-    renderCalendar();
     invalidateSchedules();
   });
 

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import doc_status, source_badge %}
 {% block title %}{{ document.title }} · {{ shipment.shipment_id }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/document.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
 {% block content %}
   <div class="page_head no_print">
     <div>
@@ -57,4 +57,4 @@
     </div>
   {% endif %}
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/document.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('js/document.js') }}"></script>{% endblock %}

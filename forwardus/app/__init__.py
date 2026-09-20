@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, url_for
 
 from config import Config
 from app.extensions import db
@@ -36,7 +36,17 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     @flask_app.context_processor
     def inject_globals():
-        return {"nav_active": request.blueprint or ""}
+        return {"nav_active": request.blueprint or "", "static_url": static_url}
+
+    def static_url(filename: str) -> str:
+        """정적 파일 URL에 수정 시각을 붙입니다.
+
+        파일을 고치면 주소가 바뀌므로 브라우저가 예전 파일을 계속 쓰지 않습니다.
+        """
+
+        path = Path(flask_app.static_folder or "") / filename
+        version = int(path.stat().st_mtime) if path.exists() else 0
+        return url_for("static", filename=filename, v=version)
 
     @flask_app.template_filter("won")
     def format_won(value):
