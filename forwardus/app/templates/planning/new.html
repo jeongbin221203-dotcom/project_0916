@@ -89,6 +89,8 @@
             </div>
           </div>
 
+          <p class="transit_summary" data-transit hidden></p>
+
           <div class="badge_guide" data-air-only hidden>
             <p><em class="ac_note cargo">KE 화물</em>
               대한항공 화물이 취항하는 공항입니다. 인천에서 화물기 또는 여객기 화물칸으로 바로 보낼 수 있습니다.
@@ -248,6 +250,7 @@
       countries: "{{ url_for('planning.api_countries') }}",
       unlocode: "{{ url_for('planning.api_unlocode') }}",
       departureCheck: "{{ url_for('planning.api_departure_check') }}",
+      transitEstimate: "{{ url_for('planning.api_transit_estimate') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",

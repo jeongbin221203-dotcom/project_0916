@@ -73,6 +73,13 @@ def api_schedules():
         return error_response(exc)
 
 
+@planning_bp.get("/api/transit-estimate")
+def api_transit_estimate():
+    """선택한 도착지 구간의 해상·항공 예상 소요일."""
+
+    return jsonify({"success": True, "data": planning_service.transit_summary(request.args.get("destination", ""))})
+
+
 @planning_bp.post("/api/departure-check")
 def api_departure_check():
     """출발 희망일 여유(Seller 예정일) 확인."""

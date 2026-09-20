@@ -273,6 +273,35 @@ def estimate_transit_days(transport_mode: str, sea_mode: str | None, destination
     return min(days) if days else DEFAULT_TRANSIT_DAYS["AIR" if transport_mode == "AIR" else "SEA"]
 
 
+def transit_summary(destination_code: str) -> dict:
+    """선택한 구간의 해상·항공 예상 소요일. 출발지·도착지를 모두 고른 뒤 보여줍니다."""
+
+    destination = location_client.find_location(destination_code)
+    if not destination:
+        return {"available": False}
+
+    region = destination.get("region", "asia")
+    try:
+        schedules = load_mock("schedules")
+    except (OSError, ValueError):
+        return {"available": False}
+
+    def days_for(service: str) -> list[int]:
+        return sorted(t["transit_days"][region] for t in schedules.get(service, [])
+                      if region in t["transit_days"])
+
+    fcl, lcl, air = days_for("FCL"), days_for("LCL"), days_for("AIR")
+    sea = sorted(set(fcl + lcl))
+    return {
+        "available": True,
+        "destination": destination["name"],
+        "kind": destination["kind"],
+        "sea": {"min": sea[0], "max": sea[-1]} if sea else None,
+        "air": {"min": air[0], "max": air[-1]} if air else None,
+        "source": "mock",
+    }
+
+
 def check_departure_date(payload: dict) -> dict:
     """출발 희망일이 Buyer 요청 도착일에 맞는지 확인합니다.
 

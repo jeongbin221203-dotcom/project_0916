@@ -290,6 +290,7 @@
     invalidateSchedules();
     saveDraftSoon();
     updateSelectedDates();
+    refreshTransitSummary();
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
     state.sea_mode = value;
@@ -507,6 +508,7 @@
       input.value = code ? `${name} (${code})` : name;
       box.hidden = true;
       invalidateSchedules();
+      refreshTransitSummary();
     });
   }
 
@@ -547,6 +549,8 @@
         if (item) input.value = `${item.name} (${item.code})`;
         invalidateSchedules();
         saveDraftSoon();
+        updateSelectedDates();
+        refreshTransitSummary();
       },
       {
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
@@ -607,6 +611,7 @@
     }
     updateSelectedDates();
     renderCalendar();
+    refreshTransitSummary();
     const filter = form.querySelector("[data-country-filter]");
     if (filter && draft.country) filter.value = draft.country;
     state.sort = draft.sort || state.sort;
@@ -841,6 +846,30 @@
   // 함수 선언으로 두어 초기화 순서와 관계없이 호출할 수 있게 합니다.
   let departureCheckTimer;
 
+  async function refreshTransitSummary() {
+    const box = document.querySelector("[data-transit]");
+    if (!box) return;
+    if (!state.origin || !state.destination) {
+      box.hidden = true;
+      return;
+    }
+    const response = await getJson(`${urls.transitEstimate}?${new URLSearchParams({
+      destination: state.destination.code,
+    })}`);
+    const data = response.success ? response.data : null;
+    if (!data || !data.available) {
+      box.hidden = true;
+      return;
+    }
+    const range = (value) => (value.min === value.max ? `${value.min}일` : `${value.min}~${value.max}일`);
+    const parts = [];
+    if (data.sea) parts.push(`<span class="mode_sea">🚢 해상 ${range(data.sea)}</span>`);
+    if (data.air) parts.push(`<span class="mode_air">✈️ 항공 ${range(data.air)}</span>`);
+    box.innerHTML = `${escapeHtml(state.origin.name)} → ${escapeHtml(data.destination)} 예상 소요 `
+      + parts.join(" · ") + ` <em>Data Source: Mock</em>`;
+    box.hidden = false;
+  }
+
   function checkDeparture() {
     clearTimeout(departureCheckTimer);
     departureCheckTimer = setTimeout(runDepartureCheck, 250);
@@ -884,6 +913,12 @@
       + `<span class="date_item buyer"><i></i>Buyer 요청일 ${buyerDate || "미선택"}</span>`;
     checkDeparture();
   }
+
+  // 날짜 칸을 직접 고쳐도 달력이 바로 다시 그려지도록 input 이벤트도 받습니다.
+  form.elements.buyer_required_date.addEventListener("input", () => {
+    updateSelectedDates();
+    renderCalendar();
+  });
 
   form.elements.buyer_required_date.addEventListener("change", () => {
     const value = form.elements.buyer_required_date.value;

@@ -71,6 +71,24 @@ def test_departure_margin_levels(app):
     assert check("LAX", 7, 20, mode="AIR", sea_mode=None)["margin_days"] > check("USLAX", 7, 20)["margin_days"]
 
 
+def test_transit_summary(app):
+    """출발지·도착지를 고르면 해상·항공 예상 소요일을 함께 보여줍니다."""
+
+    la = planning_service.transit_summary("USLAX")
+    assert la["available"] and la["destination"] == "로스앤젤레스항"
+    assert la["sea"]["min"] < la["sea"]["max"]
+    assert la["air"]["min"] <= la["air"]["max"]
+    assert la["air"]["max"] < la["sea"]["min"]        # 항공이 해상보다 빠릅니다.
+
+    # 먼 구간일수록 소요일이 깁니다.
+    assert planning_service.transit_summary("VNSGN")["sea"]["min"] < la["sea"]["min"]
+    assert la["sea"]["min"] < planning_service.transit_summary("DEHAM")["sea"]["min"]
+
+    # 공항을 골라도 같은 구간 기준으로 계산합니다.
+    assert planning_service.transit_summary("LAX")["available"]
+    assert planning_service.transit_summary("ZZZZZ")["available"] is False
+
+
 def test_departure_check_without_buyer_date(app):
     """Buyer 요청일이 없으면 도착 예정일만 알려줍니다."""
 
