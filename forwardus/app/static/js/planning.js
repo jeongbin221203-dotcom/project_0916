@@ -75,6 +75,9 @@
     sort: "recommended",
   };
 
+  // 예상 일정 조회를 묶어서 보내기 위한 타이머. (선언 순서 문제를 피해 위쪽에 둡니다)
+  let departureCheckTimer;
+
   const errorBox = document.querySelector("[data-form-error]");
 
   /* ----- 입력값 임시 저장: 다른 메뉴에 다녀와도 내용이 남습니다 ----- */
@@ -842,9 +845,6 @@
   document.querySelectorAll("[data-step-tab]").forEach((tab) => {
     tab.addEventListener("click", () => openStep(Number(tab.dataset.stepTab)));
   });
-
-  // 함수 선언으로 두어 초기화 순서와 관계없이 호출할 수 있게 합니다.
-  let departureCheckTimer;
 
   const LEVEL_TEXT = {
     ok: "여유 있음",
