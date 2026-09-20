@@ -82,6 +82,14 @@ def api_tariff():
         request.args.get("hs", ""), request.args.get("country", ""))})
 
 
+@planning_bp.get("/api/destination-tariff")
+def api_destination_tariff():
+    """도착국이 실제로 매기는 관세와 그 나라의 세분 부호."""
+
+    return jsonify({"success": True, "data": planning_service.destination_tariff(
+        request.args.get("hs", ""), request.args.get("country", ""))})
+
+
 @planning_bp.post("/api/cargo")
 def api_cargo():
     try:

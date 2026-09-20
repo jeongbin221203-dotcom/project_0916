@@ -753,8 +753,49 @@
     if (!data.available && data.message) {
       html += `<p class="tariff_plain">${escapeHtml(data.message)}</p>`;
     }
+    html += `<div class="dest" data-dest-tariff><p class="tariff_note">도착국 관세율표를 조회하는 중…</p></div>`;
     box.innerHTML = html;
     box.hidden = false;
+    refreshDestinationTariff(hs, country, box.querySelector("[data-dest-tariff]"));
+  }
+
+  /* ----- 도착국이 실제로 매기는 관세와 그 나라의 세분 부호 ----- */
+  let destinationRequest = 0;
+  async function refreshDestinationTariff(hs, country, slot) {
+    const token = ++destinationRequest;
+    const response = await getJson(`${urls.destinationTariff}?${new URLSearchParams({ hs, country })}`);
+    if (token !== destinationRequest || !slot.isConnected) return;   // 그 사이 다른 품목을 골랐습니다.
+    const data = response.success ? response.data : null;
+    if (!data || !data.available) {
+      slot.innerHTML = `<p class="tariff_note">${escapeHtml((data && data.message) || "도착국 관세율 자료를 받지 못했습니다.")}</p>`;
+      return;
+    }
+
+    const pct = (value) => (value === null || value === undefined || value === "" ? "" : `${value}%`);
+    const cell = (value) => (value ? escapeHtml(value) : "—");
+    let html = `<p class="tariff_head">${escapeHtml(data.country)}이(가) 실제로 매기는 관세`
+      + ` <span class="mono">HS ${escapeHtml(data.hs6)}</span></p>`;
+
+    html += `<div class="dest_rates">` + data.rates.map((row) => (row.rate === null
+      ? `<span class="dest_rate"><b>${escapeHtml(row.label)}</b> <i>${escapeHtml(row.note || "")}</i></span>`
+      : `<span class="dest_rate"><b>${escapeHtml(row.label)}</b> <strong>${escapeHtml(pct(row.rate))}</strong>`
+        + ` <i>최소 ${escapeHtml(pct(row.min))} · 최대 ${escapeHtml(pct(row.max))} · 세분 ${escapeHtml(row.lines)}줄 · ${escapeHtml(String(row.year))}년</i></span>`
+    )).join("") + `</div>`;
+    html += `<p class="tariff_note">${escapeHtml(data.rate_note)}</p>`;
+
+    if (data.national) {
+      const n = data.national;
+      html += `<p class="dest_sub">${escapeHtml(n.label)} <small>${escapeHtml(n.digits)}${n.edition ? ` · ${escapeHtml(n.edition)} 기준` : ""}</small></p>`;
+      html += `<table class="dest_table"><thead><tr><th>부호</th><th>품목</th>`
+        + n.columns.map((c) => `<th>${escapeHtml(c.label)}</th>`).join("") + `</tr></thead><tbody>`
+        + n.lines.map((line) => `<tr><td class="mono">${cell(line.code)}</td>`
+          + `<td style="padding-left:${8 + (line.indent || 0) * 10}px">${escapeHtml(line.description)}</td>`
+          + n.columns.map((c) => `<td>${cell(line[c.key])}</td>`).join("") + `</tr>`).join("")
+        + `</tbody></table>`;
+    }
+    html += `<p class="tariff_note">${escapeHtml(data.national_note)}`
+      + ` <a class="dest_link" href="${escapeHtml(data.link.url)}" target="_blank" rel="noopener">${escapeHtml(data.link.label)}에서 직접 확인 ↗</a></p>`;
+    slot.innerHTML = html;
   }
 
   let lastHsQuery = "";

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
-from app.collectors import customs_client, exchange_client, location_client, schedule_client
+from app.collectors import (customs_client, exchange_client, location_client, schedule_client,
+                            tariff_client)
 from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
 from app.processors.cargo_calculator import calculate_cargo_lines, calculate_cargo_metrics
@@ -218,6 +220,169 @@ def _rate_value(rate: str) -> float:
         return float(rate)
     except (TypeError, ValueError):
         return 999.0
+
+
+# 나라별 세분 부호를 API로 받을 수 있는 곳. 그 밖의 나라는 WITS의 HS 6단위 세율과
+# 공식 조회 페이지 링크로 안내합니다.
+NATIONAL_TARIFF_SYSTEMS = {
+    "US": {"label": "미국 HTS(USITC) 세분 부호", "digits": "10자리",
+           "columns": [("general", "일반세율"), ("korea", "한국산(KR)")]},
+    "GB": {"label": "영국 Trade Tariff 세분 부호", "digits": "10자리",
+           "columns": [("general", "제3국 세율"), ("korea", "한국산 특혜")]},
+    "JP": {"label": "일본 실행관세율표 통계부호", "digits": "9자리",
+           "columns": [("general", "기본세율"), ("wto", "WTO세율"), ("korea", "한국산(RCEP)")]},
+}
+WITS_RATE_NOTE = ("세계은행 WITS(UNCTAD TRAINS) 자료입니다. HS 6자리 아래 세분 라인의 단순평균이라"
+                  " 최소·최대를 함께 적었습니다. 실제 적용세율은 그 나라 세분 부호로 확인하세요.")
+
+
+def destination_tariff(hs_code: str, country_code: str) -> dict:
+    """도착국이 실제로 매기는 관세와 그 나라의 세분 부호를 정리합니다.
+
+    HS 앞 6자리는 세계 공통이라 WITS에서 모든 나라의 6단위 세율(MFN·한국산 특혜)을
+    받고, 세분 부호(뒤 자리)는 API가 있는 미국·영국·일본만 그 나라 관세율표에서
+    가져옵니다. EU 등 나머지는 공식 조회 페이지 링크를 붙입니다.
+    """
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    country = (country_code or "").strip().upper()
+    location = location_client.find_location(country) if len(country) > 2 else None
+    if location:
+        country = location["country_code"]
+    digits = "".join(ch for ch in (hs_code or "") if ch.isdigit())
+    if len(digits) < 6 or not country:
+        return {"available": False, "message": "HS 6자리 이상과 도착국이 필요합니다."}
+
+    hs6 = digits[:6]
+    eu_members = fta_guide.blocs().get("EU", ())
+    reporter = tariff_client.reporter_for(country, eu_members)
+    country_name = location_client.country_name(country) or country
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        mfn = pool.submit(tariff_client.fetch_wits, reporter, tariff_client.WORLD, hs6)
+        korea = pool.submit(tariff_client.fetch_wits, reporter, tariff_client.KOREA, hs6)
+        national = pool.submit(_national_tariff_lines, country, hs6)
+        mfn, korea, national = mfn.result(), korea.result(), national.result()
+
+    rates = []
+    for label, result in (("MFN(최혜국) 세율", mfn), ("한국산 특혜세율", korea)):
+        row = result.get("data") if result["success"] else None
+        if row:
+            rates.append({"label": label, **row})
+    if korea["success"] and not korea.get("data") and rates:
+        mfn_free = rates[0]["rate"] == 0
+        # MFN이 이미 0%면 특혜세율이 있을 이유가 없습니다. 그 밖에는 협정이 없거나 미반영입니다.
+        rates.append({"label": "한국산 특혜세율", "rate": None,
+                      "note": ("MFN 세율이 0%라 특혜세율이 따로 없습니다." if mfn_free else
+                               "WITS에 한국산 특혜세율 자료가 없습니다. 협정이 없거나 아직 반영되지 않았습니다.")})
+
+    return {
+        "available": bool(rates or national),
+        "country": country_name,
+        "country_code": country,
+        "hs6": f"{hs6[:4]}.{hs6[4:]}",
+        "in_eu": country in eu_members,
+        "rates": rates,
+        "rate_note": WITS_RATE_NOTE if rates else "WITS에 이 나라·품목의 세율 자료가 없습니다.",
+        "national": national,
+        "national_note": (
+            f"뒤 자리는 나라마다 달라 우리 부호 {customs_client.format_hs_code(digits)}와 1:1로"
+            f" 맞지 않습니다. 품목 설명이 맞는 줄을 고르세요."
+            if national else
+            f"{country_name}의 세분 부호는 공개 API가 없어 아래 공식 조회 페이지에서 확인합니다."),
+        "link": tariff_client.lookup_page(country, hs6, eu_members),
+        "source": "api",
+    }
+
+
+def _national_tariff_lines(country: str, hs6: str) -> dict | None:
+    """미국·영국·일본의 세분 부호 목록. 다른 나라는 None."""
+
+    system = NATIONAL_TARIFF_SYSTEMS.get(country)
+    if not system:
+        return None
+
+    if country == "US":
+        result = tariff_client.fetch_us_hts(hs6[:4])
+        lines = _us_lines_under(result["data"], hs6) if result["success"] else []
+        edition = ""
+    elif country == "GB":
+        result = tariff_client.fetch_uk_heading(hs6[:4])
+        lines = _uk_lines_under(result["data"], hs6) if result["success"] else []
+        edition = ""
+    else:
+        result = tariff_client.fetch_japan_tariff(hs6)
+        lines = [{"code": row["code"], "description": row["description"], "indent": 1 if row["stat"] else 0,
+                  "general": row["general"] or row["temporary"], "wto": row["wto"], "korea": row["korea"]}
+                 for row in result["data"]["lines"] if row["hs"].replace(".", "") != hs6[:4]] if result["success"] else []
+        edition = result["data"]["edition"] if result["success"] else ""
+
+    if not lines:
+        return None
+    keys = [key for key, _ in system["columns"]]
+    return {"label": system["label"], "digits": system["digits"], "edition": edition,
+            "columns": [{"key": key, "label": label} for key, label in system["columns"]],
+            "lines": _inherit_rates(lines, keys)}
+
+
+def _inherit_rates(lines: list[dict], keys: list[str]) -> list[dict]:
+    """세율은 상위 줄에만 적히고 통계용 하위 줄은 비어 있습니다. 가까운 상위 줄 값을 물려줍니다."""
+
+    parents: list[dict] = []          # 들여쓰기 단계별로 가장 가까운 상위 줄
+    for line in lines:
+        indent = line.get("indent", 0)
+        del parents[indent:]
+        for key in keys:
+            if not line.get(key):
+                line[key] = next((p[key] for p in reversed(parents) if p.get(key)), "")
+        parents.append(line)
+    return lines
+
+
+def _us_lines_under(rows: list[dict], hs6: str) -> list[dict]:
+    """HTS 목록에서 HS 6자리 아래의 부호가 있는 줄만 남깁니다. ("Other:" 같은 소제목 줄은 뺍니다.)"""
+
+    lines = []
+    for row in rows:
+        code = row["code"].replace(".", "")
+        if not (code.startswith(hs6) and len(code) > 6):
+            continue
+        lines.append({"code": row["code"], "description": row["description"], "indent": row["indent"],
+                      "general": row["general"], "korea": _us_korea_rate(row["special"], row["general"])})
+    return lines
+
+
+def _us_korea_rate(special: str, general: str) -> str:
+    """HTS 특별세율 난("Free (A, AU, KR, ...)")에서 한국(KR)에 적용되는 세율만 뽑습니다."""
+
+    for rate, members in re.findall(r"([^()]+?)\s*\(([^)]*)\)", special or ""):
+        if "KR" in [m.strip() for m in members.split(",")]:
+            return rate.strip()
+    return ""
+
+
+def _uk_lines_under(rows: list[dict], hs6: str) -> list[dict]:
+    """영국 헤딩 목록에서 HS 6자리 아래 줄을 고르고, 잎 줄마다 한국산 특혜세율을 받습니다."""
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    picked = [row for row in rows if row["code"].startswith(hs6)]
+
+    def korea_rate(row: dict) -> str:
+        if not row["leaf"]:
+            return ""
+        result = tariff_client.fetch_uk_tariff(row["code"])
+        if not result["success"]:
+            return ""
+        return next((m["rate"] for m in result["data"]["measures"]
+                     if m["type"] == "Tariff preference" and m["area"] == "KR"), "")
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        korea = list(pool.map(korea_rate, picked))
+    return [{"code": f"{row['code'][:4]}.{row['code'][4:6]}.{row['code'][6:]}", "description": row["description"],
+             "indent": row["indent"], "general": row["general"], "korea": rate}
+            for row, rate in zip(picked, korea)]
 
 
 def _resolve_location(payload: dict, role: str, kind: str) -> dict:
