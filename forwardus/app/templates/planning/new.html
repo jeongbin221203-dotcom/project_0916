@@ -28,7 +28,7 @@
           <label class="field_label">예상 일정</label>
           <div class="calendar" data-calendar></div>
           <p class="selected_date" data-selected-date></p>
-          <p class="margin_box" data-margin hidden></p>
+          <div class="outlook" data-outlook hidden></div>
         </div>
         <div class="route_fields">
           <label class="field">
@@ -88,8 +88,6 @@
               <button type="button" class="button small primary" data-custom-apply>적용</button>
             </div>
           </div>
-
-          <p class="transit_summary" data-transit hidden></p>
 
           <div class="badge_guide" data-air-only hidden>
             <p><em class="ac_note cargo">KE 화물</em>
@@ -251,6 +249,7 @@
       unlocode: "{{ url_for('planning.api_unlocode') }}",
       departureCheck: "{{ url_for('planning.api_departure_check') }}",
       transitEstimate: "{{ url_for('planning.api_transit_estimate') }}",
+      scheduleOutlook: "{{ url_for('planning.api_schedule_outlook') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",

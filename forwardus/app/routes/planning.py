@@ -80,6 +80,17 @@ def api_transit_estimate():
     return jsonify({"success": True, "data": planning_service.transit_summary(request.args.get("destination", ""))})
 
 
+@planning_bp.post("/api/schedule-outlook")
+def api_schedule_outlook():
+    """해상·항공 소요시간과 납기 여유."""
+
+    try:
+        return jsonify({"success": True,
+                        "data": planning_service.schedule_outlook(request.get_json(silent=True) or {})})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+
+
 @planning_bp.post("/api/departure-check")
 def api_departure_check():
     """출발 희망일 여유(Seller 예정일) 확인."""

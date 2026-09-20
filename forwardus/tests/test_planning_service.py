@@ -71,6 +71,43 @@ def test_departure_margin_levels(app):
     assert check("LAX", 7, 20, mode="AIR", sea_mode=None)["margin_days"] > check("USLAX", 7, 20)["margin_days"]
 
 
+def test_schedule_outlook(app):
+    """달력 아래에 해상·항공 소요시간과 납기 여유를 함께 보여줍니다."""
+
+    today = date.today()
+
+    def outlook(destination, departure_days, buyer_days=None):
+        return planning_service.schedule_outlook({
+            "destination_code": destination,
+            "requested_departure_date": (today + timedelta(days=departure_days)).isoformat(),
+            "buyer_required_date": (today + timedelta(days=buyer_days)).isoformat() if buyer_days else "",
+        })
+
+    result = outlook("DEHAM", 7, 40)
+    assert result["available"] and result["destination"] == "함부르크항"
+    modes = {mode["mode"]: mode for mode in result["modes"]}
+    assert set(modes) == {"SEA", "AIR"}
+
+    # 같은 납기에서 해상은 촉박하고 항공은 여유가 있습니다.
+    assert modes["SEA"]["level"] == "late"
+    assert modes["AIR"]["level"] == "ok"
+    assert modes["AIR"]["margin_worst"] > modes["SEA"]["margin_worst"]
+    # 보수적으로 가장 오래 걸리는 일정으로 등급을 매깁니다.
+    assert modes["SEA"]["margin_worst"] <= modes["SEA"]["margin_best"]
+
+    # 납기가 넉넉하면 둘 다 여유 있음입니다.
+    relaxed = {m["mode"]: m for m in outlook("USLAX", 7, 80)["modes"]}
+    assert relaxed["SEA"]["level"] == "ok" and relaxed["AIR"]["level"] == "ok"
+
+    # Buyer 요청일이 없으면 소요시간만 보여줍니다.
+    without_buyer = outlook("USLAX", 7)["modes"][0]
+    assert without_buyer["level"] == "none" and without_buyer["margin_worst"] is None
+    assert without_buyer["eta_fastest"]
+
+    # 출발일이나 도착지가 없으면 계산하지 않습니다.
+    assert planning_service.schedule_outlook({})["available"] is False
+
+
 def test_transit_summary(app):
     """출발지·도착지를 고르면 해상·항공 예상 소요일을 함께 보여줍니다."""
 

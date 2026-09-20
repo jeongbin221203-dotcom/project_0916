@@ -302,6 +302,61 @@ def transit_summary(destination_code: str) -> dict:
     }
 
 
+MODE_LABELS = {"SEA": "해상", "AIR": "항공"}
+
+
+def schedule_outlook(payload: dict) -> dict:
+    """선택한 구간의 해상·항공 소요시간과 납기 여유를 함께 계산합니다.
+
+    화면 왼쪽 달력 아래에 표시합니다. 여유는 가장 오래 걸리는 스케줄(보수적)
+    기준으로 등급을 매기고, 가장 빠른 스케줄 기준 여유도 함께 돌려줍니다.
+    """
+
+    departure = parse_date(payload.get("requested_departure_date"), "Seller 예상일", required=False,
+                           field="requested_departure_date")
+    buyer_required = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", required=False,
+                                field="buyer_required_date")
+    summary = transit_summary(str(payload.get("destination_code") or ""))
+    if not departure or not summary.get("available"):
+        return {"available": False}
+
+    modes = []
+    for mode in ("SEA", "AIR"):
+        days = summary["sea" if mode == "SEA" else "air"]
+        if not days:
+            continue
+        entry = {
+            "mode": mode,
+            "label": MODE_LABELS[mode],
+            "min_days": days["min"],
+            "max_days": days["max"],
+            "eta_fastest": calculate_eta(departure, days["min"]).isoformat(),
+            "eta_slowest": calculate_eta(departure, days["max"]).isoformat(),
+        }
+        if buyer_required:
+            fastest = check_departure_margin(departure, buyer_required, mode, days["min"])
+            slowest = check_departure_margin(departure, buyer_required, mode, days["max"])
+            entry.update({
+                "margin_best": fastest["margin_days"],
+                "margin_worst": slowest["margin_days"],
+                "level": slowest["level"],          # 보수적으로 판단합니다.
+                "status": slowest["label"],
+            })
+        else:
+            entry.update({"margin_best": None, "margin_worst": None,
+                          "level": "none", "status": "Buyer 요청일 미입력"})
+        modes.append(entry)
+
+    return {
+        "available": True,
+        "destination": summary["destination"],
+        "departure_date": departure.isoformat(),
+        "buyer_required_date": buyer_required.isoformat() if buyer_required else None,
+        "modes": modes,
+        "source": "mock",
+    }
+
+
 def check_departure_date(payload: dict) -> dict:
     """출발 희망일이 Buyer 요청 도착일에 맞는지 확인합니다.
 

@@ -122,13 +122,20 @@
 .custom_search .ac_list { top: calc(100% + 2px); }
 @media (max-width: 640px) { .custom_box { grid-template-columns: 1fr 1fr; } }
 
-/* 출발일 여유 표시 */
-.margin_box { margin: 8px 0 0; padding: 9px 12px; border-radius: 12px; font-size: 13px; font-weight: 700; }
-.margin_box.level_ok { background: var(--green_soft); color: #07694f; }
-.margin_box.level_caution { background: #e8f3ff; color: var(--blue_dark); }
-.margin_box.level_tight { background: var(--amber_soft); color: #8a4f00; }
-.margin_box.level_late { background: var(--red_soft); color: var(--red); }
-.margin_box.level_none { background: #f1f5f9; color: var(--muted); }
+/* 달력 아래 예상 일정: 해상·항공 소요시간과 납기 여유 */
+.outlook { margin-top: 12px; display: grid; gap: 6px; }
+.outlook_head { display: flex; align-items: center; gap: 8px; margin: 0 0 2px; font-size: 13px; font-weight: 800; color: var(--ink); }
+.outlook_head em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 800; color: #b45309; background: #fff1e6; padding: 2px 8px; border-radius: 999px; }
+.outlook_row { display: grid; grid-template-columns: 72px 78px 1fr auto; gap: 4px 10px; align-items: center; padding: 9px 12px; border-radius: 12px; font-size: 13px; font-weight: 700; }
+.outlook_mode { font-weight: 800; }
+.outlook_eta { color: inherit; opacity: .8; font-weight: 600; font-size: 12px; }
+.outlook_margin { font-weight: 800; }
+.outlook_level { grid-column: 4; font-size: 12px; font-weight: 800; }
+.outlook_row.level_ok { background: var(--green_soft); color: #07694f; }
+.outlook_row.level_caution { background: #e8f3ff; color: var(--blue_dark); }
+.outlook_row.level_tight { background: var(--amber_soft); color: #8a4f00; }
+.outlook_row.level_late { background: var(--red_soft); color: var(--red); }
+.outlook_row.level_none { background: #f1f5f9; color: var(--muted); }
 
 /* 항공 배지 설명 */
 .badge_guide { margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; background: #f8fafc; border: 1px solid var(--line); }

@@ -291,7 +291,7 @@
     invalidateSchedules();
     saveDraftSoon();
     updateSelectedDates();
-    refreshTransitSummary();
+    refreshOutlook();
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
     state.sea_mode = value;
@@ -509,7 +509,7 @@
       input.value = code ? `${name} (${code})` : name;
       box.hidden = true;
       invalidateSchedules();
-      refreshTransitSummary();
+      refreshOutlook();
     });
   }
 
@@ -551,7 +551,7 @@
         invalidateSchedules();
         saveDraftSoon();
         updateSelectedDates();
-        refreshTransitSummary();
+        refreshOutlook();
       },
       {
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
@@ -611,7 +611,7 @@
       viewMonth = new Date(year, month - 1, 1);
     }
     updateSelectedDates();
-    refreshTransitSummary();
+    refreshOutlook();
     const filter = form.querySelector("[data-country-filter]");
     if (filter && draft.country) filter.value = draft.country;
     state.sort = draft.sort || state.sort;
@@ -846,64 +846,60 @@
   // 함수 선언으로 두어 초기화 순서와 관계없이 호출할 수 있게 합니다.
   let departureCheckTimer;
 
-  async function refreshTransitSummary() {
-    const box = document.querySelector("[data-transit]");
+  const LEVEL_TEXT = {
+    ok: "여유 있음",
+    caution: "여유 적음",
+    tight: "일정 촉박",
+    late: "납기 초과",
+    none: "Buyer 요청일을 입력하면 여유를 계산합니다",
+  };
+
+  async function refreshOutlook() {
+    const box = document.querySelector("[data-outlook]");
     if (!box) return;
-    if (!state.origin || !state.destination) {
+    if (!state.departure_date || !state.destination) {
       box.hidden = true;
       return;
     }
-    const response = await getJson(`${urls.transitEstimate}?${new URLSearchParams({
-      destination: state.destination.code,
-    })}`);
+    const response = await postJson(urls.scheduleOutlook, {
+      destination_code: state.destination.code,
+      requested_departure_date: state.departure_date,
+      buyer_required_date: form.elements.buyer_required_date.value,
+    });
     const data = response.success ? response.data : null;
     if (!data || !data.available) {
       box.hidden = true;
       return;
     }
-    const range = (value) => (value.min === value.max ? `${value.min}일` : `${value.min}~${value.max}일`);
-    const parts = [];
-    if (data.sea) parts.push(`<span class="mode_sea">🚢 해상 ${range(data.sea)}</span>`);
-    if (data.air) parts.push(`<span class="mode_air">✈️ 항공 ${range(data.air)}</span>`);
-    box.innerHTML = `${escapeHtml(state.origin.name)} → ${escapeHtml(data.destination)} 예상 소요 `
-      + parts.join(" · ") + ` <em>Data Source: Mock</em>`;
+
+    const days = (mode) => (mode.min_days === mode.max_days
+      ? `${mode.min_days}일` : `${mode.min_days}~${mode.max_days}일`);
+    const margin = (mode) => {
+      if (mode.margin_worst === null || mode.margin_worst === undefined) return "";
+      if (mode.margin_worst < 0) return `${Math.abs(mode.margin_worst)}일 부족`;
+      return mode.margin_worst === mode.margin_best
+        ? `여유 ${mode.margin_worst}일`
+        : `여유 ${mode.margin_worst}~${mode.margin_best}일`;
+    };
+    const icon = { SEA: "🚢", AIR: "✈️" };
+
+    box.innerHTML = `<p class="outlook_head">${escapeHtml(state.origin ? state.origin.name : "출발지")}`
+      + ` → ${escapeHtml(data.destination)} 예상 일정 <em>Data Source: Mock</em></p>`
+      + data.modes.map((mode) => `
+        <div class="outlook_row level_${mode.level}">
+          <span class="outlook_mode">${icon[mode.mode]} ${escapeHtml(mode.label)}</span>
+          <span class="outlook_days">${days(mode)}</span>
+          <span class="outlook_eta">도착 ${mode.eta_fastest}${
+            mode.eta_slowest !== mode.eta_fastest ? ` ~ ${mode.eta_slowest}` : ""}</span>
+          <span class="outlook_margin">${escapeHtml(margin(mode))}</span>
+          <span class="outlook_level">${escapeHtml(LEVEL_TEXT[mode.level] || "")}</span>
+        </div>`).join("");
     box.hidden = false;
   }
 
   function checkDeparture() {
     clearTimeout(departureCheckTimer);
-    departureCheckTimer = setTimeout(runDepartureCheck, 250);
-  }
-
-  async function runDepartureCheck() {
-    const marginBox = document.querySelector("[data-margin]");
-    if (!marginBox) return;
-    if (!state.departure_date) {
-      marginBox.hidden = true;
-      return;
-    }
-    const response = await postJson(urls.departureCheck, {
-      transport_mode: state.transport_mode,
-      sea_mode: state.transport_mode === "SEA" ? state.sea_mode : null,
-      destination_code: state.destination ? state.destination.code : "",
-      requested_departure_date: state.departure_date,
-      buyer_required_date: form.elements.buyer_required_date.value,
-    });
-    if (!response.success || !response.data.available) {
-      marginBox.hidden = true;
-      return;
-    }
-    const data = response.data;
-    const where = data.destination ? `${escapeHtml(data.destination)}까지 ` : "";
-    let text = `${where}예상 ${data.transit_days}일 · 도착 예정 ${data.eta}`;
-    if (data.margin_days !== null && data.margin_days !== undefined) {
-      const days = data.margin_days;
-      text += ` · ${data.label}`
-        + (days >= 0 ? ` (여유 ${days}일)` : ` (${Math.abs(days)}일 부족)`);
-    }
-    marginBox.className = `margin_box level_${data.level}`;
-    marginBox.innerHTML = text;
-    marginBox.hidden = false;
+    departureCheckTimer = setTimeout(refreshOutlook, 250);
   }
 
   function updateSelectedDates() {
