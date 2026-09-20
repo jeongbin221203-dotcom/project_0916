@@ -20,6 +20,11 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+/* 화면 전체를 2/3 크기로 줄여 한 화면에 더 많이 보이게 합니다.
+   좁은 화면에서는 읽기 어려워 원래 크기로 둡니다. */
+body { zoom: var(--ui_scale, .67); }
+@media (max-width: 900px) { body { zoom: 1; } }
+
 body {
   margin: 0; min-width: 320px; background: var(--surface); color: var(--ink);
   font-family: Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

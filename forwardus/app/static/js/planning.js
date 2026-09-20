@@ -85,25 +85,7 @@
   // sessionStorage를 씁니다. (브라우저를 닫으면 사라집니다)
   const DRAFT_KEY = "forwardus:planning-draft";
   const draftStore = window.sessionStorage;
-  // 예전에 localStorage에 남아 있던 임시 저장본은 더 이상 쓰지 않으므로 지웁니다.
-  try { window.localStorage.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
 
-  // 메뉴를 오갈 때는 입력을 그대로 두고, 새로고침하면 처음부터 시작합니다.
-  function isReload() {
-    const entry = (window.performance && window.performance.getEntriesByType)
-      ? window.performance.getEntriesByType("navigation")[0] : null;
-    return entry ? entry.type === "reload" : false;
-  }
-  if (isReload()) {
-    // 새로고침은 처음부터 다시 시작한다는 뜻으로 보고 첫 화면으로 보냅니다.
-    try { draftStore.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
-    window.location.replace(urls.home);
-    return;
-  }
-  // 로고(홈)를 누르면 처음부터 다시 작성하는 것으로 봅니다.
-  document.querySelector(".brand")?.addEventListener("click", () => {
-    try { draftStore.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
-  });
   const DRAFT_FIELDS = [
     "project_name", "buyer_required_date", "product_description", "hs_code", "package_type",
     "quantity", "length_cm", "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg",
@@ -346,7 +328,10 @@
       overrideQuery = null;
       items = await fetchItems(query);
       if (!items.length) {
-        list.innerHTML = `<li class="empty">검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.</li>`;
+        const message = options.emptyMessage
+          ? options.emptyMessage()
+          : `검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.`;
+        list.innerHTML = `<li class="empty">${escapeHtml(message)}</li>`;
         return;
       }
       let html = "";
@@ -601,6 +586,7 @@
         saveDraftSoon();
         updateSelectedDates();
         refreshOutlook();
+        refreshTariff();
       },
       {
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
@@ -667,6 +653,7 @@
     }
     updateSelectedDates();
     refreshOutlook();
+    refreshTariff();
     const filter = form.querySelector("[data-country-filter]");
     if (filter && draft.country) filter.value = draft.country;
     state.sort = draft.sort || state.sort;
@@ -678,10 +665,69 @@
 
   updateSelectedDates();   // 임시저장이 없을 때도 날짜 표시를 채웁니다.
 
+  /* ----- 도착국에 적용되는 협정·세율 ----- */
+  async function refreshTariff() {
+    const box = document.querySelector("[data-tariff]");
+    if (!box) return;
+    const hs = form.elements.hs_code.value.trim();
+    const country = state.destination ? state.destination.country_code : "";
+    if (!hs || !country) {
+      box.hidden = true;
+      return;
+    }
+    const response = await getJson(`${urls.tariff}?${new URLSearchParams({ hs, country })}`);
+    const data = response.success ? response.data : null;
+    if (!data) {
+      box.hidden = true;
+      return;
+    }
+
+    const rate = (value) => (value === "" || value === undefined ? "-" : `${value}%`);
+    const period = (row) => (row.start_date
+      ? `${row.start_date.slice(0, 4)}-${row.start_date.slice(4, 6)}-${row.start_date.slice(6)} 적용` : "");
+
+    let html = `<p class="tariff_head"><b>${escapeHtml(data.country)}</b>에 수출할 때 쓸 수 있는 협정`
+      + (data.hs_code ? ` <span class="mono">${escapeHtml(data.hs_code)}</span>` : "") + `</p>`;
+
+    if (data.agreements && data.agreements.length) {
+      html += data.agreements.map((row) => `
+        <div class="tariff_row">
+          <span class="tariff_name">${escapeHtml(row.agreement)}</span>
+          <span class="tariff_rate">${escapeHtml(rate(row.rate))}</span>
+          <span class="tariff_period">${escapeHtml(period(row))}</span>
+          <span class="tariff_proof">${escapeHtml(row.proof)}</span>
+        </div>`).join("");
+    }
+    if (data.without_rate && data.without_rate.length) {
+      html += `<p class="tariff_plain">발효 중이지만 이 품목에는 협정세율이 없습니다:`
+        + ` ${escapeHtml(data.without_rate.join(" · "))}</p>`;
+    }
+    if (!data.in_force || !data.in_force.length) {
+      html += `<p class="tariff_plain">${escapeHtml(data.country)}와(과) 발효된 FTA가 없습니다.`
+        + ` 일반 세율이 적용됩니다.</p>`;
+    }
+    if (data.general && data.general.length) {
+      html += `<p class="tariff_plain">참고 · `
+        + data.general.map((row) => `${escapeHtml(row.name)} ${escapeHtml(rate(row.rate))}`).join(" / ")
+        + `</p>`;
+    }
+    if (data.note) html += `<p class="tariff_note">${escapeHtml(data.note)}</p>`;
+    if (!data.available && data.message) {
+      html += `<p class="tariff_plain">${escapeHtml(data.message)}</p>`;
+    }
+    box.innerHTML = html;
+    box.hidden = false;
+  }
+
+  let lastHsQuery = "";
   setupAutocomplete(
     form.querySelector("[data-autocomplete=hs_code]"),
     async (q) => {
-      const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q })}`);
+      // 아무것도 입력하지 않았으면 위에 적은 품명으로 찾아봅니다.
+      const query = q.trim() || form.elements.product_description.value.trim();
+      lastHsQuery = query;
+      if (!query) return [];
+      const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: query })}`);
       if (!response.success) return [];
       // 관세청 조회인지 예시 목록인지 함께 표시합니다.
       return response.data.map((item) => ({ ...item, source: response.source }));
@@ -692,7 +738,21 @@
       return `<span class="mono">${escapeHtml(item.code)}</span>`
         + ` <b>${escapeHtml(item.name || item.name_en)}</b><small>${escapeHtml(sub)}</small>`;
     },
-    (item, input) => { if (item) input.value = item.code; },
+    (item, input) => {
+      if (!item) return;
+      input.value = item.code;
+      refreshTariff();     // 고른 품목의 협정세율을 아래에 보여줍니다.
+    },
+    {
+      emptyMessage: () => {
+        const digits = lastHsQuery.replace(/[.\-\s]/g, "");
+        if (/^\d+$/.test(digits) && digits.length !== 10) {
+          return "HS부호는 10자리를 모두 입력해야 조회됩니다. 품명으로 찾아보세요.";
+        }
+        if (!lastHsQuery) return "품명(예: 립스틱, 샴푸) 또는 HS부호 10자리를 입력하세요.";
+        return `"${lastHsQuery}"로 찾은 품목이 없습니다. 더 일반적인 낱말로 찾아보세요.`;
+      },
+    },
   );
 
   /* ----- Cargo calculation ----- */

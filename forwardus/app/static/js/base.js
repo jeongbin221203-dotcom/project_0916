@@ -79,6 +79,34 @@
     input.addEventListener("focus", open);
   });
 
+  /* ----- 새로고침·로고 클릭은 "처음부터 다시" ----- */
+  // 입력하던 내용은 탭 세션에 임시 저장됩니다(메뉴를 오가도 유지).
+  // 새로고침하거나 회사 로고를 누르면 그 내용을 지우고 첫 화면으로 돌아갑니다.
+  const DRAFT_KEY = "forwardus:planning-draft";
+  const brand = document.querySelector(".brand");
+  const homeUrl = brand ? brand.getAttribute("href") : "/";
+
+  function clearDraft() {
+    [window.sessionStorage, window.localStorage].forEach((store) => {
+      try { store.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
+    });
+  }
+
+  function isReload() {
+    const entry = (window.performance && window.performance.getEntriesByType)
+      ? window.performance.getEntriesByType("navigation")[0] : null;
+    return entry ? entry.type === "reload" : false;
+  }
+
+  if (isReload()) {
+    clearDraft();
+    if (window.location.pathname !== homeUrl) {
+      window.location.replace(homeUrl);
+      return;
+    }
+  }
+  if (brand) brand.addEventListener("click", clearDraft);
+
   document.querySelectorAll(".flash_stack .flash").forEach((el) => {
     setTimeout(() => el.classList.add("fade"), 6000);
   });
