@@ -256,56 +256,14 @@
     });
     applyMode();
     refreshCountryOptions();
-
-  async function restoreDraft() {
-    const draft = loadDraft();
-    if (!draft) return;
-
-    DRAFT_FIELDS.forEach((name) => {
-      const input = form.elements[name];
-      if (input && draft.fields && draft.fields[name] !== undefined) input.value = draft.fields[name];
-    });
-    if (draft.incoterms) {
-      const radio = form.querySelector(`input[name=incoterms][value="${draft.incoterms}"]`);
-      if (radio) radio.checked = true;
-    }
-    if (draft.transport_mode && draft.transport_mode !== state.transport_mode) {
-      const button = form.querySelector(`[data-toggle=transport_mode] [data-value=${draft.transport_mode}]`);
-      if (button) button.click();
-    }
-    if (draft.sea_mode && draft.sea_mode !== state.sea_mode) {
-      const button = form.querySelector(`[data-toggle=sea_mode] [data-value=${draft.sea_mode}]`);
-      if (button) button.click();
-    }
-    ["origin", "destination"].forEach((role) => {
-      const item = draft[role];
-      if (!item) return;
-      state[role] = item;
-      form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = `${item.name} (${item.code})`;
-    });
-    if (draft.departure_date) {
-      state.departure_date = draft.departure_date;
-      const [year, month] = draft.departure_date.split("-").map(Number);
-      viewMonth = new Date(year, month - 1, 1);
-    }
-    updateSelectedDates();
-    renderCalendar();
-    const filter = form.querySelector("[data-country-filter]");
-    if (filter && draft.country) filter.value = draft.country;
-    state.sort = draft.sort || state.sort;
-    state.schedule_id = draft.schedule_id || null;
-
-    recalc();
-    if (draft.step && draft.step > 1) await openStep(draft.step);
-  }
-
-  restoreDraft();
     invalidateSchedules();
+    saveDraftSoon();
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
     state.sea_mode = value;
     applyMode();
     invalidateSchedules();
+    saveDraftSoon();
   });
   applyMode();
 
