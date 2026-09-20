@@ -200,7 +200,21 @@ def list_countries(kind: str, exclude: list[str] | None = None) -> dict:
     return ok(items, "mock")
 
 
-def search_locations(query: str, kind: str | None = None, country: str | None = None) -> dict:
+def apply_origin(items: list[dict], origin_code: str | None) -> list[dict]:
+    """출발 공항을 알면 그 공항 기준으로 직항 여부를 다시 계산합니다."""
+
+    origin_code = (origin_code or "").strip().upper()
+    if not origin_code:
+        return items
+    for item in items:
+        if item["kind"] != "airport" or item.get("direct_from_korea") is None:
+            continue
+        item["direct_from_korea"] = origin_code in (item.get("direct_from") or [])
+    return items
+
+
+def search_locations(query: str, kind: str | None = None, country: str | None = None,
+                     origin_code: str | None = None) -> dict:
     """Match on code, Korean/English name, city, or country."""
 
     try:
@@ -258,4 +272,8 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
             item["name"] if has_korean else item["name_en"].lower(),
         )
 
-    return ok(deepcopy(sorted(results, key=rank)[:MAX_MAIN_RESULTS]), "mock")
+    items = apply_origin(deepcopy(sorted(results, key=rank)), origin_code)
+    if origin_code:
+        # 직항 여부가 바뀌었으므로 다시 정렬합니다.
+        items.sort(key=rank)
+    return ok(items, "mock")
