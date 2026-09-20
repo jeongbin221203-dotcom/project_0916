@@ -275,3 +275,64 @@ def test_incheon_cargo_flights_are_connected(app):
         rows = {row["key"]: row for row in carrier_client.sources()}
     assert rows["icn_cargo"]["ready"] is True
     assert rows["icn_cargo"]["env"] == "DATA_GO_KR_SERVICE_KEY"
+
+
+def test_health_check_tells_real_answers_apart_from_fallbacks(app, monkeypatch):
+    """키가 있다는 것과 실제로 응답이 온다는 것은 다릅니다.
+
+    예시 데이터로 대체된 것을 "연결됨"이라고 하면 사람이 실데이터로 믿습니다.
+    """
+
+    from app.services import lookup_service
+
+    answers = iter([
+        {"success": True, "source": "api", "data": [1, 2]},      # 진짜 응답
+        {"success": True, "source": "mock", "data": [1]},        # 예시로 대체
+        {"success": False, "source": "api", "data": None,
+         "message": "키가 없습니다."},                             # 안 됨
+    ])
+
+    def one(*args, **kwargs):
+        try:
+            return next(answers)
+        except StopIteration:
+            return {"success": True, "source": "api", "data": []}
+
+    monkeypatch.setattr(lookup_service, "HEALTH_CHECKS",
+                        [("가짜1", "E1", one), ("가짜2", "E2", one), ("가짜3", "E3", one)])
+    # 뒤에 덧붙는 검사들도 같은 답을 주게 둡니다.
+    for module, name in (("customs_client", "search_hs_codes"),):
+        pass
+
+    with app.app_context():
+        with patch("httpx.request", side_effect=lambda *a, **k: httpx.Response(
+                200, text="<a/>", request=httpx.Request("GET", "https://x"))):
+            result = lookup_service.health_check()
+
+    states = {row["label"]: row for row in result["rows"]}
+    assert states["가짜1"]["ok"] is True and states["가짜1"]["state"] == "응답함"
+    assert states["가짜2"]["ok"] is False and "예시" in states["가짜2"]["state"]
+    assert states["가짜3"]["ok"] is False and states["가짜3"]["state"] == "안 됨"
+    assert result["live"] >= 1
+    assert "예시" in result["note"]
+
+
+def test_health_check_survives_a_collector_that_raises(app, monkeypatch):
+    """진단 도중 하나가 터져도 나머지는 계속 봐야 합니다."""
+
+    from app.services import lookup_service
+
+    def boom():
+        raise RuntimeError("터짐")
+
+    monkeypatch.setattr(lookup_service, "HEALTH_CHECKS", [("터지는 것", "E", boom)])
+    with app.app_context():
+        with patch("httpx.request", side_effect=lambda *a, **k: httpx.Response(
+                200, text="<a/>", request=httpx.Request("GET", "https://x"))):
+            result = lookup_service.health_check()
+
+    row = next(r for r in result["rows"] if r["label"] == "터지는 것")
+    assert row["ok"] is False and row["state"] == "터짐"
+    assert "RuntimeError" in row["detail"]
+    # 나머지 검사도 함께 돌았어야 합니다.
+    assert len(result["rows"]) > 1

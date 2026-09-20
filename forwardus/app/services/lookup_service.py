@@ -9,8 +9,14 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeout
+
 from app.collectors import carrier_client, customs_client, customs_extra_client
 from app.services import ServiceError
+
+# 자가진단 전체를 이 시간 안에 끝냅니다. 기관이 멈춰도 화면이 멎지 않습니다.
+HEALTH_TIMEOUT = 20
 
 # 조회 종류. key는 화면에서 고르는 값입니다.
 LOOKUPS = {
@@ -294,3 +300,103 @@ def _trade_stats_ready() -> bool:
 
 
 _TRADE_STATS_READY: bool | None = None
+
+
+# 자가진단: 실제로 한 번씩 불러 보고 무엇이 살아 있는지 확인합니다.
+# 키가 있다는 것과 실제로 응답이 온다는 것은 다릅니다.
+HEALTH_CHECKS = [
+    ("HS부호검색", "UNIPASS_KEY_HS_CODE_SEARCH",
+     lambda: customs_client.search_hs_codes("샴푸")),
+    ("관세율 조회", "UNIPASS_KEY_TARIFF_RATE",
+     lambda: customs_client.fetch_tariff_rates("3305100000")),
+    ("통계부호(국가코드)", "UNIPASS_KEY_STATISTICS_CODE",
+     lambda: customs_client.fetch_country_codes()),
+    ("세관장확인대상", "UNIPASS_KEY_REQUIREMENT_APPROVAL",
+     lambda: customs_extra_client.export_requirement_laws("3307902000")),
+    ("통관고유부호", "UNIPASS_KEY_CUSTOMS_CLEARANCE_CODE",
+     lambda: customs_extra_client.clearance_code(business_no="1078800075")),
+    ("간이정액 환급율표", "UNIPASS_KEY_SIMPLE_REFUND_RATE",
+     lambda: customs_extra_client.refund_rate("3305100000")),
+    ("수출이행기간 단축품목", "UNIPASS_KEY_EXPORT_PERIOD_SHORTENING_ITEM",
+     lambda: customs_extra_client.shortened_loading_period("3305100000")),
+    ("선사 목록", "UNIPASS_KEY_SHIPPING_COMPANY_LIST",
+     lambda: carrier_client.search_shipping_companies("에이치엠엠")),
+    ("항공사 목록", "UNIPASS_KEY_AIRLINE_LIST",
+     lambda: customs_extra_client.search_airlines("대한항공")),
+    ("화물운송주선업자 목록", "UNIPASS_KEY_FORWARDER_LIST",
+     lambda: customs_extra_client.search_forwarders("한국")),
+]
+
+
+def health_check() -> dict:
+    """연결된 API를 하나씩 실제로 불러 봅니다.
+
+    키가 있다고 해서 응답이 온다는 뜻은 아닙니다. 관세청이 멈추거나 호출이
+    많으면 잠시 막히기도 합니다. 그럴 때 무엇이 안 되는지 눈으로 봐야 합니다.
+    """
+
+    from app.collectors import container_client, exchange_client, trade_stats_client
+
+    checks = list(HEALTH_CHECKS) + [
+        ("관세 고시환율", "UNIPASS_KEY_CUSTOMS_EXCHANGE_RATE",
+         lambda: exchange_client.fetch_krw_rates()),
+        ("수출이행내역", "UNIPASS_KEY_EXPORT_PERFORMANCE_BY_DECLARATION",
+         lambda: container_client.export_performance(declaration_no="122100900340033")),
+        ("컨테이너내역", "UNIPASS_KEY_CONTAINER_DETAIL",
+         lambda: container_client.container_detail("00ANLU083N59007001")),
+        ("인천공항 화물기", "DATA_GO_KR_SERVICE_KEY",
+         lambda: _incheon_probe()),
+        ("관세청 수출입무역통계", "DATA_GO_KR_SERVICE_KEY",
+         lambda: trade_stats_client.item_trade("3305")),
+    ]
+
+    # 하나씩 부르면 기관이 멈췄을 때 한 곳당 25초씩 기다려 화면이 몇 분 동안
+    # 멎습니다. 동시에 부르고 전체를 HEALTH_TIMEOUT 안에 끊습니다.
+    with ThreadPoolExecutor(max_workers=len(checks)) as pool:
+        pending = {pool.submit(_probe, label, env, call): (label, env)
+                   for label, env, call in checks}
+        rows = []
+        try:
+            for future in as_completed(pending, timeout=HEALTH_TIMEOUT):
+                rows.append(future.result())
+        except FuturesTimeout:
+            pass
+        done = {row["label"] for row in rows}
+        for label, env in pending.values():
+            if label not in done:
+                rows.append({"label": label, "env": env, "ok": False,
+                             "state": "응답 없음",
+                             "detail": f"{HEALTH_TIMEOUT}초 안에 답하지 않았습니다."})
+
+    order = {label: index for index, (label, _, _) in enumerate(checks)}
+    rows.sort(key=lambda row: order.get(row["label"], 999))
+    live = sum(1 for row in rows if row["ok"])
+    return {"rows": rows, "live": live, "total": len(rows),
+            "note": ("'응답함'은 기관에서 실제 값이 온 것입니다. "
+                     "'예시 데이터로 대체'는 기관이 멈춰 우리 예시를 보여 준 것이고, "
+                     "'안 됨'과 '응답 없음'은 키가 없거나 기관이 막은 것입니다.")}
+
+
+def _probe(label: str, env: str, call) -> dict:
+    """한 곳을 불러 보고 결과를 한 줄로 정리합니다."""
+
+    try:
+        result = call()
+    except Exception as error:              # noqa: BLE001 - 진단이라 모두 잡습니다.
+        return {"label": label, "env": env, "ok": False,
+                "state": "터짐", "detail": f"{type(error).__name__}: {error}"[:150]}
+    ok_now = bool(result.get("success"))
+    source = result.get("source", "")
+    return {
+        "label": label, "env": env,
+        "ok": ok_now and source == "api",
+        "state": ("응답함" if source == "api" else "예시 데이터로 대체") if ok_now else "안 됨",
+        "detail": result.get("message", "") or
+                  (f"{len(result['data'])}건" if isinstance(result.get("data"), list) else ""),
+    }
+
+
+def _incheon_probe() -> dict:
+    """인천공항 화물기 시간표가 응답하는지만 봅니다."""
+
+    return carrier_client.fetch_icn_cargo_flights()

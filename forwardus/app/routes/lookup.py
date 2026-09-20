@@ -36,6 +36,15 @@ def sources():
     return render_template("lookup/sources.html", data=lookup_service.data_sources())
 
 
+@lookup_bp.get("/sources/check")
+def sources_check():
+    """연결된 API를 실제로 한 번씩 불러 봅니다. 시간이 좀 걸립니다."""
+
+    return render_template("lookup/sources.html",
+                           data=lookup_service.data_sources(),
+                           health=lookup_service.health_check())
+
+
 @lookup_bp.get("/declaration")
 def declaration():
     """수출신고필증 검증. 여섯 항목을 모두 넣어야 대조합니다."""
