@@ -44,32 +44,93 @@ def get_form_options() -> dict:
     }
 
 
-def search_locations(query: str, transport_mode: str, role: str | None = None) -> dict:
-    result = location_client.search_locations(query, location_kind(transport_mode.upper()))
-    if result["success"] and role in ("origin", "destination"):
-        # Export flow: origin in Korea, destination abroad.
-        want_korea = role == "origin"
-        result["data"] = [item for item in result["data"] if (item["country_code"] == "KR") == want_korea]
+def search_locations(query: str, transport_mode: str, role: str | None = None, country: str | None = None) -> dict:
+    """Search ports or airports. Export flow: origin in Korea, destination abroad."""
+
+    if role == "origin":
+        country = "KR"
+    result = location_client.search_locations(query, location_kind(transport_mode.upper()), country)
+    if result["success"] and role == "destination":
+        result["data"] = [item for item in result["data"] if item["country_code"] != "KR"]
     return result
+
+
+def list_countries(transport_mode: str, role: str | None = None) -> dict:
+    """Destination country list for the country filter."""
+
+    return location_client.list_countries(
+        location_kind(transport_mode.upper()), exclude=["KR"] if role == "destination" else None
+    )
 
 
 def search_hs_codes(query: str) -> dict:
     return customs_client.search_hs_codes(query)
 
 
-def _resolve_locations(route: dict) -> tuple[dict, dict]:
+def _resolve_location(payload: dict, role: str, kind: str) -> dict:
+    """Return a location from the master list, or build one from direct input.
+
+    Direct input is kept because UN/LOCODE does not cover every terminal a
+    forwarder may quote. Such a location is marked ``source = manual``.
+    """
+
+    field = f"{role}_code"
+    code = str(payload.get(field) or "").strip().upper()
+    custom = payload.get(f"{role}_custom") or {}
+    known = location_client.find_location(code)
+
+    if known and known["kind"] == kind:
+        location = known
+    elif custom:
+        location = _build_custom_location(code, custom, role, kind)
+    elif known:
+        raise ValidationError(
+            f"{code}은(는) {'공항' if kind == 'airport' else '항구'} 코드가 아닙니다.", field)
+    else:
+        raise ValidationError("목록에서 선택하거나 직접 입력해주세요.", field)
+
+    if role == "origin" and location["country_code"] != "KR":
+        raise ValidationError("수출 견적은 국내 항구·공항에서 출발합니다.", field)
+    if role == "destination" and location["country_code"] == "KR":
+        raise ValidationError("도착지는 해외 항구·공항이어야 합니다.", field)
+    return location
+
+
+def _build_custom_location(code: str, custom: dict, role: str, kind: str) -> dict:
+    field = f"{role}_code"
+    if not code.isalnum() or not location_client.CODE_MIN_LENGTH <= len(code) <= location_client.CODE_MAX_LENGTH:
+        raise ValidationError(
+            f"코드는 영문·숫자 {location_client.CODE_MIN_LENGTH}~{location_client.CODE_MAX_LENGTH}자로 입력해주세요. (예: KRPUS)",
+            field)
+
+    country_code = "KR" if role == "origin" else str(custom.get("country_code") or "").strip().upper()
+    country = location_client.get_country(country_code)
+    if not country:
+        raise ValidationError("국가를 선택해주세요.", f"{role}_country")
+
+    name = optional_text(custom.get("name"), max_length=200)
+    if not name:
+        raise ValidationError("항구·공항 이름을 입력해주세요.", f"{role}_name")
+
+    return {
+        "code": code,
+        "name": name,
+        "name_en": name,
+        "city": name,
+        "city_en": name,
+        "country": country["name"],
+        "country_en": country["name_en"],
+        "country_code": country_code,
+        "region": country["region"],
+        "kind": kind,
+        "major": False,
+        "source": "manual",
+    }
+
+
+def _resolve_locations(route: dict, payload: dict) -> tuple[dict, dict]:
     kind = location_kind(route["transport_mode"])
-    origin = location_client.find_location(route["origin_code"])
-    destination = location_client.find_location(route["destination_code"])
-    if not origin or origin["kind"] != kind:
-        raise ValidationError("출발지를 목록에서 선택해주세요.", "origin_code")
-    if not destination or destination["kind"] != kind:
-        raise ValidationError("도착지를 목록에서 선택해주세요.", "destination_code")
-    if origin["country_code"] != "KR":
-        raise ValidationError("수출 견적은 국내 항구·공항에서 출발합니다.", "origin_code")
-    if destination["country_code"] == "KR":
-        raise ValidationError("도착지는 해외 항구·공항이어야 합니다.", "destination_code")
-    return origin, destination
+    return _resolve_location(payload, "origin", kind), _resolve_location(payload, "destination", kind)
 
 
 def calculate_cargo(payload: dict) -> dict:
@@ -94,7 +155,7 @@ def search_schedules(payload: dict) -> dict:
     """Validate route and cargo, then return sorted schedules with deadline checks."""
 
     route = validate_route(payload)
-    origin, destination = _resolve_locations(route)
+    origin, destination = _resolve_locations(route, payload)
     metrics = calculate_cargo_metrics(payload.get("cargo") or {})
     buyer_required_date = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", required=False,
                                      field="buyer_required_date")
@@ -157,7 +218,7 @@ def create_shipment(payload: dict) -> Shipment:
     """
 
     route = validate_route(payload)
-    origin, destination = _resolve_locations(route)
+    origin, destination = _resolve_locations(route, payload)
     terms = validate_trade_terms(payload, route["transport_mode"])
     parties = validate_parties(payload)
 

@@ -177,6 +177,7 @@
       form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = "";
     });
     applyMode();
+    refreshCountryOptions();
     invalidateSchedules();
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
@@ -192,17 +193,32 @@
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); };
   }
 
-  function setupAutocomplete(container, fetchItems, renderItem, onSelect) {
+  function setupAutocomplete(container, fetchItems, renderItem, onSelect, options = {}) {
     const input = container.querySelector("[data-ac-input]");
     const list = container.querySelector("[data-ac-list]");
     let items = [];
 
     const search = debounce(async () => {
-      items = await fetchItems(input.value.trim());
-      list.innerHTML = items.length
-        ? items.map((item, i) => `<li role="option" data-index="${i}">${renderItem(item)}</li>`).join("")
-        : `<li class="empty">검색 결과가 없습니다.</li>`;
+      list.innerHTML = `<li class="empty">검색 중…</li>`;
       list.hidden = false;
+      items = await fetchItems(input.value.trim());
+      if (!items.length) {
+        list.innerHTML = `<li class="empty">검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.</li>`;
+        return;
+      }
+      let html = "";
+      let group = null;
+      items.forEach((item, index) => {
+        if (options.groupBy) {
+          const value = options.groupBy(item);
+          if (value !== group) {
+            group = value;
+            html += `<li class="ac_group">${escapeHtml(value)}</li>`;
+          }
+        }
+        html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;
+      });
+      list.innerHTML = html;
     }, 200);
 
     input.addEventListener("input", () => { onSelect(null, input); search(); });
@@ -214,13 +230,71 @@
       onSelect(items[Number(li.dataset.index)], input);
       list.hidden = true;
     });
+    return { search };
   }
 
+  /* ----- Destination country filter and direct input ----- */
+  const countryCache = {};
+
+  async function loadCountries(mode) {
+    if (!countryCache[mode]) {
+      const response = await getJson(`${urls.countries}?${new URLSearchParams({ mode, role: "destination" })}`);
+      countryCache[mode] = response.success ? response.data : [];
+    }
+    return countryCache[mode];
+  }
+
+  async function refreshCountryOptions() {
+    const countries = await loadCountries(state.transport_mode);
+    const optionsHtml = countries
+      .map((c) => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${c.count.toLocaleString("ko-KR")})</option>`)
+      .join("");
+    const filter = form.querySelector("[data-country-filter]");
+    if (filter) {
+      const current = filter.value;
+      filter.innerHTML = `<option value="">국가 전체 (주요 항만 표시)</option>${optionsHtml}`;
+      filter.value = current;
+    }
+    const customCountry = form.querySelector("[data-autocomplete=destination] [data-custom-country]");
+    if (customCountry) customCountry.innerHTML = `<option value="">국가 선택</option>${optionsHtml}`;
+  }
+
+  function setupCustomInput(role) {
+    const container = form.querySelector(`[data-autocomplete=${role}]`);
+    const box = container.querySelector("[data-custom]");
+    const input = container.querySelector("[data-ac-input]");
+
+    container.querySelector("[data-custom-toggle]").addEventListener("click", () => {
+      box.hidden = !box.hidden;
+      if (!box.hidden) box.querySelector("[data-custom-code]").focus();
+    });
+
+    container.querySelector("[data-custom-apply]").addEventListener("click", () => {
+      const code = box.querySelector("[data-custom-code]").value.trim().toUpperCase();
+      const name = box.querySelector("[data-custom-name]").value.trim();
+      const countrySelect = box.querySelector("[data-custom-country]");
+      const countryCode = countrySelect ? countrySelect.value : "KR";
+      if (!code || !name || !countryCode) {
+        showError("직접 입력하려면 코드, 이름, 국가를 모두 채워주세요.");
+        return;
+      }
+      showError("");
+      state[role] = { code, name, country_code: countryCode, custom: true };
+      input.value = `${name} (${code})`;
+      box.hidden = true;
+      invalidateSchedules();
+    });
+  }
+
+  const locationSearch = {};
   ["origin", "destination"].forEach((role) => {
-    setupAutocomplete(
-      form.querySelector(`[data-autocomplete=${role}]`),
+    const container = form.querySelector(`[data-autocomplete=${role}]`);
+    const countryFilter = container.querySelector("[data-country-filter]");
+    locationSearch[role] = setupAutocomplete(
+      container,
       async (q) => {
         const params = new URLSearchParams({ q, mode: state.transport_mode, role });
+        if (countryFilter && countryFilter.value) params.set("country", countryFilter.value);
         const response = await getJson(`${urls.locations}?${params}`);
         return response.success ? response.data : [];
       },
@@ -230,8 +304,17 @@
         if (item) input.value = `${item.name} (${item.code})`;
         invalidateSchedules();
       },
+      { groupBy: role === "destination" ? (item) => item.country : null },
     );
+    setupCustomInput(role);
+    if (countryFilter) {
+      countryFilter.addEventListener("change", () => {
+        container.querySelector("[data-ac-input]").focus();
+        locationSearch[role].search();
+      });
+    }
   });
+  refreshCountryOptions();
 
   setupAutocomplete(
     form.querySelector("[data-autocomplete=hs_code]"),
@@ -301,6 +384,11 @@
     state.schedule_id = null;
   }
 
+  function customPayload(role) {
+    const item = state[role];
+    return item && item.custom ? { name: item.name, country_code: item.country_code } : null;
+  }
+
   function routePayload() {
     return {
       project_name: form.elements.project_name.value,
@@ -308,6 +396,8 @@
       sea_mode: state.transport_mode === "SEA" ? state.sea_mode : null,
       origin_code: state.origin ? state.origin.code : "",
       destination_code: state.destination ? state.destination.code : "",
+      origin_custom: customPayload("origin"),
+      destination_custom: customPayload("destination"),
       requested_departure_date: state.departure_date,
       buyer_required_date: form.elements.buyer_required_date.value,
     };

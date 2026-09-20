@@ -1,27 +1,70 @@
-"""Port and airport master data for autocomplete."""
+"""Port and airport master data for autocomplete.
+
+Codes come from the official UN/LOCODE list (see data/build_locations.py).
+"""
 
 from __future__ import annotations
 
 from copy import deepcopy
+from functools import lru_cache
 
 from app.collectors.base_client import fail, load_mock, ok
 
-MAX_RESULTS = 10
+MAX_RESULTS = 30
+CODE_MIN_LENGTH = 3
+CODE_MAX_LENGTH = 10
 
 
 def _all_locations() -> list[dict]:
     return load_mock("locations")
 
 
-def find_location(code: str) -> dict | None:
-    code = (code or "").strip().upper()
+@lru_cache(maxsize=1)
+def _by_code() -> dict[str, dict]:
+    return {item["code"]: item for item in _all_locations()}
+
+
+@lru_cache(maxsize=1)
+def _countries() -> dict[str, dict]:
+    """Country code → name, region, and location counts."""
+
+    countries: dict[str, dict] = {}
     for item in _all_locations():
-        if item["code"] == code:
-            return deepcopy(item)
-    return None
+        entry = countries.setdefault(item["country_code"], {
+            "code": item["country_code"],
+            "name": item["country"],
+            "name_en": item["country_en"],
+            "region": item["region"],
+            "port_count": 0,
+            "airport_count": 0,
+        })
+        entry["port_count" if item["kind"] == "port" else "airport_count"] += 1
+    return countries
 
 
-def search_locations(query: str, kind: str | None = None) -> dict:
+def find_location(code: str) -> dict | None:
+    return deepcopy(_by_code().get((code or "").strip().upper()))
+
+
+def get_country(country_code: str) -> dict | None:
+    return deepcopy(_countries().get((country_code or "").strip().upper()))
+
+
+def list_countries(kind: str, exclude: list[str] | None = None) -> dict:
+    """Countries that have at least one location of the requested kind."""
+
+    field = "port_count" if kind == "port" else "airport_count"
+    excluded = {code.upper() for code in (exclude or [])}
+    items = [
+        {**country, "count": country[field]}
+        for country in _countries().values()
+        if country[field] and country["code"] not in excluded
+    ]
+    items.sort(key=lambda item: item["name"])
+    return ok(items, "mock")
+
+
+def search_locations(query: str, kind: str | None = None, country: str | None = None) -> dict:
     """Match on code, Korean/English name, city, or country."""
 
     try:
@@ -30,15 +73,33 @@ def search_locations(query: str, kind: str | None = None) -> dict:
         return fail("MOCK_DATA_ERROR", "mock")
 
     keyword = (query or "").strip().lower()
+    country = (country or "").strip().upper()
+    # With no keyword and no country there is nothing to rank by, so only the
+    # well-known locations are suggested. Typing searches the full list.
+    majors_only = not keyword and not country
     results = []
     for item in items:
         if kind and item["kind"] != kind:
             continue
-        haystack = " ".join(
-            [item["code"], item["name"], item["name_en"], item["city"], item["city_en"], item["country"]]
-        ).lower()
-        if not keyword or keyword in haystack:
-            results.append(deepcopy(item))
-    # Exact code matches first, then alphabetical by code.
-    results.sort(key=lambda item: (item["code"].lower() != keyword, item["code"]))
-    return ok(results[:MAX_RESULTS], "mock")
+        if country and item["country_code"] != country:
+            continue
+        if majors_only and not item["major"]:
+            continue
+        if keyword:
+            haystack = " ".join((
+                item["code"], item["name"], item["name_en"], item["country"], item["country_en"]
+            )).lower()
+            if keyword not in haystack:
+                continue
+        results.append(item)
+
+    # Exact code, then names starting with the keyword, then well-known ports.
+    # Shorter names win so that "부산" lists 부산항 before 부산신항.
+    results.sort(key=lambda item: (
+        item["code"].lower() != keyword,
+        not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
+        not item["major"],
+        len(item["name"]),
+        item["name"],
+    ))
+    return ok(deepcopy(results[:MAX_RESULTS]), "mock")

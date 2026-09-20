@@ -52,15 +52,34 @@
           </div>
 
           <div class="field autocomplete" data-autocomplete="origin">
-            <span class="field_label">출발지 (국내 <span data-kind-label>항구</span>)</span>
+            <span class="field_label">출발지 (국내 <span data-kind-label>항구</span>)
+              <button type="button" class="link_button inline" data-custom-toggle>직접 입력</button>
+            </span>
             <input type="text" autocomplete="off" placeholder="부산, KRPUS, 인천…" data-ac-input>
             <ul class="ac_list" data-ac-list hidden></ul>
+            <div class="custom_box" data-custom hidden>
+              <input type="text" data-custom-code maxlength="10" placeholder="코드 (예: KRPUS)">
+              <input type="text" data-custom-name maxlength="200" placeholder="이름 (예: 부산항)">
+              <span class="custom_country">대한민국</span>
+              <button type="button" class="button small primary" data-custom-apply>적용</button>
+            </div>
           </div>
 
           <div class="field autocomplete" data-autocomplete="destination">
-            <span class="field_label">도착지 (해외 <span data-kind-label>항구</span>)</span>
+            <span class="field_label">도착지 (해외 <span data-kind-label>항구</span>)
+              <button type="button" class="link_button inline" data-custom-toggle>직접 입력</button>
+            </span>
+            <select data-country-filter>
+              <option value="">국가 전체 (주요 항만 표시)</option>
+            </select>
             <input type="text" autocomplete="off" placeholder="Los Angeles, USLAX, 상하이…" data-ac-input>
             <ul class="ac_list" data-ac-list hidden></ul>
+            <div class="custom_box" data-custom hidden>
+              <input type="text" data-custom-code maxlength="10" placeholder="코드 (예: USLAX)">
+              <input type="text" data-custom-name maxlength="200" placeholder="이름 (예: Port of Los Angeles)">
+              <select data-custom-country><option value="">국가 선택</option></select>
+              <button type="button" class="button small primary" data-custom-apply>적용</button>
+            </div>
           </div>
 
           <label class="field">
@@ -207,6 +226,7 @@
   <script>
     window.FORWARDUS_URLS = {
       locations: "{{ url_for('planning.api_locations') }}",
+      countries: "{{ url_for('planning.api_countries') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",

@@ -53,10 +53,81 @@ def test_reverse_schedule_service_validation(app):
 
 def test_location_search_filters_by_mode_and_role(app):
     ports = planning_service.search_locations("부산", "SEA", "origin")["data"]
-    assert [p["code"] for p in ports] == ["KRPUS"]
+    assert [p["code"] for p in ports] == ["KRPUS", "KRBNP"]  # 주요 항만·짧은 이름 우선
+    assert all(p["country_code"] == "KR" and p["kind"] == "port" for p in ports)
     airports = planning_service.search_locations("los angeles", "AIR", "destination")["data"]
     assert [a["code"] for a in airports] == ["LAX"]
     assert planning_service.search_locations("USLAX", "SEA", "origin")["data"] == []
+
+
+def test_origin_covers_every_korean_port(app):
+    """Every Korean UN/LOCODE seaport is selectable as an origin."""
+
+    from app.collectors import location_client
+
+    all_kr_ports = [
+        item["code"] for item in location_client.load_mock("locations")
+        if item["country_code"] == "KR" and item["kind"] == "port"
+    ]
+    assert len(all_kr_ports) > 70
+    for code in ("KRPUS", "KRINC", "KRKAN", "KRUSN", "KRPTK", "KRMAS", "KRKPO", "KRMOK"):
+        assert code in all_kr_ports
+        assert planning_service.search_locations(code, "SEA", "origin")["data"][0]["code"] == code
+
+
+def test_destination_countries_and_country_filter(app):
+    countries = planning_service.list_countries("SEA", "destination")["data"]
+    codes = {c["code"] for c in countries}
+    assert len(countries) > 200
+    assert "KR" not in codes
+    assert {"US", "VN", "DE", "AE", "ZA", "BR"} <= codes
+
+    vietnam = planning_service.search_locations("", "SEA", "destination", country="VN")["data"]
+    assert vietnam and all(item["country_code"] == "VN" for item in vietnam)
+    assert "VNSGN" in {item["code"] for item in vietnam}
+
+
+def test_schedules_cover_every_region(app, shipment_payload):
+    """Each destination region has mock rates, including Africa and the Middle East."""
+
+    for destination in ("AEJEA", "ZADUR", "BRSSZ"):
+        payload = {**shipment_payload, "destination_code": destination}
+        assert planning_service.search_schedules(payload)["items"], f"{destination} 스케줄 없음"
+
+
+def test_direct_input_location_accepted(app, shipment_payload):
+    payload = {
+        **shipment_payload,
+        "destination_code": "USZZZ",
+        "destination_custom": {"name": "Private Terminal", "country_code": "US"},
+    }
+    schedules = planning_service.search_schedules(payload)
+    assert schedules["items"]
+    payload["schedule_id"] = schedules["items"][0]["schedule_id"]
+    shipment = planning_service.create_shipment(payload)
+    assert shipment.destination_code == "USZZZ"
+    assert shipment.destination_name == "Private Terminal"
+    assert shipment.destination_country == "US"
+
+
+@pytest.mark.parametrize("custom,field", [
+    ({"name": "No Country", "country_code": ""}, "destination_country"),
+    ({"name": "", "country_code": "US"}, "destination_name"),
+    ({"name": "Bad Code", "country_code": "US"}, "destination_code"),
+    ({"name": "Korean Destination", "country_code": "KR"}, "destination_code"),
+])
+def test_direct_input_validation(app, shipment_payload, custom, field):
+    code = "A!" if custom["name"] == "Bad Code" else "USZZZ"
+    payload = {**shipment_payload, "destination_code": code, "destination_custom": custom}
+    with pytest.raises(ValidationError) as info:
+        planning_service.search_schedules(payload)
+    assert info.value.field == field
+
+
+def test_unknown_code_without_direct_input_rejected(app, shipment_payload):
+    with pytest.raises(ValidationError) as info:
+        planning_service.search_schedules({**shipment_payload, "destination_code": "ZZZZZ"})
+    assert info.value.field == "destination_code"
 
 
 def test_schedules_are_mock_labeled_and_sorted(app, shipment_payload):
