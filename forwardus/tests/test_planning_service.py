@@ -62,22 +62,26 @@ def test_location_search_filters_by_mode_and_role(app):
     assert planning_service.search_locations("USLAX", "SEA", "origin")["data"] == []
 
 
-def test_origin_covers_every_korean_port(app):
-    """Every Korean UN/LOCODE seaport is selectable as an origin."""
+def test_origin_lists_only_korean_trade_ports(app):
+    """출발지는 「항만법」상 무역항과 소속 부두만 노출합니다."""
 
     from app.collectors import location_client
 
-    all_kr_ports = [
+    all_kr_ports = {
         item["code"] for item in location_client.load_mock("locations")
         if item["country_code"] == "KR" and item["kind"] == "port"
-    ]
-    assert len(all_kr_ports) > 70
-    # 옛 로마자 표기로 중복 등록된 코드는 제외합니다. (KRTGA = KRTGH 동해항)
-    assert "KRTGA" not in all_kr_ports
-    assert "KRTGH" in all_kr_ports
-    for code in ("KRPUS", "KRINC", "KRKAN", "KRUSN", "KRPTK", "KRMAS", "KRKPO", "KRMOK"):
+    }
+    # 무역항 31곳 + 소속 부두
+    assert 30 < len(all_kr_ports) < 50
+    for code in ("KRPUS", "KRINC", "KRKAN", "KRUSN", "KRPTK", "KRMAS", "KRKPO", "KRMOK",
+                 "KRSEL", "KRHAS", "KRBNP", "KRTGH"):
         assert code in all_kr_ports
         assert planning_service.search_locations(code, "SEA", "origin")["data"][0]["code"] == code
+    # 어항·연안항과 중복 코드는 제외합니다.
+    assert not (all_kr_ports & {"KRGRP", "KRHPO", "KRJMJ", "KRHDO", "KRULL", "KRTGA", "KRKWA"})
+    # 국내 항구는 전부 주요 항구로 표시합니다.
+    assert all(item["major"] for item in location_client.load_mock("locations")
+               if item["country_code"] == "KR" and item["kind"] == "port")
 
 
 def test_destination_countries_and_country_filter(app):

@@ -48,8 +48,8 @@ LANDLOCKED_COUNTRIES.discard("SI")
 EXCLUDED_COUNTRIES = LANDLOCKED_COUNTRIES | {"AQ"}
 
 # 같은 항만이 옛 로마자 표기로 중복 등록된 코드입니다.
-# KRTGA(Tonghae) = KRTGH(동해항)
-DUPLICATE_CODES = {"KRTGA"}
+# KRTGA(Tonghae) = KRTGH(동해항), KRKWA(Kwangyang) = KRKAN(광양항)
+DUPLICATE_CODES = {"KRTGA", "KRKWA"}
 
 # UN/LOCODE function codes: 1 = seaport, 4 = airport.
 PORT_FUNCTION = "1"
@@ -91,20 +91,45 @@ SUB_REGION_TO_REGION = {
 INTERMEDIATE_REGION_TO_REGION = {"South America": "south_america"}
 DEFAULT_REGION = "asia"
 
-# Korean display names, keyed by UN/LOCODE. Major ports are listed first in
-# search results. build_locations.py warns when a code is not in the dataset.
+# 해외 주요 항만의 한글 표기. build_locations.py 실행 시 UN/LOCODE에 없는 코드는
+# 경고로 알려줍니다.
+# 「항만법」상 무역항 31곳과 그 소속 부두·터미널. 국내 출발지는 이 목록만 노출하고
+# 어항·연안항(구룡포·후포·주문진·홍도 등)은 제외합니다.
+KOREA_TRADE_PORTS = {
+    # 국가관리무역항
+    "KRGIN": "경인항",
+    "KRINC": "인천항",
+    "KRPTK": "평택항", "KRTJI": "당진항",
+    "KRTSN": "대산항",
+    "KRCHG": "장항항",
+    "KRKUV": "군산항",
+    "KRMOK": "목포항", "KRDBL": "대불부두(목포)",
+    "KRYOS": "여수항", "KRYOC": "여천부두(여수)",
+    "KRKAN": "광양항",
+    "KRPUS": "부산항", "KRBNP": "부산신항", "KRKCN": "감천부두(부산)",
+    "KRUSN": "울산항", "KRONS": "온산부두(울산)", "KRMIP": "미포부두(울산)",
+    "KRKPO": "포항항", "KRSHG": "포항신항",
+    "KRTGH": "동해항", "KRMUK": "묵호항",
+    "KRMAS": "마산항",
+    # 지방관리무역항
+    "KRSEL": "서울항",
+    "KRTAN": "태안항",
+    "KRBOR": "보령항",
+    "KRCHA": "제주항",
+    "KRSPO": "서귀포항",
+    "KRWND": "완도항",
+    "KRSCP": "삼천포항",
+    "KRTYG": "통영항",
+    "KROKP": "옥포항",
+    "KRKHN": "고현항",
+    "KRCHF": "진해항",
+    "KRSUK": "삼척항",
+    "KRSHO": "속초항",
+    "KROKK": "옥계항",
+    "KRHAS": "호산항",
+}
+
 KOREAN_NAMES = {
-    # 국내 무역항 (코드는 UN/LOCODE 확인값)
-    "KRPUS": "부산항", "KRBNP": "부산신항", "KRKCN": "감천항(부산)", "KRINC": "인천항",
-    "KRGIN": "경인항", "KRPTK": "평택항", "KRTJI": "당진항", "KRTSN": "대산항",
-    "KRKAN": "광양항", "KRYOS": "여수항", "KRUSN": "울산항", "KRONS": "온산항(울산)",
-    "KRMIP": "미포항(울산)", "KRKPO": "포항항", "KRSHG": "포항신항", "KRMAS": "마산항",
-    "KRCHF": "진해항", "KRTYG": "통영항", "KRSCP": "삼천포항", "KROKP": "옥포항",
-    "KRKHN": "고현항", "KRCHG": "장항항", "KRBOR": "보령항", "KRKUV": "군산항",
-    "KRMOK": "목포항", "KRDBL": "대불항", "KRWND": "완도항", "KRTGH": "동해항",
-    "KRMUK": "묵호항", "KRSUK": "삼척항", "KROKK": "옥계항", "KRSHO": "속초항",
-    "KRGRP": "구룡포항", "KRCHA": "제주항", "KRSPO": "서귀포항", "KRHDO": "하동항",
-    "KRTAN": "태안항", "KRSEL": "서울항",
     # 주요 해외 항만
     "USLAX": "로스앤젤레스항", "USLGB": "롱비치항", "USNYC": "뉴욕·뉴저지항",
     "USSEA": "시애틀항", "USSAV": "서배너항", "USHOU": "휴스턴항", "USOAK": "오클랜드항",
@@ -295,12 +320,16 @@ def build() -> list[dict]:
         code = f"{country_code}{row['Location']}"
         if code in seen or code in DUPLICATE_CODES:
             continue
+        # 국내는 법정 무역항만 노출합니다 (어항·연안항 제외).
+        if country_code == "KR" and code not in KOREA_TRADE_PORTS:
+            continue
         seen.add(code)
         name_en = title_case(row["NameWoDiacritics"] or row["Name"])
         harbor_size = harbor_sizes.get(code)
+        display_names = {**KOREAN_NAMES, **KOREA_TRADE_PORTS}
         locations.append({
             "code": code,
-            "name": KOREAN_NAMES.get(code, name_en),
+            "name": display_names.get(code, name_en),
             "name_en": name_en,
             "city": row["Name"],
             "city_en": name_en,
@@ -311,7 +340,7 @@ def build() -> list[dict]:
             "kind": "port",
             "status": row["Status"],
             "harbor_size": harbor_size,
-            "major": code in KOREAN_NAMES or harbor_size in MAIN_HARBOR_SIZES,
+            "major": code in display_names or harbor_size in MAIN_HARBOR_SIZES,
         })
 
     for iata, (name_ko, name_en, country_code) in MAJOR_AIRPORTS.items():
@@ -374,7 +403,7 @@ def promote_main_ports(locations: list[dict]) -> None:
 
 if __name__ == "__main__":
     items = build()
-    unmatched = sorted(set(KOREAN_NAMES) - {item["code"] for item in items})
+    unmatched = sorted((set(KOREAN_NAMES) | set(KOREA_TRADE_PORTS)) - {item["code"] for item in items})
     if unmatched:
         print(f"경고: UN/LOCODE에 없는 코드 {len(unmatched)}개 -> {', '.join(unmatched)}")
     OUTPUT.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
