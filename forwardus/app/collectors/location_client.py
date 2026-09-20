@@ -283,6 +283,41 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
     return ok(items, "mock")
 
 
+def sea_links() -> dict:
+    """국내 항구별로 실제 항로가 이어진 나라 목록.
+
+    data/build_sea_links.py가 searoute 항만 네트워크에서 뽑은 값입니다.
+    """
+
+    try:
+        return load_mock("sea_links")
+    except (OSError, ValueError):
+        return {"origins": {}, "by_country": {}}
+
+
+def sea_lane_direct(origin_code: str, destination_country: str) -> dict:
+    """이 출발항에서 그 나라로 가는 배가 실제로 있는지 봅니다.
+
+    예전에는 도착항만 보고 "한국에서 직기항이 있는 항구"인지 판정했습니다.
+    그러면 광양항처럼 멕시코 항로가 없는 항구에서도 직기항이라고 나왔습니다.
+    출발항이 그 나라와 이어져 있는지를 함께 봐야 맞습니다.
+
+    `known`이 False면 자료가 없다는 뜻이고, 없다고 단정하지 않습니다.
+    """
+
+    links = sea_links()
+    origin = (origin_code or "").strip().upper()
+    country = (destination_country or "").strip().upper()
+    countries = links.get("origins", {}).get(origin)
+    if countries is None or not country:
+        return {"known": False}
+    if country in countries:
+        return {"known": True, "direct": True, "origin": origin, "alternatives": []}
+    # 같은 나라로 가는 배가 있는 다른 국내 항구를 알려 줍니다.
+    others = [code for code in links.get("by_country", {}).get(country, []) if code != origin]
+    return {"known": True, "direct": False, "origin": origin, "alternatives": others}
+
+
 def sea_route(origin_code: str, destination_code: str) -> dict | None:
     """미리 계산해 둔 실제 해상 항로 거리와 지나는 길목을 돌려줍니다.
 

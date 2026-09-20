@@ -721,15 +721,23 @@ def transit_summary(origin_code: str, destination_code: str) -> dict:
 
     sea = _sea_leg(origin, destination)
     if sea:
+        # 직기항 여부는 출발항과 도착국을 함께 봐야 합니다. 도착항만 보면
+        # 광양항처럼 그 나라 항로가 없는 곳에서도 직기항으로 나옵니다.
+        lane = location_client.sea_lane_direct(sea["origin"]["code"],
+                                               sea["destination"]["country_code"])
+        direct = lane["direct"] if lane["known"] else sea["destination"].get("sea_direct")
         result["sea"] = {
             mode: transit_calculator.sea_transit(
                 sea["distance_km"], sea["passages"], mode,
-                direct=sea["destination"].get("sea_direct"), region=sea["destination"]["region"])
+                direct=direct, region=sea["destination"]["region"])
             for mode in ("FCL", "LCL")
         }
         result["sea_route"] = {"origin": sea["origin"]["name"], "destination": sea["destination"]["name"],
+                               "origin_code": sea["origin"]["code"],
                                "distance_km": sea["distance_km"], "passages": sea["passages"],
-                               "transship": sea["destination"].get("sea_direct") is False}
+                               "transship": direct is False,
+                               "lane_known": lane["known"],
+                               "direct_from": lane.get("alternatives") or []}
 
     air = _air_leg(origin, destination)
     if air:
@@ -840,7 +848,10 @@ def schedule_outlook(payload: dict) -> dict:
     sea_route = summary.get("sea_route") or {}
     sea_note = ""
     if sea_route.get("transship"):
-        sea_note = "한국 직기항 없음 · 환적 포함"
+        others = sea_route.get("direct_from") or []
+        names = [(location_client.find_location(code) or {}).get("name", code) for code in others]
+        sea_note = (f"{sea_route['origin']} 출발 직기항 없음 · {' · '.join(names)} 출발은 직기항"
+                    if names else "한국 직기항 없음 · 환적 포함")
     else:
         # 소요일에 영향을 주는 길목만 안내합니다.
         labels = {"suez": "수에즈 운하", "panama": "파나마 운하", "south_africa": "희망봉"}

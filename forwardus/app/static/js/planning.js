@@ -1654,7 +1654,7 @@
 
     box.innerHTML = `<p class="outlook_head">${escapeHtml(state.origin ? state.origin.name : "출발지")}`
       + ` → ${escapeHtml(data.destination)} 예상 일정`
-      + ` <em>실제 항로 기준</em></p>`
+      + ` <em title="거리는 실제 바닷길·대권거리로 구했습니다. 직기항 여부는 운항 기록에서 모은 국가별 연결 자료로 판정합니다. 선사별 정기선 유무는 선사에 확인해야 합니다.">실제 바닷길 거리 기준 · 추정</em></p>`
       + data.modes.map((mode) => `
         <div class="outlook_row level_${mode.level}${mode.selected ? " is_selected" : ""}">
           ${mode.selected ? `<span class="outlook_pick">선택</span>` : ""}
