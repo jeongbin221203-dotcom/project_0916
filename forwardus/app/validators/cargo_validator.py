@@ -91,6 +91,10 @@ def parse_number(
 
     if isinstance(value, bool) or value is None or (isinstance(value, str) and not value.strip()):
         raise ValidationError(f"{field_name} 값을 입력해주세요.", field)
+    if isinstance(value, str):
+        # 화면이 천 단위 쉼표를 붙여 보여주므로 사람이 그대로 옮겨 적습니다.
+        # (48,000.00 같은 값) 쉼표는 떼고 읽습니다.
+        value = value.replace(",", "").replace(" ", "")
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:

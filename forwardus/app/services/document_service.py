@@ -53,11 +53,6 @@ DOCUMENT_FIELDS = {
         "total_cbm", "equipment", "reefer", "freight_term", "prepaid_at", "collect_at", "confirmation_to", "dangerous_goods",
         "remarks",
     ],
-    "bl_draft": [
-        "doc_no", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party", "pol", "pod",
-        "vessel_or_flight", "etd", "product_description", "hs_code", "quantity", "package_type",
-        "gross_weight_kg", "total_cbm", "freight_term", "dangerous_goods", "remarks",
-    ],
 }
 
 FIELD_LABELS = {
@@ -154,15 +149,77 @@ DOCUMENT_ITEM_FIELDS = {
         ("description", "Description of goods"), ("packages", "Packages"),
         ("total_weight", "Gross Weight (kg)"), ("measurement", "Measurement (CBM)"),
     ],
-    "bl_draft": [
-        ("shipping_marks", "Marks & numbers"), ("packages", "No. of Pkgs"),
-        ("description", "Description of goods"), ("total_weight", "Gross Weight (kg)"),
-        ("measurement", "Measurement (CBM)"),
-    ],
 }
 
 # 서식에 인쇄된 고정 문구
 PACKING_LIST_NOTE = ("When referring to this shipment be sure to give order # and shipping date.")
+
+# 실제 서식처럼 칸을 묶어 보여줍니다. cols는 그 줄에 나란히 놓을 칸 수이고,
+# {"items": True}는 품목 표가 들어갈 자리입니다.
+DOCUMENT_SECTIONS = {
+    "packing_list": [
+        {"cols": 2, "fields": ["order_no", "doc_date"]},
+        {"title": "SHIPPED TO", "cols": 1,
+         "fields": ["consignee", "consignee_address", "consignee_city_zip"],
+         "note": PACKING_LIST_NOTE},
+        {"cols": 4, "fields": ["date_ordered", "customer_order_no", "date_shipped", "attention"]},
+        {"cols": 3, "fields": ["shipped_via", "container_no", "invoice_no"]},
+        {"items": True},
+        {"cols": 3, "fields": ["gross_weight_kg", "net_weight_kg", "total_cbm"]},
+        {"cols": 2, "fields": ["comments", "packed_by"]},
+    ],
+    "commercial_invoice": [
+        {"cols": 2, "fields": ["doc_no", "doc_date"]},
+        {"title": "SELLER / BUYER", "cols": 2,
+         "fields": ["exporter", "consignee", "exporter_address", "consignee_address",
+                    "buyer", "notify_party"]},
+        {"cols": 3, "fields": ["lc_no", "other_references", "payment_terms"]},
+        {"title": "SHIPMENT", "cols": 3,
+         "fields": ["pol", "pod", "incoterms", "carrier", "vessel_or_flight", "etd"]},
+        {"items": True},
+        {"cols": 3, "fields": ["invoice_value", "currency", "unit_price"]},
+        {"cols": 3, "fields": ["gross_weight_kg", "net_weight_kg", "shipping_marks"]},
+        {"cols": 2, "fields": ["remarks", "signed_by"]},
+    ],
+    "proforma_invoice": [
+        {"cols": 3, "fields": ["doc_no", "doc_date", "validity_date"]},
+        {"title": "SELLER / BUYER", "cols": 2,
+         "fields": ["exporter", "consignee", "exporter_address", "consignee_address", "po_no"]},
+        {"title": "SHIPMENT", "cols": 3,
+         "fields": ["pol", "pod", "final_destination", "incoterms", "carriage_by",
+                    "country_of_origin", "shipment_time"]},
+        {"items": True},
+        {"cols": 3, "fields": ["invoice_value", "currency", "unit_price"]},
+        {"cols": 2, "fields": ["payment_terms", "bank_info"]},
+        {"cols": 2, "fields": ["shipping_marks", "remarks"]},
+        {"cols": 1, "fields": ["signed_by"]},
+    ],
+    "shipping_instruction": [
+        {"cols": 3, "fields": ["doc_no", "doc_date", "booking_no"]},
+        {"title": "SHIPPER / CONSIGNEE", "cols": 2,
+         "fields": ["exporter", "consignee", "exporter_address", "consignee_address", "notify_party"]},
+        {"title": "ROUTE", "cols": 3,
+         "fields": ["pol", "pod", "carrier", "vessel_or_flight", "etd", "incoterms"]},
+        {"items": True},
+        {"cols": 3, "fields": ["gross_weight_kg", "total_cbm", "freight_term"]},
+        {"cols": 2, "fields": ["container_seal_no", "dangerous_goods"]},
+        {"cols": 2, "fields": ["remarks", "signed_by"]},
+    ],
+    "booking_request": [
+        {"cols": 3, "fields": ["doc_no", "doc_date", "service_contract_no"]},
+        {"title": "SHIPPER / CONSIGNEE / NOTIFY", "cols": 2,
+         "fields": ["exporter", "consignee", "exporter_address", "consignee_address",
+                    "notify_party", "notify_party_2", "contact", "confirmation_to"]},
+        {"title": "ROUTE", "cols": 4,
+         "fields": ["carrier", "vessel_or_flight", "pol", "etd", "pod", "eta",
+                    "hs6", "routing_remark"]},
+        {"items": True},
+        {"cols": 3, "fields": ["gross_weight_kg", "total_cbm", "equipment"]},
+        {"cols": 2, "fields": ["reefer", "dangerous_goods"]},
+        {"cols": 3, "fields": ["freight_term", "prepaid_at", "collect_at"]},
+        {"cols": 1, "fields": ["remarks"]},
+    ],
+}
 
 # 칸이 넓어야 읽기 좋은 항목 (주소·품명·화인·비고 등)
 WIDE_FIELDS = {"product_description", "exporter_address", "consignee_address", "remarks", "shipping_marks",
@@ -174,7 +231,6 @@ DOC_PREFIX = {
     "proforma_invoice": "PI",
     "shipping_instruction": "SI",
     "booking_request": "BR",
-    "bl_draft": "BL",
 }
 
 
@@ -321,19 +377,46 @@ def list_documents(shipment) -> list[dict]:
     return [{"doc_type": key, "title": title, "document": existing.get(key)} for key, title in DOCUMENT_TYPES.items()]
 
 
+def is_outdated(document) -> bool:
+    """서식이 바뀐 뒤에 만들어진 문서인지 봅니다.
+
+    서식에 칸이 더해지거나 빠져도 이미 만들어 둔 문서는 예전 칸을 그대로
+    들고 있습니다. 그러면 화면에서 "양식이 안 바뀐" 것처럼 보이므로
+    다시 만들 대상으로 잡습니다.
+    """
+
+    wanted = set(DOCUMENT_FIELDS.get(document.doc_type, []))
+    have = set(document.data) - {"items"}
+    if wanted != have:
+        return True
+    # 품목 표가 생긴 서식인데 표가 없으면 그것도 예전 문서입니다.
+    return bool(DOCUMENT_ITEM_FIELDS.get(document.doc_type)) and "items" not in document.data
+
+
 def generate_documents(shipment, doc_types: list[str] | None = None, *, overwrite: bool = False) -> list:
-    """Create documents from Shipment data. Existing edits are kept unless ``overwrite``."""
+    """Create documents from Shipment data.
+
+    서식이 바뀐 문서는 새 서식으로 다시 만들되, 사람이 직접 적어 둔 값은
+    새 서식에도 있는 칸이면 그대로 살립니다.
+    """
 
     reference = build_reference(shipment)
     generated = []
     for doc_type in doc_types or list(DOCUMENT_TYPES):
         _require_document_type(doc_type)
         existing = document_repository.get(shipment, doc_type)
-        if existing and not overwrite:
+        stale = existing is not None and is_outdated(existing)
+        if existing and not overwrite and not stale:
             continue
+
+        data = _generate_data(shipment, doc_type, reference)
+        if existing and stale and not overwrite:
+            # 예전 문서에 사람이 적어 둔 값은 새 서식에 남아 있는 칸에만 옮깁니다.
+            data.update({key: value for key, value in existing.data.items()
+                         if key in data and value not in ("", None)})
         generated.append(document_repository.upsert(
-            shipment, doc_type, _generate_data(shipment, doc_type, reference), "generated", "calculated"
-        ))
+            shipment, doc_type, data, "generated",
+            "manual" if existing and existing.source == "manual" else "calculated"))
     shipment_repository.commit()
     return generated
 
@@ -361,13 +444,17 @@ def update_document(shipment, doc_type: str, form: dict):
 def check_documents(shipment) -> dict | None:
     """Run the cross-document comparison without changing any status."""
 
-    documents = document_repository.list_for_shipment(shipment)
+    # 서식 목록에서 빠진 문서(예: 선사가 발행하는 B/L)는 예전 데이터가 남아 있어도
+    # 화면에 없으니 검증에서도 뺍니다. 고칠 수 없는 칸을 지적하면 혼란만 줍니다.
+    documents = [doc for doc in document_repository.list_for_shipment(shipment)
+                 if doc.doc_type in DOCUMENT_TYPES]
     if not documents:
         return None
     return validate_documents(
         {doc.doc_type: doc.data for doc in documents},
         build_reference(shipment),
         DOCUMENT_TYPES,
+        DOCUMENT_FIELDS,
     )
 
 
@@ -377,7 +464,8 @@ def validate_shipment_documents(shipment) -> dict:
     result = check_documents(shipment)
     if result is None:
         raise ServiceError("검증할 문서가 없습니다. 먼저 문서를 생성해주세요.", "NO_DOCUMENTS")
-    documents = document_repository.list_for_shipment(shipment)
+    documents = [doc for doc in document_repository.list_for_shipment(shipment)
+                 if doc.doc_type in DOCUMENT_TYPES]
     flagged = {finding["document"] for finding in result["findings"]}
     for doc in documents:
         if doc.status == "final":
@@ -402,6 +490,26 @@ def document_view(document) -> list[dict]:
          "wide": key in WIDE_FIELDS}
         for key in DOCUMENT_FIELDS[document.doc_type]
     ]
+
+
+def document_sections(document) -> list[dict]:
+    """서식 모양대로 칸을 묶어 돌려줍니다. 정의가 없으면 한 덩어리로 보여줍니다."""
+
+    values = {field["key"]: field for field in document_view(document)}
+    sections = DOCUMENT_SECTIONS.get(document.doc_type)
+    if not sections:
+        return [{"title": "", "cols": 2, "items": False, "fields": list(values.values())}]
+
+    out = []
+    for section in sections:
+        if section.get("items"):
+            out.append({"title": "", "cols": 1, "items": True, "fields": [], "note": ""})
+            continue
+        fields = [values[key] for key in section["fields"] if key in values]
+        if fields:
+            out.append({"title": section.get("title", ""), "cols": section.get("cols", 2),
+                        "items": False, "fields": fields, "note": section.get("note", "")})
+    return out
 
 
 def document_items(document) -> dict:

@@ -12,7 +12,6 @@ DOCUMENT_TYPES = {
     "proforma_invoice": "Proforma Invoice",
     "shipping_instruction": "Shipping Request (S/I)",
     "booking_request": "Booking Request",
-    "bl_draft": "B/L Draft",
 }
 
 

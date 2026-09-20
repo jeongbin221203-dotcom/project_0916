@@ -28,7 +28,8 @@ def generate(shipment_id: str):
     shipment = load_shipment(shipment_id)
     overwrite = request.form.get("overwrite") == "1"
     created = document_service.generate_documents(shipment, overwrite=overwrite)
-    flash(f"{len(created)}개 문서를 Shipment 데이터로 작성했습니다." if created else "이미 모든 문서가 작성되어 있습니다.", "success")
+    flash(f"{len(created)}개 문서를 Shipment 데이터로 작성했습니다."
+          if created else "이미 모든 문서가 최신 서식으로 작성되어 있습니다.", "success")
     return redirect(url_for("document.center", shipment_id=shipment_id))
 
 
@@ -58,7 +59,7 @@ def view(shipment_id: str, doc_type: str):
         "document/view.html",
         shipment=shipment,
         document=document,
-        fields=document_service.document_view(document),
+        sections=document_service.document_sections(document),
         items=document_service.document_items(document),
         edit=request.args.get("edit") == "1" and document.status != "final",
     )

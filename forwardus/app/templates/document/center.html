@@ -72,7 +72,7 @@
               {% endif %}
             </div>
           {% else %}
-            <span class="muted small">{{ '검증용 B/L 초안 — 선사 Draft 값을 입력해 비교하세요.' if item.doc_type == 'bl_draft' else '자동 작성 대기' }}</span>
+            <span class="muted small">자동 작성 대기</span>
             <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type) }}">작성</a>
           {% endif %}
         </article>

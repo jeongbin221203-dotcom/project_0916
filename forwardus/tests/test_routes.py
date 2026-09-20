@@ -48,7 +48,7 @@ def test_full_flow(client, shipment_payload):
     assert client.post(f"/documents/{shipment_id}/validate").status_code == 302
     assert client.get(f"/documents/{shipment_id}").status_code == 200
     assert client.get(f"/documents/{shipment_id}/commercial_invoice").status_code == 200
-    assert client.get(f"/documents/{shipment_id}/bl_draft?edit=1").status_code == 200
+    assert client.get(f"/documents/{shipment_id}/shipping_instruction?edit=1").status_code == 200
     assert client.get(f"/documents/{shipment_id}/not_a_doc").status_code == 302
 
     for _ in range(3):

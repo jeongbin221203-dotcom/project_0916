@@ -14,7 +14,7 @@ def test_quantity_mismatch_matches_spec_example():
     documents = {
         "commercial_invoice": {"quantity": 500},
         "packing_list": {"quantity": 500},
-        "bl_draft": {"quantity": 480},
+        "shipping_instruction": {"quantity": 480},
     }
     result = validate_documents(documents, reference)
     assert result["status"] == "warning"
@@ -24,7 +24,7 @@ def test_quantity_mismatch_matches_spec_example():
     assert finding["field"] == "quantity"
     assert finding["expected"] == 500
     assert finding["actual"] == 480
-    assert finding["document"] == "bl_draft"
+    assert finding["document"] == "shipping_instruction"
 
 
 def test_text_comparison_ignores_case_and_spacing():
@@ -118,7 +118,7 @@ def test_item_tables_cover_every_document_that_lists_goods(create_shipment):
     shipment = create_shipment()
     document_service.generate_documents(shipment)
     with_items = {"commercial_invoice", "packing_list", "proforma_invoice",
-                  "shipping_instruction", "booking_request", "bl_draft"}
+                  "shipping_instruction", "booking_request"}
     for doc_type in with_items:
         items = document_service.document_items(document_service.get_document(shipment, doc_type))
         assert items and items["rows"], doc_type
@@ -147,25 +147,100 @@ def test_dangerous_goods_are_declared_on_shipping_documents(create_shipment):
         "dg_class": "3", "proper_shipping_name": "PAINT", "packing_group": "II"})
     document_service.generate_documents(shipment)
 
-    for doc_type in ("booking_request", "shipping_instruction", "bl_draft"):
+    for doc_type in ("booking_request", "shipping_instruction"):
         declared = document_service.get_document(shipment, doc_type).data["dangerous_goods"]
         assert declared == "UN1263 CLASS 3 PG II PAINT", doc_type
 
     # 위험물이 아니면 빈칸입니다.
     plain = create_shipment()
     document_service.generate_documents(plain)
-    assert document_service.get_document(plain, "bl_draft").data["dangerous_goods"] == ""
+    assert document_service.get_document(plain, "booking_request").data["dangerous_goods"] == ""
+
+
+def test_bill_of_lading_is_not_a_document_the_exporter_writes():
+    """B/L은 선사가 발행합니다. 수출자가 작성하는 서류 목록에 있으면 안 됩니다."""
+
+    from app.models.document import DOCUMENT_TYPES
+
+    assert "bl_draft" not in DOCUMENT_TYPES
+    assert list(DOCUMENT_TYPES) == ["commercial_invoice", "packing_list", "proforma_invoice",
+                                    "shipping_instruction", "booking_request"]
+
+
+def test_stale_documents_are_rebuilt_with_the_current_form(create_shipment):
+    """서식을 바꾸면 이미 만든 문서도 새 서식으로 다시 만들어야 합니다.
+
+    예전에는 "이미 있음"으로 건너뛰어 화면에서 양식이 그대로인 것처럼 보였습니다.
+    """
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    doc = document_service.get_document(shipment, "packing_list")
+
+    # 예전 서식으로 만들어진 문서를 흉내 냅니다. (칸 구성이 지금과 다름)
+    doc.data = {"doc_no": "PL-OLD", "consignee": "ABC", "comments": "사람이 적은 메모"}
+    document_service.shipment_repository.commit()
+    assert document_service.is_outdated(doc) is True
+
+    document_service.generate_documents(shipment)          # 덮어쓰기 없이 자동 작성
+    rebuilt = document_service.get_document(shipment, "packing_list")
+    assert set(rebuilt.data) - {"items"} == set(document_service.DOCUMENT_FIELDS["packing_list"])
+    assert rebuilt.data["items"]                           # 품목 표가 생깁니다.
+    assert rebuilt.data["comments"] == "사람이 적은 메모"    # 사람이 적은 값은 살립니다.
+    assert "doc_no" not in rebuilt.data                    # 새 서식에 없는 칸은 버립니다.
+
+    # 최신 서식이면 다시 만들지 않습니다.
+    assert document_service.is_outdated(rebuilt) is False
+    assert document_service.generate_documents(shipment) == []
+
+
+def test_validation_ignores_boxes_the_current_form_does_not_show(create_shipment):
+    """예전 문서에 남은 칸까지 비교하면 고칠 수 없는 불일치가 보고됩니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    doc = document_service.get_document(shipment, "commercial_invoice")
+    # 지금 서식의 상업송장에는 없는 칸에 틀린 값이 남아 있어도 지적하지 않습니다.
+    doc.data["total_cbm"] = 999.0
+    document_service.shipment_repository.commit()
+    assert document_service.check_documents(shipment)["status"] == "passed"
+
+
+def test_numbers_can_be_typed_with_thousands_separators(create_shipment):
+    """화면이 48,000.00으로 보여주므로 그대로 옮겨 적어도 저장돼야 합니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    document_service.update_document(shipment, "commercial_invoice", {"gross_weight_kg": "48,000.00"})
+    assert document_service.get_document(shipment, "commercial_invoice").data["gross_weight_kg"] == 48000.0
+
+
+def test_document_sections_follow_the_printed_form(create_shipment):
+    """서류 화면은 칸을 서식 순서대로 묶어 보여줍니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    sections = document_service.document_sections(
+        document_service.get_document(shipment, "packing_list"))
+
+    # 첫 묶음은 ORDER # / DATE, 그다음이 SHIPPED TO입니다.
+    assert [f["key"] for f in sections[0]["fields"]] == ["order_no", "doc_date"]
+    assert sections[1]["title"] == "SHIPPED TO"
+    assert "order #" in sections[1]["note"]
+    # 품목 표 자리가 중간에 한 번 들어갑니다.
+    assert [s["items"] for s in sections].count(True) == 1
+    assert sections[-1]["fields"][-1]["key"] == "packed_by"
 
 
 def test_edit_creates_warning_and_blocks_finalize(create_shipment):
     shipment = create_shipment()
     document_service.generate_documents(shipment)
-    document_service.update_document(shipment, "bl_draft", {"quantity": "480"})
+    document_service.update_document(shipment, "shipping_instruction", {"quantity": "480"})
     result = document_service.validate_shipment_documents(shipment)
     assert result["status"] == "warning"
-    assert [(f["document"], f["field"]) for f in result["findings"]] == [("bl_draft", "quantity")]
+    assert [(f["document"], f["field"]) for f in result["findings"]] == [("shipping_instruction", "quantity")]
     with pytest.raises(ValidationError):
-        document_service.finalize_document(shipment, "bl_draft")
+        document_service.finalize_document(shipment, "shipping_instruction")
     # Unaffected documents can still be finalized.
     assert document_service.finalize_document(shipment, "commercial_invoice").status == "final"
     with pytest.raises(ServiceError):
