@@ -76,8 +76,9 @@ def test_schedule_outlook(app):
 
     today = date.today()
 
-    def outlook(destination, departure_days, buyer_days=None):
+    def outlook(destination, departure_days, buyer_days=None, origin="KRPUS"):
         return planning_service.schedule_outlook({
+            "origin_code": origin,
             "destination_code": destination,
             "requested_departure_date": (today + timedelta(days=departure_days)).isoformat(),
             "buyer_required_date": (today + timedelta(days=buyer_days)).isoformat() if buyer_days else "",
@@ -85,19 +86,22 @@ def test_schedule_outlook(app):
 
     result = outlook("DEHAM", 7, 40)
     assert result["available"] and result["destination"] == "함부르크항"
-    modes = {mode["mode"]: mode for mode in result["modes"]}
-    assert set(modes) == {"SEA", "AIR"}
+    # 해상은 FCL·LCL을 나눠서, 항공은 한 줄로 보여줍니다.
+    modes = {mode["label"]: mode for mode in result["modes"]}
+    assert set(modes) == {"해상 FCL", "해상 LCL", "항공"}
 
     # 같은 납기에서 해상은 촉박하고 항공은 여유가 있습니다.
-    assert modes["SEA"]["level"] == "late"
-    assert modes["AIR"]["level"] == "ok"
-    assert modes["AIR"]["margin_worst"] > modes["SEA"]["margin_worst"]
+    assert modes["해상 FCL"]["level"] == "late"
+    assert modes["항공"]["level"] == "ok"
+    assert modes["항공"]["margin_worst"] > modes["해상 FCL"]["margin_worst"]
     # 보수적으로 가장 오래 걸리는 일정으로 등급을 매깁니다.
-    assert modes["SEA"]["margin_worst"] <= modes["SEA"]["margin_best"]
+    assert modes["해상 FCL"]["margin_worst"] <= modes["해상 FCL"]["margin_best"]
+    # LCL은 CFS 작업이 더해져 FCL보다 오래 걸립니다.
+    assert modes["해상 LCL"]["min_days"] > modes["해상 FCL"]["min_days"]
 
-    # 납기가 넉넉하면 둘 다 여유 있음입니다.
-    relaxed = {m["mode"]: m for m in outlook("USLAX", 7, 80)["modes"]}
-    assert relaxed["SEA"]["level"] == "ok" and relaxed["AIR"]["level"] == "ok"
+    # 납기가 넉넉하면 모두 여유 있음입니다.
+    relaxed = {m["label"]: m for m in outlook("USLAX", 7, 80)["modes"]}
+    assert {m["level"] for m in relaxed.values()} == {"ok"}
 
     # Buyer 요청일이 없으면 소요시간만 보여줍니다.
     without_buyer = outlook("USLAX", 7)["modes"][0]
@@ -109,21 +113,30 @@ def test_schedule_outlook(app):
 
 
 def test_transit_summary(app):
-    """출발지·도착지를 고르면 해상·항공 예상 소요일을 함께 보여줍니다."""
+    """실제 항로 거리로 해상(FCL·LCL)과 항공 소요일을 계산합니다."""
 
-    la = planning_service.transit_summary("USLAX")
+    la = planning_service.transit_summary("KRPUS", "USLAX")
     assert la["available"] and la["destination"] == "로스앤젤레스항"
-    assert la["sea"]["min"] < la["sea"]["max"]
-    assert la["air"]["min"] <= la["air"]["max"]
-    assert la["air"]["max"] < la["sea"]["min"]        # 항공이 해상보다 빠릅니다.
+    assert la["sea"]["FCL"]["min"] < la["sea"]["FCL"]["max"]
+    assert la["air"]["max"] < la["sea"]["FCL"]["min"]     # 항공이 해상보다 빠릅니다.
+    # LCL은 출발지·도착지 CFS 작업만큼 더 걸립니다.
+    assert la["sea"]["LCL"]["min"] > la["sea"]["FCL"]["min"]
+
+    # 실제 항로 거리를 함께 돌려줍니다 (부산→로스앤젤레스 약 9,800km).
+    assert 9_000 < la["sea_route"]["distance_km"] < 11_000
+    assert la["sea_route"]["origin"] == "부산항"
 
     # 먼 구간일수록 소요일이 깁니다.
-    assert planning_service.transit_summary("VNSGN")["sea"]["min"] < la["sea"]["min"]
-    assert la["sea"]["min"] < planning_service.transit_summary("DEHAM")["sea"]["min"]
+    saigon = planning_service.transit_summary("KRPUS", "VNSGN")
+    hamburg = planning_service.transit_summary("KRPUS", "DEHAM")
+    assert saigon["sea"]["FCL"]["min"] < la["sea"]["FCL"]["min"] < hamburg["sea"]["FCL"]["min"]
+    # 유럽 항로는 수에즈 운하를 지납니다.
+    assert "suez" in hamburg["sea_route"]["passages"]
 
-    # 공항을 골라도 같은 구간 기준으로 계산합니다.
-    assert planning_service.transit_summary("LAX")["available"]
-    assert planning_service.transit_summary("ZZZZZ")["available"] is False
+    # 공항을 골라도 가장 가까운 항구로 바꿔 해상 일정을 함께 보여줍니다.
+    air = planning_service.transit_summary("ICN", "LAX")
+    assert air["available"] and air["sea_route"]["origin"] == "인천항"
+    assert planning_service.transit_summary("KRPUS", "ZZZZZ")["available"] is False
 
 
 def test_departure_check_without_buyer_date(app):

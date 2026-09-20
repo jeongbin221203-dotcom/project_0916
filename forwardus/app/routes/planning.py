@@ -78,7 +78,7 @@ def api_schedules():
 def api_transit_estimate():
     """선택한 도착지 구간의 해상·항공 예상 소요일."""
 
-    return jsonify({"success": True, "data": planning_service.transit_summary(request.args.get("destination", ""))})
+    return jsonify({"success": True, "data": planning_service.transit_summary(request.args.get("origin", ""), request.args.get("destination", ""))})
 
 
 @planning_bp.post("/api/schedule-outlook")

@@ -9,6 +9,8 @@ from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
 from app.processors.cargo_calculator import calculate_cargo_metrics
 from app.processors.cost_calculator import INCOTERMS_INFO, calculate_logistics_cost
+from app.processors import transit_calculator
+from app.processors.transit_calculator import great_circle_km
 from app.processors.schedule_calculator import (
     DEFAULT_TRANSIT_DAYS,
     calculate_eta,
@@ -275,33 +277,69 @@ def estimate_transit_days(transport_mode: str, sea_mode: str | None, destination
     return min(days) if days else DEFAULT_TRANSIT_DAYS["AIR" if transport_mode == "AIR" else "SEA"]
 
 
-def transit_summary(destination_code: str) -> dict:
-    """선택한 구간의 해상·항공 예상 소요일. 출발지·도착지를 모두 고른 뒤 보여줍니다."""
+def _sea_leg(origin: dict | None, destination: dict | None) -> dict | None:
+    """해상 구간: 고른 곳이 공항이면 같은 나라의 가장 가까운 항구로 바꿔 계산합니다."""
+
+    origin = origin if origin and origin["kind"] == "port" else location_client.nearest(origin, "port", "KR")
+    destination = (destination if destination and destination["kind"] == "port"
+                   else location_client.nearest(destination, "port"))
+    if not origin or not destination:
+        return None
+    route = location_client.sea_route(origin["code"], destination["code"])
+    if not route:
+        return None
+    return {"origin": origin, "destination": destination, **route}
+
+
+def _air_leg(origin: dict | None, destination: dict | None) -> dict | None:
+    """항공 구간: 고른 곳이 항구면 같은 나라의 가장 가까운 공항으로 바꿔 계산합니다."""
+
+    origin = origin if origin and origin["kind"] == "airport" else location_client.nearest(origin, "airport", "KR")
+    destination = (destination if destination and destination["kind"] == "airport"
+                   else location_client.nearest(destination, "airport"))
+    if not origin or not destination or origin["lat"] is None or destination["lat"] is None:
+        return None
+    distance = great_circle_km((origin["lat"], origin["lon"]), (destination["lat"], destination["lon"]))
+    direct = origin["code"] in (destination.get("direct_from") or [])
+    return {"origin": origin, "destination": destination,
+            "distance_km": distance, "direct": direct}
+
+
+def transit_summary(origin_code: str, destination_code: str) -> dict:
+    """선택한 구간의 실제 소요일. 해상은 FCL·LCL을 나눠서 계산합니다.
+
+    해상 거리는 실제 항로망에서 구한 값이고, 항공 거리는 공항 사이 대권거리입니다.
+    계산 근거는 app/processors/transit_calculator.py에 있습니다.
+    """
 
     destination = location_client.find_location(destination_code)
     if not destination:
         return {"available": False}
+    origin = location_client.find_location(origin_code) if origin_code else None
 
-    region = destination.get("region", "asia")
-    try:
-        schedules = load_mock("schedules")
-    except (OSError, ValueError):
-        return {"available": False}
+    result = {"available": True, "destination": destination["name"],
+              "kind": destination["kind"], "source": "searoute · OurAirports"}
 
-    def days_for(service: str) -> list[int]:
-        return sorted(t["transit_days"][region] for t in schedules.get(service, [])
-                      if region in t["transit_days"])
+    sea = _sea_leg(origin, destination)
+    if sea:
+        result["sea"] = {
+            mode: transit_calculator.sea_transit(
+                sea["distance_km"], sea["passages"], mode,
+                direct=sea["destination"].get("sea_direct"), region=sea["destination"]["region"])
+            for mode in ("FCL", "LCL")
+        }
+        result["sea_route"] = {"origin": sea["origin"]["name"], "destination": sea["destination"]["name"],
+                               "distance_km": sea["distance_km"], "passages": sea["passages"],
+                               "transship": sea["destination"].get("sea_direct") is False}
 
-    fcl, lcl, air = days_for("FCL"), days_for("LCL"), days_for("AIR")
-    sea = sorted(set(fcl + lcl))
-    return {
-        "available": True,
-        "destination": destination["name"],
-        "kind": destination["kind"],
-        "sea": {"min": sea[0], "max": sea[-1]} if sea else None,
-        "air": {"min": air[0], "max": air[-1]} if air else None,
-        "source": "mock",
-    }
+    air = _air_leg(origin, destination)
+    if air:
+        result["air"] = transit_calculator.air_transit(
+            air["distance_km"], transfers=0 if air["direct"] else 1)
+        result["air_route"] = {"origin": air["origin"]["name"], "destination": air["destination"]["name"],
+                               "origin_code": air["origin"]["code"], "destination_code": air["destination"]["code"],
+                               "distance_km": round(air["distance_km"]), "direct": air["direct"]}
+    return result
 
 
 MODE_LABELS = {"SEA": "해상", "AIR": "항공"}
@@ -343,35 +381,55 @@ def schedule_outlook(payload: dict) -> dict:
                            field="requested_departure_date")
     buyer_required = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", required=False,
                                 field="buyer_required_date")
-    summary = transit_summary(str(payload.get("destination_code") or ""))
+    origin_code = str(payload.get("origin_code") or "")
+    destination_code = str(payload.get("destination_code") or "")
+    summary = transit_summary(origin_code, destination_code)
     if not departure or not summary.get("available"):
         return {"available": False}
 
-    origin_code = str(payload.get("origin_code") or "")
-    route = air_route_status(origin_code, str(payload.get("destination_code") or ""))
+    # 항구를 골랐으면 가장 가까운 공항으로 바꿔 항공편을 확인합니다.
+    air_route = summary.get("air_route") or {}
+    route = air_route_status(air_route.get("origin_code", origin_code),
+                             air_route.get("destination_code", destination_code))
+    air_origin = air_route.get("origin_code") or origin_code
+    air_note = ""
+    if route.get("known") and not route.get("direct"):
+        # 직항이 없으면 어디서 출발하거나 어디를 경유해야 하는지 알려줍니다.
+        if route["korea_alternatives"]:
+            air_note = f"{air_origin} 직항 없음 · {', '.join(route['korea_alternatives'])} 출발은 직항"
+        elif route["transfer_via"]:
+            air_note = f"직항 없음 · {', '.join(route['transfer_via'])} 경유"
+        else:
+            air_note = "직항 없음 · 환승 필요"
+
+    sea_route = summary.get("sea_route") or {}
+    sea_note = ""
+    if sea_route.get("transship"):
+        sea_note = "한국 직기항 없음 · 환적 포함"
+    else:
+        # 소요일에 영향을 주는 길목만 안내합니다.
+        labels = {"suez": "수에즈 운하", "panama": "파나마 운하", "south_africa": "희망봉"}
+        passed = [labels[p] for p in sea_route.get("passages", []) if p in labels]
+        sea_note = f"{' · '.join(passed)} 경유" if passed else ""
+
+    plans = []
+    for sea_mode in ("FCL", "LCL"):
+        days = (summary.get("sea") or {}).get(sea_mode)
+        if days:
+            plans.append(("SEA", sea_mode, days, sea_note))
+    if summary.get("air"):
+        plans.append(("AIR", None, summary["air"], air_note))
 
     modes = []
-    for mode in ("SEA", "AIR"):
-        days = summary["sea" if mode == "SEA" else "air"]
-        if not days:
-            continue
-        extra = 0
-        note = ""
-        if mode == "AIR" and route.get("known") and not route.get("direct"):
-            # 직항이 없으면 환승 시간을 더하고 경유지를 안내합니다.
-            extra = TRANSFER_EXTRA_DAYS
-            if route["korea_alternatives"]:
-                note = f"{origin_code} 직항 없음 · {', '.join(route['korea_alternatives'])} 출발은 직항"
-            elif route["transfer_via"]:
-                note = f"직항 없음 · {', '.join(route['transfer_via'])} 경유"
-            else:
-                note = "직항 없음 · 환승 필요"
-        days = {"min": days["min"] + extra, "max": days["max"] + extra}
+    for mode, sea_mode, days, note in plans:
         entry = {
             "mode": mode,
-            "label": MODE_LABELS[mode],
+            "sea_mode": sea_mode,
+            "label": f"{MODE_LABELS[mode]} {sea_mode}" if sea_mode else MODE_LABELS[mode],
             "note": note,
-            "direct": route.get("direct") if mode == "AIR" else None,
+            "direct": route.get("direct") if mode == "AIR" else not sea_route.get("transship"),
+            "distance_km": days["distance_km"],
+            "breakdown": days["breakdown"],
             "min_days": days["min"],
             "max_days": days["max"],
             "eta_fastest": calculate_eta(departure, days["min"]).isoformat(),
@@ -397,7 +455,9 @@ def schedule_outlook(payload: dict) -> dict:
         "departure_date": departure.isoformat(),
         "buyer_required_date": buyer_required.isoformat() if buyer_required else None,
         "modes": modes,
-        "source": "mock",
+        "sea_route": summary.get("sea_route"),
+        "air_route": summary.get("air_route"),
+        "source": summary["source"],
     }
 
 
