@@ -6,6 +6,39 @@
   {{ shipment_header(shipment) }}
   {{ shipment_tabs(shipment, 'document') }}
 
+  <section class="card origin_card">
+    <h2>원산지증명서 <small class="muted">수출국에 따라 쓰는 협정이 다릅니다</small></h2>
+    {% if origin_certificate.available %}
+      <p class="muted">{{ origin_certificate.country }}로 보낼 때
+        <b class="mono">{{ origin_certificate.hs_code }}</b> 품목에 쓸 수 있는 협정입니다.</p>
+      {% if origin_certificate.agreements %}
+        {% for row in origin_certificate.agreements %}
+          <div class="origin_row">
+            <div class="row_between wrap">
+              <b>{{ row.agreement }}</b>
+              <span class="origin_rate">협정세율 {{ row.rate }}%</span>
+            </div>
+            <p class="origin_about">{{ row.about }}</p>
+            {% if row.certificate %}
+              <dl class="origin_detail">
+                {% if row.certificate.method %}<div><dt>발급방식</dt><dd>{{ row.certificate.method }}</dd></div>{% endif %}
+                {% if row.certificate.issuer %}<div><dt>발급자</dt><dd>{{ row.certificate.issuer }}</dd></div>{% endif %}
+                {% if row.certificate.form %}<div><dt>서식</dt><dd>{{ row.certificate.form }}</dd></div>{% endif %}
+                {% if row.certificate.valid_for %}<div><dt>유효기간</dt><dd>{{ row.certificate.valid_for }}</dd></div>{% endif %}
+              </dl>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <p class="muted small">{{ origin_certificate.note }}
+          <em>출처: {{ origin_certificate.source }}</em></p>
+      {% else %}
+        <p class="muted">{{ origin_certificate.country }}와(과) 발효된 FTA가 없어 원산지증명서로 받을 혜택이 없습니다.</p>
+      {% endif %}
+    {% else %}
+      <p class="muted">{{ origin_certificate.reason }}</p>
+    {% endif %}
+  </section>
+
   <section class="card">
     <div class="row_between wrap">
       <div>

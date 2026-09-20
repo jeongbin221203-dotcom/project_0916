@@ -888,7 +888,7 @@ def test_tariff_guide_matches_destination_country(app):
     netherlands = planning_service.tariff_guide("3304991000", "NL")
     assert netherlands["available"] and netherlands["country"] == "네덜란드"
     assert [row["agreement"] for row in netherlands["agreements"]] == ["한·EU FTA"]
-    assert "인증수출자" in netherlands["agreements"][0]["proof"]
+    assert "원산지증명서" in netherlands["agreements"][0]["proof"]
     # 기본세율·WTO세율은 참고로 함께 줍니다.
     assert {row["code"] for row in netherlands["general"]} == {"A", "C"}
 
@@ -928,7 +928,10 @@ def test_agreement_country_comes_from_customs_names(app):
     assert "NL" in countries("FEU1", "한ㆍEU FTA협정세율(선택1)")
     assert "CH" in countries("FEF1", "한ㆍEFTA FTA협정세율(선택1)")
     assert "VN" in countries("FAS1", "한ㆍ아세안 FTA협정세율(선택1)")
-    assert len(fta_guide.BLOCS["EU"]) == 27 and len(fta_guide.BLOCS["아세안"]) == 10
+    assert len(fta_guide.blocs()["EU"]) == 27 and len(fta_guide.blocs()["아세안"]) == 10
+    # 회원국은 관세청 FTA 포털에서 받아 둔 파일에서 읽습니다.
+    assert fta_guide.seed()["source"] == "관세청 FTA 포털"
+    assert set(fta_guide.blocs()) == {"EU", "EFTA", "아세안", "중미", "일반"}
 
     # 협정이 아닌 세율은 나라를 따지지 않습니다.
     assert countries("A", "기본세율") == ()
@@ -938,10 +941,15 @@ def test_agreement_country_comes_from_customs_names(app):
     # 협정 이름은 "(선택1)" 같은 꼬리를 떼고 보여줍니다.
     assert fta_guide.agreement_label("한ㆍ칠레FTA협정세율(선택1)") == "한·칠레FTA"
     assert fta_guide.agreement_label("RCEP협정세율_일본(선택1)") == "RCEP 일본"
-    # 원산지증명 방식은 협정 종류에 따라 다릅니다.
-    assert "인증수출자" in fta_guide.proof_for("FEU1")
-    assert "자율발급" in fta_guide.proof_for("FUS1")
-    assert "기관발급" in fta_guide.proof_for("FAS1")
+    # 원산지증명 발급 정보도 관세청 FTA 포털에서 받습니다.
+    assert "자율발급" in fta_guide.proof_for("FUS1", "한ㆍ미 FTA 협정세율(선택1)")
+    assert "기관발급" in fta_guide.proof_for("FAS1", "한ㆍ아세안 FTA협정세율(선택1)")
+    # 서식과 유효기간까지 함께 알려줍니다.
+    us = fta_guide.certificate_for("FUS1", "한ㆍ미 FTA 협정세율(선택1)")
+    assert us["form"] and us["valid_for"] == "4년"
+    # 한·중미는 나라별로 코드가 갈려도 발급 방식은 하나입니다.
+    assert (fta_guide.certificate_for("FCECR1", "한ㆍ중미 FTA협정세율_코스타리카(선택1)")
+            == fta_guide.certificate_for("FCEPA1", "한ㆍ중미 FTA협정세율_파나마(선택1)"))
 
 
 def test_number_fields_accept_thousands_separators(app, client):
@@ -1086,3 +1094,38 @@ def test_english_hs_search_fills_korean_name(app, client):
     assert result["source"] == "api" and result["data"]
     assert all(item["name"] for item in result["data"]), "한글 품명이 비어 있습니다"
     assert any("화장" in item["name"] for item in result["data"])
+
+
+def test_origin_certificate_guide_uses_portal_data(app):
+    """서류 화면에서 협정별 원산지증명서를 어떻게 받는지 알려줍니다."""
+
+    from app.services import document_service
+
+    today = date.today()
+    payload = {
+        "project_name": "원산지증명", "transport_mode": "SEA", "sea_mode": "FCL",
+        "origin_code": "KRPUS", "destination_code": "NLRTM",
+        "requested_departure_date": (today + timedelta(days=7)).isoformat(),
+        "incoterms": "FOB", "currency": "USD", "invoice_value": "30000",
+        "exporter_name": "포워더스", "exporter_address": "서울시 강남구",
+        "buyer": {"name": "Buyer BV", "country": "NL", "address": "Rotterdam"},
+        "cargo": {"items": [{"product_description": "기초화장품", "hs_code": "3304991000",
+                             "package_type": "carton", "quantity": "21", "length_cm": "50",
+                             "width_cm": "50", "height_cm": "50", "weight_per_package_kg": "24"}]},
+    }
+    payload["schedule_id"] = planning_service.search_schedules(payload)["items"][0]["schedule_id"]
+    shipment = planning_service.create_shipment(payload)
+
+    guide = document_service.origin_certificate_guide(shipment)
+    assert guide["available"] and guide["country"] == "네덜란드"
+    agreement = guide["agreements"][0]
+    assert agreement["agreement"] == "한·EU FTA"
+    # 발급방식·발급자·서식·유효기간을 관세청 FTA 포털에서 가져옵니다.
+    certificate = agreement["certificate"]
+    assert certificate["method"] and certificate["issuer"]
+    assert certificate["form"] and certificate["valid_for"]
+    assert guide["source"] == "관세청 FTA 포털"
+
+    # HS부호나 도착국이 없으면 확인할 수 없다고 알립니다.
+    shipment.cargos[0].hs_code = ""
+    assert document_service.origin_certificate_guide(shipment)["available"] is False

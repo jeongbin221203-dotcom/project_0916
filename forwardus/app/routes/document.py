@@ -19,6 +19,7 @@ def center(shipment_id: str):
         shipment=shipment,
         documents=document_service.list_documents(shipment),
         validation=document_service.check_documents(shipment),
+        origin_certificate=document_service.origin_certificate_guide(shipment),
     )
 
 

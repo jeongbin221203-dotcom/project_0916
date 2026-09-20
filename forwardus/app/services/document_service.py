@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.models.document import DOCUMENT_TYPES
+from app.services import planning_service
 from app.processors.document_validator import validate_documents
 from app.repositories import document_repository, shipment_repository
 from app.services import ServiceError
@@ -231,3 +232,42 @@ def document_view(document) -> list[dict]:
         {"key": key, "label": FIELD_LABELS.get(key, key), "value": document.data.get(key, "")}
         for key in DOCUMENT_FIELDS[document.doc_type]
     ]
+
+
+def origin_certificate_guide(shipment) -> dict:
+    """이 건에 쓸 수 있는 협정과 필요한 원산지증명서를 정리합니다.
+
+    원산지증명서는 협정마다 서식과 발급 주체가 달라 우리가 대신 만들어 줄 수
+    없습니다. (기관발급은 세관·상공회의소가 발급하고, 자율발급도 협정문이 정한
+    서식을 씁니다.) 그래서 "무엇을 어디서 어떤 서식으로 받아야 하는지"만
+    알려줍니다.
+    """
+
+    cargo = shipment.cargo
+    hs_code = (cargo.hs_code if cargo else "") or ""
+    country = shipment.destination_country or ""
+    if not hs_code or not country:
+        return {"available": False,
+                "reason": "HS부호와 도착국이 있어야 적용 협정을 확인할 수 있습니다."}
+
+    guide = planning_service.tariff_guide(hs_code, country)
+    if not guide.get("available"):
+        return {"available": False, "reason": guide.get("message", ""),
+                "country": guide.get("country", country)}
+
+    agreements = [{
+        "agreement": row["agreement"],
+        "rate": row["rate"],
+        "about": row.get("about", ""),
+        "certificate": row.get("certificate") or {},
+    } for row in guide["agreements"]]
+
+    return {
+        "available": True,
+        "country": guide["country"],
+        "hs_code": guide["hs_code"],
+        "agreements": agreements,
+        "note": ("원산지증명서는 협정이 정한 서식으로 발급받아야 합니다."
+                 " 기관발급은 세관 또는 상공회의소에, 자율발급은 수출자가 직접 작성합니다."),
+        "source": "관세청 FTA 포털",
+    }

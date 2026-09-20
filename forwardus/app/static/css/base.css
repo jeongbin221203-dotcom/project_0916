@@ -124,7 +124,10 @@ p { margin: 0 0 10px; }
 /* Forms */
 .field { display: grid; gap: 6px; margin-bottom: 14px; min-width: 0; }
 .field_label { font-size: 13px; font-weight: 800; color: #334155; }
-input[type=text], input[type=number], input[type=date], input[type=email], select {
+/* 입력칸 모양. 타입 선택자에만 기대면 타입을 바꿀 때 스타일이 빠지므로
+   .text_input 클래스도 함께 받습니다. */
+input[type=text], input[type=number], input[type=date], input[type=email],
+input.text_input, select {
   width: 100%; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; outline: none; transition: border-color .15s, box-shadow .15s;
 }
 input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(43,102,246,.15); }

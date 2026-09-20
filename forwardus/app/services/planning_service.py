@@ -152,7 +152,8 @@ def tariff_guide(hs_code: str, country_code: str) -> dict:
             matched.append({**row,
                             "agreement": fta_guide.agreement_label(row["name"]),
                             "about": fta_guide.describe(row["code"], row["name"], countries, by_code),
-                            "proof": fta_guide.proof_for(row["code"])})
+                            "certificate": fta_guide.certificate_for(row["code"], row["name"]),
+                            "proof": fta_guide.proof_for(row["code"], row["name"])})
 
     # 같은 협정에서 선택1·선택2가 함께 오면 세율이 낮은 쪽만 남깁니다.
     best: dict[str, dict] = {}

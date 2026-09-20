@@ -33,7 +33,7 @@
         <div class="route_fields">
           <label class="field">
             <span class="field_label">견적명</span>
-            <input type="text" name="project_name" maxlength="200" placeholder="예: 10월 LA 화장품 출하" required>
+            <input class="text_input" type="text" name="project_name" maxlength="200" placeholder="예: 10월 LA 화장품 출하" required>
           </label>
 
           <div class="field">
@@ -166,11 +166,11 @@
         <div class="form_grid">
           <label class="field span2">
             <span class="field_label">품명 (Product Description)</span>
-            <input type="text" name="product_description" maxlength="300" placeholder="예: Skin care cream 50ml">
+            <input class="text_input" type="text" name="product_description" maxlength="300" placeholder="예: Skin care cream 50ml">
           </label>
           <div class="field autocomplete span2" data-autocomplete="hs_code">
             <span class="field_label">HS CODE <small class="muted">(선택)</small></span>
-            <input type="text" name="hs_code" autocomplete="off" placeholder="립스틱, 샴푸 또는 HS부호 10자리" data-ac-input>
+            <input class="text_input" type="text" name="hs_code" autocomplete="off" placeholder="립스틱, 샴푸 또는 HS부호 10자리" data-ac-input>
             <ul class="ac_list" data-ac-list hidden></ul>
             <small class="field_hint">관세청 HS부호검색으로 찾습니다. 품명은 한글·영문 모두 되고,
               HS부호는 10자리를 모두 입력해야 조회됩니다.</small>
@@ -189,27 +189,27 @@
           </label>
           <label class="field">
             <span class="field_label">수량 (Quantity)</span>
-            <input type="text" name="quantity" inputmode="numeric" autocomplete="off" data-number data-step="1" data-min="1" data-calc>
+            <input class="text_input" type="text" name="quantity" inputmode="numeric" autocomplete="off" data-number data-step="1" data-min="1" data-calc>
           </label>
           <label class="field">
             <span class="field_label">가로 Length (cm)</span>
-            <input type="text" name="length_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
+            <input class="text_input" type="text" name="length_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">세로 Width (cm)</span>
-            <input type="text" name="width_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
+            <input class="text_input" type="text" name="width_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">높이 Height (cm)</span>
-            <input type="text" name="height_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
+            <input class="text_input" type="text" name="height_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">포장당 총중량 (kg)</span>
-            <input type="text" name="weight_per_package_kg" inputmode="decimal" autocomplete="off" data-number data-step="10" data-min="0" data-calc>
+            <input class="text_input" type="text" name="weight_per_package_kg" inputmode="decimal" autocomplete="off" data-number data-step="10" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">총 순중량 Net Weight (kg) <small class="muted">(선택)</small></span>
-            <input type="text" name="net_weight_kg" inputmode="decimal" autocomplete="off" data-number data-step="10" data-min="0">
+            <input class="text_input" type="text" name="net_weight_kg" inputmode="decimal" autocomplete="off" data-number data-step="10" data-min="0">
           </label>
           <div class="field">
             <span class="field_label">Invoice Value</span>
@@ -226,7 +226,7 @@
                   {% endfor %}
                 </optgroup>
               </select>
-              <input type="text" name="invoice_value" inputmode="decimal" autocomplete="off" data-number data-step="100" data-min="0">
+              <input class="text_input" type="text" name="invoice_value" inputmode="decimal" autocomplete="off" data-number data-step="100" data-min="0">
             </div>
           </div>
 
@@ -281,13 +281,13 @@
     <section class="card step" data-step="5" hidden>
       <h2>수출자·Buyer 정보</h2>
       <div class="form_grid">
-        <label class="field"><span class="field_label">수출자(Exporter)명</span><input type="text" name="exporter_name" maxlength="200"></label>
-        <label class="field"><span class="field_label">수출자 주소</span><input type="text" name="exporter_address" maxlength="500"></label>
-        <label class="field"><span class="field_label">Buyer(Consignee)명</span><input type="text" name="buyer_name" maxlength="200"></label>
-        <label class="field"><span class="field_label">Buyer 국가</span><input type="text" name="buyer_country" maxlength="100" placeholder="비워두면 도착지 국가"></label>
-        <label class="field"><span class="field_label">Buyer 주소</span><input type="text" name="buyer_address" maxlength="500"></label>
+        <label class="field"><span class="field_label">수출자(Exporter)명</span><input class="text_input" type="text" name="exporter_name" maxlength="200"></label>
+        <label class="field"><span class="field_label">수출자 주소</span><input class="text_input" type="text" name="exporter_address" maxlength="500"></label>
+        <label class="field"><span class="field_label">Buyer(Consignee)명</span><input class="text_input" type="text" name="buyer_name" maxlength="200"></label>
+        <label class="field"><span class="field_label">Buyer 국가</span><input class="text_input" type="text" name="buyer_country" maxlength="100" placeholder="비워두면 도착지 국가"></label>
+        <label class="field"><span class="field_label">Buyer 주소</span><input class="text_input" type="text" name="buyer_address" maxlength="500"></label>
         <label class="field"><span class="field_label">Buyer 이메일</span><input type="email" name="buyer_email" maxlength="200"></label>
-        <label class="field span2"><span class="field_label">Notify Party</span><input type="text" name="notify_party" maxlength="300" placeholder="SAME AS CONSIGNEE"></label>
+        <label class="field span2"><span class="field_label">Notify Party</span><input class="text_input" type="text" name="notify_party" maxlength="300" placeholder="SAME AS CONSIGNEE"></label>
       </div>
       <h3>요약</h3>
       <dl class="summary_list" data-summary></dl>
