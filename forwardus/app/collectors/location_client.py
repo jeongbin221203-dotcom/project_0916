@@ -10,9 +10,9 @@ from functools import lru_cache
 
 from app.collectors.base_client import fail, load_mock, ok
 
-# Main trade ports are listed first; the rest follow under "기타 항구".
-MAX_MAIN_RESULTS = 40
-MAX_OTHER_RESULTS = 12
+# 목록에는 주요 항구·공항만 노출합니다. 그 밖의 항구는 화면의 "직접 입력"에서
+# UN/LOCODE 전체 색인(search_unlocode)으로 찾습니다.
+MAX_MAIN_RESULTS = 50
 # World Port Index harbour size, biggest first.
 HARBOR_SIZE_RANK = {"L": 0, "M": 1, "S": 2, "V": 3}
 # 국내 무역항은 국가관리 -> 지방관리 순으로 보여줍니다.
@@ -187,7 +187,7 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
     country = (country or "").strip().upper()
     # With no keyword and no country there is nothing to rank by, so only the
     # well-known locations are suggested. Typing searches the full list.
-    majors_only = not keyword and not country
+    majors_only = True
     results = []
     for item in items:
         if kind and item["kind"] != kind:
@@ -210,6 +210,8 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         return (
             item["code"].lower() != keyword,
             not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
+            # 공항은 국내 직항편이 있는 곳을 먼저 보여줍니다.
+            item.get("direct_from_korea") is False,
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
             # 공항은 국가 안에서 규모가 큰 곳부터.
             item.get("size_rank") or 99,
@@ -222,6 +224,4 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
             item["name"],
         )
 
-    main_ports = sorted((item for item in results if item["major"]), key=rank)[:MAX_MAIN_RESULTS]
-    other_ports = sorted((item for item in results if not item["major"]), key=rank)[:MAX_OTHER_RESULTS]
-    return ok(deepcopy(main_ports + other_ports), "mock")
+    return ok(deepcopy(sorted(results, key=rank)[:MAX_MAIN_RESULTS]), "mock")

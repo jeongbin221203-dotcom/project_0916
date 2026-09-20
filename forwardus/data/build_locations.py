@@ -5,6 +5,7 @@ Sources
 - World Port Index / NGA Pub 150 (harbour size, used to pick each country's
   main trade ports)
 - OurAirports (공항 IATA 코드·명칭·규모)
+- airline-route-data (국내 공항발 직항 노선 여부)
 - ISO 3166 country list with regions (for schedule region mapping)
 - Korean country names
 
@@ -38,6 +39,7 @@ ISO_URL = "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regio
 KOREAN_COUNTRY_URL = "https://raw.githubusercontent.com/umpirsky/country-list/master/data/ko/country.json"
 WPI_URL = "https://msi.nga.mil/api/publications/world-port-index?output=json"
 AIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
+ROUTES_URL = "https://raw.githubusercontent.com/Jonty/airline-route-data/main/airline_routes.json"
 
 # 내륙국(바다에 접하지 않는 국가)은 강·운하 항만만 있어 해상 수출 목적지가 될 수
 # 없으므로 제외합니다. 항공 목적지는 MAJOR_AIRPORTS에서 따로 관리합니다.
@@ -221,6 +223,9 @@ KOREAN_NAMES = {
 
 # Major cargo airports (IATA code → Korean name). UN/LOCODE airport rows are
 # noisy, so international airports used for air freight are curated here.
+# 국내 공항. 이 공항들에서 직항편이 있는 해외 공항을 "직항 연결"로 표시합니다.
+KOREA_AIRPORTS = {"ICN", "GMP", "PUS", "CJU", "TAE", "CJJ", "MWX", "YNY"}
+
 # 국가별 대표 관문 공항. AIRPORT_OVERRIDES에 없는 국가에서 이 공항이 먼저
 # 보이도록 순서를 앞당깁니다.
 PRIMARY_AIRPORTS = {
@@ -440,6 +445,7 @@ def build() -> list[dict]:
             "kind": "port",
             "status": row["Status"],
             "harbor_size": harbor_size,
+            "direct_from_korea": None,
             "port_class": KOREA_TRADE_PORTS.get(code, (None, None))[1],
             "note": PORT_NOTES.get(code, ""),
             "size_rank": None,
@@ -463,6 +469,7 @@ def build() -> list[dict]:
         item["country_code"],
         not item["major"],
         class_rank.get(item["port_class"], 0),
+        item["direct_from_korea"] is False,
         item["size_rank"] or 99,
         -(item["cargo_volume_mt"] or 0),
         item["port_group"],
@@ -471,6 +478,17 @@ def build() -> list[dict]:
         item["code"],
     ))
     return locations
+
+
+def load_direct_routes() -> set[str]:
+    """국내 공항에서 직항편이 운항하는 해외 공항 IATA 코드."""
+
+    data = json.loads(download(ROUTES_URL, "airline_routes.json"))
+    direct = set()
+    for code in KOREA_AIRPORTS:
+        for route in data.get(code, {}).get("routes", []):
+            direct.add(route["iata"])
+    return direct - KOREA_AIRPORTS
 
 
 def build_airports(country_info: dict[str, dict]) -> list[dict]:
@@ -482,6 +500,7 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
 
     rows = list(csv.DictReader(io.StringIO(
         download(AIRPORTS_URL, "ourairports_airports.csv").decode("utf-8", "replace"))))
+    direct_routes = load_direct_routes()
 
     airports = []
     seen = set()
@@ -524,6 +543,8 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "size_rank": (override[3] if override
                           else 10 if iata in PRIMARY_AIRPORTS
                           else 50 if is_large else 60),
+            # 국내 공항에서 직항편이 있는지. 없으면 환승이 필요합니다.
+            "direct_from_korea": iata in direct_routes,
             "major": is_large or bool(override),
         })
 
@@ -593,7 +614,9 @@ if __name__ == "__main__":
           f"countries {len({item['country_code'] for item in items}):,})")
     print(f"{INDEX_OUTPUT}: 전체 UN/LOCODE 항구 색인 {index_size:,}개")
     airports = [item for item in items if item["kind"] == "airport"]
-    print(f"  공항 {len(airports):,}곳 (국가 {len({a['country_code'] for a in airports})}개국)")
+    direct = [a for a in airports if a["direct_from_korea"]]
+    print(f"  공항 {len(airports):,}곳 (국가 {len({a['country_code'] for a in airports})}개국) "
+          f"· 국내 직항 연결 {len(direct)}곳")
     print(f"  주요 항구 {len(mains):,}곳 / 기타 항구 {len(ports) - len(mains):,}곳 "
           f"(주요 항구 보유 국가 {len({item['country_code'] for item in mains}):,}개국)")
     without_main = {item["country_code"] for item in ports} - {item["country_code"] for item in mains}

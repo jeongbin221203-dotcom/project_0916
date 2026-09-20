@@ -217,9 +217,9 @@
           const value = options.groupBy(item);
           if (value !== group) {
             group = value;
-            const other = value.startsWith("기타 ");
+            const other = value === "환승 필요";
             html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
-              + (other ? `<small>규모가 작거나 분류 정보가 없는 곳</small>` : "")
+              + (other ? `<small>국내 공항발 직항편이 없어 환승이 필요합니다</small>` : "")
               + `</li>`;
           }
         }
@@ -396,7 +396,9 @@
           ? ""
           : ({ L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "");
         const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
-        return `<b>${escapeHtml(item.name)}</b>${note} <span class="mono">${escapeHtml(item.code)}</span>`
+        const direct = item.kind === "airport" && item.direct_from_korea
+          ? `<em class="ac_note direct">직항</em>` : "";
+        return `<b>${escapeHtml(item.name)}</b>${note}${direct} <span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`;
       },
       (item, input) => {
@@ -408,12 +410,14 @@
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
         // 규모가 작은 항구는 맨 아래 "기타 항구"로 모읍니다.
         groupBy: (item) => {
-          const place = state.transport_mode === "AIR" ? "공항" : "항구";
-          if (!item.major) return `기타 ${place}`;
+          if (state.transport_mode === "AIR" && role === "destination") {
+            // 국내 공항에서 직항으로 갈 수 있는지로 나눕니다.
+            return item.direct_from_korea ? "국내 직항 노선" : "환승 필요";
+          }
           if (role === "destination") return item.country;
           if (item.port_class === "national") return "국가관리 무역항";
           if (item.port_class === "local") return "지방관리 무역항";
-          return `주요 ${place}`;
+          return state.transport_mode === "AIR" ? "주요 공항" : "주요 항구";
         },
       },
     );

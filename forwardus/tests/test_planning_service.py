@@ -129,6 +129,38 @@ def test_every_listed_port_is_classified(app):
     assert all(item["harbor_size"] or item["major"] for item in ports)
 
 
+def test_search_lists_only_main_ports(app):
+    """검색 결과에는 주요 항구만 나오고, 나머지는 직접 입력으로 찾습니다."""
+
+    for country in ("US", "VN", "DE"):
+        items = planning_service.search_locations("", "SEA", "destination", country=country)["data"]
+        assert items and all(item["major"] for item in items)
+
+    # 목록에서 빠진 소규모 항구도 직접 입력 검색에서는 실제 코드로 찾힙니다.
+    found = planning_service.search_unlocode("Hoodsport", country="US")["data"]
+    assert found and found[0]["code"] == "US9WA"
+
+
+def test_airports_split_by_direct_route(app):
+    """도착지 공항은 국내 직항 노선 여부로 나뉩니다."""
+
+    from app.collectors import location_client
+
+    airports = [item for item in location_client.load_mock("locations") if item["kind"] == "airport"]
+    direct = {item["code"] for item in airports if item["direct_from_korea"]}
+    assert 100 < len(direct) < 400
+    # 인천발 직항이 있는 노선
+    assert {"LAX", "JFK", "PVG", "NRT", "SGN", "FRA", "SIN", "BKK"} <= direct
+    # 국내 직항편이 없는 공항
+    assert not ({"ABQ", "BRE", "DRS"} & direct)
+
+    items = planning_service.search_locations("", "AIR", "destination", country="US")["data"]
+    flags = [item["direct_from_korea"] for item in items]
+    assert flags[0] is True
+    # 직항 공항이 모두 앞쪽에 모여 있어야 합니다.
+    assert flags.index(False) > max(i for i, v in enumerate(flags) if v)
+
+
 def test_destination_countries_and_country_filter(app):
     countries = planning_service.list_countries("SEA", "destination")["data"]
     codes = {c["code"] for c in countries}
