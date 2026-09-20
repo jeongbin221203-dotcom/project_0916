@@ -87,32 +87,57 @@ def _normalize(name: str) -> str:
     return "".join(ch for ch in (name or "").lower() if ch.isalnum())
 
 
-def search_unlocode(country_code: str, query: str, limit: int = 20) -> dict:
-    """직접 입력 칸에서 쓰는 검색. 코드와 이름(영문·한글) 모두 대조합니다."""
+def find_country_by_name(name: str) -> str | None:
+    """'베트남', 'Vietnam'처럼 나라 이름을 코드로 바꿉니다."""
+
+    needle = _normalize(name)
+    if not needle:
+        return None
+    for country in _countries().values():
+        if needle in (_normalize(country["name"]), _normalize(country["name_en"])):
+            return country["code"]
+    return None
+
+
+def search_unlocode(country_code: str, query: str, limit: int = 50) -> dict:
+    """직접 입력 칸에서 쓰는 검색.
+
+    코드와 이름(영문·한글)을 대조하고, 나라 이름을 입력하면 그 나라 항구를
+    모두 보여줍니다. 목록에 없는 소규모 항구도 여기에서 찾을 수 있습니다.
+    """
 
     country_code = (country_code or "").strip().upper()
     needle = (query or "").strip().lower()
-    if not needle:
+    country_match = find_country_by_name(query)
+    if country_match and (not country_code or country_code == country_match):
+        country_code, needle = country_match, ""
+    if not needle and not country_code:
         return ok([], "mock")
 
     compact = _normalize(needle)
+    listed = _by_code()
     results = []
     for code, entry in _unlocode_index().items():
         if country_code and entry[1] != country_code:
             continue
         korean = entry[2] if len(entry) > 2 else ""
         haystack = f"{code} {entry[0]} {korean}".lower()
-        if needle in haystack or (compact and compact in _normalize(f"{entry[0]}{korean}")):
-            results.append({
-                "code": code,
-                "name": korean or entry[0],
-                "name_en": entry[0],
-                "country_code": entry[1],
-            })
-    # 코드가 정확히 일치하거나 이름이 짧은 항구를 먼저 보여줍니다.
+        if needle and not (needle in haystack or (compact and compact in _normalize(f"{entry[0]}{korean}"))):
+            continue
+        known = listed.get(code)
+        results.append({
+            "code": code,
+            "name": (known or {}).get("name") or korean or entry[0],
+            "name_en": entry[0],
+            "country_code": entry[1],
+            # 목록(주요 항구)에 있는 곳인지 표시합니다.
+            "major": bool(known and known.get("major")),
+        })
+    # 코드가 정확히 일치하는 곳, 주요 항구, 이름이 짧은 곳 순으로 보여줍니다.
     results.sort(key=lambda item: (
         item["code"].lower() != needle,
-        not item["name"].lower().startswith(needle),
+        not item["major"],
+        not item["name"].lower().startswith(needle) if needle else False,
         len(item["name"]),
         item["code"],
     ))

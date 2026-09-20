@@ -245,6 +245,41 @@ def test_direct_input_finds_korean_ports(app, shipment_payload, name, code):
     assert planning_service.search_schedules(payload)["items"][0]["origin_code"] == code
 
 
+def test_direct_input_lists_country_ports(app):
+    """직접 입력에 나라 이름을 치면 그 나라 항구를 주요·기타 모두 보여줍니다."""
+
+    for query in ("베트남", "Vietnam"):
+        items = planning_service.search_unlocode(query)["data"]
+        assert len(items) > 20
+        assert all(item["country_code"] == "VN" for item in items)
+        codes = [item["code"] for item in items]
+        assert "VNSGN" in codes                      # 목록에 있는 주요 항구
+        assert any(not item["major"] for item in items)  # 목록에서 빠진 항구도 포함
+        # 주요 항구가 먼저 나옵니다.
+        flags = [item["major"] for item in items]
+        assert flags.index(False) > max(i for i, v in enumerate(flags) if v)
+
+
+def test_transfer_airports_suggest_hub(app):
+    """환승이 필요한 공항에는 경유 가능한 공항을 함께 안내합니다."""
+
+    from app.collectors import location_client
+
+    airports = [item for item in location_client.load_mock("locations") if item["kind"] == "airport"]
+    direct = {item["code"] for item in airports if item["direct_from_korea"]}
+    transfers = [item for item in airports if not item["direct_from_korea"] and item["transfer_via"]]
+    assert len(transfers) > 500
+
+    for item in transfers:
+        for code, name in item["transfer_via"]:
+            assert code in direct, f"{item['code']} 경유지 {code}는 국내 직항이 아닙니다"
+            assert name
+
+    by_code = {item["code"]: item for item in airports}
+    assert by_code["MIA"]["transfer_via"]           # 마이애미는 미국 내 환승
+    assert not by_code["LAX"]["transfer_via"]       # 직항 공항에는 경유 안내가 없습니다
+
+
 def test_direct_input_suggestions(app):
     """직접 입력 칸에서 이름 일부만 쳐도 실제 코드 후보가 나옵니다."""
 
@@ -259,7 +294,12 @@ def test_direct_input_suggestions(app):
     # 도착지는 선택한 국가로 좁힙니다.
     china = planning_service.search_unlocode("Yantian", country="CN")["data"]
     assert china and china[0]["code"] == "CNYTN"
-    assert planning_service.search_unlocode("", role="origin")["data"] == []
+    # 검색어가 없으면 그 나라(출발지는 국내) 항구를 훑어볼 수 있습니다.
+    korean = planning_service.search_unlocode("", role="origin")["data"]
+    assert korean and all(item["country_code"] == "KR" for item in korean)
+    assert korean[0]["major"]  # 무역항이 먼저
+    # 나라도 검색어도 없으면 결과를 내지 않습니다.
+    assert planning_service.search_unlocode("")["data"] == []
 
 
 def test_airports_cover_major_countries(app):

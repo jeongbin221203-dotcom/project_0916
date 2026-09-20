@@ -333,9 +333,11 @@
       suggestions = response.success ? response.data : [];
       suggestList.innerHTML = suggestions.length
         ? suggestions.map((item, index) => `<li role="option" data-index="${index}">`
-          + `<b>${escapeHtml(item.name)}</b> <span class="mono">${escapeHtml(item.code)}</span>`
+          + `<b>${escapeHtml(item.name)}</b>`
+          + (item.major ? `<em class="ac_note">주요 항구</em>` : "")
+          + ` <span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)}</small></li>`).join("")
-        : `<li class="empty">UN/LOCODE에서 찾지 못했습니다. 영문 이름이나 코드를 확인해주세요.</li>`;
+        : `<li class="empty">UN/LOCODE에서 찾지 못했습니다. 나라 이름(예: 베트남)이나 항구 이름을 입력해보세요.</li>`;
       suggestList.hidden = false;
     }, 200);
 
@@ -398,8 +400,13 @@
         const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
         const direct = item.kind === "airport" && item.direct_from_korea
           ? `<em class="ac_note direct">직항</em>` : "";
+        const via = (item.transfer_via || []).length
+          ? `<small class="ac_via">경유: ${item.transfer_via
+              .map(([code, name]) => `${escapeHtml(name)}(${escapeHtml(code)})`).join(" · ")}</small>`
+          : "";
         return `<b>${escapeHtml(item.name)}</b>${note}${direct} <span class="mono">${escapeHtml(item.code)}</span>`
-          + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`;
+          + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`
+          + via;
       },
       (item, input) => {
         state[role] = item;

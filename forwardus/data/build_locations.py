@@ -446,6 +446,7 @@ def build() -> list[dict]:
             "status": row["Status"],
             "harbor_size": harbor_size,
             "direct_from_korea": None,
+            "transfer_via": [],
             "port_class": KOREA_TRADE_PORTS.get(code, (None, None))[1],
             "note": PORT_NOTES.get(code, ""),
             "size_rank": None,
@@ -457,6 +458,7 @@ def build() -> list[dict]:
 
     locations.extend(build_airports(country_info))
 
+    attach_transfer_hub_names(locations)
     promote_main_ports(locations)
     # 항만 규모 정보가 없고 주요 항구도 아닌 곳은 제외합니다. 무역에 쓰이지 않는
     # 소규모 선착장이 대부분이며, 필요하면 화면에서 "직접 입력"으로 지정합니다.
@@ -480,15 +482,31 @@ def build() -> list[dict]:
     return locations
 
 
-def load_direct_routes() -> set[str]:
-    """국내 공항에서 직항편이 운항하는 해외 공항 IATA 코드."""
+# 환승 공항에 안내할 경유 후보 수.
+MAX_TRANSFER_HUBS = 3
+
+
+def load_route_data() -> tuple[set[str], dict[str, list[str]]]:
+    """국내 직항 공항 목록과, 환승 공항별 경유 후보를 만듭니다.
+
+    경유 후보는 "국내에서 직항으로 갈 수 있고, 그곳에서 목적 공항까지
+    다시 직항편이 있는" 공항입니다. 운항 항공사 수가 많은 곳을 먼저 둡니다.
+    """
 
     data = json.loads(download(ROUTES_URL, "airline_routes.json"))
-    direct = set()
-    for code in KOREA_AIRPORTS:
-        for route in data.get(code, {}).get("routes", []):
-            direct.add(route["iata"])
-    return direct - KOREA_AIRPORTS
+    direct = {route["iata"] for code in KOREA_AIRPORTS
+              for route in data.get(code, {}).get("routes", [])} - KOREA_AIRPORTS
+
+    transfers: dict[str, list[str]] = {}
+    for iata, airport in data.items():
+        if iata in direct or iata in KOREA_AIRPORTS:
+            continue
+        hubs = [(len(route.get("carriers", [])), route["iata"])
+                for route in airport.get("routes", []) if route["iata"] in direct]
+        hubs.sort(key=lambda item: (-item[0], item[1]))
+        if hubs:
+            transfers[iata] = [code for _, code in hubs[:MAX_TRANSFER_HUBS]]
+    return direct, transfers
 
 
 def build_airports(country_info: dict[str, dict]) -> list[dict]:
@@ -500,7 +518,7 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
 
     rows = list(csv.DictReader(io.StringIO(
         download(AIRPORTS_URL, "ourairports_airports.csv").decode("utf-8", "replace"))))
-    direct_routes = load_direct_routes()
+    direct_routes, transfer_hubs = load_route_data()
 
     airports = []
     seen = set()
@@ -543,8 +561,9 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "size_rank": (override[3] if override
                           else 10 if iata in PRIMARY_AIRPORTS
                           else 50 if is_large else 60),
-            # 국내 공항에서 직항편이 있는지. 없으면 환승이 필요합니다.
+            # 국내 공항에서 직항편이 있는지. 없으면 경유 후보를 함께 보여줍니다.
             "direct_from_korea": iata in direct_routes,
+            "transfer_via": [] if iata in direct_routes else transfer_hubs.get(iata, []),
             "major": is_large or bool(override),
         })
 
@@ -559,6 +578,17 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
     if unknown_ko:
         print(f"경고: 한글 표기만 있고 데이터에 없는 공항 {len(unknown_ko)}개 -> {', '.join(unknown_ko)}")
     return airports
+
+
+def attach_transfer_hub_names(locations: list[dict]) -> None:
+    """경유 후보 코드를 화면에 쓸 [코드, 이름] 형태로 바꿉니다."""
+
+    names = {item["code"]: item["name"] for item in locations if item["kind"] == "airport"}
+    for item in locations:
+        if item["kind"] != "airport" or not item["transfer_via"]:
+            continue
+        item["transfer_via"] = [[code, names.get(code, code)] for code in item["transfer_via"]
+                                if code in names]
 
 
 def promote_main_ports(locations: list[dict]) -> None:
@@ -615,8 +645,9 @@ if __name__ == "__main__":
     print(f"{INDEX_OUTPUT}: 전체 UN/LOCODE 항구 색인 {index_size:,}개")
     airports = [item for item in items if item["kind"] == "airport"]
     direct = [a for a in airports if a["direct_from_korea"]]
+    with_hub = [a for a in airports if a["transfer_via"]]
     print(f"  공항 {len(airports):,}곳 (국가 {len({a['country_code'] for a in airports})}개국) "
-          f"· 국내 직항 연결 {len(direct)}곳")
+          f"· 국내 직항 연결 {len(direct)}곳 · 경유 안내 {len(with_hub)}곳")
     print(f"  주요 항구 {len(mains):,}곳 / 기타 항구 {len(ports) - len(mains):,}곳 "
           f"(주요 항구 보유 국가 {len({item['country_code'] for item in mains}):,}개국)")
     without_main = {item["country_code"] for item in ports} - {item["country_code"] for item in mains}
