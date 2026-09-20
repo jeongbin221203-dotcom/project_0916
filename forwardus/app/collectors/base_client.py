@@ -45,8 +45,17 @@ def get_config(key: str, default: Any = None) -> Any:
     return getattr(Config, key, default)
 
 
-def request_json(method: str, url: str, *, required_fields: list[str] | None = None, **kwargs) -> dict:
-    """Call an external JSON API and normalize every failure mode into an error result."""
+def request_text(method: str, url: str, **kwargs) -> dict:
+    """Call an external API that answers with text (XML 등) and normalize failures."""
+
+    response = _request(method, url, **kwargs)
+    if isinstance(response, dict):
+        return response
+    return ok(response.text, "api")
+
+
+def _request(method: str, url: str, **kwargs):
+    """Perform the call and map every failure mode to an error result."""
 
     timeout = get_config("API_TIMEOUT_SECONDS", 8)
     try:
@@ -66,6 +75,15 @@ def request_json(method: str, url: str, *, required_fields: list[str] | None = N
         return fail("API_HTTP_ERROR", "api")
     if not response.content:
         return fail("API_EMPTY_RESPONSE", "api")
+    return response
+
+
+def request_json(method: str, url: str, *, required_fields: list[str] | None = None, **kwargs) -> dict:
+    """Call an external JSON API and normalize every failure mode into an error result."""
+
+    response = _request(method, url, **kwargs)
+    if isinstance(response, dict):
+        return response
     try:
         payload = response.json()
     except ValueError:
