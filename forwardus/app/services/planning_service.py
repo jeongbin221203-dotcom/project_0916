@@ -62,6 +62,13 @@ def get_form_options() -> dict:
     }
 
 
+def un_number_search(query: str) -> dict:
+    """UN번호를 물품 이름·영문 품명·번호로 찾습니다. 찾는 방법 안내도 함께 줍니다."""
+
+    return {"items": dangerous_goods.search_un_numbers(query),
+            **dangerous_goods.lookup_help()}
+
+
 def dangerous_goods_guide(dg_class: str, transport_mode: str, country_code: str = "") -> dict:
     """고른 위험물 등급을 어떻게 보내야 하는지 정리합니다."""
 

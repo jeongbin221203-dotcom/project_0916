@@ -90,6 +90,14 @@ def api_destination_tariff():
         request.args.get("hs", ""), request.args.get("country", ""))})
 
 
+@planning_bp.get("/api/un-numbers")
+def api_un_numbers():
+    """UN번호 찾기. 물품 이름이나 번호로 검색합니다."""
+
+    return jsonify({"success": True,
+                    "data": planning_service.un_number_search(request.args.get("q", ""))})
+
+
 @planning_bp.get("/api/dangerous-goods")
 def api_dangerous_goods():
     """고른 위험물 등급을 어떻게 보내야 하는지 안내합니다."""

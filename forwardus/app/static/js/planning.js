@@ -903,11 +903,14 @@
         <small>인화성·가스·배터리·화학품 등은 부킹과 서류가 달라집니다.</small>
       </label>
       <div class="dg_fields" data-dg-fields hidden>
-        <label class="field">
+        <div class="field autocomplete" data-un-search>
           <span class="field_label">UN 번호</span>
-          <input class="text_input" type="text" data-dg="un_number" maxlength="6" placeholder="예: UN1263" autocomplete="off">
-          <small class="field_hint">MSDS 14번 항목(운송 정보)에 적혀 있습니다.</small>
-        </label>
+          <input class="text_input" type="text" data-dg="un_number" data-ac-input maxlength="60"
+                 placeholder="번호 또는 물품 이름 (예: UN1263, 페인트, 배터리)" autocomplete="off">
+          <ul class="ac_list" data-ac-list hidden></ul>
+          <small class="field_hint">MSDS 14번 항목(운송 정보)에 적혀 있습니다.
+            <button type="button" class="link_button" data-un-help>어떻게 찾나요?</button></small>
+        </div>
         <label class="field">
           <span class="field_label">위험물 등급 (UN Class)</span>
           <select data-dg="dg_class"><option value="">등급 선택</option>${options}</select>
@@ -929,7 +932,55 @@
         </label>
       </div>
       <p class="dg_warn" data-dg-warn hidden></p>
+      <div class="dg_help" data-un-help-box hidden></div>
       <div class="dg_guide" data-dg-guide hidden></div>`;
+  }
+
+  /* ----- UN번호 찾기 ----- */
+  let unLookupHelp = null;
+
+  function wireUnSearch(box) {
+    const container = box.querySelector("[data-un-search]");
+    const input = container.querySelector("[data-ac-input]");
+
+    setupAutocomplete(
+      container,
+      async (query) => {
+        const response = await getJson(`${urls.unNumbers}?${new URLSearchParams({ q: query })}`);
+        if (!response.success) return [];
+        unLookupHelp = response.data;
+        return response.data.items;
+      },
+      (item) => `<span class="ac_title"><b>${escapeHtml(item.un_number)}</b>`
+        + `<span class="muted">${escapeHtml(item.class_label)}</span></span>`
+        + `<small>${escapeHtml(item.korean_name)} · ${escapeHtml(item.proper_shipping_name)}</small>`,
+      (item) => {
+        if (!item) return;
+        // 고르면 등급과 정식운송품명까지 한 번에 채웁니다.
+        input.value = item.un_number;
+        box.querySelector('[data-dg="dg_class"]').value = item.dg_class;
+        box.querySelector('[data-dg="proper_shipping_name"]').value = item.proper_shipping_name;
+        box.refreshDg();
+      },
+      { emptyMessage: () => "목록에 없습니다. MSDS에 적힌 번호를 그대로 입력하세요." },
+    );
+
+    const helpBox = box.querySelector("[data-un-help-box]");
+    box.querySelector("[data-un-help]").addEventListener("click", async () => {
+      if (!helpBox.hidden) { helpBox.hidden = true; return; }
+      if (!unLookupHelp) {
+        const response = await getJson(`${urls.unNumbers}?q=`);
+        unLookupHelp = response.success ? response.data : null;
+      }
+      if (!unLookupHelp) return;
+      helpBox.innerHTML = `<p class="dg_sub">UN번호 찾는 방법</p>`
+        + unLookupHelp.steps.map((s) => `<p class="dg_line"><b>${escapeHtml(s.title)}</b><br>`
+          + `${escapeHtml(s.body)}`
+          + (s.link ? ` <a href="${escapeHtml(s.link.url)}" target="_blank" rel="noopener noreferrer">`
+            + `${escapeHtml(s.link.label)} ↗</a>` : "") + `</p>`).join("")
+        + `<p class="tariff_note">${escapeHtml(unLookupHelp.note)}</p>`;
+      helpBox.hidden = false;
+    });
   }
 
   async function renderDgGuide(box) {
@@ -986,6 +1037,7 @@
       .forEach((input) => input.addEventListener("input", () => { recalc(); saveDraftSoon(); }));
     box.querySelector('[data-dg="packing_group"]').addEventListener("change", saveDraftSoon);
     box.refreshDg = sync;
+    wireUnSearch(box);
     return box;
   }
 
@@ -1272,6 +1324,16 @@
   bindToggle(document.querySelector("[data-sort]"), (value) => { state.sort = value; loadSchedules(); });
 
   /* ----- Step validation ----- */
+  // 스케줄 조회에 실제로 필요한 것만 봅니다. 견적명은 견적에 붙이는 이름일 뿐이라
+  // 운항 정보를 보는 데는 필요하지 않습니다.
+  function scheduleBlocker() {
+    if (!state.origin) return { message: "출발지를 목록에서 선택해주세요.", step: 1 };
+    if (!state.destination) return { message: "도착지를 목록에서 선택해주세요.", step: 1 };
+    if (!state.departure_date) return { message: "캘린더에서 출발 희망일을 선택해주세요.", step: 1 };
+    if (!state.metrics) return { message: "화물 치수·수량·중량을 입력해주세요.", step: 3 };
+    return null;
+  }
+
   function validateStep(step) {
     const f = form.elements;
     if (step === 1) {
@@ -1330,10 +1392,12 @@
     showError("");
     goToStep(step);
     if (step === 4 && !state.schedules.length) {
-      const blocker = [1, 3].map(validateStep).find(Boolean);
+      const blocker = scheduleBlocker();
       if (blocker) {
         scheduleMeta.textContent = "";
-        scheduleList.innerHTML = `<p class="muted">스케줄을 조회하려면 Route·Cargo 정보가 필요합니다: ${escapeHtml(blocker)}</p>`;
+        const where = blocker.step === 1 ? "1 Route" : "3 Cargo";
+        scheduleList.innerHTML = `<p class="muted">${escapeHtml(blocker.message)}`
+          + ` <button type="button" class="link_button" data-goto-step="${blocker.step}">${where} 단계로 이동</button></p>`;
       } else {
         await loadSchedules();
       }
@@ -1344,6 +1408,8 @@
   form.addEventListener("click", (event) => {
     if (event.target.matches("[data-prev]")) openStep(state.step - 1);
     if (event.target.matches("[data-next]")) openStep(state.step + 1);
+    const goto = event.target.closest("[data-goto-step]");
+    if (goto) openStep(Number(goto.dataset.gotoStep));
   });
 
   document.querySelectorAll("[data-step-tab]").forEach((tab) => {

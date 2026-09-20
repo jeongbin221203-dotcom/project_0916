@@ -89,31 +89,42 @@ def _air_schedules(origin: dict, destination: dict, departure_date: date) -> lis
         return []
 
     transit = destination.get("transit_days") or 2
-    items = []
+    items, seen = [], set()
     for row in result["data"]:
-        if not row["days"] or row["counterpart_code"] != destination["code"]:
+        if not row["days"]:
             continue
+        # 공항공사는 도착 공항으로 이미 걸러 줍니다. 표시되는 공항이 다르면
+        # 그곳을 들렀다 가는 편(예: 인천→밀라노→프랑크푸르트)이라 경유로 적습니다.
+        via = row["counterpart_code"] if row["counterpart_code"] != destination["code"] else ""
         for offset in range(AIR_SCHEDULE_HORIZON_DAYS):
             etd = departure_date + timedelta(days=offset)
             if "월화수목금토일"[etd.weekday()] not in row["days"]:
                 continue
             if row["valid_to"] and etd.isoformat() > row["valid_to"]:
                 continue
+            schedule = f"{row['days_label']} 운항 · {row['scheduled_time']} 출발".strip(" ·")
+            key = (row["vessel_or_flight"], etd.isoformat())
+            if key in seen:
+                # 같은 편이 유효기간·시즌별로 여러 줄 옵니다. 한 번만 보여줍니다.
+                continue
+            seen.add(key)
             items.append({
                 "schedule_id": f"ICN-{row['vessel_or_flight']}-{etd.isoformat()}",
                 "carrier": row["carrier"],
                 "vessel_or_flight": row["vessel_or_flight"],
-                "service": f"{row['days_label']} 운항 · {row['scheduled_time']} 출발".strip(" ·"),
+                "service": f"{via} 경유 · {schedule}" if via else schedule,
                 "etd": etd.isoformat(),
-                "eta": (etd + timedelta(days=transit)).isoformat(),
-                "transit_days": transit,
-                "direct": True,
+                # 경유편은 그만큼 늦게 도착합니다.
+                "eta": (etd + timedelta(days=transit + (1 if via else 0))).isoformat(),
+                "transit_days": transit + (1 if via else 0),
+                "direct": not via,
+                "transship_port": via,
                 "origin_code": origin["code"],
                 "destination_code": destination["code"],
                 "reliability": None,
                 "source": "api",
             })
-    return sorted(items, key=lambda item: (item["etd"], item["carrier"]))
+    return sorted(items, key=lambda item: (item["etd"], not item["direct"], item["carrier"]))
 
 
 # --- 운임 (늘 추정) -----------------------------------------------------------

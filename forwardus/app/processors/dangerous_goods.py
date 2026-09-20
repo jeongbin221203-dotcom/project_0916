@@ -209,3 +209,94 @@ def guide(dg_class: str, transport_mode: str, country_name: str = "") -> dict:
             "도착지를 고르면 그 나라에서 확인할 곳을 함께 안내합니다."),
         "references": REFERENCES,
     }
+
+
+# 수출에서 자주 나오는 UN번호. UN 위험물 운송 권고(UN Model Regulations)의
+# 위험물 목록(Dangerous Goods List)에 실린 정식운송품명(PSN)과 급입니다.
+# 포장등급(PG)은 같은 UN번호라도 농도·인화점에 따라 갈려서 넣지 않습니다.
+COMMON_UN_NUMBERS = [
+    ("UN1263", "PAINT", "3", "페인트·락카·에나멜·바니시·퍼티·광택제"),
+    ("UN1866", "RESIN SOLUTION", "3", "수지 용액"),
+    ("UN1133", "ADHESIVES", "3", "접착제·본드 (인화성 용제 포함)"),
+    ("UN1210", "PRINTING INK, FLAMMABLE", "3", "인쇄 잉크"),
+    ("UN1170", "ETHANOL", "3", "에탄올·에틸알코올"),
+    ("UN1219", "ISOPROPANOL", "3", "이소프로필알코올·IPA"),
+    ("UN1090", "ACETONE", "3", "아세톤"),
+    ("UN1307", "XYLENES", "3", "크실렌·자일렌"),
+    ("UN1203", "GASOLINE", "3", "휘발유·가솔린"),
+    ("UN1202", "GAS OIL", "3", "경유·디젤"),
+    ("UN1266", "PERFUMERY PRODUCTS", "3", "향수·화장품 (인화성 용제 포함)"),
+    ("UN1993", "FLAMMABLE LIQUID, N.O.S.", "3", "따로 이름이 없는 인화성 액체"),
+    ("UN1950", "AEROSOLS", "2.1", "에어로졸·스프레이 캔"),
+    ("UN1057", "LIGHTERS", "2.1", "라이터"),
+    ("UN1965", "HYDROCARBON GAS MIXTURE, LIQUEFIED, N.O.S.", "2.1", "LPG·부탄가스"),
+    ("UN1044", "FIRE EXTINGUISHERS", "2.2", "소화기"),
+    ("UN1072", "OXYGEN, COMPRESSED", "2.2", "압축 산소"),
+    ("UN1066", "NITROGEN, COMPRESSED", "2.2", "압축 질소"),
+    ("UN3480", "LITHIUM ION BATTERIES", "9", "리튬이온 배터리 (배터리만 보낼 때)"),
+    ("UN3481", "LITHIUM ION BATTERIES CONTAINED IN EQUIPMENT", "9",
+     "기기에 들어 있거나 기기와 같이 보내는 리튬이온 배터리"),
+    ("UN3090", "LITHIUM METAL BATTERIES", "9", "리튬메탈 배터리 (배터리만 보낼 때)"),
+    ("UN3091", "LITHIUM METAL BATTERIES CONTAINED IN EQUIPMENT", "9",
+     "기기에 들어 있거나 기기와 같이 보내는 리튬메탈 배터리"),
+    ("UN1845", "CARBON DIOXIDE, SOLID", "9", "드라이아이스"),
+    ("UN3077", "ENVIRONMENTALLY HAZARDOUS SUBSTANCE, SOLID, N.O.S.", "9", "환경유해물질 (고체)"),
+    ("UN3082", "ENVIRONMENTALLY HAZARDOUS SUBSTANCE, LIQUID, N.O.S.", "9", "환경유해물질 (액체)"),
+    ("UN1830", "SULPHURIC ACID", "8", "황산"),
+    ("UN1789", "HYDROCHLORIC ACID", "8", "염산"),
+    ("UN1824", "SODIUM HYDROXIDE SOLUTION", "8", "수산화나트륨 수용액·가성소다"),
+    ("UN1805", "PHOSPHORIC ACID SOLUTION", "8", "인산 수용액"),
+    ("UN2794", "BATTERIES, WET, FILLED WITH ACID", "8", "납축전지 (자동차 배터리)"),
+    ("UN1760", "CORROSIVE LIQUID, N.O.S.", "8", "따로 이름이 없는 부식성 액체"),
+    ("UN3066", "PAINT (corrosive)", "8", "부식성 페인트"),
+    ("UN1350", "SULPHUR", "4.1", "황"),
+    ("UN1944", "MATCHES, SAFETY", "4.1", "안전성냥"),
+    ("UN1325", "FLAMMABLE SOLID, ORGANIC, N.O.S.", "4.1", "따로 이름이 없는 가연성 고체"),
+    ("UN1428", "SODIUM", "4.3", "나트륨"),
+    ("UN1402", "CALCIUM CARBIDE", "4.3", "카바이드"),
+    ("UN2014", "HYDROGEN PEROXIDE, AQUEOUS SOLUTION", "5.1", "과산화수소 수용액"),
+    ("UN2067", "AMMONIUM NITRATE BASED FERTILIZER", "5.1", "질산암모늄 비료"),
+    ("UN1479", "OXIDIZING SOLID, N.O.S.", "5.1", "따로 이름이 없는 산화성 고체"),
+    ("UN2902", "PESTICIDE, LIQUID, TOXIC, N.O.S.", "6.1", "농약·살충제 (액체)"),
+    ("UN2811", "TOXIC SOLID, ORGANIC, N.O.S.", "6.1", "따로 이름이 없는 독성 고체"),
+    ("UN3373", "BIOLOGICAL SUBSTANCE, CATEGORY B", "6.2", "진단용 검체"),
+    ("UN2814", "INFECTIOUS SUBSTANCE, AFFECTING HUMANS", "6.2", "사람 감염성 물질"),
+    ("UN2910", "RADIOACTIVE MATERIAL, EXCEPTED PACKAGE", "7", "방사성 물질 (소량 면제포장)"),
+]
+
+# UN번호를 어디서 확인하는지. 우리가 정해 줄 수 없는 값이라 찾는 방법을 알려 줍니다.
+UN_LOOKUP_STEPS = [
+    {"title": "1. MSDS 14번 항목을 봅니다 (가장 확실합니다)",
+     "body": "물질안전보건자료(MSDS/SDS)의 14번 '운송에 필요한 정보'에 UN번호·급·"
+             "정식운송품명·포장등급이 모두 적혀 있습니다. 제조사나 공급사에서 받으세요."},
+    {"title": "2. 물질명으로 MSDS를 찾습니다",
+     "body": "MSDS가 없으면 안전보건공단 MSDS 검색에서 물질명이나 CAS번호로 찾을 수 있습니다.",
+     "link": {"label": "안전보건공단 MSDS 검색", "url": "https://msds.kosha.or.kr/MSDSInfo/kcic/msdssearch.do"}},
+    {"title": "3. 아래 칸에서 물품 이름으로 찾습니다",
+     "body": "자주 나오는 품목은 UN번호 칸에 '페인트', '배터리', '1263'처럼 입력하면 "
+             "골라 넣을 수 있습니다. 고르면 등급과 정식운송품명이 함께 채워집니다."},
+    {"title": "4. 마지막 확인은 선사·포워더와 함께",
+     "body": "같은 물품도 농도·인화점에 따라 UN번호가 달라집니다. MSDS를 포워더에 보내 "
+             "확정하세요. 신고 내용의 책임은 화주(수출자)에게 있습니다."},
+]
+
+
+def search_un_numbers(query: str, limit: int = 12) -> list[dict]:
+    """UN번호·정식운송품명·우리말 품목으로 찾습니다."""
+
+    text = (query or "").strip().lower()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    rows = []
+    for un, psn, dg_class, korean_name in COMMON_UN_NUMBERS:
+        haystack = f"{un} {psn} {korean_name}".lower()
+        if not text or text in haystack or (digits and digits in un):
+            info = DG_CLASSES.get(dg_class, {})
+            rows.append({"un_number": un, "proper_shipping_name": psn, "dg_class": dg_class,
+                         "class_label": info.get("label", dg_class), "korean_name": korean_name})
+    return rows[:limit]
+
+
+def lookup_help() -> dict:
+    return {"steps": UN_LOOKUP_STEPS,
+            "note": "여기 목록은 수출에서 자주 나오는 것만 추린 것입니다."
+                    " 목록에 없으면 MSDS에 적힌 번호를 그대로 입력하세요."}

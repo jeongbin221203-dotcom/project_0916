@@ -40,15 +40,23 @@ HMM_JSON = json.dumps({"resultCode": "200", "resultData": [
      "totalTransitDay": 36, "vessel": [{"vesselName": "HMM ALGECIRAS", "voyageNumber": "0045E"}]},
 ]}, ensure_ascii=False)
 
-ICN_JSON = json.dumps({"response": {"body": {"items": {"item": [
+# 인천공항공사는 items를 배열로 바로 줍니다. 도착 공항 필터는 서버가 걸러 주므로
+# 여기 줄은 모두 FRA행입니다. 표시 공항이 다르면 그곳을 들렀다 가는 편입니다.
+ICN_JSON = json.dumps({"response": {"body": {"totalCount": 3, "items": [
     {"airline": "대한항공", "flightid": "KE9269", "airport": "프랑크푸르트", "airportCode": "FRA",
      "st": "2130", "firstdate": "20260301", "lastdate": "20261031", "season": "S26",
      "monday": "Y", "tuesday": "N", "wednesday": "Y", "thursday": "N",
      "friday": "Y", "saturday": "N", "sunday": "N"},
-    {"airline": "아시아나", "flightid": "OZ563", "airport": "로스앤젤레스", "airportCode": "LAX",
+    # 같은 편이 시즌별로 한 번 더 옵니다. 화면에는 한 번만 나와야 합니다.
+    {"airline": "대한항공", "flightid": "KE9269", "airport": "프랑크푸르트", "airportCode": "FRA",
+     "st": "2130", "firstdate": "20261101", "lastdate": "20270228", "season": "W26",
+     "monday": "Y", "tuesday": "N", "wednesday": "Y", "thursday": "N",
+     "friday": "Y", "saturday": "N", "sunday": "N"},
+    # 인천 → 밀라노 → 프랑크푸르트 경유편
+    {"airline": "아시아나", "flightid": "OZ563", "airport": "밀라노", "airportCode": "MXP",
      "st": "1010", "monday": "Y", "tuesday": "Y", "wednesday": "Y", "thursday": "Y",
      "friday": "Y", "saturday": "Y", "sunday": "Y"},
-]}}}}, ensure_ascii=False)
+]}}}, ensure_ascii=False)
 
 METRICS = {"container_quantity": 2, "container_type": "40GP",
            "billable_revenue_ton": 12.5, "chargeable_weight_kg": 800.0}
@@ -110,8 +118,11 @@ def test_hmm_rows_map_to_our_schedule_shape(app, monkeypatch):
     assert carrier_client.fetch_hmm_schedules("PUS", "DEHAM", date(2026, 10, 1))["success"] is False
 
 
-def test_missing_keys_say_where_to_get_them(app):
+def test_missing_keys_say_where_to_get_them(app, monkeypatch):
     """키가 없을 때 "API가 없다"가 아니라 어디서 받는지 알려줍니다."""
+
+    # 개발자 환경에 키가 있든 없든 같은 결과가 나와야 합니다.
+    monkeypatch.setattr(carrier_client, "get_config", lambda key, default="": default)
 
     sea = carrier_client.fetch_hmm_schedules("KRPUS", "DEHAM", date(2026, 10, 1))
     assert sea["success"] is False and "HMM_API_KEY" in sea["message"]
@@ -131,7 +142,7 @@ def test_icn_timetable_reads_operating_days(app, monkeypatch):
     assert rows[0]["carrier"] == "대한항공" and rows[0]["vessel_or_flight"] == "KE9269"
     assert rows[0]["days"] == ["월", "수", "금"] and rows[0]["scheduled_time"] == "21:30"
     assert rows[0]["valid_to"] == "2026-10-31"
-    assert rows[1]["days_label"] == "월·화·수·목·금·토·일"
+    assert rows[2]["days_label"] == "월·화·수·목·금·토·일"
 
 
 def test_live_sea_schedules_replace_the_examples(app, monkeypatch):
@@ -157,8 +168,10 @@ def test_live_sea_schedules_replace_the_examples(app, monkeypatch):
     assert "운임은 추정" in result["note"]
 
 
-def test_example_schedules_name_the_missing_key(app):
+def test_example_schedules_name_the_missing_key(app, monkeypatch):
     """예시로 돌아갈 때 무엇이 없어서인지 정확히 적습니다."""
+
+    monkeypatch.setattr(carrier_client, "get_config", lambda key, default="": default)
 
     result = schedule_client.fetch_schedules(
         transport_mode="SEA", sea_mode="FCL", origin={"code": "KRPUS"},
@@ -189,12 +202,25 @@ def test_air_timetable_expands_into_dated_departures(app, monkeypatch):
         departure_date=date(2026, 10, 1), metrics=METRICS)   # 2026-10-01은 목요일
 
     assert result["source"] == "api"
-    etds = [item["etd"] for item in result["data"]]
-    # 월·수·금 운항이므로 목요일 다음은 금(10/2) -> 월(10/5) -> 수(10/7) 순입니다.
-    assert etds[:3] == ["2026-10-02", "2026-10-05", "2026-10-07"]
-    assert result["data"][0]["carrier"] == "대한항공"
-    assert result["data"][0]["eta"] == "2026-10-05"        # 출발 + 3일
-    assert result["data"][0]["freight_source"] == "estimate"
+    direct = [item for item in result["data"] if item["direct"]]
+    # 대한항공 KE9269는 월·수·금 운항이라 목요일(10/1) 다음은 금(10/2) -> 월(10/5) -> 수(10/7)입니다.
+    assert [item["etd"] for item in direct][:3] == ["2026-10-02", "2026-10-05", "2026-10-07"]
+    assert direct[0]["carrier"] == "대한항공"
+    assert direct[0]["eta"] == "2026-10-05"                # 출발 + 3일
+    assert direct[0]["freight_source"] == "estimate"
+
+    # 같은 편이 시즌별로 두 줄 와도 한 번만 나옵니다.
+    same_day = [item for item in result["data"]
+                if item["etd"] == "2026-10-02" and item["vessel_or_flight"] == "KE9269"]
+    assert len(same_day) == 1
+
+    # 밀라노를 들렀다 가는 편은 경유로 적고 하루를 더합니다.
+    via = next(item for item in result["data"] if not item["direct"])
+    assert via["transship_port"] == "MXP" and "MXP 경유" in via["service"]
+    assert via["transit_days"] == 4
+    # 같은 날 출발이면 직항이 위에 옵니다. (10/2에는 직항과 경유가 모두 있습니다)
+    oct2 = [item["direct"] for item in result["data"] if item["etd"] == "2026-10-02"]
+    assert oct2 == [True, False]
 
     # 인천 출발이 아니면 이 시간표를 쓸 수 없습니다.
     busan = schedule_client.fetch_schedules(

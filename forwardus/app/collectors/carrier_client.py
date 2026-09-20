@@ -236,7 +236,11 @@ def fetch_icn_cargo_flights(airport_code: str = "", arrivals: bool = False) -> d
         return fail("API_INVALID_RESPONSE", "api")
 
     body = (payload.get("response") or {}).get("body") or {}
-    rows = ((body.get("items") or {}).get("item")) or []
+    # 이 API는 items를 배열로 바로 줍니다. 다른 공공데이터 API처럼 items.item으로
+    # 한 겹 더 싸서 오는 경우도 있어 둘 다 받습니다.
+    rows = body.get("items") or []
+    if isinstance(rows, dict):
+        rows = rows.get("item") or []
     if isinstance(rows, dict):
         rows = [rows]
     return ok([_icn_row(row) for row in rows], "api")

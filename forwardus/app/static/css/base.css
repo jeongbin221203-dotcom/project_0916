@@ -124,7 +124,9 @@ p { margin: 0 0 10px; }
 .alert.warn { background: var(--amber_soft); color: #8a4f00; }
 
 /* Forms */
-.field { display: grid; gap: 6px; margin-bottom: 14px; min-width: 0; }
+/* align-content: start가 없으면, 같은 줄의 옆 칸에 설명문이 붙어 줄이 높아질 때
+   이쪽 입력칸이 늘어나 옆 칸보다 커집니다. (수량 칸이 포장 유형보다 높던 문제) */
+.field { display: grid; gap: 6px; margin-bottom: 14px; min-width: 0; align-content: start; }
 .field_label { font-size: 13px; font-weight: 800; color: #334155; }
 /* 입력칸 모양. 타입 선택자에만 기대면 타입을 바꿀 때 스타일이 빠지므로
    .text_input 클래스도 함께 받습니다. */

@@ -165,6 +165,48 @@ def test_unchecking_dangerous_goods_clears_the_warning(app):
     assert cleared["total_cbm"] == broken["total_cbm"]
 
 
+def test_un_number_search_by_korean_name_english_name_or_number(app):
+    """UN번호를 모를 때 물품 이름으로 찾을 수 있어야 합니다."""
+
+    search = dangerous_goods.search_un_numbers
+    paint = search("페인트")
+    assert paint[0]["un_number"] == "UN1263"
+    assert paint[0]["dg_class"] == "3" and paint[0]["proper_shipping_name"] == "PAINT"
+    assert "인화성 액체" in paint[0]["class_label"]
+
+    # 번호 일부로도, 영문 정식품명으로도 찾습니다.
+    assert search("1263")[0]["un_number"] == "UN1263"
+    assert search("UN1263")[0]["un_number"] == "UN1263"
+    assert [row["un_number"] for row in search("LITHIUM")][:2] == ["UN3480", "UN3481"]
+
+    # 배터리는 "배터리만" 보낼 때와 "기기에 들어 있을 때" UN번호가 다릅니다.
+    battery = {row["un_number"]: row["korean_name"] for row in search("배터리")}
+    assert "배터리만" in battery["UN3480"] and "기기에 들어" in battery["UN3481"]
+
+    assert search("있을리없는물질") == []
+    # 빈 검색어는 전체 목록을 보여 줍니다. (처음 열었을 때)
+    assert len(search("")) > 0
+
+
+def test_un_lookup_help_tells_where_to_find_the_number(app):
+    """UN번호는 우리가 정해 줄 수 없어 찾는 방법을 안내합니다."""
+
+    data = planning_service.un_number_search("")
+    titles = " ".join(step["title"] for step in data["steps"])
+    assert "MSDS" in titles and "선사" in titles
+    # 실제로 찾아볼 수 있는 공식 창구를 함께 줍니다.
+    links = [step["link"]["url"] for step in data["steps"] if step.get("link")]
+    assert any("kosha" in url for url in links)
+    assert data["items"]
+
+
+def test_un_number_api(client):
+    response = client.get("/planning/api/un-numbers?q=페인트")
+    assert response.status_code == 200
+    data = response.get_json()["data"]
+    assert data["items"][0]["un_number"] == "UN1263" and data["steps"]
+
+
 def test_dangerous_goods_api(client):
     response = client.get("/planning/api/dangerous-goods?dg_class=3&mode=AIR&country=DE")
     assert response.status_code == 200

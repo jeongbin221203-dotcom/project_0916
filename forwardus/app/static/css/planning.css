@@ -229,6 +229,8 @@
 .dg_fields .field.span2 { grid-column: span 2; }
 .dg_warn { margin: 0; padding: 9px 12px; border-radius: 10px; background: #fee2e2; color: #b91c1c;
   font-size: 12px; font-weight: 700; line-height: 1.6; }
+.dg_help { display: grid; gap: 8px; padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px dashed #fbbf24; }
+.dg_help .dg_line b { color: #92400e; }
 .dg_guide { display: grid; gap: 6px; padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px solid #fde68a; }
 .dg_head { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 13.5px; }
 .dg_status { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
