@@ -95,4 +95,6 @@
 .custom_box { display: grid; grid-template-columns: 110px 1fr 130px auto; gap: 6px; align-items: center; margin-top: 6px; padding: 10px; border: 1px dashed var(--line); border-radius: 12px; background: #f8fafc; }
 .custom_box input, .custom_box select { min-height: 36px; font-size: 13px; padding: 0 9px; border-radius: 10px; }
 .custom_country { font-size: 13px; font-weight: 700; color: var(--muted); }
+.custom_search { position: relative; }
+.custom_search .ac_list { top: calc(100% + 2px); }
 @media (max-width: 640px) { .custom_box { grid-template-columns: 1fr 1fr; } }

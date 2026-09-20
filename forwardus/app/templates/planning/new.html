@@ -59,7 +59,10 @@
             <ul class="ac_list" data-ac-list hidden></ul>
             <div class="custom_box" data-custom hidden>
               <input type="text" data-custom-code maxlength="10" placeholder="UN/LOCODE (선택)">
-              <input type="text" data-custom-name maxlength="200" placeholder="이름 또는 코드로 검색 (예: 구룡포항)">
+              <div class="custom_search">
+                <input type="text" data-custom-name maxlength="200" placeholder="이름으로 검색 (예: 신항, 구룡포)">
+                <ul class="ac_list" data-custom-list hidden></ul>
+              </div>
               <span class="custom_country">대한민국</span>
               <button type="button" class="button small primary" data-custom-apply>적용</button>
             </div>
@@ -76,7 +79,10 @@
             <ul class="ac_list" data-ac-list hidden></ul>
             <div class="custom_box" data-custom hidden>
               <input type="text" data-custom-code maxlength="10" placeholder="UN/LOCODE (선택)">
-              <input type="text" data-custom-name maxlength="200" placeholder="이름 (예: Yantian Pt)">
+              <div class="custom_search">
+                <input type="text" data-custom-name maxlength="200" placeholder="이름으로 검색 (예: Yantian)">
+                <ul class="ac_list" data-custom-list hidden></ul>
+              </div>
               <select data-custom-country><option value="">국가 선택</option></select>
               <button type="button" class="button small primary" data-custom-apply>적용</button>
             </div>
@@ -227,6 +233,7 @@
     window.FORWARDUS_URLS = {
       locations: "{{ url_for('planning.api_locations') }}",
       countries: "{{ url_for('planning.api_countries') }}",
+      unlocode: "{{ url_for('planning.api_unlocode') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",

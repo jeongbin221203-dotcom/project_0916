@@ -217,9 +217,9 @@
           const value = options.groupBy(item);
           if (value !== group) {
             group = value;
-            const other = value === "기타 항구";
+            const other = value.startsWith("기타 ");
             html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
-              + (other ? `<small>규모가 작거나 분류 정보가 없는 항구</small>` : "")
+              + (other ? `<small>규모가 작거나 분류 정보가 없는 곳</small>` : "")
               + `</li>`;
           }
         }
@@ -288,16 +288,53 @@
     const container = form.querySelector(`[data-autocomplete=${role}]`);
     const box = container.querySelector("[data-custom]");
     const input = container.querySelector("[data-ac-input]");
+    const codeInput = box.querySelector("[data-custom-code]");
+    const nameInput = box.querySelector("[data-custom-name]");
+    const suggestList = box.querySelector("[data-custom-list]");
+    const countrySelect = box.querySelector("[data-custom-country]");
+
+    // 이름을 입력하면 실제 UN/LOCODE 후보를 보여줍니다.
+    let suggestions = [];
+    const suggest = debounce(async () => {
+      const query = nameInput.value.trim();
+      if (!query) {
+        suggestList.hidden = true;
+        return;
+      }
+      const params = new URLSearchParams({ q: query, role });
+      if (countrySelect && countrySelect.value) params.set("country", countrySelect.value);
+      const response = await getJson(`${urls.unlocode}?${params}`);
+      suggestions = response.success ? response.data : [];
+      suggestList.innerHTML = suggestions.length
+        ? suggestions.map((item, index) => `<li role="option" data-index="${index}">`
+          + `<b>${escapeHtml(item.name)}</b> <span class="mono">${escapeHtml(item.code)}</span>`
+          + `<small>${escapeHtml(item.name_en)}</small></li>`).join("")
+        : `<li class="empty">UN/LOCODE에서 찾지 못했습니다. 영문 이름이나 코드를 확인해주세요.</li>`;
+      suggestList.hidden = false;
+    }, 200);
+
+    nameInput.addEventListener("input", suggest);
+    nameInput.addEventListener("focus", suggest);
+    nameInput.addEventListener("blur", () => setTimeout(() => { suggestList.hidden = true; }, 150));
+    suggestList.addEventListener("mousedown", (event) => {
+      const li = event.target.closest("li[data-index]");
+      if (!li) return;
+      const item = suggestions[Number(li.dataset.index)];
+      codeInput.value = item.code;
+      nameInput.value = item.name;
+      if (countrySelect) countrySelect.value = item.country_code;
+      suggestList.hidden = true;
+    });
+    if (countrySelect) countrySelect.addEventListener("change", suggest);
 
     container.querySelector("[data-custom-toggle]").addEventListener("click", () => {
       box.hidden = !box.hidden;
-      if (!box.hidden) box.querySelector("[data-custom-code]").focus();
+      if (!box.hidden) nameInput.focus();
     });
 
     container.querySelector("[data-custom-apply]").addEventListener("click", () => {
-      const code = box.querySelector("[data-custom-code]").value.trim().toUpperCase();
-      const name = box.querySelector("[data-custom-name]").value.trim();
-      const countrySelect = box.querySelector("[data-custom-country]");
+      const code = codeInput.value.trim().toUpperCase();
+      const name = nameInput.value.trim();
       const countryCode = countrySelect ? countrySelect.value : "KR";
       if (!name) {
         showError("직접 입력하려면 항구·공항 이름을 입력해주세요.");
@@ -329,7 +366,9 @@
         return response.success ? response.data : [];
       },
       (item) => {
-        const size = { L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "";
+        const size = item.kind === "airport"
+          ? ""
+          : ({ L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "");
         const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
         return `<b>${escapeHtml(item.name)}</b>${note} <span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`;
@@ -343,11 +382,12 @@
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
         // 규모가 작은 항구는 맨 아래 "기타 항구"로 모읍니다.
         groupBy: (item) => {
-          if (!item.major) return "기타 항구";
+          const place = state.transport_mode === "AIR" ? "공항" : "항구";
+          if (!item.major) return `기타 ${place}`;
           if (role === "destination") return item.country;
           if (item.port_class === "national") return "국가관리 무역항";
           if (item.port_class === "local") return "지방관리 무역항";
-          return "주요 항구";
+          return `주요 ${place}`;
         },
       },
     );

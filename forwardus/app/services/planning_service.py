@@ -75,6 +75,12 @@ def list_countries(transport_mode: str, role: str | None = None) -> dict:
     return result
 
 
+def search_unlocode(query: str, role: str | None = None, country: str | None = None) -> dict:
+    """직접 입력 칸의 후보 목록. 출발지는 국내(KR)로 한정합니다."""
+
+    return location_client.search_unlocode("KR" if role == "origin" else country, query)
+
+
 def search_hs_codes(query: str) -> dict:
     return customs_client.search_hs_codes(query)
 

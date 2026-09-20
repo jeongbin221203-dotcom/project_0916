@@ -213,6 +213,36 @@ def test_direct_input_finds_korean_ports(app, shipment_payload, name, code):
     assert planning_service.search_schedules(payload)["items"][0]["origin_code"] == code
 
 
+def test_direct_input_suggestions(app):
+    """직접 입력 칸에서 이름 일부만 쳐도 실제 코드 후보가 나옵니다."""
+
+    result = planning_service.search_unlocode("신항", role="origin")
+    assert result["success"]
+    codes = [item["code"] for item in result["data"]]
+    assert "KRBNP" in codes and "KRSHG" in codes           # 부산신항, 포항신항
+    assert all(item["country_code"] == "KR" for item in result["data"])
+
+    # 코드로도 찾습니다.
+    assert planning_service.search_unlocode("KRPUS", role="origin")["data"][0]["code"] == "KRPUS"
+    # 도착지는 선택한 국가로 좁힙니다.
+    china = planning_service.search_unlocode("Yantian", country="CN")["data"]
+    assert china and china[0]["code"] == "CNYTN"
+    assert planning_service.search_unlocode("", role="origin")["data"] == []
+
+
+def test_airports_sorted_by_size(app):
+    """공항은 국가 안에서 규모가 큰 곳부터 보여줍니다."""
+
+    korea = [item["code"] for item in planning_service.search_locations("", "AIR", "origin")["data"]]
+    assert korea[:3] == ["ICN", "GMP", "PUS"]
+    usa = [item["code"] for item in
+           planning_service.search_locations("", "AIR", "destination", country="US")["data"]]
+    assert usa[:2] == ["LAX", "JFK"]
+    china = [item["code"] for item in
+             planning_service.search_locations("", "AIR", "destination", country="CN")["data"]]
+    assert china[0] == "PVG"
+
+
 def test_direct_input_rejects_codes_outside_unlocode(app, shipment_payload):
     """서류에 찍히는 값이므로 실제 코드가 아니면 거절합니다."""
 

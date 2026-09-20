@@ -87,6 +87,38 @@ def _normalize(name: str) -> str:
     return "".join(ch for ch in (name or "").lower() if ch.isalnum())
 
 
+def search_unlocode(country_code: str, query: str, limit: int = 20) -> dict:
+    """직접 입력 칸에서 쓰는 검색. 코드와 이름(영문·한글) 모두 대조합니다."""
+
+    country_code = (country_code or "").strip().upper()
+    needle = (query or "").strip().lower()
+    if not needle:
+        return ok([], "mock")
+
+    compact = _normalize(needle)
+    results = []
+    for code, entry in _unlocode_index().items():
+        if country_code and entry[1] != country_code:
+            continue
+        korean = entry[2] if len(entry) > 2 else ""
+        haystack = f"{code} {entry[0]} {korean}".lower()
+        if needle in haystack or (compact and compact in _normalize(f"{entry[0]}{korean}")):
+            results.append({
+                "code": code,
+                "name": korean or entry[0],
+                "name_en": entry[0],
+                "country_code": entry[1],
+            })
+    # 코드가 정확히 일치하거나 이름이 짧은 항구를 먼저 보여줍니다.
+    results.sort(key=lambda item: (
+        item["code"].lower() != needle,
+        not item["name"].lower().startswith(needle),
+        len(item["name"]),
+        item["code"],
+    ))
+    return ok(results[:limit], "mock")
+
+
 def find_unlocode_by_name(country_code: str, name: str, limit: int = 5) -> list[dict]:
     """국가 안에서 이름으로 실제 UN/LOCODE를 찾습니다.
 
@@ -179,6 +211,8 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
             item["code"].lower() != keyword,
             not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
+            # 공항은 국가 안에서 규모가 큰 곳부터.
+            item.get("size_rank") or 99,
             # 물동량이 많은 항만부터, 같은 항만의 부두는 모항 다음에 표시합니다.
             -(item.get("cargo_volume_mt") or 0),
             item.get("port_group") or "",
