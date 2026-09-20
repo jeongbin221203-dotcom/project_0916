@@ -1,5 +1,6 @@
 {% macro source_badge(source) -%}
-  {%- set labels = {"api": "API", "mock": "Mock", "manual": "Manual", "calculated": "Calculated", "imputed": "Imputed"} -%}
+  {%- set labels = {"api": "API", "mock": "Mock", "manual": "Manual", "calculated": "Calculated",
+                    "imputed": "Imputed", "tariff": "표준단가"} -%}
   <span class="badge source_{{ source }}" title="Data Source">Data Source: {{ labels.get(source, source) }}</span>
 {%- endmacro %}
 

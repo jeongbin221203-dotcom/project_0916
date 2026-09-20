@@ -1214,3 +1214,31 @@ def test_cargo_metrics_keeps_each_item_name_for_the_panel(app):
     assert result["total_cbm"] == 5.88
     assert result["total_weight_kg"] == 1740.0
     assert result["container_quantity"] == 1
+
+
+def test_schedule_sort_survives_missing_values_from_live_apis():
+    """실데이터에는 빈 칸이 있습니다. 항공사 시간표에는 정시율이 없습니다.
+
+    예전에는 여기서 터져 항공 스케줄이 통째로 조회되지 않았습니다.
+    """
+
+    from app.services.planning_service import _sort_schedules
+
+    items = [
+        {"schedule_id": "a", "reliability": None, "direct": True,
+         "freight_usd": 900, "transit_days": None},
+        {"schedule_id": "b", "reliability": 95, "direct": True,
+         "freight_usd": None, "transit_days": 3},
+        {"schedule_id": "c", "reliability": 80, "direct": False,
+         "freight_usd": 700, "transit_days": 5},
+    ]
+
+    for sort_by in ("recommended", "price", "duration"):
+        order = [item["schedule_id"] for item in _sort_schedules(items, sort_by)]
+        assert sorted(order) == ["a", "b", "c"], sort_by
+
+    # 값이 있는 것이 빈 것보다 앞에 옵니다.
+    assert [i["schedule_id"] for i in _sort_schedules(items, "price")][0] == "c"
+    assert [i["schedule_id"] for i in _sort_schedules(items, "duration")][0] == "b"
+    # 정시율이 높은 쪽이 추천에서 앞섭니다. (빈 값은 0으로 봅니다)
+    assert [i["schedule_id"] for i in _sort_schedules(items, "recommended")][0] == "b"

@@ -1,7 +1,14 @@
-"""Logistics cost breakdown calculation.
+"""물류비 산출.
 
-Tariff figures are prototype estimates (source = mock). The calculation itself
-is deterministic Python logic; the AI assistant only explains the result.
+부대비용(내륙운송·터미널 처리비·서류비·통관 수수료·도착지 비용)은 아래 표준단가
+표에서 뽑습니다. 이 값들은 어디에도 API로 공개되지 않습니다. 포워더마다 계약
+단가가 달라 실제 청구액은 견적서를 받아야 확정됩니다. 그래서 "Mock"(가짜)이
+아니라 "표준단가"(tariff)로 표시해 추정값임을 분명히 합니다.
+
+해상·항공 운임도 마찬가지로 계약 단가라 공개 API가 없습니다. 스케줄은 선사
+API에서 실제로 받아 오지만 운임은 추정치입니다.
+
+계산 자체는 모두 파이썬 코드가 하고, AI는 결과를 설명만 합니다.
 """
 
 from __future__ import annotations
@@ -145,7 +152,8 @@ def calculate_logistics_cost(
 
     service = "AIR" if transport_mode == "AIR" else (sea_mode or "FCL")
     containers = (metrics.get("container_quantity") or 1) if service == "FCL" else 1
-    rate_source = "mock"
+    # 표준단가 표에서 뽑은 추정값. 실제 청구액은 포워더 견적으로 확정됩니다.
+    rate_source = "tariff"
 
     lines = [
         _line("Origin Charge", "origin", "origin_trucking", "출발지 내륙운송", "KRW",

@@ -1322,6 +1322,7 @@
   /* ----- Schedules ----- */
   const scheduleList = document.querySelector("[data-schedule-list]");
   const scheduleMeta = document.querySelector("[data-schedule-meta]");
+  const scheduleNote = document.querySelector("[data-schedule-note]");
 
   function invalidateSchedules() {
     state.schedules = [];
@@ -1419,8 +1420,10 @@
     state.schedules = response.data.items;
     if (!state.schedules.some((s) => s.schedule_id === state.schedule_id)) state.schedule_id = null;
     // 예시 스케줄이면 "무슨 키가 없어서인지"까지 서버가 적어 보냅니다.
-    scheduleMeta.textContent = `${state.origin.name} → ${state.destination.name} · ${state.departure_date} 이후 출발 · ${state.schedules.length}건`
-      + (response.data.note ? ` · ${response.data.note}` : "");
+    scheduleMeta.textContent = `${state.origin.name} → ${state.destination.name} · ${state.departure_date} 이후 출발 · ${state.schedules.length}건`;
+    // 예시 스케줄을 보여 주는 중이면 지나치기 쉬운 회색 글 대신 경고 상자로 알립니다.
+    scheduleNote.hidden = !response.data.note;
+    scheduleNote.textContent = response.data.note || "";
     renderSchedules();
     return true;
   }

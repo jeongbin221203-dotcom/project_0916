@@ -571,17 +571,34 @@ def calculate_cargo(payload: dict) -> dict:
     return calculate_cargo_metrics(payload, strict=False)
 
 
+# 실데이터는 예시 데이터와 달리 비어 있는 칸이 있습니다. 항공사 시간표에는
+# 정시율이 없고, 어떤 선사는 소요일을 주지 않습니다. 정렬하다 터지지 않게
+# 빈 값은 "모름"으로 두고 뒤로 보냅니다.
+_MISSING_DAYS = 10 ** 6
+_MISSING_PRICE = float("inf")
+
+
+def _number(value, fallback: float) -> float:
+    return fallback if value is None else value
+
+
 def _sort_schedules(items: list[dict], sort_by: str) -> list[dict]:
+    def price(item):
+        return _number(item.get("freight_usd"), _MISSING_PRICE)
+
+    def days(item):
+        return _number(item.get("transit_days"), _MISSING_DAYS)
+
     if sort_by == "price":
-        return sorted(items, key=lambda item: (item["freight_usd"], item["transit_days"]))
+        return sorted(items, key=lambda item: (price(item), days(item)))
     if sort_by == "duration":
-        return sorted(items, key=lambda item: (item["transit_days"], item["freight_usd"]))
+        return sorted(items, key=lambda item: (days(item), price(item)))
     # Recommended: arrive in time first, then reliability, direct service, price.
     return sorted(items, key=lambda item: (
         not (item.get("deadline") or {}).get("on_time", True),
-        -item["reliability"],
-        not item["direct"],
-        item["freight_usd"],
+        -_number(item.get("reliability"), 0),
+        not item.get("direct"),
+        price(item),
     ))
 
 

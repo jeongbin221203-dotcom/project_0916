@@ -228,3 +228,5 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   .kpi_row { grid-template-columns: 1fr; }
   .page { padding-top: 22px; }
 }
+/* 표준단가 표에서 뽑은 추정값. Mock(가짜)과 구분합니다. */
+.badge.source_tariff { background: #ede9fe; color: #6d28d9; }
