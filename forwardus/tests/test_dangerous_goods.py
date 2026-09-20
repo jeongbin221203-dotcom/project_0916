@@ -103,7 +103,11 @@ def test_korean_particle_matches_the_preceding_word():
     assert josa("호주", "로") == "호주로"          # 받침 없음
     assert josa("프랑스", "이") == "프랑스가"
     assert josa("독일", "이") == "독일이"
-    assert josa("USA", "이") == "USA가(이)"        # 한글이 아니면 둘 다 적습니다.
+    # 영문·숫자도 사람은 한국어로 읽습니다. (A 에이, 8 팔)
+    assert josa("USA", "이") == "USA가"
+    assert josa("HMM", "로") == "HMM으로"          # M = 엠, ㅁ받침
+    # 읽는 법을 모르는 글자로 끝나면 예전처럼 둘 다 적습니다.
+    assert josa("東京", "이") == "東京가(이)"
 
 
 def test_cargo_metrics_collect_dangerous_classes(app):

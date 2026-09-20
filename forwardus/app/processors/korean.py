@@ -25,15 +25,43 @@ PARTICLES = {
 }
 
 
+# 숫자·영문으로 끝나는 말도 사람은 한국어로 읽습니다. ("8" -> 팔, "L" -> 엘)
+# 읽은 소리에 받침이 있는지로 조사를 정합니다.
+# 값은 종성 번호입니다. 0이면 받침 없음, 8은 ㄹ입니다.
+DIGIT_FINALS = {
+    "0": 21,   # 영
+    "1": 8,    # 일  (ㄹ)
+    "2": 0,    # 이
+    "3": 16,   # 삼  (ㅁ)
+    "4": 0,    # 사
+    "5": 0,    # 오
+    "6": 1,    # 육  (ㄱ)
+    "7": 8,    # 칠  (ㄹ)
+    "8": 8,    # 팔  (ㄹ)
+    "9": 0,    # 구
+}
+LETTER_FINALS = {
+    "L": 8,    # 엘  (ㄹ)
+    "M": 16,   # 엠  (ㅁ)
+    "N": 4,    # 엔  (ㄴ)
+    "R": 8,    # 알  (ㄹ)
+}
+
+
 def _final_consonant(word: str) -> int | None:
-    """마지막 글자의 종성 번호. 한글이 아니면 None."""
+    """마지막 글자의 종성 번호. 판단할 수 없으면 None."""
 
     for ch in reversed(word or ""):
-        if ch.isspace() or ch in "()[]{}":
+        if ch.isspace() or ch in "()[]{}-_.,/":
             continue
         if HANGUL_START <= ord(ch) <= HANGUL_END:
             return (ord(ch) - HANGUL_START) % JONGSEONG_COUNT
-        # 영문·숫자로 끝나면 받침 여부를 알 수 없어 판단하지 않습니다.
+        if ch in DIGIT_FINALS:
+            return DIGIT_FINALS[ch]
+        upper = ch.upper()
+        if "A" <= upper <= "Z":
+            # 표에 없는 알파벳은 모두 모음으로 끝납니다. (A 에이, B 비, S 에스 ...)
+            return LETTER_FINALS.get(upper, 0)
         return None
     return None
 
