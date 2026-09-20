@@ -120,3 +120,11 @@
 .margin_box.level_tight { background: var(--amber_soft); color: #8a4f00; }
 .margin_box.level_late { background: var(--red_soft); color: var(--red); }
 .margin_box.level_none { background: #f1f5f9; color: var(--muted); }
+
+/* 항공 배지 설명 */
+.badge_guide { margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; background: #f8fafc; border: 1px solid var(--line); }
+.badge_guide p { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.badge_guide p:last-child { margin-bottom: 0; }
+.badge_guide .ac_note { margin-right: 6px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-style: normal; font-weight: 800; background: var(--blue_soft); color: var(--blue_dark); }
+.badge_guide .ac_note.cargo { background: #fff1e6; color: #b45309; }
+.badge_guide .ac_note.direct { background: var(--green_soft); color: #07694f; }

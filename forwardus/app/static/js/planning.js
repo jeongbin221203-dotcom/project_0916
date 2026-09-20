@@ -233,6 +233,7 @@
   /* ----- Transport mode toggles ----- */
   function applyMode() {
     const isAir = state.transport_mode === "AIR";
+    document.querySelectorAll("[data-air-only]").forEach((el) => { el.hidden = !isAir; });
     document.querySelectorAll("[data-sea-only]").forEach((el) => { el.hidden = isAir; });
     document.querySelectorAll("[data-kind-label]").forEach((el) => { el.textContent = isAir ? "공항" : "항구"; });
     document.querySelectorAll("[data-sea-only-term]").forEach((card) => {
@@ -303,8 +304,13 @@
         });
         groups.forEach((entries, value) => {
           const other = value === "환승 필요";
+          const GROUP_NOTES = {
+            "환승 필요": "국내 공항발 직항편이 없어 환승이 필요합니다",
+            "항공화물 거점 (직항)": "화물기 취항지 또는 화물 처리 거점입니다",
+          };
+          const note = GROUP_NOTES[value];
           html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
-            + (other ? `<small>국내 공항발 직항편이 없어 환승이 필요합니다</small>` : "")
+            + (note ? `<small>${escapeHtml(note)}</small>` : "")
             + `</li>`;
           entries.forEach(({ item, index }) => {
             html += `<li role="option" data-index="${index}">${renderItem(item)}</li>`;

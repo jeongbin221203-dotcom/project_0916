@@ -357,6 +357,26 @@ def test_transfer_airports_suggest_hub(app):
     assert not by_code["LAX"]["transfer_via"]       # 직항 공항에는 경유 안내가 없습니다
 
 
+def test_korean_air_cargo_destinations(app):
+    """대한항공 화물 취항지가 확인된 목록과 일치합니다."""
+
+    from app.collectors import location_client
+
+    airports = {item["code"]: item for item in location_client.load_mock("locations")
+                if item["kind"] == "airport"}
+    ke = {code for code, item in airports.items() if item["korean_air_cargo"]}
+    assert 50 <= len(ke) <= 60
+    # 공식 소개 페이지와 위키백과 화물 표기 노선에서 확인한 공항
+    assert {"LAX", "JFK", "ORD", "SFO", "ATL", "ANC", "AMS", "FRA", "LHR", "CDG",
+            "VIE", "BRU", "ZRH", "MAD", "ZAZ", "ARN", "BUD", "OSL",
+            "NRT", "KIX", "KKJ", "PVG", "CGO", "TAS", "SGN", "HAN", "DEL", "MAA"} <= ke
+    # 데이터에 없거나 운항이 끝난 노선은 제외합니다.
+    assert "SVO" not in ke      # 모스크바: 운항 종료
+    assert "CMH" not in ke      # 콜럼버스: 실제 취항지는 Rickenbacker(LCK)
+    assert "NAV" not in ke      # NAV는 터키 네브셰히르, 나보이는 NVI
+    assert all(airports[code]["cargo_hub"] for code in ke)
+
+
 def test_cargo_hubs_listed_first(app):
     """항공화물 거점이 목록 맨 위에 옵니다."""
 

@@ -224,16 +224,28 @@ KOREAN_NAMES = {
 # Major cargo airports (IATA code → Korean name). UN/LOCODE airport rows are
 # noisy, so international airports used for air freight are curated here.
 # 항공화물 거점 공항.
-# - KE: 대한항공 화물이 취항한다고 공식 소개 페이지에 밝힌 도시
-#   (cargo.koreanair.com, 2025.08 기준 25개국 44개 도시)
+# - KE: 대한항공 화물(여객기 벨리 포함) 취항지.
+#   출처: cargo.koreanair.com 소개 페이지(2025.08 기준 25개국 44개 도시)와
+#   위키백과 List of Korean Air destinations의 화물 표기 노선.
+#   콜럼버스(Rickenbacker/LCK), 시카고 록퍼드(RFD), 나보이(NVI)는 공항 데이터에 없어
+#   제외했고, 모스크바(SVO)는 운항 종료로 제외했습니다.
 # - HUB: 전 세계 항공화물 처리량 상위 공항과 특송사 허브
 # 여객 노선만 있는 공항과 구분해 목록 위에 표시합니다.
 KOREAN_AIR_CARGO = {
-    "LAX", "JFK", "ORD", "SFO",              # 북미
-    "GDL",                                    # 중남미
-    "LHR", "FRA", "AMS", "VIE", "OSL", "ZAZ", "BUD",  # 유럽
-    "NRT", "KIX", "CGO",                      # 동북아
-    "SIN", "SGN", "HAN",                      # 동남아
+    # 북미
+    "ANC", "ATL", "ORD", "DFW", "LAX", "MIA", "JFK", "SFO", "SEA",
+    "YEG", "YHZ", "YYZ", "YVR",
+    # 중남미
+    "VCP", "SCL", "BOG", "GDL", "LIM",
+    # 유럽
+    "VIE", "BRU", "BSL", "FRA", "CDG", "MXP", "MAD", "ZAZ", "ARN", "ZRH", "AMS", "LHR",
+    "OSL", "BUD",
+    # 중앙아시아
+    "TAS",
+    # 동북아
+    "NRT", "KIX", "KKJ", "PEK", "PVG", "CAN", "SHE", "TSN", "XIY", "CGO", "CTU", "HKG",
+    # 동남아·남아시아
+    "SIN", "BKK", "KUL", "PEN", "CGK", "DPS", "MNL", "HAN", "SGN", "DEL", "MAA", "DAC",
 }
 GLOBAL_CARGO_HUBS = {
     # 북미
