@@ -1242,3 +1242,53 @@ def test_schedule_sort_survives_missing_values_from_live_apis():
     assert [i["schedule_id"] for i in _sort_schedules(items, "duration")][0] == "b"
     # 정시율이 높은 쪽이 추천에서 앞섭니다. (빈 값은 0으로 봅니다)
     assert [i["schedule_id"] for i in _sort_schedules(items, "recommended")][0] == "b"
+
+
+def test_direct_sailing_is_judged_per_lane_not_per_destination(app):
+    """직기항은 출발항과 도착국을 함께 봐야 합니다.
+
+    예전에는 도착항만 보고 판정해서, 멕시코 항로가 없는 광양항에서도
+    "직기항"이라고 나왔습니다. searoute 운항 기록 기준으로 멕시코와 이어진
+    국내 항구는 부산뿐입니다.
+    """
+
+    from app.collectors import location_client
+
+    with app.app_context():
+        gwangyang = location_client.sea_lane_direct("KRKAN", "MX")
+        busan = location_client.sea_lane_direct("KRPUS", "MX")
+
+        assert gwangyang["known"] is True
+        assert gwangyang["direct"] is False
+        assert gwangyang["alternatives"] == ["KRPUS"]      # 부산 출발은 있습니다.
+        assert busan["direct"] is True
+
+        # 미국은 광양에서도 이어집니다. 무조건 막는 것이 아닙니다.
+        assert location_client.sea_lane_direct("KRKAN", "US")["direct"] is True
+        # 자료에 없는 항구는 "모른다"로 둡니다. 없다고 단정하지 않습니다.
+        assert location_client.sea_lane_direct("KRZZZ", "MX")["known"] is False
+
+
+def test_outlook_says_which_korean_port_has_the_service(app):
+    """직기항이 없으면 어느 항구에서 출발해야 하는지 알려 줍니다."""
+
+    with app.app_context():
+        outlook = planning_service.schedule_outlook({
+            "origin_code": "KRKAN", "destination_code": "MXZLO",
+            "requested_departure_date": "2026-09-21",
+            "transport_mode": "SEA", "sea_mode": "LCL"})
+
+    sea = [mode for mode in outlook["modes"] if mode["mode"] == "SEA"]
+    assert sea and all(mode["direct"] is False for mode in sea)
+    assert all("부산항 출발은 직기항" in mode["note"] for mode in sea)
+
+    with app.app_context():
+        busan = planning_service.schedule_outlook({
+            "origin_code": "KRPUS", "destination_code": "MXZLO",
+            "requested_departure_date": "2026-09-21",
+            "transport_mode": "SEA", "sea_mode": "LCL"})
+
+    busan_sea = [mode for mode in busan["modes"] if mode["mode"] == "SEA"]
+    assert all(mode["direct"] is True for mode in busan_sea)
+    # 환적이 빠지면 소요일도 줄어듭니다.
+    assert busan_sea[0]["min_days"] < sea[0]["min_days"]
