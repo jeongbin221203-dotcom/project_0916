@@ -218,7 +218,10 @@ def _validate_money(payload: dict) -> dict:
     except ValidationError:
         quantity = 0
     if amount is None and unit_price is not None and quantity:
-        amount = round(unit_price * quantity, 2)
+        amount = unit_price * quantity
     elif unit_price is None and amount is not None and quantity:
         unit_price = round(amount / quantity, 4)
-    return {"unit_price": unit_price, "amount": amount}
+    # 금액은 줄 단위로 먼저 원 단위(소수 둘째 자리)까지 맞춥니다.
+    # 그래야 송장에 적히는 품목 금액의 합과 총액이 어긋나지 않습니다.
+    return {"unit_price": unit_price,
+            "amount": None if amount is None else round(amount, 2)}

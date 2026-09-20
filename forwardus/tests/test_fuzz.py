@@ -15,6 +15,12 @@ from pathlib import Path
 
 import pytest
 
+# 이 파일은 10분 가까이 걸립니다. 평소에는 빼고 돌리세요.
+#     python -m pytest tests -m "not slow"
+# 코드를 크게 고친 뒤에는 한 번씩 돌려 주세요.
+#     python -m pytest tests/test_fuzz.py
+pytestmark = pytest.mark.slow
+
 HERE = Path(__file__).resolve().parent
 
 

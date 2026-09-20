@@ -139,6 +139,7 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         "quantity": sum(line["quantity"] for line in lines),
         # 품목별 금액을 모두 적었으면 그 합이 송장 금액입니다.
         # 하나라도 비어 있으면 지어내지 않고 None을 돌려줍니다.
+        # 줄마다 이미 둘째 자리로 맞춰 두었으므로 그대로 더하면 송장과 맞습니다.
         "amount": (round(sum(line["amount"] for line in lines), 2)
                    if lines and all(line.get("amount") is not None for line in lines) else None),
         "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
