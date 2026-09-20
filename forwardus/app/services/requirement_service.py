@@ -21,6 +21,27 @@ MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 UPLOAD_DIR = Path("instance") / "requirement_uploads"
 
 
+def official_requirements(hs_code: str) -> dict:
+    """관세청에 이 품목의 수출 요건을 직접 물어봅니다.
+
+    우리 규칙표는 HS 류(類)로 짐작한 안내이고, 이쪽은 세번 10자리 기준의
+    관세청 자료입니다. 답이 오면 그것이 기준이고, 우리 규칙은 보조가 됩니다.
+    """
+
+    from app.collectors import customs_extra_client
+
+    result = customs_extra_client.export_requirement_laws(hs_code)
+    if result["success"]:
+        return {"available": True, "laws": result["data"], "source": "api",
+                "note": ("관세법 제226조 세관장확인대상입니다. 아래 법령의 요건승인을 "
+                         "받아야 수출신고가 수리됩니다." if result["data"] else
+                         "이 세번은 세관장확인대상이 아닙니다. 다만 개별법 요건은 "
+                         "따로 확인해야 합니다.")}
+    # 키가 없거나 관세청이 멈춘 경우. 우리 규칙표로만 안내하고 그렇다고 밝힙니다.
+    return {"available": False, "laws": [], "source": result["source"],
+            "message": result["message"]}
+
+
 def requirements_for(shipment) -> dict:
     """이 건에서 확인해야 할 수출 요건."""
 
@@ -31,11 +52,14 @@ def requirements_for(shipment) -> dict:
     seen = {}
     for cargo in cargos:
         items = export_requirements.check(cargo.hs_code, is_dangerous=cargo.is_dangerous)
+        official = official_requirements(cargo.hs_code) if cargo.hs_code else {
+            "available": False, "laws": [], "source": "", "message": "HS부호가 없습니다."}
         by_item.append({
             "line_no": cargo.line_no,
             "product_description": cargo.product_description,
             "hs_code": cargo.hs_code,
             "items": items,
+            "official": official,
             "summary": export_requirements.summary(cargo.hs_code, items),
         })
         for item in items:

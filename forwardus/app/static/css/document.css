@@ -145,3 +145,28 @@
 .origin_upload_form input[type=file] { font-size: 12.5px; }
 .origin_upload_box .upload_list { margin-top: 14px; }
 @media (max-width: 760px) { .origin_upload_form { grid-template-columns: 1fr; } }
+
+/* 관세청이 직접 답한 수출요건 (우리 규칙표보다 앞섭니다) */
+.req_official { margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+  background: var(--blue_soft); border-left: 3px solid var(--blue); }
+.req_official > b { font-size: 12.5px; color: var(--blue_dark); }
+.req_official p { margin: 4px 0 8px; }
+.req_law_list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.req_law_list li { display: grid; gap: 2px; padding: 8px 11px; border-radius: 9px;
+  background: #fff; font-size: 12.5px; line-height: 1.55; }
+.req_law_list li b { font-size: 13px; }
+.req_law_list li span { font-weight: 700; color: var(--muted); }
+.req_official_none { margin: 8px 0 0; font-size: 12.5px; color: var(--green); font-weight: 700; }
+
+/* 연결된 자료원 현황 */
+.src_grid { display: grid; gap: 6px; margin-top: 12px; }
+.src_row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px) 130px;
+  gap: 12px; align-items: center; padding: 9px 13px; border-radius: 10px;
+  background: #f8fafc; font-size: 13px; }
+.src_row.no_key { background: var(--amber_soft); }
+.src_row b { font-weight: 700; }
+.src_env { font-size: 11.5px; color: var(--muted); }
+.src_state { text-align: right; white-space: nowrap; }
+.src_state a { margin-left: 6px; font-size: 11.5px; font-weight: 800; color: var(--blue); }
+@media (max-width: 760px) { .src_row { grid-template-columns: 1fr; gap: 3px; }
+  .src_state { text-align: left; } }

@@ -28,8 +28,11 @@
         <label class="field">
           <span class="field_label">수출자 사업자등록번호</span>
           <input class="text_input" type="text" name="exporter_business_no"
-                 value="{{ shipment.exporter_business_no }}" placeholder="000-00-00000" maxlength="20">
+                 value="{{ shipment.exporter_business_no }}" placeholder="000-00-00000"
+                 maxlength="20" data-business-no>
           <small class="muted small">숫자 10자리. 수출신고서에 반드시 들어갑니다.</small>
+          <button type="button" class="button small ghost" data-find-ecm>통관고유부호 찾기</button>
+          <small class="muted small" data-ecm-result hidden></small>
         </label>
         <label class="field">
           <span class="field_label">거래구분</span>
@@ -104,6 +107,42 @@
     </div>
   </section>
 
+  {% if refund.available or refund.company %}
+    <section class="card">
+      <h2>간이정액 환급 <small class="muted">관세청 환급율표</small></h2>
+      <p class="muted">{{ refund.note }}</p>
+
+      {% if refund.company %}
+        <div class="alert {{ 'ok' if refund.company.eligible else 'warn' }}">
+          {{ refund.company.name }}은(는) 간이정액 환급
+          {{ '대상입니다' if refund.company.eligible else '대상이 아닙니다' }}.
+          {% if refund.company.applied_on %}(적용 승인 {{ refund.company.applied_on }}){% endif %}
+          {% if refund.company.excluded_reason %}· {{ refund.company.excluded_reason }}{% endif %}
+        </div>
+      {% endif %}
+
+      {% if refund.rates %}
+        <div class="table_scroll">
+          <table class="table">
+            <thead><tr><th>품목</th><th>HS CODE</th><th>규격</th><th>환급액</th><th>기준</th><th>적용일</th></tr></thead>
+            <tbody>
+              {% for rate in refund.rates %}
+                <tr>
+                  <td>{{ rate.product_description }}</td>
+                  <td class="mono">{{ rate.hs_code }}</td>
+                  <td class="muted small">{{ rate.spec or '-' }}</td>
+                  <td><b>{{ rate.amount_krw }}원</b></td>
+                  <td class="muted small">{{ rate.basis or '-' }}</td>
+                  <td class="muted small">{{ rate.start_date or '-' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+
   <section class="card">
     <div class="row_between wrap">
       <h2>그대로 보내기</h2>
@@ -114,6 +153,30 @@
   </section>
 
   <script>
+    // 사업자등록번호로 통관고유부호를 관세청에서 찾아 줍니다.
+    document.querySelector("[data-find-ecm]")?.addEventListener("click", async (event) => {
+      const input = document.querySelector("[data-business-no]");
+      const slot = document.querySelector("[data-ecm-result]");
+      const button = event.currentTarget;
+      slot.hidden = false;
+      slot.textContent = "찾는 중…";
+      button.disabled = true;
+      try {
+        const url = "{{ url_for('document.api_clearance_code', shipment_id=shipment.shipment_id) }}"
+          + "?business_no=" + encodeURIComponent(input.value);
+        const body = await (await fetch(url)).json();
+        if (body.success && body.data.length) {
+          const row = body.data[0];
+          slot.textContent = `통관고유부호 ${row.clearance_code} · ${row.name}`;
+        } else {
+          slot.textContent = body.message || "관세청에 등록된 통관고유부호를 찾지 못했습니다.";
+        }
+      } catch (error) {
+        slot.textContent = "조회하지 못했습니다. 잠시 후 다시 눌러주세요.";
+      }
+      button.disabled = false;
+    });
+
     document.querySelector("[data-copy-filing]")?.addEventListener("click", async (event) => {
       const text = document.querySelector("[data-filing-text]").textContent;
       const button = event.currentTarget;

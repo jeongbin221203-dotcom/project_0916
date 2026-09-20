@@ -22,6 +22,31 @@
           <span class="mono muted small">{{ row.hs_code or 'HS부호 미입력' }}</span>
         </div>
         <p class="muted small">{{ row.summary }}</p>
+
+        {# 관세청이 세번 10자리로 답해 주면 그것이 기준입니다. #}
+        {% if row.official.available %}
+          {% if row.official.laws %}
+            <div class="req_official">
+              <b>관세청 세관장확인대상</b>
+              <p class="muted small">{{ row.official.note }}</p>
+              <ul class="req_law_list">
+                {% for law in row.official.laws %}
+                  <li>
+                    <b>{{ law.law_name }}</b>
+                    {% if law.agency %}<span>{{ law.agency }}</span>{% endif %}
+                    {% if law.document %}<small class="muted">{{ law.document }}</small>{% endif %}
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% else %}
+            <p class="req_official_none">{{ row.official.note }}
+              <span class="badge source_api">Data Source: API</span></p>
+          {% endif %}
+        {% elif row.hs_code %}
+          <p class="muted small">관세청에 직접 물어보지 못했습니다.
+            ({{ row.official.message }}) 아래는 우리 규칙표로 짚은 안내입니다.</p>
+        {% endif %}
       </div>
     {% endfor %}
   </section>

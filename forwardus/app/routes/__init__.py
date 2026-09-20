@@ -33,10 +33,12 @@ def register_blueprints(flask_app: Flask) -> None:
     from app.routes.assistant import assistant_bp
     from app.routes.dashboard import dashboard_bp
     from app.routes.document import document_bp
+    from app.routes.lookup import lookup_bp
     from app.routes.home import home_bp
     from app.routes.planning import planning_bp
     from app.routes.shipment import shipment_bp
     from app.routes.tracking import tracking_bp
 
-    for blueprint in (home_bp, planning_bp, shipment_bp, document_bp, tracking_bp, assistant_bp, dashboard_bp):
+    for blueprint in (home_bp, planning_bp, shipment_bp, document_bp, tracking_bp,
+                      assistant_bp, dashboard_bp, lookup_bp):
         flask_app.register_blueprint(blueprint)

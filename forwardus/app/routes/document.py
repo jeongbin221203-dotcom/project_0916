@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import (Blueprint, flash, jsonify, redirect, render_template,
+                   request, url_for)
 
 from app.routes import load_shipment
 from app.services import (ServiceError, customs_filing_service, document_service,
@@ -98,7 +99,17 @@ def customs_filing(shipment_id: str):
         sheet=sheet,
         sheet_text=customs_filing_service.as_text(sheet),
         missing_summary=customs_filing_service.describe_missing(sheet),
+        refund=customs_filing_service.refund_estimate(shipment),
     )
+
+
+@document_bp.get("/<shipment_id>/customs-filing/clearance-code")
+def api_clearance_code(shipment_id: str):
+    """사업자등록번호로 통관고유부호를 찾아 줍니다."""
+
+    load_shipment(shipment_id)
+    result = customs_filing_service.lookup_clearance_code(request.args.get("business_no", ""))
+    return jsonify(result), (200 if result["success"] else 502)
 
 
 @document_bp.post("/<shipment_id>/customs-filing")

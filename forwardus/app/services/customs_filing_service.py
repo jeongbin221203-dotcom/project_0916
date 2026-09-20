@@ -37,6 +37,55 @@ DEFAULT_PAYMENT_METHOD = "TT"
 TRANSPORT_LABELS = {"SEA": "10 · 해상", "AIR": "40 · 항공"}
 
 
+def lookup_clearance_code(business_no: str) -> dict:
+    """사업자등록번호로 통관고유부호를 관세청에서 찾아 줍니다.
+
+    통관고유부호는 수출신고서의 법정 기재사항(시행령 제246조 제1항 제5호)이고
+    따로 신청해야 받습니다. 번호를 모르면 신고를 시작할 수 없습니다.
+    """
+
+    from app.collectors import customs_extra_client
+
+    return customs_extra_client.clearance_code(business_no=business_no)
+
+
+def refund_estimate(shipment) -> dict:
+    """간이정액 환급으로 얼마를 돌려받을 수 있는지 어림합니다.
+
+    관세청 환급율표는 "수출금액 1만원당 몇 원" 또는 "10달러당 몇 원"으로 줍니다.
+    실제 환급액은 세관이 정하므로 여기서는 어림값이라고 밝힙니다.
+    """
+
+    from app.collectors import customs_extra_client
+
+    rows = []
+    for cargo in shipment.cargos:
+        if not cargo.hs_code:
+            continue
+        found = customs_extra_client.refund_rate(cargo.hs_code)
+        if not found["success"] or not found["data"]:
+            continue
+        for rate in found["data"]:
+            rows.append({**rate, "line_no": cargo.line_no,
+                         "product_description": cargo.product_description})
+
+    eligible = None
+    if shipment.exporter_business_no:
+        codes = customs_extra_client.clearance_code(business_no=shipment.exporter_business_no)
+        if codes["success"] and codes["data"]:
+            company = customs_extra_client.refund_company(codes["data"][0]["clearance_code"])
+            if company["success"] and company["data"]:
+                eligible = company["data"][0]
+
+    return {
+        "available": bool(rows),
+        "rates": rows,
+        "company": eligible,
+        "note": ("간이정액 환급율표는 관세청이 품목별로 고시합니다. "
+                 "실제 환급액은 수출 실적과 서류를 보고 세관이 정합니다."),
+    }
+
+
 def _blank(value) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
