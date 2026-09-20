@@ -894,6 +894,8 @@
   function dgBoxHtml() {
     const options = DG_CLASSES
       .map((c) => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.label)}</option>`).join("");
+    const groups = Object.entries(window.FORWARDUS_PACKING_GROUPS || {})
+      .map(([code, label]) => `<option value="${escapeHtml(code)}">${escapeHtml(label)}</option>`).join("");
     return `
       <label class="dg_check">
         <input type="checkbox" data-dg="is_dangerous">
@@ -911,7 +913,22 @@
           <select data-dg="dg_class"><option value="">등급 선택</option>${options}</select>
           <small class="field_hint" data-dg-examples></small>
         </label>
+        <label class="field span2">
+          <span class="field_label">정식운송품명 (Proper Shipping Name)</span>
+          <input class="text_input" type="text" data-dg="proper_shipping_name" maxlength="200"
+                 placeholder="예: PAINT" autocomplete="off">
+          <small class="field_hint">위험물 신고서와 포장 라벨에 이 이름을 그대로 씁니다.
+            상품명이 아니라 MSDS에 적힌 공식 품명입니다.</small>
+        </label>
+        <label class="field">
+          <span class="field_label">포장등급 (Packing Group) <small class="muted">(선택)</small></span>
+          <select data-dg="packing_group">
+            <option value="">해당 없음</option>${groups}
+          </select>
+          <small class="field_hint">위험도입니다. 등급에 따라 쓸 수 있는 용기가 달라집니다.</small>
+        </label>
       </div>
+      <p class="dg_warn" data-dg-warn hidden></p>
       <div class="dg_guide" data-dg-guide hidden></div>`;
   }
 
@@ -955,32 +972,52 @@
       fields.hidden = !toggle.checked;
       const info = DG_CLASSES.find((c) => c.code === select.value);
       examples.textContent = info ? `예: ${info.examples}` : "";
+      if (!toggle.checked) showDgWarning(box, "");
       renderDgGuide(box);
+      // 위험물 표시를 바꾸면 계산도 다시 돌려야 합니다. 체크를 풀었는데
+      // 예전 경고가 계산 패널에 남아 있던 문제를 여기서 막습니다.
+      recalc();
       invalidateSchedules();
       saveDraftSoon();
     };
     toggle.addEventListener("change", sync);
     select.addEventListener("change", sync);
-    box.querySelector('[data-dg="un_number"]').addEventListener("input", saveDraftSoon);
+    box.querySelectorAll('[data-dg="un_number"], [data-dg="proper_shipping_name"]')
+      .forEach((input) => input.addEventListener("input", () => { recalc(); saveDraftSoon(); }));
+    box.querySelector('[data-dg="packing_group"]').addEventListener("change", saveDraftSoon);
     box.refreshDg = sync;
     return box;
   }
 
+  const DG_FIELDS = ["un_number", "dg_class", "proper_shipping_name", "packing_group"];
+
+  function showDgWarning(box, message) {
+    const warn = box && box.querySelector("[data-dg-warn]");
+    if (!warn) return;
+    warn.textContent = message || "";
+    warn.hidden = !message;
+  }
+
   function dgValues(box) {
-    if (!box) return { is_dangerous: false, un_number: "", dg_class: "" };
-    return {
-      is_dangerous: box.querySelector('[data-dg="is_dangerous"]').checked,
-      un_number: box.querySelector('[data-dg="un_number"]').value.trim(),
-      dg_class: box.querySelector('[data-dg="dg_class"]').value,
-    };
+    if (!box) return { is_dangerous: false };
+    const values = { is_dangerous: box.querySelector('[data-dg="is_dangerous"]').checked };
+    DG_FIELDS.forEach((key) => { values[key] = box.querySelector(`[data-dg="${key}"]`).value.trim(); });
+    return values;
   }
 
   function setDgValues(box, values = {}) {
     if (!box || !values) return;
     box.querySelector('[data-dg="is_dangerous"]').checked = Boolean(values.is_dangerous);
-    box.querySelector('[data-dg="un_number"]').value = values.un_number || "";
-    box.querySelector('[data-dg="dg_class"]').value = values.dg_class || "";
+    DG_FIELDS.forEach((key) => { box.querySelector(`[data-dg="${key}"]`).value = values[key] || ""; });
     box.refreshDg();
+  }
+
+  // 위험물 칸이 덜 채워졌다는 안내를 해당 품목의 상자에 붙입니다.
+  // 서버가 돌려주는 line_no는 실제로 보낸 품목 순서라, 보낸 순서 그대로 맞춥니다.
+  function applyDgWarnings(warnings, boxes) {
+    const all = [mainDgBox, ...cargoLinesBox.querySelectorAll("[data-dg-box]")];
+    all.forEach((box) => showDgWarning(box, ""));
+    (warnings || []).forEach((warning) => showDgWarning(boxes[warning.line_no - 1], warning.message));
   }
 
   const mainDgBox = document.querySelector("[data-dg-main]");
@@ -1052,15 +1089,20 @@
     });
   }
 
-  function extraCargoLines() {
+  function extraCargoEntries() {
     return Array.from(cargoLinesBox.querySelectorAll(".cargo_item")).map((row) => {
-      const item = { ...dgValues(row.querySelector("[data-dg-box]")) };
+      const box = row.querySelector("[data-dg-box]");
+      const item = { ...dgValues(box) };
       row.querySelectorAll("[data-line]").forEach((input) => {
         item[input.dataset.line] = input.dataset.number === undefined
           ? input.value : plainNumber(input.value);
       });
-      return item;
-    }).filter((item) => LINE_FIELDS.every((key) => item[key] !== ""));
+      return { item, box };
+    }).filter(({ item }) => LINE_FIELDS.every((key) => item[key] !== ""));
+  }
+
+  function extraCargoLines() {
+    return extraCargoEntries().map(({ item }) => item);
   }
 
   document.querySelector("[data-add-cargo]")?.addEventListener("click", () => addCargoLine());
@@ -1072,6 +1114,9 @@
     invalidateSchedules();
     saveDraftSoon();
   });
+
+  // 보낸 품목과 그 위험물 상자를 짝지어 둡니다. 경고를 제자리에 붙이는 데 씁니다.
+  let lastCargoBoxes = [];
 
   function cargoPayload() {
     const f = form.elements;
@@ -1087,7 +1132,9 @@
       weight_per_package_kg: plainNumber(f.weight_per_package_kg.value),
       net_weight_kg: plainNumber(f.net_weight_kg.value),
     };
-    return { items: [first, ...extraCargoLines()] };
+    const extras = extraCargoEntries();
+    lastCargoBoxes = [mainDgBox, ...extras.map(({ box }) => box)];
+    return { items: [first, ...extras.map(({ item }) => item)] };
   }
 
   function renderMetrics(metrics) {
@@ -1113,9 +1160,13 @@
       calcMessage.textContent = "치수·수량·중량을 입력하면 계산됩니다.";
       return;
     }
+    const boxes = lastCargoBoxes;
     const response = await postJson(urls.cargo, payload);
     state.metrics = response.success ? response.data : null;
     renderMetrics(state.metrics);
+    // 위험물 칸이 덜 채워진 것은 계산 오류가 아닙니다. 계산값은 그대로 보여주고
+    // 경고만 해당 품목의 위험물 상자에 붙입니다.
+    applyDgWarnings(response.success ? response.data.dg_warnings : [], boxes);
     calcMessage.textContent = response.success ? "서버에서 계산된 값입니다." : response.message;
   }, 250);
 

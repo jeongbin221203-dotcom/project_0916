@@ -59,6 +59,7 @@ def view(shipment_id: str, doc_type: str):
         shipment=shipment,
         document=document,
         fields=document_service.document_view(document),
+        items=document_service.document_items(document),
         edit=request.args.get("edit") == "1" and document.status != "final",
     )
 

@@ -26,11 +26,12 @@ DOCUMENT_FIELDS = {
         "package_type", "unit_price", "invoice_value", "currency", "gross_weight_kg", "net_weight_kg",
         "remarks", "signed_by",
     ],
+    # 패킹리스트는 주문 단위 서식을 씁니다. (ORDER # / SHIPPED TO / 품목표 / PACKED BY)
     "packing_list": [
-        "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "buyer",
-        "notify_party", "other_references", "pol", "pod", "vessel_or_flight", "etd", "shipping_marks",
-        "product_description", "hs_code", "quantity", "package_type", "gross_weight_kg", "net_weight_kg",
-        "total_cbm", "remarks", "signed_by",
+        "order_no", "doc_date", "consignee", "consignee_address", "consignee_city_zip",
+        "date_ordered", "customer_order_no", "date_shipped", "attention",
+        "shipped_via", "container_no", "invoice_no",
+        "gross_weight_kg", "net_weight_kg", "total_cbm", "comments", "packed_by",
     ],
     "proforma_invoice": [
         "doc_no", "doc_date", "validity_date", "po_no", "exporter", "exporter_address", "consignee",
@@ -43,19 +44,19 @@ DOCUMENT_FIELDS = {
         "doc_no", "doc_date", "booking_no", "exporter", "exporter_address", "consignee", "consignee_address",
         "notify_party", "pol", "pod", "carrier", "vessel_or_flight", "etd", "shipping_marks",
         "product_description", "hs_code", "quantity", "package_type", "gross_weight_kg", "total_cbm",
-        "container_seal_no", "freight_term", "incoterms", "remarks", "signed_by",
+        "container_seal_no", "freight_term", "incoterms", "dangerous_goods", "remarks", "signed_by",
     ],
     "booking_request": [
         "doc_no", "doc_date", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party",
         "notify_party_2", "contact", "service_contract_no", "carrier", "vessel_or_flight", "pol", "etd", "pod",
         "eta", "hs6", "routing_remark", "product_description", "quantity", "package_type", "gross_weight_kg",
-        "total_cbm", "equipment", "reefer", "freight_term", "prepaid_at", "collect_at", "confirmation_to",
+        "total_cbm", "equipment", "reefer", "freight_term", "prepaid_at", "collect_at", "confirmation_to", "dangerous_goods",
         "remarks",
     ],
     "bl_draft": [
         "doc_no", "exporter", "exporter_address", "consignee", "consignee_address", "notify_party", "pol", "pod",
         "vessel_or_flight", "etd", "product_description", "hs_code", "quantity", "package_type",
-        "gross_weight_kg", "total_cbm", "freight_term", "remarks",
+        "gross_weight_kg", "total_cbm", "freight_term", "dangerous_goods", "remarks",
     ],
 }
 
@@ -109,10 +110,59 @@ FIELD_LABELS = {
     "hs6": "HS6 Code",
     "routing_remark": "Special Remark on Routing",
     "reefer": "Reefer (Temperature / Humidity)",
+    "dangerous_goods": "Dangerous Goods (UN No. / Class / PG)",
     "prepaid_at": "Prepaid at",
     "collect_at": "Collect at",
     "confirmation_to": "Booking Confirmation Deliver To",
+    # 패킹리스트 서식
+    "order_no": "ORDER #",
+    "consignee_city_zip": "City, State, ZIP",
+    "date_ordered": "Date Ordered",
+    "customer_order_no": "Customer Order Number",
+    "date_shipped": "Date Shipped",
+    "attention": "Attention",
+    "shipped_via": "Shipped Via",
+    "container_no": "Container Number",
+    "invoice_no": "Our Invoice Number",
+    "comments": "Comments",
+    "packed_by": "Packed By",
 }
+
+# 품목이 여러 개인 서류는 표로 적습니다. 서식마다 칸 이름이 달라 따로 둡니다.
+DOCUMENT_ITEM_FIELDS = {
+    "commercial_invoice": [
+        ("shipping_marks", "Shipping Marks"), ("packages", "No. & kind of packages"),
+        ("description", "Goods description"), ("quantity", "Quantity"),
+        ("unit_price", "Unit price"), ("amount", "Amount"),
+    ],
+    "packing_list": [
+        ("item_number", "ITEM NUMBER"), ("quantity", "QUANTITY"), ("shipped", "SHIPPED"),
+        ("backordered", "BACKORDERED"), ("description", "DESCRIPTION"),
+        ("unit_weight", "UNIT WEIGHT"), ("total_weight", "TOTAL WEIGHT"),
+    ],
+    "proforma_invoice": [
+        ("description", "Item"), ("quantity", "Quantity"), ("unit", "UNIT"),
+        ("unit_price", "Unit Price"), ("amount", "Amount"),
+    ],
+    # 선적 서류의 화물 표시란 (Marks and numbers / Description of goods)
+    "shipping_instruction": [
+        ("shipping_marks", "Marks & numbers"), ("packages", "No. of Pkgs"),
+        ("description", "Description of goods"), ("total_weight", "Gross Weight (kg)"),
+        ("measurement", "Measurement (CBM)"),
+    ],
+    "booking_request": [
+        ("description", "Description of goods"), ("packages", "Packages"),
+        ("total_weight", "Gross Weight (kg)"), ("measurement", "Measurement (CBM)"),
+    ],
+    "bl_draft": [
+        ("shipping_marks", "Marks & numbers"), ("packages", "No. of Pkgs"),
+        ("description", "Description of goods"), ("total_weight", "Gross Weight (kg)"),
+        ("measurement", "Measurement (CBM)"),
+    ],
+}
+
+# 서식에 인쇄된 고정 문구
+PACKING_LIST_NOTE = ("When referring to this shipment be sure to give order # and shipping date.")
 
 # 칸이 넓어야 읽기 좋은 항목 (주소·품명·화인·비고 등)
 WIDE_FIELDS = {"product_description", "exporter_address", "consignee_address", "remarks", "shipping_marks",
@@ -144,6 +194,13 @@ def build_reference(shipment) -> dict:
     prepaid = shipment.incoterms in PREPAID_INCOTERMS
     hs_digits = "".join(ch for ch in (cargo.hs_code if cargo else "") or "" if ch.isdigit())
     return {
+        # 위험물은 선사·항공사에 반드시 신고합니다. 한 건에 여럿이면 모두 적습니다.
+        "dangerous_goods": " / ".join(
+            " ".join(part for part in [
+                item.un_number, f"CLASS {item.dg_class}",
+                f"PG {item.packing_group}" if item.packing_group else "",
+                item.proper_shipping_name] if part)
+            for item in shipment.cargos if item.is_dangerous and item.un_number),
         "exporter": shipment.exporter_name,
         "exporter_address": shipment.exporter_address,
         "consignee": buyer.name if buyer else "",
@@ -185,7 +242,61 @@ def build_reference(shipment) -> dict:
         "validity_date": "", "po_no": "", "bank_info": "", "booking_no": "", "container_seal_no": "",
         "notify_party_2": "", "contact": "", "service_contract_no": "", "routing_remark": "", "reefer": "",
         "confirmation_to": "",
+        # 패킹리스트 서식
+        "order_no": shipment.shipment_id,
+        "consignee_city_zip": "",
+        "date_ordered": "",
+        "customer_order_no": "",
+        "date_shipped": shipment.etd.isoformat() if shipment.etd else "",
+        "attention": buyer.contact_email if buyer else "",
+        "shipped_via": " / ".join(part for part in [shipment.carrier, shipment.vessel_or_flight] if part),
+        "container_no": "",
+        "invoice_no": f"CI-{shipment.shipment_id}",
+        "comments": "",
+        "packed_by": shipment.exporter_name,
     }
+
+
+def build_items(shipment, doc_type: str) -> list[dict]:
+    """화물 품목을 그 서류의 표 모양으로 바꿉니다.
+
+    품목이 하나뿐이면 송장 금액을 그 줄에 넣을 수 있지만, 여러 개면 금액을
+    어떻게 나눌지 우리가 알 수 없어 비워 둡니다. (지어내지 않습니다)
+    """
+
+    columns = DOCUMENT_ITEM_FIELDS.get(doc_type)
+    if not columns:
+        return []
+
+    cargos = list(shipment.cargos)
+    single = len(cargos) == 1
+    rows = []
+    for cargo in cargos:
+        unit = PACKAGE_UNITS.get(cargo.package_type, cargo.package_type)
+        dangerous = (f"{cargo.un_number} · {cargo.proper_shipping_name}"
+                     if cargo.is_dangerous and cargo.un_number else "")
+        row = {
+            "item_number": cargo.hs_code or "",
+            "description": " / ".join(part for part in [cargo.product_description, dangerous] if part),
+            "quantity": cargo.quantity,
+            "shipped": cargo.quantity,
+            "backordered": 0,
+            "unit": unit,
+            "packages": f"{cargo.quantity} {unit}",
+            "unit_weight": cargo.weight_per_package_kg,
+            "total_weight": cargo.total_weight_kg,
+            "measurement": cargo.total_cbm,
+            "shipping_marks": "",
+            "unit_price": (round(shipment.invoice_value / cargo.quantity, 4)
+                           if single and cargo.quantity else ""),
+            "amount": shipment.invoice_value if single else "",
+        }
+        rows.append({key: row.get(key, "") for key, _ in columns})
+    return rows
+
+
+def item_columns(doc_type: str) -> list[dict]:
+    return [{"key": key, "label": label} for key, label in DOCUMENT_ITEM_FIELDS.get(doc_type, [])]
 
 
 def _generate_data(shipment, doc_type: str, reference: dict) -> dict:
@@ -194,6 +305,9 @@ def _generate_data(shipment, doc_type: str, reference: dict) -> dict:
         data["doc_no"] = f"{DOC_PREFIX[doc_type]}-{shipment.shipment_id}"
     if "doc_date" in data:
         data["doc_date"] = date.today().isoformat()
+    items = build_items(shipment, doc_type)
+    if items:
+        data["items"] = items
     return data
 
 
@@ -288,6 +402,16 @@ def document_view(document) -> list[dict]:
          "wide": key in WIDE_FIELDS}
         for key in DOCUMENT_FIELDS[document.doc_type]
     ]
+
+
+def document_items(document) -> dict:
+    """서류의 품목 표. 칸 이름과 줄을 함께 돌려줍니다."""
+
+    columns = item_columns(document.doc_type)
+    if not columns:
+        return {}
+    return {"columns": columns, "rows": document.data.get("items") or [],
+            "note": PACKING_LIST_NOTE if document.doc_type == "packing_list" else ""}
 
 
 def origin_certificate_guide(shipment) -> dict:

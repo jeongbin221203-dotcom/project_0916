@@ -86,6 +86,77 @@ def test_documents_follow_standard_form_fields(create_shipment):
     assert next(f for f in view if f["key"] == "po_no")["wide"] is False
 
 
+def test_packing_list_uses_the_order_form_with_an_item_table(create_shipment):
+    """패킹리스트는 주문 서식(ORDER # / SHIPPED TO / 품목표 / PACKED BY)을 씁니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    doc = document_service.get_document(shipment, "packing_list")
+
+    assert {"order_no", "date_ordered", "customer_order_no", "date_shipped", "attention",
+            "shipped_via", "container_no", "invoice_no", "comments", "packed_by"} <= set(doc.data)
+    assert doc.data["order_no"] == shipment.shipment_id
+    assert doc.data["packed_by"] == shipment.exporter_name
+    assert doc.data["invoice_no"] == f"CI-{shipment.shipment_id}"
+
+    items = document_service.document_items(doc)
+    assert [c["label"] for c in items["columns"]] == [
+        "ITEM NUMBER", "QUANTITY", "SHIPPED", "BACKORDERED", "DESCRIPTION",
+        "UNIT WEIGHT", "TOTAL WEIGHT"]
+    assert len(items["rows"]) == len(shipment.cargos)
+    first = items["rows"][0]
+    assert first["quantity"] == shipment.cargos[0].quantity
+    assert first["shipped"] == first["quantity"] and first["backordered"] == 0
+    assert first["total_weight"] == shipment.cargos[0].total_weight_kg
+    # 서식에 인쇄된 안내 문구도 함께 내려줍니다.
+    assert "order #" in items["note"]
+
+
+def test_item_tables_cover_every_document_that_lists_goods(create_shipment):
+    """품목을 줄로 적는 서식은 모두 표를 갖습니다. 나머지는 표가 없습니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    with_items = {"commercial_invoice", "packing_list", "proforma_invoice",
+                  "shipping_instruction", "booking_request", "bl_draft"}
+    for doc_type in with_items:
+        items = document_service.document_items(document_service.get_document(shipment, doc_type))
+        assert items and items["rows"], doc_type
+
+
+def test_item_cells_can_be_edited(create_shipment):
+    """표의 칸도 서류 화면에서 고칠 수 있어야 합니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    document_service.update_document(shipment, "packing_list", {"item-0-backordered": "5"})
+    rows = document_service.get_document(shipment, "packing_list").data["items"]
+    assert rows[0]["backordered"] == "5"
+    # 표에 없는 칸 이름은 무시합니다.
+    document_service.update_document(shipment, "packing_list", {"item-9-quantity": "1"})
+    assert len(document_service.get_document(shipment, "packing_list").data["items"]) == len(rows)
+
+
+def test_dangerous_goods_are_declared_on_shipping_documents(create_shipment):
+    """위험물은 선사에 신고해야 하므로 선적 서류에 UN번호·급·포장등급이 들어갑니다."""
+
+    shipment = create_shipment(cargo={
+        "product_description": "페인트", "hs_code": "3208100000", "package_type": "drum",
+        "quantity": 20, "length_cm": 50, "width_cm": 50, "height_cm": 60,
+        "weight_per_package_kg": 40, "is_dangerous": True, "un_number": "UN1263",
+        "dg_class": "3", "proper_shipping_name": "PAINT", "packing_group": "II"})
+    document_service.generate_documents(shipment)
+
+    for doc_type in ("booking_request", "shipping_instruction", "bl_draft"):
+        declared = document_service.get_document(shipment, doc_type).data["dangerous_goods"]
+        assert declared == "UN1263 CLASS 3 PG II PAINT", doc_type
+
+    # 위험물이 아니면 빈칸입니다.
+    plain = create_shipment()
+    document_service.generate_documents(plain)
+    assert document_service.get_document(plain, "bl_draft").data["dangerous_goods"] == ""
+
+
 def test_edit_creates_warning_and_blocks_finalize(create_shipment):
     shipment = create_shipment()
     document_service.generate_documents(shipment)

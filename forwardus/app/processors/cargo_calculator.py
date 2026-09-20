@@ -47,10 +47,11 @@ def calculate_container_quantity(
     return max(1, by_volume, by_weight)
 
 
-def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAINER_TYPE) -> dict:
+def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAINER_TYPE,
+                            *, strict_dg: bool = True) -> dict:
     """Validate cargo input and calculate CBM, weight, R/T, chargeable weight, and containers."""
 
-    cargo = validate_cargo_input(payload)
+    cargo = validate_cargo_input(payload, strict_dg=strict_dg)
     if container_type not in CONTAINER_SPECS:
         container_type = DEFAULT_CONTAINER_TYPE
 
@@ -74,7 +75,8 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
     }
 
 
-def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTAINER_TYPE) -> dict:
+def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTAINER_TYPE,
+                          *, strict_dg: bool = True) -> dict:
     """화물이 여러 건일 때 품목별 계산과 전체 합계를 함께 돌려줍니다.
 
     컨테이너 수량과 항공 운임중량은 품목을 더한 뒤에 정해야 하므로,
@@ -84,7 +86,7 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
     if container_type not in CONTAINER_SPECS:
         container_type = DEFAULT_CONTAINER_TYPE
 
-    lines = [calculate_cargo_metrics(item, container_type) for item in items]
+    lines = [calculate_cargo_metrics(item, container_type, strict_dg=strict_dg) for item in items]
     total_cbm = sum(line["total_cbm"] for line in lines)
     total_weight_kg = sum(line["total_weight_kg"] for line in lines)
     revenue_ton = calculate_revenue_ton(total_cbm, total_weight_kg)
@@ -93,7 +95,11 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         "lines": lines,
         "line_count": len(lines),
         # 한 건에 위험물이 섞여 있으면 부킹·서류가 통째로 달라집니다. 등급을 모아 둡니다.
-        "dangerous_classes": sorted({line["dg_class"] for line in lines if line["is_dangerous"]}),
+        "dangerous_classes": sorted({line["dg_class"] for line in lines
+                                     if line["is_dangerous"] and line["dg_class"]}),
+        # 입력이 덜 된 위험물 항목. 계산은 막지 않고 품목 번호와 함께 알려 줍니다.
+        "dg_warnings": [{"line_no": index, "message": line["dg_warning"]}
+                        for index, line in enumerate(lines, start=1) if line.get("dg_warning")],
         "quantity": sum(line["quantity"] for line in lines),
         "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
         "total_cbm": round(total_cbm, 4),

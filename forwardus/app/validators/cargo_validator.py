@@ -66,6 +66,13 @@ def package_types_for(transport_mode: str) -> dict:
     mode = (transport_mode or "SEA").upper()
     return {key: info for key, info in PACKAGE_TYPE_INFO.items() if mode in info["modes"]}
 
+# 포장등급(Packing Group). 같은 급이라도 위험도가 갈리고 포장 기준이 달라집니다.
+PACKING_GROUPS = {
+    "I": "I · 위험성 큼",
+    "II": "II · 위험성 보통",
+    "III": "III · 위험성 낮음",
+}
+
 PACKAGE_UNITS = {
     "carton": "CTN", "pallet": "PLT", "wooden_crate": "CRT", "drum": "DRM",
     "flexible_bag": "BAG", "uld": "ULD", "bulk": "BLK",
@@ -114,30 +121,57 @@ def parse_optional_number(value: Any, field_name: str, *, max_value: float | Non
     return parse_number(value, field_name, max_value=max_value, field=field)
 
 
-def validate_dangerous_goods(payload: dict) -> dict:
-    """위험물 표시를 확인합니다. 체크했으면 UN번호와 급이 함께 있어야 합니다."""
+def validate_dangerous_goods(payload: dict, *, strict: bool = True) -> dict:
+    """위험물 표시를 확인합니다. 체크했으면 UN번호와 급이 함께 있어야 합니다.
+
+    `strict=False`는 입력하는 도중에 쓰는 모드입니다. 아직 UN번호를 안 적었다고
+    해서 CBM·중량 계산까지 막으면 안 되므로, 오류 대신 `dg_warning`을 달아
+    돌려주고 계산은 그대로 진행합니다. 저장할 때는 strict로 다시 확인합니다.
+    """
 
     from app.processors.dangerous_goods import DG_CLASSES
 
     flag = payload.get("is_dangerous")
     is_dangerous = flag in (True, "true", "True", "on", "1", 1)
     if not is_dangerous:
-        return {"is_dangerous": False, "un_number": "", "dg_class": ""}
+        return {"is_dangerous": False, "un_number": "", "dg_class": "",
+                "packing_group": "", "proper_shipping_name": "", "dg_warning": ""}
+
+    # 정식운송품명(PSN)은 위험물 신고서·라벨에 그대로 쓰는 공식 품명입니다.
+    psn = str(payload.get("proper_shipping_name") or "").strip()[:200]
+
+    def problem(message: str, field: str) -> dict:
+        if strict:
+            raise ValidationError(message, field)
+        return {"is_dangerous": True,
+                "un_number": str(payload.get("un_number") or "").strip().upper(),
+                "dg_class": str(payload.get("dg_class") or "").strip(),
+                "packing_group": "", "proper_shipping_name": psn, "dg_warning": message}
 
     # UN번호는 "UN1234" 또는 숫자 네 자리입니다. 모든 위험물 서류의 기준이라 필수입니다.
     raw = str(payload.get("un_number") or "").strip().upper().replace(" ", "")
     digits = raw[2:] if raw.startswith("UN") else raw
     if not (digits.isdigit() and len(digits) == 4):
-        raise ValidationError("UN번호는 네 자리 숫자입니다. (예: UN1263)", "un_number")
+        return problem("UN번호는 네 자리 숫자입니다. (예: UN1263)", "un_number")
 
     dg_class = str(payload.get("dg_class") or "").strip()
     if dg_class not in DG_CLASSES:
-        raise ValidationError("위험물 등급을 골라주세요.", "dg_class")
+        return problem("위험물 등급을 골라주세요.", "dg_class")
 
-    return {"is_dangerous": True, "un_number": f"UN{digits}", "dg_class": dg_class}
+    # 포장등급(PG)은 위험도입니다. I 큼 / II 보통 / III 낮음. 급에 따라 없는 것도 있습니다.
+    packing_group = str(payload.get("packing_group") or "").strip().upper()
+    if packing_group and packing_group not in PACKING_GROUPS:
+        return problem("포장등급은 I·II·III 중 하나입니다.", "packing_group")
+
+    if not psn:
+        return problem("정식운송품명(Proper Shipping Name)을 적어주세요. MSDS 14번 항목에 있습니다.",
+                       "proper_shipping_name")
+
+    return {"is_dangerous": True, "un_number": f"UN{digits}", "dg_class": dg_class,
+            "packing_group": packing_group, "proper_shipping_name": psn, "dg_warning": ""}
 
 
-def validate_cargo_input(payload: dict) -> dict:
+def validate_cargo_input(payload: dict, *, strict_dg: bool = True) -> dict:
     """Validate raw cargo dimensions and return typed values."""
 
     package_type = str(payload.get("package_type") or "carton")
@@ -145,7 +179,7 @@ def validate_cargo_input(payload: dict) -> dict:
         raise ValidationError("포장 유형을 확인해주세요.", "package_type")
 
     return {
-        **validate_dangerous_goods(payload),
+        **validate_dangerous_goods(payload, strict=strict_dg),
         "length_cm": parse_number(payload.get("length_cm"), "가로(Length)", max_value=MAX_DIMENSION_CM, field="length_cm"),
         "width_cm": parse_number(payload.get("width_cm"), "세로(Width)", max_value=MAX_DIMENSION_CM, field="width_cm"),
         "height_cm": parse_number(payload.get("height_cm"), "높이(Height)", max_value=MAX_DIMENSION_CM, field="height_cm"),

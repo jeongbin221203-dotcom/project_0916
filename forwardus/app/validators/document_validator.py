@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from app.validators import ValidationError
 from app.validators.cargo_validator import parse_number
 
@@ -45,7 +47,27 @@ EDITABLE_FIELDS = [
     "po_no", "final_destination", "carriage_by", "country_of_origin", "shipment_time", "bank_info",
     "booking_no", "container_seal_no", "notify_party_2", "contact", "service_contract_no", "hs6",
     "routing_remark", "reefer", "prepaid_at", "collect_at", "confirmation_to",
+    "order_no", "consignee_city_zip", "date_ordered", "customer_order_no", "date_shipped",
+    "attention", "shipped_via", "container_no", "invoice_no", "comments", "packed_by",
+    "dangerous_goods",
 ]
+
+# 품목 표의 칸은 "item-<줄번호>-<칸이름>" 이름으로 들어옵니다.
+ITEM_FIELD_PATTERN = re.compile(r"^item-(\d+)-([a-z_]+)$")
+
+
+def clean_document_items(form: dict, current: list) -> list:
+    """품목 표 수정분을 반영합니다. 줄 수와 칸은 원래 표를 따릅니다."""
+
+    rows = [dict(row) for row in (current or [])]
+    for name, value in form.items():
+        match = ITEM_FIELD_PATTERN.match(name)
+        if not match:
+            continue
+        index, key = int(match.group(1)), match.group(2)
+        if 0 <= index < len(rows) and key in rows[index]:
+            rows[index][key] = str(value or "").strip()[:200]
+    return rows
 
 
 def clean_document_fields(form: dict, current: dict) -> dict:
@@ -66,4 +88,6 @@ def clean_document_fields(form: dict, current: dict) -> dict:
             updated[key] = number
         else:
             updated[key] = str(raw or "").strip()[:500]
+    if current.get("items"):
+        updated["items"] = clean_document_items(form, current["items"])
     return updated

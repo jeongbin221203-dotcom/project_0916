@@ -25,7 +25,7 @@ from app.processors.schedule_calculator import (
 from app.repositories import buyer_repository, shipment_repository
 from app.services import ServiceError
 from app.validators import ValidationError
-from app.validators.cargo_validator import PACKAGE_TYPE_INFO, PACKAGE_TYPES
+from app.validators.cargo_validator import PACKAGE_TYPE_INFO, PACKAGE_TYPES, PACKING_GROUPS
 from app.validators.shipment_validator import (
     optional_text,
     parse_date,
@@ -58,6 +58,7 @@ def get_form_options() -> dict:
         "sort_options": SORT_OPTIONS,
         "currencies": exchange_client.list_currencies(),
         "dg_classes": dangerous_goods.classes(),
+        "packing_groups": PACKING_GROUPS,
     }
 
 
@@ -550,12 +551,17 @@ def _resolve_locations(route: dict, payload: dict) -> tuple[dict, dict]:
 
 
 def calculate_cargo(payload: dict) -> dict:
-    """화물 계산. 품목 하나만 보내던 예전 방식과 여러 품목 모두 받습니다."""
+    """화물 계산. 품목 하나만 보내던 예전 방식과 여러 품목 모두 받습니다.
+
+    입력하는 도중에 부르는 화면용 계산이라 위험물 칸이 덜 채워졌다고 막지
+    않습니다. CBM·중량은 치수와 수량만 있으면 낼 수 있기 때문입니다.
+    덜 채운 항목은 `dg_warnings`로 돌려주고, 저장할 때 다시 확인합니다.
+    """
 
     if isinstance(payload, dict) and (payload.get("cargo") or payload.get("items")):
         return calculate_cargo_lines(cargo_items(
-            payload if payload.get("cargo") else {"cargo": payload.get("items")}))
-    return calculate_cargo_metrics(payload)
+            payload if payload.get("cargo") else {"cargo": payload.get("items")}), strict_dg=False)
+    return calculate_cargo_metrics(payload, strict_dg=False)
 
 
 def _sort_schedules(items: list[dict], sort_by: str) -> list[dict]:
@@ -951,10 +957,10 @@ def cargo_items(payload: dict) -> list[dict]:
     return [item for item in (items or [cargo]) if item]
 
 
-def cargo_metrics(payload: dict) -> dict:
+def cargo_metrics(payload: dict, *, strict_dg: bool = True) -> dict:
     """품목이 하나든 여럿이든 같은 모양의 계산 결과를 돌려줍니다."""
 
-    return calculate_cargo_lines(cargo_items(payload))
+    return calculate_cargo_lines(cargo_items(payload), strict_dg=strict_dg)
 
 
 def create_shipment(payload: dict) -> Shipment:
@@ -1054,6 +1060,8 @@ def create_shipment(payload: dict) -> Shipment:
             is_dangerous=line["is_dangerous"],
             un_number=line["un_number"],
             dg_class=line["dg_class"],
+            packing_group=line["packing_group"],
+            proper_shipping_name=line["proper_shipping_name"],
             length_cm=line["length_cm"],
             width_cm=line["width_cm"],
             height_cm=line["height_cm"],

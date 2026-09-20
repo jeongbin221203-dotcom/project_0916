@@ -322,6 +322,7 @@
     };
     // UN 위험물 등급 목록. 첫 품목과 추가 품목이 같은 목록을 씁니다.
     window.FORWARDUS_DG_CLASSES = {{ options.dg_classes|tojson }};
+    window.FORWARDUS_PACKING_GROUPS = {{ options.packing_groups|tojson }};
   </script>
   <script src="{{ static_url('js/planning.js') }}"></script>
 {% endblock %}

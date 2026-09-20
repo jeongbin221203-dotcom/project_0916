@@ -14,8 +14,14 @@ CARGO = {"product_description": "페인트", "package_type": "drum", "quantity":
          "length_cm": 40, "width_cm": 40, "height_cm": 60, "weight_per_package_kg": 50}
 
 
+DG = {"is_dangerous": True, "un_number": "UN1263", "dg_class": "3",
+      "proper_shipping_name": "PAINT"}
+
+
 def test_unchecked_cargo_carries_no_dangerous_goods_fields():
-    assert validate_dangerous_goods({}) == {"is_dangerous": False, "un_number": "", "dg_class": ""}
+    assert validate_dangerous_goods({}) == {
+        "is_dangerous": False, "un_number": "", "dg_class": "",
+        "packing_group": "", "proper_shipping_name": "", "dg_warning": ""}
     assert validate_dangerous_goods({"is_dangerous": False, "un_number": "UN1263"})["un_number"] == ""
 
 
@@ -24,23 +30,37 @@ def test_unchecked_cargo_carries_no_dangerous_goods_fields():
 def test_un_number_is_normalised(raw, expected):
     """UN번호는 서류마다 표기가 달라 들어오는 대로 받고 한 가지 모양으로 맞춥니다."""
 
-    result = validate_dangerous_goods({"is_dangerous": True, "un_number": raw, "dg_class": "3"})
-    assert result == {"is_dangerous": True, "un_number": expected, "dg_class": "3"}
+    result = validate_dangerous_goods({**DG, "un_number": raw, "packing_group": "ii"})
+    assert result == {"is_dangerous": True, "un_number": expected, "dg_class": "3",
+                      "packing_group": "II", "proper_shipping_name": "PAINT", "dg_warning": ""}
 
 
 @pytest.mark.parametrize("payload,field", [
-    ({"is_dangerous": True, "un_number": "", "dg_class": "3"}, "un_number"),
-    ({"is_dangerous": True, "un_number": "UN126", "dg_class": "3"}, "un_number"),
-    ({"is_dangerous": True, "un_number": "ABCD", "dg_class": "3"}, "un_number"),
-    ({"is_dangerous": True, "un_number": "UN1263", "dg_class": ""}, "dg_class"),
-    ({"is_dangerous": True, "un_number": "UN1263", "dg_class": "99"}, "dg_class"),
+    ({**DG, "un_number": ""}, "un_number"),
+    ({**DG, "un_number": "UN126"}, "un_number"),
+    ({**DG, "un_number": "ABCD"}, "un_number"),
+    ({**DG, "dg_class": ""}, "dg_class"),
+    ({**DG, "dg_class": "99"}, "dg_class"),
+    ({**DG, "proper_shipping_name": ""}, "proper_shipping_name"),
+    ({**DG, "packing_group": "IV"}, "packing_group"),
 ])
-def test_dangerous_goods_needs_un_number_and_class(payload, field):
-    """위험물이라고 체크했으면 UN번호와 급이 반드시 있어야 서류를 만들 수 있습니다."""
+def test_dangerous_goods_needs_every_declaration_field(payload, field):
+    """위험물 신고서에 그대로 들어가는 항목이라 저장할 때는 모두 있어야 합니다."""
 
     with pytest.raises(ValidationError) as error:
         validate_dangerous_goods(payload)
     assert error.value.field == field
+
+
+def test_incomplete_dangerous_goods_do_not_block_the_calculation():
+    """입력하는 도중에는 막지 않습니다. CBM은 치수와 수량만 있으면 낼 수 있습니다."""
+
+    result = validate_dangerous_goods({**DG, "un_number": ""}, strict=False)
+    assert result["is_dangerous"] is True
+    assert "UN번호는 네 자리" in result["dg_warning"]
+    # 이미 적은 값은 지우지 않습니다.
+    assert result["dg_class"] == "3" and result["proper_shipping_name"] == "PAINT"
+    assert validate_dangerous_goods(DG, strict=False)["dg_warning"] == ""
 
 
 def test_air_and_sea_rules_differ_for_the_same_class(app):
@@ -90,9 +110,9 @@ def test_cargo_metrics_collect_dangerous_classes(app):
     """한 건에 위험물이 섞이면 부킹이 달라지므로 등급을 모아 둡니다."""
 
     metrics = planning_service.cargo_metrics({"cargo": {"items": [
-        {**CARGO, "is_dangerous": True, "un_number": "1263", "dg_class": "3"},
-        {**CARGO, "product_description": "배터리", "is_dangerous": True,
-         "un_number": "UN3480", "dg_class": "9"},
+        {**CARGO, **DG, "un_number": "1263"},
+        {**CARGO, "product_description": "배터리", "is_dangerous": True, "un_number": "UN3480",
+         "dg_class": "9", "proper_shipping_name": "LITHIUM ION BATTERIES"},
         {**CARGO, "product_description": "포장재"},
     ]}})
     assert metrics["dangerous_classes"] == ["3", "9"]
@@ -106,12 +126,43 @@ def test_cargo_metrics_collect_dangerous_classes(app):
 def test_dangerous_goods_are_stored_on_the_shipment(create_shipment):
     """저장한 뒤에도 UN번호와 급이 남아야 서류에 쓸 수 있습니다."""
 
-    shipment = create_shipment(cargo={**CARGO, "is_dangerous": True,
-                                      "un_number": "un1263", "dg_class": "3"})
+    shipment = create_shipment(cargo={**CARGO, **DG, "un_number": "un1263", "packing_group": "II"})
     cargo = shipment.cargos[0]
     assert cargo.is_dangerous is True
     assert cargo.un_number == "UN1263" and cargo.dg_class == "3"
-    assert cargo.to_dict()["dg_class"] == "3"
+    assert cargo.packing_group == "II" and cargo.proper_shipping_name == "PAINT"
+    assert cargo.to_dict()["proper_shipping_name"] == "PAINT"
+
+
+def test_preview_returns_warnings_instead_of_failing(app):
+    """화면 계산은 위험물 칸이 덜 채워져도 CBM을 내고, 어느 품목인지 알려줍니다."""
+
+    result = planning_service.calculate_cargo({"cargo": {"items": [
+        {**CARGO},                                    # 1번: 위험물 아님
+        {**CARGO, **DG, "un_number": ""},             # 2번: UN번호 없음
+    ]}})
+    assert result["total_cbm"] > 0                    # 계산은 그대로 됩니다.
+    assert [w["line_no"] for w in result["dg_warnings"]] == [2]
+    assert "UN번호" in result["dg_warnings"][0]["message"]
+    # 등급이 비면 위험물 등급 집계에 들어가지 않습니다.
+    assert result["dangerous_classes"] == ["3"]
+
+    # 다 채우면 경고가 없습니다.
+    done = planning_service.calculate_cargo({"cargo": {"items": [{**CARGO, **DG}]}})
+    assert done["dg_warnings"] == []
+
+
+def test_unchecking_dangerous_goods_clears_the_warning(app):
+    """위험물 체크를 풀면 경고가 사라지고 계산이 정상으로 돌아와야 합니다."""
+
+    broken = planning_service.calculate_cargo({"cargo": {"items": [{**CARGO, **DG, "un_number": ""}]}})
+    assert broken["dg_warnings"]
+
+    cleared = planning_service.calculate_cargo({"cargo": {"items": [
+        {**CARGO, **DG, "un_number": "", "is_dangerous": False}]}})
+    assert cleared["dg_warnings"] == []
+    assert cleared["dangerous_classes"] == []
+    assert cleared["total_cbm"] == broken["total_cbm"]
 
 
 def test_dangerous_goods_api(client):

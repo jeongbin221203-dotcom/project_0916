@@ -39,7 +39,9 @@ def migrate_cargo_lines(database) -> None:
     # 위험물 칸은 뒤에 더해진 것이라 기존 행에는 없습니다. 칸만 덧붙이면 됩니다.
     added = {"is_dangerous": "BOOLEAN NOT NULL DEFAULT 0",
              "un_number": "VARCHAR(10) NOT NULL DEFAULT ''",
-             "dg_class": "VARCHAR(5) NOT NULL DEFAULT ''"}
+             "dg_class": "VARCHAR(5) NOT NULL DEFAULT ''",
+             "packing_group": "VARCHAR(5) NOT NULL DEFAULT ''",
+             "proper_shipping_name": "VARCHAR(200) NOT NULL DEFAULT ''"}
     missing = {name: spec for name, spec in added.items() if name not in columns}
     if missing:
         with database.engine.begin() as connection:

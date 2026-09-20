@@ -28,6 +28,8 @@ class Cargo(db.Model):
     is_dangerous = db.Column(db.Boolean, nullable=False, default=False)
     un_number = db.Column(db.String(10), nullable=False, default="")
     dg_class = db.Column(db.String(5), nullable=False, default="")
+    packing_group = db.Column(db.String(5), nullable=False, default="")
+    proper_shipping_name = db.Column(db.String(200), nullable=False, default="")
 
     total_cbm = db.Column(db.Float, nullable=False)
     total_weight_kg = db.Column(db.Float, nullable=False)
@@ -46,6 +48,8 @@ class Cargo(db.Model):
             "is_dangerous": self.is_dangerous,
             "un_number": self.un_number,
             "dg_class": self.dg_class,
+            "packing_group": self.packing_group,
+            "proper_shipping_name": self.proper_shipping_name,
             "length_cm": self.length_cm,
             "width_cm": self.width_cm,
             "height_cm": self.height_cm,
