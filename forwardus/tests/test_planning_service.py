@@ -89,6 +89,17 @@ def test_destination_countries_and_country_filter(app):
     assert "VNSGN" in {item["code"] for item in vietnam}
 
 
+@pytest.mark.parametrize("mode", ["SEA", "AIR"])
+def test_top_trade_partners_are_ranked(app, mode):
+    """상위 교역국 20개국은 어떤 운송 모드에서도 목록에 있고 순위가 매겨집니다."""
+
+    countries = planning_service.list_countries(mode, "destination")["data"]
+    ranked = {c["code"]: c["trade_rank"] for c in countries if c.get("trade_rank")}
+    assert set(ranked) == set(planning_service.TOP_TRADE_PARTNERS)
+    assert sorted(ranked.values()) == list(range(1, len(planning_service.TOP_TRADE_PARTNERS) + 1))
+    assert ranked["CN"] == 1 and ranked["US"] == 2
+
+
 def test_schedules_cover_every_region(app, shipment_payload):
     """Every destination region has mock rates (Middle East, Africa, South America…)."""
 

@@ -247,11 +247,18 @@
     return countryCache[mode];
   }
 
+  function countryOption(c) {
+    return `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${c.count.toLocaleString("ko-KR")})</option>`;
+  }
+
   async function refreshCountryOptions() {
     const countries = await loadCountries(state.transport_mode);
-    const optionsHtml = countries
-      .map((c) => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.name)} (${c.count.toLocaleString("ko-KR")})</option>`)
-      .join("");
+    // 한국 교역액 상위 국가를 맨 위 그룹으로 먼저 보여줍니다.
+    const top = countries.filter((c) => c.trade_rank).sort((a, b) => a.trade_rank - b.trade_rank);
+    const optionsHtml = (top.length
+      ? `<optgroup label="주요 무역국">${top.map(countryOption).join("")}</optgroup>`
+        + `<optgroup label="전체 국가 (가나다순)">${countries.map(countryOption).join("")}</optgroup>`
+      : countries.map(countryOption).join(""));
     const filter = form.querySelector("[data-country-filter]");
     if (filter) {
       const current = filter.value;

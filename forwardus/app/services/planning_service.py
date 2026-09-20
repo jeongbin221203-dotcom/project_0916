@@ -28,6 +28,13 @@ from app.validators.shipment_validator import (
 
 SORT_OPTIONS = {"recommended": "추천순", "price": "최저 운임순", "duration": "최단 운송기간순"}
 
+# 한국 교역액 상위 국가 (관세청·무역협회 교역 규모 기준). 도착지 국가 목록 상단에
+# "주요 무역국"으로 먼저 노출합니다.
+TOP_TRADE_PARTNERS = [
+    "CN", "US", "VN", "JP", "HK", "TW", "SG", "IN", "MX", "AU",
+    "MY", "ID", "PH", "DE", "TH", "PL", "NL", "SA", "CA", "AE",
+]
+
 
 def location_kind(transport_mode: str) -> str:
     return "airport" if transport_mode == "AIR" else "port"
@@ -56,11 +63,16 @@ def search_locations(query: str, transport_mode: str, role: str | None = None, c
 
 
 def list_countries(transport_mode: str, role: str | None = None) -> dict:
-    """Destination country list for the country filter."""
+    """Destination country list, with Korea's main trading partners ranked first."""
 
-    return location_client.list_countries(
+    result = location_client.list_countries(
         location_kind(transport_mode.upper()), exclude=["KR"] if role == "destination" else None
     )
+    if result["success"]:
+        ranks = {code: index + 1 for index, code in enumerate(TOP_TRADE_PARTNERS)}
+        for country in result["data"]:
+            country["trade_rank"] = ranks.get(country["code"])
+    return result
 
 
 def search_hs_codes(query: str) -> dict:
