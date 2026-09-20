@@ -22,6 +22,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -383,6 +384,45 @@ def normalize_name(name: str) -> str:
     return "".join(ch for ch in (name or "").lower() if ch.isalnum())
 
 
+# World Port Index에서 모은 실제 선석 좌표
+PORT_COORDS: dict[str, tuple[float, float]] = {}
+
+
+def load_sea_network() -> dict[str, dict]:
+    """searoute의 항만 데이터(UN/LOCODE + 좌표 + 실제 연결 국가)를 읽습니다.
+
+    `to_cty`는 실제 운항 기록에서 모은 연결 국가 목록이라, 항공의 노선
+    데이터처럼 "한국에서 직기항 선박이 있는 항구"를 가려내는 데 씁니다.
+    """
+
+    import searoute
+
+    ports = searoute.get_graphs()[1]
+    return {data["port"]: data for _, data in ports.nodes(data=True) if data.get("port")}
+
+
+def parse_dms(value: str) -> float | None:
+    """World Port Index의 35°06'00"N 형식을 십진수 좌표로 바꿉니다."""
+
+    numbers = re.findall(r"[\d.]+", value or "")
+    hemisphere = re.search(r"[NSEW]", value or "")
+    if not numbers or not hemisphere:
+        return None
+    degrees = sum(float(part) / 60 ** index for index, part in enumerate(numbers[:3]))
+    return -degrees if hemisphere.group() in "SW" else degrees
+
+
+def parse_unlocode_coord(value: str) -> tuple[float, float] | None:
+    """UN/LOCODE의 '3508N 12903E' 형식을 (위도, 경도)로 바꿉니다."""
+
+    match = re.fullmatch(r"(\d{2})(\d{2})([NS])\s+(\d{3})(\d{2})([EW])", (value or "").strip())
+    if not match:
+        return None
+    lat = int(match[1]) + int(match[2]) / 60
+    lon = int(match[4]) + int(match[5]) / 60
+    return (-lat if match[3] == "S" else lat, -lon if match[6] == "W" else lon)
+
+
 def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
     """UN/LOCODE → World Port Index harbour size (L/M/S/V).
 
@@ -401,8 +441,6 @@ def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
     sizes: dict[str, str] = {}
     for port in ports:
         size = port.get("harborSize")
-        if not size:
-            continue
         # Container terminals count as main ports regardless of harbour size.
         if port.get("loContainer") == "Y":
             size = "L"
@@ -415,7 +453,11 @@ def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
                     break
         if not code:
             continue
-        if HARBOR_SIZE_RANK.get(size, 9) < HARBOR_SIZE_RANK.get(sizes.get(code), 9):
+        # 좌표는 해상 항로 거리 계산에 씁니다. 선석 위치라 UN/LOCODE보다 정확합니다.
+        lat, lon = parse_dms(port.get("latitude") or ""), parse_dms(port.get("longitude") or "")
+        if lat is not None and lon is not None:
+            PORT_COORDS.setdefault(code, (round(lat, 4), round(lon, 4)))
+        if size and HARBOR_SIZE_RANK.get(size, 9) < HARBOR_SIZE_RANK.get(sizes.get(code), 9):
             sizes[code] = size
     return sizes
 
@@ -443,6 +485,7 @@ def build() -> list[dict]:
     iso = json.loads(download(ISO_URL, "iso_3166_regions.json"))
     korean_country = json.loads(download(KOREAN_COUNTRY_URL, "country_names_ko.json"))
     harbor_sizes = load_harbor_sizes(unlocode)
+    sea_network = load_sea_network()
 
     country_info = {
         row["alpha-2"]: {
@@ -475,6 +518,11 @@ def build() -> list[dict]:
         seen.add(code)
         name_en = title_case(row["NameWoDiacritics"] or row["Name"])
         harbor_size = harbor_sizes.get(code)
+        # 선석 좌표(WPI)를 먼저 쓰고, 해상 네트워크 → UN/LOCODE 순으로 채웁니다.
+        sea = sea_network.get(code)
+        coord = (PORT_COORDS.get(code)
+                 or ((sea["y"], sea["x"]) if sea else None)
+                 or parse_unlocode_coord(row.get("Coordinates", "")))
         display_names = {**KOREAN_NAMES, **{code: name for code, (name, _) in KOREA_TRADE_PORTS.items()}}
         locations.append({
             "code": code,
@@ -489,6 +537,10 @@ def build() -> list[dict]:
             "kind": "port",
             "status": row["Status"],
             "harbor_size": harbor_size,
+            "lat": round(coord[0], 4) if coord else None,
+            "lon": round(coord[1], 4) if coord else None,
+            # 실제 운항 기록에 한국 직기항이 있는 항구. 없으면 환적 일수를 더합니다.
+            "sea_direct": bool(sea and "KR" in (sea.get("to_cty") or [])) if sea else None,
             "direct_from_korea": None,
             "direct_from": [],
             "cargo_hub": False,
@@ -607,6 +659,9 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "region": info["region"],
             "kind": "airport",
             "status": "",
+            "lat": round(float(row["latitude_deg"]), 4),
+            "lon": round(float(row["longitude_deg"]), 4),
+            "sea_direct": None,
             "harbor_size": None,
             "port_class": None,
             "note": ("" if country_code != "KR" or iata in korea_outbound
