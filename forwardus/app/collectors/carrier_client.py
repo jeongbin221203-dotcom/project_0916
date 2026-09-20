@@ -51,7 +51,7 @@ def sources() -> list[dict]:
         {"key": "hmm", "label": "HMM 항구간 스케줄",
          "gives": "해상 항차·환적·소요일", "env": "HMM_API_KEY",
          "ready": bool(get_config("HMM_API_KEY", "")),
-         "signup": "https://apiportal.hmm21.com"},
+         "signup": "https://apiportal.hmm21.com/signup"},
         {"key": "icn_cargo", "label": "인천공항 화물기 정기운항",
          "gives": "항공 화물편 시간표", "env": "DATA_GO_KR_SERVICE_KEY",
          "ready": bool(get_config("DATA_GO_KR_SERVICE_KEY", "")),
