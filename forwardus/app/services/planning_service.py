@@ -567,8 +567,8 @@ def calculate_cargo(payload: dict) -> dict:
 
     if isinstance(payload, dict) and (payload.get("cargo") or payload.get("items")):
         return calculate_cargo_lines(cargo_items(
-            payload if payload.get("cargo") else {"cargo": payload.get("items")}), strict_dg=False)
-    return calculate_cargo_metrics(payload, strict_dg=False)
+            payload if payload.get("cargo") else {"cargo": payload.get("items")}), strict=False)
+    return calculate_cargo_metrics(payload, strict=False)
 
 
 def _sort_schedules(items: list[dict], sort_by: str) -> list[dict]:
@@ -964,10 +964,14 @@ def cargo_items(payload: dict) -> list[dict]:
     return [item for item in (items or [cargo]) if item]
 
 
-def cargo_metrics(payload: dict, *, strict_dg: bool = True) -> dict:
-    """품목이 하나든 여럿이든 같은 모양의 계산 결과를 돌려줍니다."""
+def cargo_metrics(payload: dict, *, strict: bool = False) -> dict:
+    """품목이 하나든 여럿이든 같은 모양의 계산 결과를 돌려줍니다.
 
-    return calculate_cargo_lines(cargo_items(payload), strict_dg=strict_dg)
+    스케줄 조회처럼 아직 입력 중일 때 부르는 곳이 많아 기본은 느슨하게 봅니다.
+    저장할 때는 create_shipment가 strict로 다시 확인합니다.
+    """
+
+    return calculate_cargo_lines(cargo_items(payload), strict=strict)
 
 
 def create_shipment(payload: dict) -> Shipment:
@@ -989,7 +993,7 @@ def create_shipment(payload: dict) -> Shipment:
     if not product_description:
         raise ValidationError("품명(Product Description)을 입력해주세요.", "product_description")
     hs_code = optional_text(cargo_payload.get("hs_code"), max_length=20)
-    net_weight = validate_net_weight(cargo_payload.get("net_weight_kg"), metrics["total_weight_kg"])
+    # 순중량은 품목별로 calculate_cargo_lines에서 이미 확인했습니다.
 
     schedule_id = str(payload.get("schedule_id") or "")
     if not schedule_id:
@@ -1074,7 +1078,8 @@ def create_shipment(payload: dict) -> Shipment:
             height_cm=line["height_cm"],
             quantity=line["quantity"],
             weight_per_package_kg=line["weight_per_package_kg"],
-            net_weight_kg=net_weight if index == 1 else None,
+            # 품목마다 순중량을 따로 적습니다.
+            net_weight_kg=line["net_weight_kg"],
             total_cbm=line["total_cbm"],
             total_weight_kg=line["total_weight_kg"],
             revenue_ton=line["revenue_ton"],

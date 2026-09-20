@@ -819,25 +819,46 @@
     slot.innerHTML = html;
   }
 
+  /* ----- HS부호 찾기 (첫 품목과 추가 품목이 같은 방식을 씁니다) ----- */
   let lastHsQuery = "";
-  setupAutocomplete(
+  let lastHsError = "";
+
+  // 품명(한글·영문)이나 HS부호로 관세청에서 찾습니다.
+  async function fetchHsCodes(query, fallback) {
+    const text = (query || "").trim() || (fallback || "").trim();
+    lastHsQuery = text;
+    lastHsError = "";
+    if (!text) return [];
+    const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: text })}`);
+    if (!response.success) {
+      // 결과가 없는 것과 조회가 안 된 것은 다릅니다. 섞어서 알리면 안 됩니다.
+      lastHsError = response.message || "관세청 조회에 실패했습니다. 잠시 후 다시 시도해주세요.";
+      return [];
+    }
+    return response.data.map((item) => ({ ...item, source: response.source }));
+  }
+
+  function renderHsItem(item) {
+    const sub = [item.name_en, item.weight_unit ? `중량단위 ${item.weight_unit}` : "",
+      item.source === "api" ? "관세청 HS부호" : "예시 목록"].filter(Boolean).join(" · ");
+    return `<span class="mono">${escapeHtml(item.code)}</span>`
+      + ` <b>${escapeHtml(item.name || item.name_en)}</b><small>${escapeHtml(sub)}</small>`;
+  }
+
+  function hsEmptyMessage() {
+    if (lastHsError) return lastHsError;
+    const digits = lastHsQuery.replace(/[.\-\s]/g, "");
+    if (/^\d+$/.test(digits) && digits.length !== 10) {
+      return "HS부호는 10자리를 모두 입력해야 조회됩니다. 품명으로 찾아보세요.";
+    }
+    if (!lastHsQuery) return "품명(예: 립스틱, 샴푸) 또는 HS부호 10자리를 입력하세요.";
+    return `"${lastHsQuery}"로 찾은 품목이 없습니다. 더 일반적인 낱말로 찾아보세요.`;
+  }
+
+  const hsSearch = setupAutocomplete(
     form.querySelector("[data-autocomplete=hs_code]"),
-    async (q) => {
-      // 아무것도 입력하지 않았으면 위에 적은 품명으로 찾아봅니다.
-      const query = q.trim() || form.elements.product_description.value.trim();
-      lastHsQuery = query;
-      if (!query) return [];
-      const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: query })}`);
-      if (!response.success) return [];
-      // 관세청 조회인지 예시 목록인지 함께 표시합니다.
-      return response.data.map((item) => ({ ...item, source: response.source }));
-    },
-    (item) => {
-      const sub = [item.name_en, item.weight_unit ? `중량단위 ${item.weight_unit}` : "",
-        item.source === "api" ? "관세청 HS부호" : "예시 목록"].filter(Boolean).join(" · ");
-      return `<span class="mono">${escapeHtml(item.code)}</span>`
-        + ` <b>${escapeHtml(item.name || item.name_en)}</b><small>${escapeHtml(sub)}</small>`;
-    },
+    (q) => fetchHsCodes(q, form.elements.product_description.value),
+    renderHsItem,
     (item, input) => {
       if (!item) return;
       input.value = item.code;
@@ -861,16 +882,17 @@
             + `${escapeHtml(state.destination.country)} · ${escapeHtml(summary.text)}</small>`);
         });
       },
-      emptyMessage: () => {
-        const digits = lastHsQuery.replace(/[.\-\s]/g, "");
-        if (/^\d+$/.test(digits) && digits.length !== 10) {
-          return "HS부호는 10자리를 모두 입력해야 조회됩니다. 품명으로 찾아보세요.";
-        }
-        if (!lastHsQuery) return "품명(예: 립스틱, 샴푸) 또는 HS부호 10자리를 입력하세요.";
-        return `"${lastHsQuery}"로 찾은 품목이 없습니다. 더 일반적인 낱말로 찾아보세요.`;
-      },
+      emptyMessage: hsEmptyMessage,
     },
   );
+
+  // 품명을 한글로 적으면 HS부호 후보를 바로 띄웁니다. (고르는 것은 사람이 합니다)
+  const suggestHsFromName = debounce(() => {
+    if (form.elements.hs_code.value.trim()) return;   // 이미 고른 부호가 있으면 두십니다.
+    if (form.elements.product_description.value.trim().length < 2) return;
+    hsSearch.showAll();
+  }, 600);
+  form.elements.product_description.addEventListener("input", suggestHsFromName);
 
   /* ----- Cargo calculation ----- */
   const calcMessage = document.querySelector("[data-calc-message]");
@@ -1091,16 +1113,25 @@
   // 화면에 보이는 칸 = data-line 이름. 첫 품목의 name과 같게 맞춥니다.
   const LINE_LAYOUT = [
     ["product_description", "품명 (Product Description)", "text", "span2"],
-    ["hs_code", "HS CODE", "text", "span2"],
+    ["hs_code", "HS CODE", "hs", "span2"],
     ["package_type", "포장 유형", "select", ""],
     ["quantity", "수량 (Quantity)", "number", "", { step: 1, min: 1, mode: "numeric" }],
     ["length_cm", "가로 Length (cm)", "number", "", { step: 1, min: 0 }],
     ["width_cm", "세로 Width (cm)", "number", "", { step: 1, min: 0 }],
     ["height_cm", "높이 Height (cm)", "number", "", { step: 1, min: 0 }],
     ["weight_per_package_kg", "포장당 총중량 (kg)", "number", "", { step: 10, min: 0 }],
+    ["net_weight_kg", "총 순중량 Net Weight (kg)", "number", "", { step: 10, min: 0 }],
   ];
 
   function lineFieldHtml([key, label, kind, span, opts = {}]) {
+    if (kind === "hs") {
+      // 첫 품목과 똑같이 관세청 HS부호 검색을 붙입니다.
+      return `<div class="field autocomplete ${span}" data-line-hs>`
+        + `<span class="field_label">${escapeHtml(label)}</span>`
+        + `<input class="text_input" type="text" data-line="${key}" data-ac-input autocomplete="off"`
+        + ` placeholder="품명 또는 HS부호 10자리">`
+        + `<ul class="ac_list" data-ac-list hidden></ul></div>`;
+    }
     const inner = kind === "select"
       ? `<select data-line="${key}">${packageOptions()}</select>`
       : `<input class="text_input" type="text" data-line="${key}" autocomplete="off"`
@@ -1130,6 +1161,22 @@
       input.addEventListener("input", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
       input.addEventListener("change", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
     });
+    // 이 줄의 품명을 기준으로 HS부호를 찾습니다.
+    const nameInput = row.querySelector('[data-line="product_description"]');
+    const hsBox = row.querySelector("[data-line-hs]");
+    const hsRow = setupAutocomplete(
+      hsBox,
+      (q) => fetchHsCodes(q, nameInput.value),
+      renderHsItem,
+      (item, input) => { if (item) input.value = item.code; },
+      { emptyMessage: hsEmptyMessage },
+    );
+    const suggest = debounce(() => {
+      if (hsBox.querySelector("[data-ac-input]").value.trim()) return;
+      if (nameInput.value.trim().length >= 2) hsRow.showAll();
+    }, 600);
+    nameInput.addEventListener("input", suggest);
+
     const dgBox = wireDgBox(row.querySelector("[data-dg-box]"));
     setDgValues(dgBox, values);
     return row;

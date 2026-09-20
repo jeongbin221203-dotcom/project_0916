@@ -175,7 +175,7 @@ def validate_dangerous_goods(payload: dict, *, strict: bool = True) -> dict:
             "packing_group": packing_group, "proper_shipping_name": psn, "dg_warning": ""}
 
 
-def validate_cargo_input(payload: dict, *, strict_dg: bool = True) -> dict:
+def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
     """Validate raw cargo dimensions and return typed values."""
 
     package_type = str(payload.get("package_type") or "carton")
@@ -183,7 +183,7 @@ def validate_cargo_input(payload: dict, *, strict_dg: bool = True) -> dict:
         raise ValidationError("포장 유형을 확인해주세요.", "package_type")
 
     return {
-        **validate_dangerous_goods(payload, strict=strict_dg),
+        **validate_dangerous_goods(payload, strict=strict),
         "length_cm": parse_number(payload.get("length_cm"), "가로(Length)", max_value=MAX_DIMENSION_CM, field="length_cm"),
         "width_cm": parse_number(payload.get("width_cm"), "세로(Width)", max_value=MAX_DIMENSION_CM, field="width_cm"),
         "height_cm": parse_number(payload.get("height_cm"), "높이(Height)", max_value=MAX_DIMENSION_CM, field="height_cm"),

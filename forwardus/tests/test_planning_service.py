@@ -722,6 +722,38 @@ def test_net_weight_cannot_exceed_gross(app, shipment_payload, cargo_input):
         planning_service.create_shipment(payload)
 
 
+def test_net_weight_is_kept_per_item(app, shipment_payload, cargo_input):
+    """품목마다 순중량을 따로 적습니다. 예전에는 첫 품목 값만 저장됐습니다."""
+
+    payload = {**shipment_payload, "cargo": {"items": [
+        {**cargo_input, "net_weight_kg": 100},
+        {**cargo_input, "product_description": "두 번째", "net_weight_kg": 250},
+        {**cargo_input, "product_description": "순중량 없음", "net_weight_kg": ""},
+    ]}}
+    payload["schedule_id"] = planning_service.search_schedules(payload)["items"][0]["schedule_id"]
+    shipment = planning_service.create_shipment(payload)
+
+    assert [cargo.net_weight_kg for cargo in shipment.cargos] == [100, 250, None]
+    # 합계에도 모든 품목이 들어갑니다.
+    metrics = planning_service.cargo_metrics(payload)
+    assert metrics["net_weight_kg"] == 350
+
+
+def test_wrong_net_weight_warns_while_typing_but_blocks_on_save(app, shipment_payload, cargo_input):
+    """순중량이 총중량보다 크면 알려주되, 입력 중에 CBM 계산까지 막지는 않습니다."""
+
+    payload = {"cargo": {"items": [{**cargo_input, "net_weight_kg": 999_999}]}}
+    preview = planning_service.calculate_cargo(payload)
+    assert preview["total_cbm"] > 0                       # 계산은 그대로 나옵니다.
+    assert preview["warnings"][0]["line_no"] == 1
+    assert "총중량보다 클 수 없습니다" in preview["warnings"][0]["message"]
+    assert preview["net_weight_kg"] is None
+
+    # 올바른 값이면 경고가 없습니다.
+    fine = planning_service.calculate_cargo({"cargo": {"items": [{**cargo_input, "net_weight_kg": 10}]}})
+    assert fine["warnings"] == [] and fine["net_weight_kg"] == 10
+
+
 def test_required_parties_not_invented(app, shipment_payload):
     payload = {**shipment_payload, "exporter_name": ""}
     payload["schedule_id"] = planning_service.search_schedules(payload)["items"][0]["schedule_id"]
