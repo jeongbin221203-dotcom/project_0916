@@ -458,14 +458,19 @@ def test_cargo_hubs_listed_first(app):
 
 
 def test_korean_names_listed_first(app):
-    """한글 표기는 가나다순으로 위에, 영문 표기는 알파벳순으로 아래에 둡니다."""
+    """직기항 묶음 안에서 한글 표기가 위에(가나다순), 영문 표기가 아래에(알파벳순) 옵니다."""
 
     items = planning_service.search_locations("", "SEA", "destination", country="US")["data"]
-    korean = [item["name"] for item in items if item["name"] != item["name_en"]]
-    english = [item["name"] for item in items if item["name"] == item["name_en"]]
+    # 한국 직기항 항구를 먼저 보여주고, 환적이 필요한 항구는 그 아래에 둡니다.
+    groups = [item["sea_direct"] for item in items]
+    assert groups == sorted(groups, key=lambda value: {True: 0, None: 1, False: 2}[value])
+
+    direct = [item for item in items if item["sea_direct"]]
+    korean = [item["name"] for item in direct if item["name"] != item["name_en"]]
+    english = [item["name"] for item in direct if item["name"] == item["name_en"]]
     assert korean and english
-    korean_idx = [i for i, item in enumerate(items) if item["name"] != item["name_en"]]
-    english_idx = [i for i, item in enumerate(items) if item["name"] == item["name_en"]]
+    korean_idx = [i for i, item in enumerate(direct) if item["name"] != item["name_en"]]
+    english_idx = [i for i, item in enumerate(direct) if item["name"] == item["name_en"]]
     assert max(korean_idx) < min(english_idx)
     assert korean == sorted(korean)                              # 가나다순
     assert english == sorted(english, key=str.lower)             # 알파벳순

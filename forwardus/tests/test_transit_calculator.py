@@ -96,3 +96,60 @@ def test_air_transfer_adds_a_day(app):
     direct = air_transit(9_000)
     via = air_transit(9_000, transfers=1)
     assert via["min"] > direct["min"] and "환승" in via["breakdown"]
+
+
+def test_destination_ports_group_direct_before_transship(app):
+    """도착 항구는 한국 직기항을 위에, 환적이 필요한 항구를 아래에 둡니다."""
+
+    items = planning_service.search_locations("", "SEA", "destination", country="VN")["data"]
+    order = [{True: 0, None: 1, False: 2}[item["sea_direct"]] for item in items]
+    assert order == sorted(order)
+
+    # 환적이 필요한 항구에는 어디서 갈아타는지 함께 알려줍니다.
+    gdansk = location_client.find_location("PLGDN")
+    assert gdansk["sea_direct"] is False
+    assert [code for code, _ in gdansk["sea_transfer_via"]]
+    # 그단스크는 북유럽 환적항을 거칩니다.
+    assert gdansk["sea_transfer_via"][0][0].startswith(("DE", "NL", "BE"))
+
+
+def test_destination_airports_group_by_selected_origin(app):
+    """고른 국내 공항에서 직항이 있는 공항이 위로 옵니다."""
+
+    def listing(origin):
+        result = planning_service.search_locations("", "AIR", "destination", "VN", origin)
+        return [(item["code"], item["direct_from_korea"]) for item in result["data"]]
+
+    from_busan = listing("PUS")
+    assert [direct for _, direct in from_busan] == sorted(
+        (direct for _, direct in from_busan), reverse=True)
+
+    # 하이퐁은 인천에서만 직항이라 김해를 고르면 환승 쪽으로 내려갑니다.
+    assert dict(from_busan)["HPH"] is False
+    assert dict(listing("ICN"))["HPH"] is True
+
+
+def test_air_uses_published_flight_times(app):
+    """직항이 있으면 공표 시간표의 실제 운항 시간을 씁니다."""
+
+    narita = planning_service.transit_summary("ICN", "NRT")["air"]
+    assert narita["scheduled"] is True
+    assert 2 <= narita["flight_hours"] <= 3          # 인천~나리타는 2시간대입니다.
+
+    saigon = planning_service.transit_summary("PUS", "SGN")["air"]
+    assert saigon["scheduled"] is True and 4 <= saigon["flight_hours"] <= 6
+
+    # 직항이 없으면 거리로 추정하고 환승 시간을 더합니다.
+    dubai = planning_service.transit_summary("CJU", "DXB")["air"]
+    assert dubai["scheduled"] is False and "환승" in dubai["breakdown"]
+
+
+def test_flight_minutes_come_from_route_data(app):
+    """운항 시간은 출발 공항별로 따로 기록됩니다."""
+
+    frankfurt = location_client.find_location("FRA")
+    assert set(frankfurt["flight_minutes"]) <= set(frankfurt["direct_from"])
+    assert frankfurt["flight_minutes"]["ICN"] > 600      # 10시간 이상
+
+    # 국내 공항은 출발지라 판정 대상이 아닙니다.
+    assert location_client.find_location("ICN")["flight_minutes"] == {}

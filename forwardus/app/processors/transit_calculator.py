@@ -93,10 +93,15 @@ def sea_transit(distance_km: float, passages: list[str], sea_mode: str = "FCL",
             "breakdown": {k: round(v, 1) for k, v in breakdown.items()}}
 
 
-def air_transit(distance_km: float, *, transfers: int = 0) -> dict:
-    """공항 사이 대권거리로 항공 화물 소요일을 계산합니다."""
+def air_transit(distance_km: float, *, transfers: int = 0, minutes: int | None = None) -> dict:
+    """항공 화물 소요일을 계산합니다.
 
-    flight_hours = distance_km / AIR_CRUISE_KMH + AIR_TAKEOFF_LANDING_HOURS
+    `minutes`는 공표 시간표의 실제 운항 시간입니다. 직항이 있으면 그 값을 쓰고,
+    없으면 공항 사이 대권거리로 비행 시간을 추정합니다.
+    """
+
+    flight_hours = (minutes / 60 if minutes
+                    else distance_km / AIR_CRUISE_KMH + AIR_TAKEOFF_LANDING_HOURS)
     breakdown = {"비행": flight_hours / 24,
                  "수출 터미널": AIR_ORIGIN_DAYS,
                  "도착지 인도": AIR_DESTINATION_DAYS}
@@ -108,4 +113,5 @@ def air_transit(distance_km: float, *, transfers: int = 0) -> dict:
     total = sum(breakdown.values())
     return {**to_range(total, AIR_MIN_SPREAD_DAYS), "distance_km": round(distance_km),
             "flight_hours": round(flight_hours, 1),
+            "scheduled": minutes is not None,
             "breakdown": {k: round(v, 1) for k, v in breakdown.items()}}

@@ -301,8 +301,10 @@ def _air_leg(origin: dict | None, destination: dict | None) -> dict | None:
         return None
     distance = great_circle_km((origin["lat"], origin["lon"]), (destination["lat"], destination["lon"]))
     direct = origin["code"] in (destination.get("direct_from") or [])
+    # 직항이면 공표 시간표의 실제 운항 시간을 씁니다.
+    minutes = (destination.get("flight_minutes") or {}).get(origin["code"]) if direct else None
     return {"origin": origin, "destination": destination,
-            "distance_km": distance, "direct": direct}
+            "distance_km": distance, "direct": direct, "minutes": minutes}
 
 
 def transit_summary(origin_code: str, destination_code: str) -> dict:
@@ -335,7 +337,7 @@ def transit_summary(origin_code: str, destination_code: str) -> dict:
     air = _air_leg(origin, destination)
     if air:
         result["air"] = transit_calculator.air_transit(
-            air["distance_km"], transfers=0 if air["direct"] else 1)
+            air["distance_km"], transfers=0 if air["direct"] else 1, minutes=air["minutes"])
         result["air_route"] = {"origin": air["origin"]["name"], "destination": air["destination"]["name"],
                                "origin_code": air["origin"]["code"], "destination_code": air["destination"]["code"],
                                "distance_km": round(air["distance_km"]), "direct": air["direct"]}

@@ -357,10 +357,12 @@
           groups.get(value).push({ item, index });
         });
         groups.forEach((entries, value) => {
-          const other = value === "환승 필요";
+          const other = value === "환승 필요" || value === "환적 필요"
+            || value === "정기 항로 확인 필요";
           const GROUP_NOTES = {
-            "환승 필요": "국내 공항발 직항편이 없어 환승이 필요합니다",
-            "항공화물 거점 (직항)": "화물기 취항지 또는 화물 처리 거점입니다",
+            "환승 필요": "고른 출발 공항에서 직항편이 없어 환승이 필요합니다",
+            "환적 필요": "한국에서 직기항 선박이 없어 환적항을 거칩니다",
+            "정기 항로 확인 필요": "정기 항로 기록이 없어 선사에 확인이 필요합니다",
           };
           const note = GROUP_NOTES[value];
           html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
@@ -554,16 +556,24 @@
           ? ""
           : ({ L: "대형항", M: "중형항", S: "소형항", V: "소규모" }[item.harbor_size] || "");
         const note = item.note ? `<em class="ac_note">${escapeHtml(item.note)}</em>` : "";
-        const direct = item.kind === "airport" && item.direct_from_korea
-          ? `<em class="ac_note direct">직항</em>` : "";
+        const direct = item.kind === "airport"
+          ? (item.direct_from_korea ? `<em class="ac_note direct">직항</em>` : "")
+          : (item.sea_direct ? `<em class="ac_note direct">직기항</em>` : "");
         const cargo = item.korean_air_cargo
           ? `<em class="ac_note cargo">KE 화물</em>`
           : (item.cargo_hub ? `<em class="ac_note cargo">화물 거점</em>` : "");
-        const viaLabel = item.gateway_only ? "국제선 없음 · 대체 공항" : "경유";
-        const via = (item.transfer_via || []).length
-          ? `<small class="ac_via">${viaLabel}: ${item.transfer_via
-              .map(([code, name]) => `${escapeHtml(name)}(${escapeHtml(code)})`).join(" · ")}</small>`
-          : "";
+        // 다른 국내 공항에서는 직항이 있으면 그것부터 알려줍니다.
+        const alternatives = item.kind === "airport" && !item.direct_from_korea
+          ? (item.direct_from || []) : [];
+        const viaLabel = item.gateway_only ? "국제선 없음 · 대체 공항"
+          : (item.kind === "port" ? "환적" : "경유");
+        const viaList = item.kind === "port" ? item.sea_transfer_via : item.transfer_via;
+        const via = alternatives.length
+          ? `<small class="ac_via">${alternatives.map(escapeHtml).join(" · ")} 출발은 직항</small>`
+          : (viaList || []).length
+            ? `<small class="ac_via">${viaLabel}: ${viaList
+                .map(([code, name]) => `${escapeHtml(name)}(${escapeHtml(code)})`).join(" · ")}</small>`
+            : "";
         return `<span class="ac_title"><b>${escapeHtml(item.name)}</b>${note}${cargo}${direct}</span>`
           + `<span class="mono">${escapeHtml(item.code)}</span>`
           + `<small>${escapeHtml(item.name_en)} · ${escapeHtml(item.country)}${size ? ` · ${size}` : ""}</small>`
@@ -585,10 +595,16 @@
         // 국내는 국가관리 -> 지방관리 순, 해외는 국가별로 묶고,
         // 규모가 작은 항구는 맨 아래 "기타 항구"로 모읍니다.
         groupBy: (item) => {
-          if (state.transport_mode === "AIR" && role === "destination") {
-            // 화물 노선이 있는 거점 -> 여객 직항 -> 환승 순으로 나눕니다.
-            if (item.cargo_hub && item.direct_from_korea) return "항공화물 거점 (직항)";
-            return item.direct_from_korea ? "여객 직항 노선" : "환승 필요";
+          if (role === "destination" && state.transport_mode === "AIR") {
+            // 고른 출발 공항에서 직항이 있는 곳을 위로, 환승이 필요한 곳을 아래로.
+            const from = state.origin ? `${state.origin.code} 출발 ` : "";
+            if (!item.direct_from_korea) return "환승 필요";
+            return item.cargo_hub ? `${from}직항 · 항공화물 거점` : `${from}직항 노선`;
+          }
+          if (role === "destination" && state.transport_mode === "SEA") {
+            // 한국에서 직기항 선박이 있는 항구를 위로, 환적이 필요한 항구를 아래로.
+            if (item.sea_direct) return "한국 직기항 노선";
+            return item.sea_direct === false ? "환적 필요" : "정기 항로 확인 필요";
           }
           if (role === "destination") return item.country;
           if (item.port_class === "national") return "국가관리 무역항";

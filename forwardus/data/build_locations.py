@@ -29,6 +29,10 @@ import httpx
 
 from airport_names_ko import AIRPORT_NAMES_KO
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.processors.transit_calculator import great_circle_km
+
 DATA_DIR = Path(__file__).resolve().parent
 RAW_DIR = DATA_DIR / "raw"
 OUTPUT = DATA_DIR / "mock" / "locations.json"
@@ -386,6 +390,8 @@ def normalize_name(name: str) -> str:
 
 # World Port Index에서 모은 실제 선석 좌표
 PORT_COORDS: dict[str, tuple[float, float]] = {}
+# 해상 네트워크의 항구를 좌표로 맞출 때 같은 항구로 보는 거리(km)
+SEA_MATCH_KM = 30.0
 
 
 def load_sea_network() -> dict[str, dict]:
@@ -399,6 +405,53 @@ def load_sea_network() -> dict[str, dict]:
 
     ports = searoute.get_graphs()[1]
     return {data["port"]: data for _, data in ports.nodes(data=True) if data.get("port")}
+
+
+def match_sea_port(code: str, coord: tuple[float, float] | None, network: dict[str, dict],
+                   index: list[tuple[float, float, dict]]) -> dict | None:
+    """해상 네트워크에서 같은 항구를 찾습니다.
+
+    UN/LOCODE가 서로 다른 경우가 있어(상하이 CNSGH ↔ CNSHA) 코드로 못 찾으면
+    같은 나라에서 좌표가 가장 가까운 항구를 씁니다.
+    """
+
+    if code in network:
+        return network[code]
+    if not coord:
+        return None
+    lat, lon = coord
+    nearest, best = None, SEA_MATCH_KM
+    for other_lat, other_lon, data in index:
+        if data["port"][:2] != code[:2]:
+            continue
+        km = great_circle_km((lat, lon), (other_lat, other_lon))
+        if km < best:
+            nearest, best = data, km
+    return nearest
+
+
+def build_sea_transfers(network: dict[str, dict]) -> dict[str, list[str]]:
+    """한국 직기항이 없는 항구마다 갈아탈 수 있는 환적항을 찾습니다.
+
+    한국에서 직기항이 있으면서 그 항구가 있는 나라와도 항로가 이어진 곳을
+    고릅니다. 환적항으로 표시된 곳과 항로가 많은 곳을 먼저 둡니다.
+    """
+
+    hubs = [data for data in network.values() if "KR" in (data.get("to_cty") or [])]
+
+    transfers: dict[str, list[str]] = {}
+    for code, data in network.items():
+        if "KR" in (data.get("to_cty") or []) or code.startswith("KR"):
+            continue
+        country = code[:2]
+        candidates = [h for h in hubs
+                      if country in (h.get("to_cty") or []) and h["port"] != code]
+        # 가까운 환적항을 먼저 두고, 같은 거리면 항로가 많은 곳을 씁니다.
+        candidates.sort(key=lambda h: (round(great_circle_km((data["y"], data["x"]), (h["y"], h["x"])) / 500),
+                                       not h.get("t"), -len(h.get("to_cty") or [])))
+        if candidates:
+            transfers[code] = [h["port"] for h in candidates[:MAX_TRANSFER_HUBS]]
+    return transfers
 
 
 def parse_dms(value: str) -> float | None:
@@ -486,6 +539,8 @@ def build() -> list[dict]:
     korean_country = json.loads(download(KOREAN_COUNTRY_URL, "country_names_ko.json"))
     harbor_sizes = load_harbor_sizes(unlocode)
     sea_network = load_sea_network()
+    sea_index = [(d["y"], d["x"], d) for d in sea_network.values()]
+    sea_transfers = build_sea_transfers(sea_network)
 
     country_info = {
         row["alpha-2"]: {
@@ -501,6 +556,8 @@ def build() -> list[dict]:
 
     locations = []
     seen = set()
+    # 해상 네트워크의 항구 코드 -> 우리가 쓰는 UN/LOCODE (상하이 CNSHA -> CNSGH 등)
+    sea_code_map: dict[str, str] = {}
 
     for row in unlocode:
         country_code = row["Country"]
@@ -519,10 +576,13 @@ def build() -> list[dict]:
         name_en = title_case(row["NameWoDiacritics"] or row["Name"])
         harbor_size = harbor_sizes.get(code)
         # 선석 좌표(WPI)를 먼저 쓰고, 해상 네트워크 → UN/LOCODE 순으로 채웁니다.
-        sea = sea_network.get(code)
         coord = (PORT_COORDS.get(code)
-                 or ((sea["y"], sea["x"]) if sea else None)
+                 or ((sea_network[code]["y"], sea_network[code]["x"]) if code in sea_network else None)
                  or parse_unlocode_coord(row.get("Coordinates", "")))
+        sea = match_sea_port(code, coord, sea_network, sea_index)
+        if sea and (sea["port"] == code or sea["port"] not in sea_code_map):
+            # 코드가 같은 항구를 우선합니다. 좌표로 맞춘 항구는 빈자리만 채웁니다.
+            sea_code_map[sea["port"]] = code
         display_names = {**KOREAN_NAMES, **{code: name for code, (name, _) in KOREA_TRADE_PORTS.items()}}
         locations.append({
             "code": code,
@@ -540,9 +600,12 @@ def build() -> list[dict]:
             "lat": round(coord[0], 4) if coord else None,
             "lon": round(coord[1], 4) if coord else None,
             # 실제 운항 기록에 한국 직기항이 있는 항구. 없으면 환적 일수를 더합니다.
-            "sea_direct": bool(sea and "KR" in (sea.get("to_cty") or [])) if sea else None,
+            "sea_direct": ("KR" in (sea.get("to_cty") or [])) if sea else None,
+            # 직기항이 없을 때 갈아탈 수 있는 환적항. 아래에서 우리 코드·이름으로 바꿉니다.
+            "sea_transfer_via": sea_transfers.get(sea["port"], []) if sea else [],
             "direct_from_korea": None,
             "direct_from": [],
+            "flight_minutes": {},
             "cargo_hub": False,
             "korean_air_cargo": False,
             "transfer_via": [],
@@ -559,6 +622,7 @@ def build() -> list[dict]:
     locations.extend(build_airports(country_info))
 
     attach_transfer_hub_names(locations)
+    attach_sea_hub_names(locations, sea_code_map)
     promote_main_ports(locations)
     # 항만 규모 정보가 없고 주요 항구도 아닌 곳은 제외합니다. 무역에 쓰이지 않는
     # 소규모 선착장이 대부분이며, 필요하면 화면에서 "직접 입력"으로 지정합니다.
@@ -587,7 +651,7 @@ def build() -> list[dict]:
 MAX_TRANSFER_HUBS = 3
 
 
-def load_route_data() -> tuple[set[str], dict[str, list[str]], dict[str, list[str]]]:
+def load_route_data() -> tuple[set[str], dict[str, list[str]], dict[str, dict[str, int]], dict[str, list[str]]]:
     """국내 직항 목록, 출발 공항별 직항 노선, 환승 공항별 경유 후보를 만듭니다.
 
     경유 후보는 "국내에서 직항으로 갈 수 있고, 그곳에서 목적 공항까지
@@ -597,10 +661,15 @@ def load_route_data() -> tuple[set[str], dict[str, list[str]], dict[str, list[st
     data = json.loads(download(ROUTES_URL, "airline_routes.json"))
     # 목적 공항 -> 직항편이 있는 국내 출발 공항 목록
     direct_from: dict[str, list[str]] = {}
+    # 목적 공항 -> 출발 공항별 실제 운항 시간(분). 소요일 계산에 씁니다.
+    flight_minutes: dict[str, dict[str, int]] = {}
     for code in KOREA_AIRPORTS:
         for route in data.get(code, {}).get("routes", []):
-            if route["iata"] not in KOREA_AIRPORTS:
-                direct_from.setdefault(route["iata"], []).append(code)
+            if route["iata"] in KOREA_AIRPORTS:
+                continue
+            direct_from.setdefault(route["iata"], []).append(code)
+            if route.get("min"):
+                flight_minutes.setdefault(route["iata"], {})[code] = int(route["min"])
     direct = set(direct_from)
 
     transfers: dict[str, list[str]] = {}
@@ -612,7 +681,7 @@ def load_route_data() -> tuple[set[str], dict[str, list[str]], dict[str, list[st
         hubs.sort(key=lambda item: (-item[0], item[1]))
         if hubs:
             transfers[iata] = [code for _, code in hubs[:MAX_TRANSFER_HUBS]]
-    return direct, direct_from, transfers
+    return direct, direct_from, flight_minutes, transfers
 
 
 def build_airports(country_info: dict[str, dict]) -> list[dict]:
@@ -624,7 +693,7 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
 
     rows = list(csv.DictReader(io.StringIO(
         download(AIRPORTS_URL, "ourairports_airports.csv").decode("utf-8", "replace"))))
-    direct_routes, direct_from, transfer_hubs = load_route_data()
+    direct_routes, direct_from, flight_minutes, transfer_hubs = load_route_data()
     # 정기 국제선이 실제로 있는 국내 공항. 없는 곳은 출발지 목록에서 안내합니다.
     korea_outbound = {code for codes in direct_from.values() for code in codes}
 
@@ -662,6 +731,7 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "lat": round(float(row["latitude_deg"]), 4),
             "lon": round(float(row["longitude_deg"]), 4),
             "sea_direct": None,
+            "sea_transfer_via": [],
             "harbor_size": None,
             "port_class": None,
             "note": ("" if country_code != "KR" or iata in korea_outbound
@@ -678,6 +748,8 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "direct_from_korea": None if country_code == "KR" else iata in direct_routes,
             # 어느 국내 공항에서 직항편이 오는지 (예: ["ICN", "PUS"])
             "direct_from": [] if country_code == "KR" else sorted(direct_from.get(iata, [])),
+            # 출발 공항별 실제 운항 시간(분). 공표 시간표에서 가져옵니다.
+            "flight_minutes": {} if country_code == "KR" else flight_minutes.get(iata, {}),
             "cargo_hub": iata in CARGO_HUBS,
             "korean_air_cargo": iata in KOREAN_AIR_CARGO,
             "transfer_via": ([] if country_code == "KR" or iata in direct_routes
@@ -697,6 +769,19 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
     if unknown_ko:
         print(f"경고: 한글 표기만 있고 데이터에 없는 공항 {len(unknown_ko)}개 -> {', '.join(unknown_ko)}")
     return airports
+
+
+def attach_sea_hub_names(locations: list[dict], sea_code_map: dict[str, str]) -> None:
+    """환적항 코드를 우리가 쓰는 UN/LOCODE와 한글 이름으로 바꿉니다."""
+
+    names = {item["code"]: item["name"] for item in locations if item["kind"] == "port"}
+    for item in locations:
+        hubs = []
+        for hub in item.get("sea_transfer_via") or []:
+            code = sea_code_map.get(hub, hub)
+            if code in names:
+                hubs.append([code, names[code]])
+        item["sea_transfer_via"] = hubs
 
 
 def attach_transfer_hub_names(locations: list[dict]) -> None:

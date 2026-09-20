@@ -260,6 +260,9 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
             # 항공화물 거점 -> 직항 -> 나머지
             not (item.get("cargo_hub") and item.get("direct_from_korea")),
             item.get("direct_from_korea") is False,
+            # 도착 항구도 같은 순서로: 한국 직기항 -> 항로 기록 없음 -> 환적 필요.
+            # 출발지인 국내 무역항은 아래의 관리주체·물동량 순서를 씁니다.
+            0 if item["country_code"] == "KR" else {True: 0, None: 1, False: 2}[item.get("sea_direct")],
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
             # 국내 무역항은 물동량 순서를 유지합니다.
             -(item.get("cargo_volume_mt") or 0),
