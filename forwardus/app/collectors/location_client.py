@@ -9,6 +9,7 @@ from copy import deepcopy
 from functools import lru_cache
 
 from app.collectors.base_client import fail, load_mock, ok
+from app.processors.transit_calculator import great_circle_km
 
 # 목록에는 주요 항구·공항만 노출합니다. 그 밖의 항구는 화면의 "직접 입력"에서
 # UN/LOCODE 전체 색인(search_unlocode)으로 찾습니다.
@@ -277,3 +278,41 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         # 직항 여부가 바뀌었으므로 다시 정렬합니다.
         items.sort(key=rank)
     return ok(items, "mock")
+
+
+def sea_route(origin_code: str, destination_code: str) -> dict | None:
+    """미리 계산해 둔 실제 해상 항로 거리와 지나는 길목을 돌려줍니다.
+
+    data/build_sea_routes.py가 searoute 해상 항로망에서 구한 값입니다.
+    """
+
+    try:
+        routes = load_mock("sea_routes")["routes"]
+    except (OSError, ValueError, KeyError):
+        return None
+    leg = routes.get(origin_code, {}).get(destination_code)
+    if not leg:
+        return None
+    return {"distance_km": leg[0], "passages": leg[1] if len(leg) > 1 else []}
+
+
+def nearest(location: dict, kind: str, country_code: str | None = None) -> dict | None:
+    """같은 나라에서 좌표가 가장 가까운 항구(또는 공항)를 찾습니다.
+
+    해상 모드에서 항공 소요시간을, 항공 모드에서 해상 소요시간을 함께 보여줄 때
+    짝이 되는 지점을 고르는 데 씁니다.
+    """
+
+    if not location or location.get("lat") is None:
+        return None
+    country_code = country_code or location["country_code"]
+    here = (location["lat"], location["lon"])
+    candidates = [item for item in _all_locations()
+                  if item["kind"] == kind and item["country_code"] == country_code
+                  and item["lat"] is not None and item.get("major")]
+    # 한국에서 실제로 직기항·직항이 있는 곳을 먼저 고릅니다.
+    key = "sea_direct" if kind == "port" else "direct_from_korea"
+    candidates = [item for item in candidates if item.get(key)] or candidates
+    if not candidates:
+        return None
+    return deepcopy(min(candidates, key=lambda item: great_circle_km(here, (item["lat"], item["lon"]))))
