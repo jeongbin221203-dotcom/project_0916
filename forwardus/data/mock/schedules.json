@@ -14,7 +14,8 @@
     "europe": 30,
     "oceania": 14,
     "middle_east": 22,
-    "africa": 26
+    "africa": 26,
+    "south_america": 32
    },
    "rate_usd": {
     "asia": 520,
@@ -22,7 +23,8 @@
     "europe": 2250,
     "oceania": 1350,
     "middle_east": 1750,
-    "africa": 1950
+    "africa": 1950,
+    "south_america": 2100
    }
   },
   {
@@ -39,7 +41,8 @@
     "europe": 32,
     "oceania": 15,
     "middle_east": 24,
-    "africa": 28
+    "africa": 28,
+    "south_america": 34
    },
    "rate_usd": {
     "asia": 480,
@@ -47,7 +50,8 @@
     "europe": 2120,
     "oceania": 1290,
     "middle_east": 1650,
-    "africa": 1850
+    "africa": 1850,
+    "south_america": 1980
    }
   },
   {
@@ -64,7 +68,8 @@
     "europe": 34,
     "oceania": 18,
     "middle_east": 26,
-    "africa": 30
+    "africa": 30,
+    "south_america": 36
    },
    "rate_usd": {
     "asia": 450,
@@ -72,7 +77,8 @@
     "europe": 1990,
     "oceania": 1220,
     "middle_east": 1520,
-    "africa": 1720
+    "africa": 1720,
+    "south_america": 1850
    }
   }
  ],
@@ -92,7 +98,8 @@
     "europe": 33,
     "oceania": 17,
     "middle_east": 25,
-    "africa": 29
+    "africa": 29,
+    "south_america": 34
    },
    "rate_usd": {
     "asia": 28,
@@ -100,7 +107,8 @@
     "europe": 85,
     "oceania": 62,
     "middle_east": 72,
-    "africa": 80
+    "africa": 80,
+    "south_america": 88
    }
   },
   {
@@ -118,7 +126,8 @@
     "europe": 36,
     "oceania": 19,
     "middle_east": 28,
-    "africa": 32
+    "africa": 32,
+    "south_america": 37
    },
    "rate_usd": {
     "asia": 22,
@@ -126,7 +135,8 @@
     "europe": 74,
     "oceania": 51,
     "middle_east": 60,
-    "africa": 66
+    "africa": 66,
+    "south_america": 70
    }
   },
   {
@@ -144,7 +154,8 @@
     "europe": 31,
     "oceania": 16,
     "middle_east": 24,
-    "africa": 28
+    "africa": 28,
+    "south_america": 33
    },
    "rate_usd": {
     "asia": 34,
@@ -152,7 +163,8 @@
     "europe": 96,
     "oceania": 70,
     "middle_east": 82,
-    "africa": 90
+    "africa": 90,
+    "south_america": 98
    }
   }
  ],
@@ -172,7 +184,8 @@
     "europe": 1,
     "oceania": 1,
     "middle_east": 1,
-    "africa": 2
+    "africa": 2,
+    "south_america": 2
    },
    "rate_usd": {
     "asia": 2.6,
@@ -180,7 +193,8 @@
     "europe": 5.4,
     "oceania": 4.6,
     "middle_east": 5.0,
-    "africa": 5.6
+    "africa": 5.6,
+    "south_america": 6.2
    }
   },
   {
@@ -198,7 +212,8 @@
     "europe": 2,
     "oceania": 2,
     "middle_east": 2,
-    "africa": 2
+    "africa": 2,
+    "south_america": 3
    },
    "rate_usd": {
     "asia": 2.3,
@@ -206,7 +221,8 @@
     "europe": 4.9,
     "oceania": 4.2,
     "middle_east": 4.6,
-    "africa": 5.1
+    "africa": 5.1,
+    "south_america": 5.7
    }
   },
   {
@@ -224,7 +240,8 @@
     "europe": 3,
     "oceania": 3,
     "middle_east": 3,
-    "africa": 3
+    "africa": 3,
+    "south_america": 3
    },
    "rate_usd": {
     "asia": 2.0,
@@ -232,7 +249,8 @@
     "europe": 4.3,
     "oceania": 3.8,
     "middle_east": 4.1,
-    "africa": 4.6
+    "africa": 4.6,
+    "south_america": 5.2
    }
   }
  ]

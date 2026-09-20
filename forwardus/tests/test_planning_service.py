@@ -53,7 +53,9 @@ def test_reverse_schedule_service_validation(app):
 
 def test_location_search_filters_by_mode_and_role(app):
     ports = planning_service.search_locations("부산", "SEA", "origin")["data"]
-    assert [p["code"] for p in ports] == ["KRPUS", "KRBNP"]  # 주요 항만·짧은 이름 우선
+    codes = [p["code"] for p in ports]
+    assert codes[:2] == ["KRPUS", "KRBNP"]  # 주요 항만·짧은 이름 우선
+    assert "KRKCN" in codes  # 감천항(부산)
     assert all(p["country_code"] == "KR" and p["kind"] == "port" for p in ports)
     airports = planning_service.search_locations("los angeles", "AIR", "destination")["data"]
     assert [a["code"] for a in airports] == ["LAX"]
@@ -88,11 +90,18 @@ def test_destination_countries_and_country_filter(app):
 
 
 def test_schedules_cover_every_region(app, shipment_payload):
-    """Each destination region has mock rates, including Africa and the Middle East."""
+    """Every destination region has mock rates (Middle East, Africa, South America…)."""
 
-    for destination in ("AEJEA", "ZADUR", "BRSSZ"):
+    fastest = {}
+    for destination in ("VNSGN", "USLAX", "DEHAM", "AEJEA", "ZADUR", "BRSSZ", "AUSYD"):
         payload = {**shipment_payload, "destination_code": destination}
-        assert planning_service.search_schedules(payload)["items"], f"{destination} 스케줄 없음"
+        items = planning_service.search_schedules(payload)["items"]
+        assert items, f"{destination} 스케줄 없음"
+        fastest[destination] = min(item["transit_days"] for item in items)
+
+    # 남미는 북미와 다른 구간으로 계산합니다.
+    assert fastest["BRSSZ"] > fastest["USLAX"]
+    assert fastest["VNSGN"] < fastest["USLAX"] < fastest["DEHAM"]
 
 
 def test_direct_input_location_accepted(app, shipment_payload):

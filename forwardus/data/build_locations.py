@@ -48,35 +48,39 @@ SUB_REGION_TO_REGION = {
     "Northern Africa": "africa",
     "Sub-Saharan Africa": "africa",
     "Northern America": "americas",
-    "Latin America and the Caribbean": "americas",
+    "Latin America and the Caribbean": "americas",  # 남미는 INTERMEDIATE_REGION에서 분리
     "Australia and New Zealand": "oceania",
     "Melanesia": "oceania",
     "Micronesia": "oceania",
     "Polynesia": "oceania",
 }
+# ISO intermediate-region overrides: South America is far longer than North
+# America on the Asia route, so it gets its own schedule region.
+INTERMEDIATE_REGION_TO_REGION = {"South America": "south_america"}
 DEFAULT_REGION = "asia"
 
-# Korean display names. Major ports are listed first in search results.
+# Korean display names, keyed by UN/LOCODE. Major ports are listed first in
+# search results. build_locations.py warns when a code is not in the dataset.
 KOREAN_NAMES = {
-    # 국내 무역항
-    "KRPUS": "부산항", "KRBNP": "부산신항", "KRINC": "인천항", "KRPTK": "평택·당진항",
-    "KRKAN": "광양항", "KRUSN": "울산항", "KRKPO": "포항항", "KRMAS": "마산항",
-    "KRYOS": "여수항", "KRKUV": "군산항", "KRMOK": "목포항", "KRDHA": "동해항",
-    "KRMUK": "묵호항", "KRSCH": "삼척항", "KRSOK": "속초항", "KRCHF": "진해항",
-    "KRTYG": "통영항", "KRSCP": "삼천포항", "KROKP": "옥포항", "KRJHG": "장항항",
-    "KRBOR": "보령항", "KRDSN": "대산항", "KRWND": "완도항", "KRCHA": "제주항",
-    "KRSEO": "서귀포항", "KRGUP": "구룡포항", "KRHDO": "하동항", "KRJSP": "장승포항",
-    "KRKOH": "고현항", "KRTAN": "태안항", "KRSEL": "서울항", "KROKE": "옥계항",
-    # 국내 공항
-    "KRICN": "인천국제공항", "KRPUS_AIR": "김해국제공항", "KRGMP": "김포국제공항",
-    "KRCJU": "제주국제공항", "KRTAE": "대구국제공항", "KRKWJ": "광주공항",
-    "KRCJJ": "청주국제공항", "KRYNY": "양양국제공항", "KRMWX": "무안국제공항",
+    # 국내 무역항 (코드는 UN/LOCODE 확인값)
+    "KRPUS": "부산항", "KRBNP": "부산신항", "KRKCN": "감천항(부산)", "KRINC": "인천항",
+    "KRGIN": "경인항", "KRPTK": "평택항", "KRTJI": "당진항", "KRTSN": "대산항",
+    "KRKAN": "광양항", "KRYOS": "여수항", "KRUSN": "울산항", "KRONS": "온산항(울산)",
+    "KRMIP": "미포항(울산)", "KRKPO": "포항항", "KRSHG": "포항신항", "KRMAS": "마산항",
+    "KRCHF": "진해항", "KRTYG": "통영항", "KRSCP": "삼천포항", "KROKP": "옥포항",
+    "KRKHN": "고현항", "KRCHG": "장항항", "KRBOR": "보령항", "KRKUV": "군산항",
+    "KRMOK": "목포항", "KRDBL": "대불항", "KRWND": "완도항", "KRTGH": "동해항",
+    "KRMUK": "묵호항", "KRSUK": "삼척항", "KROKK": "옥계항", "KRSHO": "속초항",
+    "KRGRP": "구룡포항", "KRCHA": "제주항", "KRSPO": "서귀포항", "KRHDO": "하동항",
+    "KRTAN": "태안항", "KRSEL": "서울항",
     # 주요 해외 항만
     "USLAX": "로스앤젤레스항", "USLGB": "롱비치항", "USNYC": "뉴욕·뉴저지항",
     "USSEA": "시애틀항", "USSAV": "서배너항", "USHOU": "휴스턴항", "USOAK": "오클랜드항",
     "CAVAN": "밴쿠버항", "MXZLO": "만사니요항",
-    "CNSHA": "상하이항", "CNNGB": "닝보·저우산항", "CNSZX": "선전항", "CNTAO": "칭다오항",
-    "CNTSN": "톈진항", "CNCAN": "광저우항", "CNXMN": "샤먼항", "CNDLC": "다롄항",
+    "CNSGH": "상하이항", "CNSHG": "상하이항 터미널", "CNNBO": "닝보항", "CNNBG": "닝보항 터미널",
+    "CNSNZ": "선전항", "CNYTN": "옌톈 터미널(선전)", "CNSHK": "서커우 터미널(선전)",
+    "CNQIN": "칭다오항", "CNTNJ": "톈진항", "CNTXG": "톈진신강 터미널",
+    "CNGGZ": "광저우항", "CNXAM": "샤먼항", "CNDAL": "다롄항",
     "HKHKG": "홍콩항", "TWKHH": "가오슝항", "TWKEL": "지룽항",
     "JPTYO": "도쿄항", "JPYOK": "요코하마항", "JPOSA": "오사카항", "JPUKB": "고베항",
     "JPNGO": "나고야항", "JPHKT": "하카타항", "JPSMZ": "시미즈항",
@@ -91,7 +95,7 @@ KOREAN_NAMES = {
     "FRLEH": "르아브르항", "ESVLC": "발렌시아항", "ESALG": "알헤시라스항",
     "ESBCN": "바르셀로나항", "ITGOA": "제노바항", "ITGIT": "조이아타우로항",
     "GRPIR": "피레우스항", "PLGDN": "그단스크항", "RULED": "상트페테르부르크항",
-    "RUVVO": "블라디보스토크항", "TRAMB": "암발리항", "TRIZM": "이즈미르항",
+    "RUVVO": "블라디보스토크항", "TRAMR": "암발리항", "TRIZM": "이즈미르항",
     "EGPSD": "포트사이드항", "MAPTM": "탕헤르메드항", "ZADUR": "더반항",
     "AUSYD": "시드니항", "AUMEL": "멜버른항", "AUBNE": "브리즈번항",
     "NZAKL": "오클랜드항", "BRSSZ": "산투스항", "CLSAI": "산안토니오항",
@@ -196,7 +200,10 @@ def build() -> list[dict]:
         row["alpha-2"]: {
             "name_en": row["name"],
             "name": korean_country.get(row["alpha-2"], row["name"]),
-            "region": SUB_REGION_TO_REGION.get(row.get("sub-region") or "", DEFAULT_REGION),
+            "region": INTERMEDIATE_REGION_TO_REGION.get(
+                row.get("intermediate-region") or "",
+                SUB_REGION_TO_REGION.get(row.get("sub-region") or "", DEFAULT_REGION),
+            ),
         }
         for row in iso
     }
@@ -250,6 +257,9 @@ def build() -> list[dict]:
 
 if __name__ == "__main__":
     items = build()
+    unmatched = sorted(set(KOREAN_NAMES) - {item["code"] for item in items})
+    if unmatched:
+        print(f"경고: UN/LOCODE에 없는 코드 {len(unmatched)}개 -> {', '.join(unmatched)}")
     OUTPUT.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     ports = [item for item in items if item["kind"] == "port"]
     print(f"{OUTPUT}: {len(items):,} locations "
