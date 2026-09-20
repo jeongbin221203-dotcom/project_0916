@@ -74,6 +74,27 @@ def migrate_shipment_columns(database) -> None:
                 connection.execute(text(f"ALTER TABLE shipments ADD COLUMN {name} {spec}"))
 
 
+# 표준단가 표에서 나오는 비용 항목. 예전에는 이것도 "mock"으로 저장했는데,
+# 가짜가 아니라 추정값이라 "tariff"로 고쳐 부릅니다.
+TARIFF_COST_CODES = ("origin_trucking", "terminal_handling", "documentation",
+                     "export_customs", "destination_charge")
+
+
+def migrate_cost_sources(database) -> None:
+    """이미 저장된 비용 줄의 출처 표기를 고칩니다. 운임은 그대로 둡니다."""
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "shipment_costs" not in inspector.get_table_names():
+        return
+    codes = ", ".join(f"'{code}'" for code in TARIFF_COST_CODES)
+    with database.engine.begin() as connection:
+        connection.execute(text(
+            f"UPDATE shipment_costs SET source = 'tariff' "
+            f"WHERE source = 'mock' AND code IN ({codes})"))
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     """Create and configure the Flask application."""
 
@@ -95,6 +116,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         db.create_all()
         migrate_cargo_lines(db)
         migrate_shipment_columns(db)
+        migrate_cost_sources(db)
 
     @flask_app.get("/health")
     def health():
