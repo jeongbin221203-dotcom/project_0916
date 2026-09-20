@@ -173,6 +173,10 @@
   let viewMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
   const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  // 달력을 누를 때마다 출발 예정일 -> Buyer 요청일 -> 출발 예정일 … 순으로 채웁니다.
+  let pickTarget = "departure";
+  // 출발일 여유 등급(ok/caution/tight/late). 두 날짜 사이를 칠하는 색으로 씁니다.
+  let marginLevel = "none";
 
   function monthHtml(base, offset) {
     const year = base.getFullYear();
@@ -181,16 +185,25 @@
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const buyerDate = form.elements.buyer_required_date.value;
 
+    const departure = state.departure_date;
     let cells = "";
     for (let i = 0; i < first.getDay(); i += 1) cells += "<span></span>";
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = new Date(year, month, day);
       const iso = toIsoDate(date);
       const classes = [];
-      if (state.departure_date === iso) classes.push("selected");
+      if (departure === iso) classes.push("selected");
       if (buyerDate === iso) classes.push("buyer");
       if (date.getTime() === today.getTime()) classes.push("today");
-      cells += `<button type="button" data-date="${iso}" ${date < today ? "disabled" : ""}`
+      // 출발일과 요청일 사이는 여유 등급에 따라 색을 달리합니다.
+      if (departure && buyerDate && iso > departure && iso < buyerDate) {
+        classes.push("in_range", `range_${marginLevel}`);
+      }
+      // 출발일은 요청일보다 뒤로, 요청일은 출발일보다 앞으로 갈 수 없습니다.
+      const blocked = (pickTarget === "departure" && buyerDate && iso > buyerDate)
+        || (pickTarget === "buyer" && departure && iso < departure);
+      if (blocked) classes.push("blocked");
+      cells += `<button type="button" data-date="${iso}" ${date < today || blocked ? "disabled" : ""}`
         + ` class="${classes.join(" ")}">${day}</button>`;
     }
     return `<div class="cal_month">
@@ -205,14 +218,16 @@
     calendarEl.innerHTML = `
       <div class="cal_head">
         <button type="button" data-cal-prev ${canGoBack ? "" : "disabled"} aria-label="이전 달">‹</button>
-        <b>출발 희망일 선택</b>
+        <b>${pickTarget === "departure" ? "출발 예정일 선택" : "Buyer 요청 도착일 선택"}</b>
         <button type="button" data-cal-next aria-label="다음 달">›</button>
       </div>
       <div class="cal_months">${monthHtml(viewMonth, 0)}${monthHtml(viewMonth, 1)}</div>
       <p class="cal_legend">
-        <span class="legend_departure">출발 희망일</span>
+        <span class="legend_departure">출발 예정일</span>
         <span class="legend_buyer">Buyer 요청 도착일</span>
-      </p>`;
+        <span class="legend_range range_${marginLevel}">운송 기간</span>
+      </p>
+      <p class="cal_hint">날짜를 누를 때마다 출발 예정일 → Buyer 요청일 순서로 지정됩니다.</p>`;
   }
 
   calendarEl.addEventListener("click", (event) => {
@@ -221,7 +236,24 @@
     if (target.hasAttribute("data-cal-prev")) viewMonth.setMonth(viewMonth.getMonth() - 1);
     else if (target.hasAttribute("data-cal-next")) viewMonth.setMonth(viewMonth.getMonth() + 1);
     else if (target.dataset.date) {
-      state.departure_date = target.dataset.date;
+      const iso = target.dataset.date;
+      const buyerInput = form.elements.buyer_required_date;
+      if (pickTarget === "departure") {
+        if (buyerInput.value && iso > buyerInput.value) {
+          showError("출발 예정일은 Buyer 요청 도착일보다 늦을 수 없습니다.");
+          return;
+        }
+        state.departure_date = iso;
+        pickTarget = "buyer";
+      } else {
+        if (state.departure_date && iso < state.departure_date) {
+          showError("Buyer 요청 도착일은 출발 예정일보다 빠를 수 없습니다.");
+          return;
+        }
+        buyerInput.value = iso;
+        pickTarget = "departure";
+      }
+      showError("");
       updateSelectedDates();
       invalidateSchedules();
       saveDraftSoon();
@@ -807,9 +839,17 @@
     tab.addEventListener("click", () => openStep(Number(tab.dataset.stepTab)));
   });
 
-  const marginBox = document.querySelector("[data-margin]");
+  // 함수 선언으로 두어 초기화 순서와 관계없이 호출할 수 있게 합니다.
+  let departureCheckTimer;
 
-  const checkDeparture = debounce(async () => {
+  function checkDeparture() {
+    clearTimeout(departureCheckTimer);
+    departureCheckTimer = setTimeout(runDepartureCheck, 250);
+  }
+
+  async function runDepartureCheck() {
+    const marginBox = document.querySelector("[data-margin]");
+    if (!marginBox) return;
     if (!state.departure_date) {
       marginBox.hidden = true;
       return;
@@ -823,6 +863,7 @@
     });
     if (!response.success || !response.data.available) {
       marginBox.hidden = true;
+      marginLevel = "none";
       return;
     }
     const data = response.data;
@@ -836,7 +877,11 @@
     marginBox.className = `margin_box level_${data.level}`;
     marginBox.innerHTML = text;
     marginBox.hidden = false;
-  }, 250);
+    if (data.level !== marginLevel) {
+      marginLevel = data.level;
+      renderCalendar();
+    }
+  }
 
   function updateSelectedDates() {
     const buyerDate = form.elements.buyer_required_date.value;
@@ -847,6 +892,14 @@
 
   form.elements.buyer_required_date.addEventListener("change", () => {
     const value = form.elements.buyer_required_date.value;
+    if (value && state.departure_date && value < state.departure_date) {
+      showError("Buyer 요청 도착일은 출발 예정일보다 빠를 수 없습니다.");
+      form.elements.buyer_required_date.value = "";
+      updateSelectedDates();
+      renderCalendar();
+      return;
+    }
+    showError("");
     if (value) {
       // 요청일이 보이도록 달력을 그 달로 옮깁니다. (해당 월이 오른쪽에 오도록)
       const [year, month] = value.split("-").map(Number);
