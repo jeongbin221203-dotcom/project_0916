@@ -27,6 +27,8 @@ import httpx
 DATA_DIR = Path(__file__).resolve().parent
 RAW_DIR = DATA_DIR / "raw"
 OUTPUT = DATA_DIR / "mock" / "locations.json"
+# 직접 입력한 항구 이름을 실제 코드로 바꾸기 위한 전체 색인 (분류 여부와 무관).
+INDEX_OUTPUT = DATA_DIR / "mock" / "unlocode_ports.json"
 
 UNLOCODE_URL = "https://raw.githubusercontent.com/datasets/un-locode/main/data/code-list.csv"
 ISO_URL = "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.json"
@@ -137,6 +139,18 @@ KOREA_TRADE_PORTS = {
     "KRSHO": ("속초항", "local"),
     "KROKK": ("옥계항", "local"),
     "KRHAS": ("호산항", "local"),
+}
+
+# 목록에 없는 국내 항구(연안항·어항 등)를 한글 이름으로도 찾을 수 있도록 하는 별칭.
+KOREAN_PORT_ALIASES = {
+    "KRGRP": "구룡포항", "KRHPO": "후포항", "KRJMJ": "주문진항", "KRULL": "울릉항",
+    "KRCJA": "추자항", "KRHLM": "한림항", "KRSSP": "성산포항", "KRHDO": "홍도항",
+    "KRDHS": "대흑산도항", "KRGMD": "거문도항", "KRNRD": "나로도항", "KRNDS": "녹동신항",
+    "KRDCN": "대천항", "KRAWL": "애월항", "KRHSN": "화순항", "KRBIN": "비인항",
+    "KRGGU": "강구항", "KRKJE": "거제항", "KRSBU": "부산남항", "KRYPD": "연평도항",
+    "KRSWD": "상왕등도항", "KRGGH": "가거항리항", "KRHHP": "화흥포항", "KRJHA": "중화항",
+    "KRKDO": "국도항", "KRGDO": "갈두항", "KRSGG": "송공항", "KRYGP": "용기포항",
+    "KRDDO": "독도", "KRCGY": "청양", "KRANJ": "안정", "KRBUK": "부평(인천)",
 }
 
 # 목록에서 함께 보여줄 안내 문구.
@@ -304,6 +318,24 @@ def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
     return sizes
 
 
+def build_unlocode_index(unlocode_rows: list[dict]) -> dict[str, list]:
+    """code → [영문명, 국가코드]. UN/LOCODE의 모든 항구를 담습니다."""
+
+    index = {}
+    for row in unlocode_rows:
+        if PORT_FUNCTION not in (row["Function"] or ""):
+            continue
+        code = f"{row['Country']}{row['Location']}"
+        if code in index or code in DUPLICATE_CODES:
+            continue
+        names = {**KOREAN_PORT_ALIASES, **{c: n for c, (n, _) in KOREA_TRADE_PORTS.items()}, **KOREAN_NAMES}
+        entry = [title_case(row["NameWoDiacritics"] or row["Name"]), row["Country"]]
+        if code in names:
+            entry.append(names[code])
+        index[code] = entry
+    return index
+
+
 def build() -> list[dict]:
     unlocode = list(csv.DictReader(io.StringIO(download(UNLOCODE_URL, "unlocode_code_list.csv").decode("utf-8", "replace"))))
     iso = json.loads(download(ISO_URL, "iso_3166_regions.json"))
@@ -426,9 +458,20 @@ def promote_main_ports(locations: list[dict]) -> None:
             port["major"] = True
 
 
+def write_unlocode_index() -> int:
+    rows = list(csv.DictReader(io.StringIO(
+        download(UNLOCODE_URL, "unlocode_code_list.csv").decode("utf-8", "replace"))))
+    index = build_unlocode_index(rows)
+    INDEX_OUTPUT.write_text(json.dumps(index, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    return len(index)
+
+
 if __name__ == "__main__":
+    index_size = write_unlocode_index()
     items = build()
-    unmatched = sorted((set(KOREAN_NAMES) | set(KOREA_TRADE_PORTS) | set(PORT_NOTES)) - {item["code"] for item in items})
+    known_codes = {item["code"] for item in items} | set(json.loads(INDEX_OUTPUT.read_text(encoding="utf-8")))
+    unmatched = sorted((set(KOREAN_NAMES) | set(KOREA_TRADE_PORTS) | set(PORT_NOTES)
+                        | set(KOREAN_PORT_ALIASES)) - known_codes)
     if unmatched:
         print(f"경고: UN/LOCODE에 없는 코드 {len(unmatched)}개 -> {', '.join(unmatched)}")
     OUTPUT.write_text(json.dumps(items, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -437,6 +480,7 @@ if __name__ == "__main__":
     print(f"{OUTPUT}: {len(items):,} locations "
           f"(ports {len(ports):,} / airports {len(items) - len(ports):,}, "
           f"countries {len({item['country_code'] for item in items}):,})")
+    print(f"{INDEX_OUTPUT}: 전체 UN/LOCODE 항구 색인 {index_size:,}개")
     print(f"  주요 항구 {len(mains):,}곳 / 기타 항구 {len(ports) - len(mains):,}곳 "
           f"(주요 항구 보유 국가 {len({item['country_code'] for item in mains}):,}개국)")
     without_main = {item["country_code"] for item in ports} - {item["country_code"] for item in mains}

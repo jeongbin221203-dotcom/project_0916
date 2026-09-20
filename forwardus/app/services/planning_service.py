@@ -122,19 +122,32 @@ def _build_custom_location(code: str, custom: dict, role: str, kind: str) -> dic
     if not name:
         raise ValidationError("항구·공항 이름을 입력해주세요.", f"{role}_name")
 
-    if not code:
-        code = location_client.generate_code(country_code, name)
-    elif not code.isalnum() or not location_client.CODE_MIN_LENGTH <= len(code) <= location_client.CODE_MAX_LENGTH:
-        raise ValidationError(
-            f"코드는 영문·숫자 {location_client.CODE_MIN_LENGTH}~{location_client.CODE_MAX_LENGTH}자로 "
-            f"입력하거나 비워두세요. (비우면 자동 부여)", field)
+    # 서류에 찍히는 코드이므로 실제 UN/LOCODE만 사용합니다.
+    if code:
+        official = location_client.lookup_unlocode(code)
+        if not official:
+            raise ValidationError(f"{code}은(는) UN/LOCODE에 없는 코드입니다. 항구 이름으로 다시 찾아주세요.", field)
+        if official["country_code"] != country_code:
+            raise ValidationError(
+                f"{code}은(는) {official['country_code']} 국가의 코드입니다. 국가를 확인해주세요.", f"{role}_country")
+    else:
+        matches = location_client.find_unlocode_by_name(country_code, name)
+        if not matches:
+            raise ValidationError(
+                f"'{name}'을(를) UN/LOCODE에서 찾지 못했습니다. 항구 이름을 영문으로 입력하거나 코드를 입력해주세요.",
+                f"{role}_name")
+        if len(matches) > 1 and matches[0]["name_en"].lower() != name.strip().lower():
+            candidates = ", ".join(f"{item['name_en']}({item['code']})" for item in matches)
+            raise ValidationError(f"항구가 여러 곳 검색되었습니다. 코드를 선택해 입력해주세요: {candidates}", field)
+        code = matches[0]["code"]
+        official = matches[0]
 
     return {
         "code": code,
         "name": name,
-        "name_en": name,
+        "name_en": official["name_en"],
         "city": name,
-        "city_en": name,
+        "city_en": official["name_en"],
         "country": country["name"],
         "country_en": country["name_en"],
         "country_code": country_code,

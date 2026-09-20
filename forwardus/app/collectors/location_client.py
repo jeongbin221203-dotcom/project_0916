@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from functools import lru_cache
-from hashlib import sha1
 
 from app.collectors.base_client import fail, load_mock, ok
 
@@ -63,22 +62,63 @@ def _build_countries(_version: int) -> dict[str, dict]:
     return countries
 
 
-def generate_code(country_code: str, name: str) -> str:
-    """직접 입력한 항구에 부여할 임시 코드.
+def _unlocode_index() -> dict[str, list]:
+    """UN/LOCODE 전체 항구 색인 (code → [영문명, 국가코드])."""
 
-    UN/LOCODE에 없는 항구이므로 국가코드 + ZZ + 이름 해시 한 글자로 만듭니다.
-    같은 이름이면 항상 같은 코드가 나오고, 기존 코드와 겹치면 다음 글자를 씁니다.
+    return load_mock("unlocode_ports")
+
+
+def lookup_unlocode(code: str) -> dict | None:
+    """코드가 실제 UN/LOCODE인지 확인하고 이름·국가를 돌려줍니다."""
+
+    code = (code or "").strip().upper()
+    entry = _unlocode_index().get(code)
+    if not entry:
+        return None
+    return {
+        "code": code,
+        "name_en": entry[0],
+        "country_code": entry[1],
+        "name_ko": entry[2] if len(entry) > 2 else "",
+    }
+
+
+def _normalize(name: str) -> str:
+    return "".join(ch for ch in (name or "").lower() if ch.isalnum())
+
+
+def find_unlocode_by_name(country_code: str, name: str, limit: int = 5) -> list[dict]:
+    """국가 안에서 이름으로 실제 UN/LOCODE를 찾습니다.
+
+    완전히 같은 이름을 먼저 찾고, 없으면 이름이 포함된 항구를 돌려줍니다.
     """
 
-    alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    digest = sha1(name.strip().upper().encode("utf-8")).hexdigest()
-    start = int(digest[:8], 16) % len(alphabet)
-    known = _by_code()
-    for offset in range(len(alphabet)):
-        code = f"{country_code}ZZ{alphabet[(start + offset) % len(alphabet)]}"
-        if code not in known:
-            return code
-    return f"{country_code}ZZZ"
+    country_code = (country_code or "").strip().upper()
+    needle = _normalize(name)
+    if not needle:
+        return []
+
+    exact, partial = [], []
+    for code, entry in _unlocode_index().items():
+        port_name, code_country = entry[0], entry[1]
+        korean_name = entry[2] if len(entry) > 2 else ""
+        if code_country != country_code:
+            continue
+        item = {"code": code, "name_en": port_name, "country_code": code_country, "name_ko": korean_name}
+        # 영문명과 한글명(있는 경우) 모두 대조합니다.
+        for candidate in (port_name, korean_name):
+            normalized = _normalize(candidate)
+            if not normalized:
+                continue
+            if normalized == needle:
+                exact.append(item)
+                break
+            if needle in normalized or normalized in needle:
+                partial.append(item)
+                break
+    matches = exact or partial
+    matches.sort(key=lambda item: (len(item["name_en"]), item["code"]))
+    return matches[:limit]
 
 
 def find_location(code: str) -> dict | None:

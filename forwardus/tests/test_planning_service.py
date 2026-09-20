@@ -151,57 +151,73 @@ def test_schedules_cover_every_region(app, shipment_payload):
 
 
 def test_direct_input_location_accepted(app, shipment_payload):
+    """목록에 없는 실제 항구를 코드로 직접 지정할 수 있습니다."""
+
     payload = {
         **shipment_payload,
-        "destination_code": "USZZZ",
-        "destination_custom": {"name": "Private Terminal", "country_code": "US"},
+        "destination_code": "US2SI",  # Sinton, Texas (UN/LOCODE 등재, 목록에는 없음)
+        "destination_custom": {"name": "Sinton Terminal", "country_code": "US"},
     }
     schedules = planning_service.search_schedules(payload)
     assert schedules["items"]
     payload["schedule_id"] = schedules["items"][0]["schedule_id"]
     shipment = planning_service.create_shipment(payload)
-    assert shipment.destination_code == "USZZZ"
-    assert shipment.destination_name == "Private Terminal"
+    assert shipment.destination_code == "US2SI"
+    # 서류에는 UN/LOCODE 공식 명칭을 씁니다.
+    assert shipment.destination_name == "Sinton"
     assert shipment.destination_country == "US"
 
 
-def test_direct_input_accepts_name_only(app, shipment_payload):
-    """코드를 비우면 이름으로 임시 코드를 부여합니다."""
+def test_direct_input_resolves_real_unlocode(app, shipment_payload):
+    """코드를 비우면 이름으로 실제 UN/LOCODE를 찾아 씁니다."""
 
     payload = {
         **shipment_payload,
         "destination_code": "",
-        "destination_custom": {"name": "Private Terminal", "country_code": "US"},
+        "destination_custom": {"name": "Yantian Pt", "country_code": "CN"},
     }
     schedules = planning_service.search_schedules(payload)
     assert schedules["items"]
     payload["schedule_id"] = schedules["items"][0]["schedule_id"]
     shipment = planning_service.create_shipment(payload)
-    assert shipment.destination_name == "Private Terminal"
-    assert shipment.destination_code.startswith("USZZ")
-    assert shipment.destination_country == "US"
-
-    # 같은 이름이면 조회할 때마다 같은 코드가 나옵니다.
-    again = planning_service.search_schedules(payload)
-    assert again["items"][0]["destination_code"] == shipment.destination_code
+    assert shipment.destination_code == "CNYTN"  # 실제 UN/LOCODE
+    assert shipment.destination_country == "CN"
 
 
-def test_generated_code_does_not_clash_with_unlocode(app):
-    from app.collectors import location_client
+@pytest.mark.parametrize("name,code", [
+    ("Guryongpo", "KRGRP"),
+    ("구룡포항", "KRGRP"),   # 목록에 없는 국내 항구도 한글 이름으로 찾습니다.
+    ("후포항", "KRHPO"),
+])
+def test_direct_input_finds_korean_ports(app, shipment_payload, name, code):
+    payload = {**shipment_payload, "origin_code": "", "origin_custom": {"name": name}}
+    assert planning_service.search_schedules(payload)["items"][0]["origin_code"] == code
 
-    code = location_client.generate_code("KR", "인천 신외항")
-    assert location_client.find_location(code) is None
-    assert code == location_client.generate_code("KR", "인천 신외항")
+
+def test_direct_input_rejects_codes_outside_unlocode(app, shipment_payload):
+    """서류에 찍히는 값이므로 실제 코드가 아니면 거절합니다."""
+
+    payload = {**shipment_payload, "destination_code": "USZZZ",
+               "destination_custom": {"name": "Fake Terminal", "country_code": "US"}}
+    with pytest.raises(ValidationError) as info:
+        planning_service.search_schedules(payload)
+    assert "UN/LOCODE" in str(info.value)
+
+    payload = {**shipment_payload, "destination_code": "",
+               "destination_custom": {"name": "Zzz Imaginary Port", "country_code": "US"}}
+    with pytest.raises(ValidationError) as info:
+        planning_service.search_schedules(payload)
+    assert info.value.field == "destination_name"
 
 
 @pytest.mark.parametrize("custom,field", [
-    ({"name": "No Country", "country_code": ""}, "destination_country"),
+    ({"name": "Los Angeles", "country_code": ""}, "destination_country"),
     ({"name": "", "country_code": "US"}, "destination_name"),
     ({"name": "Bad Code", "country_code": "US"}, "destination_code"),
-    ({"name": "Korean Destination", "country_code": "KR"}, "destination_code"),
+    ({"name": "Busan", "country_code": "KR"}, "destination_code"),
 ])
 def test_direct_input_validation(app, shipment_payload, custom, field):
-    code = "A!" if custom["name"] == "Bad Code" else "USZZZ"
+    code = "A!" if custom["name"] == "Bad Code" else ""
     payload = {**shipment_payload, "destination_code": code, "destination_custom": custom}
     with pytest.raises(ValidationError) as info:
         planning_service.search_schedules(payload)
