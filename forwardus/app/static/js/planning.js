@@ -172,30 +172,47 @@
   today.setHours(0, 0, 0, 0);
   let viewMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  function renderCalendar() {
-    const year = viewMonth.getFullYear();
-    const month = viewMonth.getMonth();
-    const firstWeekday = new Date(year, month, 1).getDay();
+  const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+  function monthHtml(base, offset) {
+    const year = base.getFullYear();
+    const month = base.getMonth() + offset;
+    const first = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const canGoBack = viewMonth > new Date(today.getFullYear(), today.getMonth(), 1);
+    const buyerDate = form.elements.buyer_required_date.value;
+
     let cells = "";
-    for (let i = 0; i < firstWeekday; i += 1) cells += "<span></span>";
+    for (let i = 0; i < first.getDay(); i += 1) cells += "<span></span>";
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = new Date(year, month, day);
       const iso = toIsoDate(date);
-      const disabled = date < today;
-      const selected = state.departure_date === iso;
-      cells += `<button type="button" data-date="${iso}" ${disabled ? "disabled" : ""}
-        class="${selected ? "selected" : ""} ${date.getTime() === today.getTime() ? "today" : ""}">${day}</button>`;
+      const classes = [];
+      if (state.departure_date === iso) classes.push("selected");
+      if (buyerDate === iso) classes.push("buyer");
+      if (date.getTime() === today.getTime()) classes.push("today");
+      cells += `<button type="button" data-date="${iso}" ${date < today ? "disabled" : ""}`
+        + ` class="${classes.join(" ")}">${day}</button>`;
     }
+    return `<div class="cal_month">
+      <div class="cal_title">${first.getFullYear()}년 ${first.getMonth() + 1}월</div>
+      <div class="cal_week">${WEEKDAYS.map((d) => `<span>${d}</span>`).join("")}</div>
+      <div class="cal_grid">${cells}</div>
+    </div>`;
+  }
+
+  function renderCalendar() {
+    const canGoBack = viewMonth > new Date(today.getFullYear(), today.getMonth(), 1);
     calendarEl.innerHTML = `
       <div class="cal_head">
         <button type="button" data-cal-prev ${canGoBack ? "" : "disabled"} aria-label="이전 달">‹</button>
-        <b>${year}년 ${month + 1}월</b>
+        <b>출발 희망일 선택</b>
         <button type="button" data-cal-next aria-label="다음 달">›</button>
       </div>
-      <div class="cal_week">${["일", "월", "화", "수", "목", "금", "토"].map((d) => `<span>${d}</span>`).join("")}</div>
-      <div class="cal_grid">${cells}</div>`;
+      <div class="cal_months">${monthHtml(viewMonth, 0)}${monthHtml(viewMonth, 1)}</div>
+      <p class="cal_legend">
+        <span class="legend_departure">출발 희망일</span>
+        <span class="legend_buyer">Buyer 요청 도착일</span>
+      </p>`;
   }
 
   calendarEl.addEventListener("click", (event) => {
@@ -205,7 +222,7 @@
     else if (target.hasAttribute("data-cal-next")) viewMonth.setMonth(viewMonth.getMonth() + 1);
     else if (target.dataset.date) {
       state.departure_date = target.dataset.date;
-      selectedDateEl.textContent = state.departure_date;
+      updateSelectedDates();
       invalidateSchedules();
       saveDraftSoon();
     }
@@ -268,11 +285,11 @@
     });
     if (draft.departure_date) {
       state.departure_date = draft.departure_date;
-      selectedDateEl.textContent = draft.departure_date;
       const [year, month] = draft.departure_date.split("-").map(Number);
       viewMonth = new Date(year, month - 1, 1);
-      renderCalendar();
     }
+    updateSelectedDates();
+    renderCalendar();
     const filter = form.querySelector("[data-country-filter]");
     if (filter && draft.country) filter.value = draft.country;
     state.sort = draft.sort || state.sort;
@@ -590,11 +607,11 @@
     });
     if (draft.departure_date) {
       state.departure_date = draft.departure_date;
-      selectedDateEl.textContent = draft.departure_date;
       const [year, month] = draft.departure_date.split("-").map(Number);
       viewMonth = new Date(year, month - 1, 1);
-      renderCalendar();
     }
+    updateSelectedDates();
+    renderCalendar();
     const filter = form.querySelector("[data-country-filter]");
     if (filter && draft.country) filter.value = draft.country;
     state.sort = draft.sort || state.sort;
@@ -825,7 +842,25 @@
     tab.addEventListener("click", () => openStep(Number(tab.dataset.stepTab)));
   });
 
-  form.elements.buyer_required_date.addEventListener("change", invalidateSchedules);
+  function updateSelectedDates() {
+    const buyerDate = form.elements.buyer_required_date.value;
+    selectedDateEl.innerHTML = `${state.departure_date || "-"}`
+      + (buyerDate ? ` <span class="buyer_date">Buyer 요청 ${buyerDate}</span>` : "");
+  }
+
+  form.elements.buyer_required_date.addEventListener("change", () => {
+    const value = form.elements.buyer_required_date.value;
+    if (value) {
+      // 요청일이 보이도록 달력을 그 달로 옮깁니다. (해당 월이 오른쪽에 오도록)
+      const [year, month] = value.split("-").map(Number);
+      const target = new Date(year, month - 2, 1);
+      const earliest = new Date(today.getFullYear(), today.getMonth(), 1);
+      viewMonth = target < earliest ? earliest : target;
+    }
+    updateSelectedDates();
+    renderCalendar();
+    invalidateSchedules();
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

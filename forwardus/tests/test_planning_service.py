@@ -112,7 +112,8 @@ def test_origin_sorted_by_cargo_volume(app):
     assert volumes == sorted(volumes, reverse=True)
 
     codes = [item["code"] for item in national]
-    assert codes[:3] == ["KRPUS", "KRBNP", "KRKCN"]  # 부산항과 소속 부두
+    assert codes[0] == "KRPUS"                       # 물동량 1위 항만
+    assert set(codes[1:3]) == {"KRBNP", "KRKCN"}     # 부산항 소속 부두가 바로 뒤에
     for parent, terminal in [("KRPUS", "KRBNP"), ("KRUSN", "KRONS"), ("KRKPO", "KRSHG")]:
         assert codes.index(parent) < codes.index(terminal)
     # 물동량 수치가 없는 항만은 뒤로 보냅니다.
@@ -328,13 +329,33 @@ def test_cargo_hubs_listed_first(app):
 
 
 def test_korean_names_listed_first(app):
-    """한글 표기가 있는 항구·공항을 위에, 영문 표기만 있는 곳을 아래에 둡니다."""
+    """한글 표기는 가나다순으로 위에, 영문 표기는 알파벳순으로 아래에 둡니다."""
 
     items = planning_service.search_locations("", "SEA", "destination", country="US")["data"]
-    korean = [i for i, item in enumerate(items) if item["name"] != item["name_en"]]
-    english = [i for i, item in enumerate(items) if item["name"] == item["name_en"]]
+    korean = [item["name"] for item in items if item["name"] != item["name_en"]]
+    english = [item["name"] for item in items if item["name"] == item["name_en"]]
     assert korean and english
-    assert max(korean) < min(english)
+    korean_idx = [i for i, item in enumerate(items) if item["name"] != item["name_en"]]
+    english_idx = [i for i, item in enumerate(items) if item["name"] == item["name_en"]]
+    assert max(korean_idx) < min(english_idx)
+    assert korean == sorted(korean)                              # 가나다순
+    assert english == sorted(english, key=str.lower)             # 알파벳순
+    assert korean[0] == "뉴욕·뉴저지항"
+
+
+def test_airports_keep_gateway_order_then_alphabetical(app):
+    """공항은 대표 관문 순서를 지키고, 나머지는 가나다순입니다."""
+
+    items = planning_service.search_locations("", "AIR", "destination", country="CN")["data"]
+    names = [item["name"] for item in items]
+    assert names[0] == "상하이 푸둥 국제공항"          # 지정 순위 1위
+    # 같은 분류(화물 거점·직항 여부) 안에서는 가나다순입니다.
+    for cargo in (True, False):
+        for direct in (True, False):
+            group = [item["name"] for item in items
+                     if (item["size_rank"] or 99) > 11
+                     and bool(item["cargo_hub"]) is cargo and bool(item["direct_from_korea"]) is direct]
+            assert group == sorted(group)
 
 
 def test_korean_airports_have_no_transfer_notice(app):

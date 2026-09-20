@@ -229,27 +229,33 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
                 continue
         results.append(item)
 
-    # Exact code, then names starting with the keyword, then harbour size.
-    # Shorter names win so that "부산" lists 부산항 before 부산신항.
+    # 정렬 순서
+    #   1) 코드가 정확히 일치 / 이름이 검색어로 시작
+    #   2) 국내 무역항 구분, 항공화물 거점·직항 구분
+    #   3) 대표 항만·공항(지정 순위 10위 이내)
+    #   4) 한글 이름(가나다순) -> 영문 이름(알파벳순)
+    CURATED_LIMIT = 10
+
     def rank(item: dict) -> tuple:
+        has_korean = item["name"] != item["name_en"]
+        curated = item.get("size_rank") or 99
         return (
             item["code"].lower() != keyword,
             not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
-            # 항공화물 거점 -> 직항 -> 나머지 순으로 보여줍니다.
+            # 항공화물 거점 -> 직항 -> 나머지
             not (item.get("cargo_hub") and item.get("direct_from_korea")),
             item.get("direct_from_korea") is False,
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
-            # 한글 이름이 있는 곳을 먼저, 영문 이름만 있는 곳을 뒤에 둡니다.
-            item["name"] == item["name_en"],
-            # 공항은 국가 안에서 규모가 큰 곳부터.
-            item.get("size_rank") or 99,
-            # 물동량이 많은 항만부터, 같은 항만의 부두는 모항 다음에 표시합니다.
+            # 국내 무역항은 물동량 순서를 유지합니다.
             -(item.get("cargo_volume_mt") or 0),
-            item.get("port_group") or "",
+            # 부두를 모항 옆에 붙이는 용도로만 씁니다. (국내 무역항)
+            item.get("port_group") if item.get("cargo_volume_mt") else "",
             bool(item.get("is_terminal")),
-            HARBOR_SIZE_RANK.get(item.get("harbor_size"), 9),
-            len(item["name"]),
-            item["name"],
+            # 지정 순위가 있는 대표 공항까지만 순서를 고정합니다.
+            curated if curated <= CURATED_LIMIT else CURATED_LIMIT + 1,
+            # 한글 이름을 먼저(가나다순), 영문 이름은 그 뒤(알파벳순)
+            not has_korean,
+            item["name"] if has_korean else item["name_en"].lower(),
         )
 
     return ok(deepcopy(sorted(results, key=rank)[:MAX_MAIN_RESULTS]), "mock")

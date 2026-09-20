@@ -12,18 +12,27 @@
 .step_actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 
 /* Route setup: calendar left, fields right */
-.route_layout { display: grid; grid-template-columns: 340px 1fr; gap: 32px; }
+.route_layout { display: grid; grid-template-columns: minmax(420px, 460px) 1fr; gap: 32px; }
 .calendar { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 6px; }
 .cal_head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .cal_head button { border: 0; background: #f1f5f9; width: 32px; height: 32px; border-radius: 10px; font-size: 18px; }
+.cal_months { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cal_title { text-align: center; font-size: 13px; font-weight: 800; color: var(--muted); margin-bottom: 6px; }
+.cal_legend { display: flex; gap: 14px; margin: 12px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.cal_legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.cal_legend .legend_departure::before { background: var(--blue); }
+.cal_legend .legend_buyer::before { background: #f5c518; }
 .cal_head button:disabled { opacity: .3; cursor: default; }
 .cal_week, .cal_grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-.cal_week span { font-size: 12px; color: var(--muted); font-weight: 700; padding: 4px 0; }
-.cal_grid button { aspect-ratio: 1; border: 0; background: transparent; border-radius: 10px; font-weight: 700; font-size: 14px; }
+.cal_week span { font-size: 11px; color: var(--muted); font-weight: 700; padding: 2px 0; }
+.cal_grid button { aspect-ratio: 1; border: 0; background: transparent; border-radius: 9px; font-weight: 700; font-size: 13px; }
 .cal_grid button:hover:not(:disabled) { background: var(--blue_soft); }
 .cal_grid button:disabled { color: #cbd5e1; cursor: default; }
 .cal_grid button.today { box-shadow: inset 0 0 0 1px var(--blue); }
 .cal_grid button.selected { background: var(--blue); color: #fff; }
+.cal_grid button.buyer { background: #fde68a; color: #7c4a03; font-weight: 900; }
+.cal_grid button.buyer.selected { background: var(--blue); color: #fff; box-shadow: inset 0 0 0 2px #f5c518; }
+.selected_date .buyer_date { margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #fde68a; color: #7c4a03; font-size: 12px; font-weight: 800; }
 .selected_date { margin-top: 10px; color: var(--muted); }
 .selected_date b { color: var(--ink); }
 
@@ -76,6 +85,7 @@
 
 @media (max-width: 900px) {
   .route_layout, .cargo_layout, .reverse_layout { grid-template-columns: 1fr; }
+  .cal_months { grid-template-columns: 1fr; }
   .calc_panel { position: static; }
   .stepper { grid-template-columns: repeat(5, auto); overflow-x: auto; }
 }

@@ -258,6 +258,8 @@ KOREA_AIRPORTS = {"ICN", "GMP", "PUS", "CJU", "TAE", "CJJ", "MWX", "YNY"}
 
 # 국가별 대표 관문 공항. AIRPORT_OVERRIDES에 없는 국가에서 이 공항이 먼저
 # 보이도록 순서를 앞당깁니다.
+# 값은 노출 순위(작을수록 위). 한 나라에 관문이 둘 이상이면 순서를 지정합니다.
+PRIMARY_AIRPORT_ORDER = {"ALA": 10, "NQZ": 11, "FCO": 10, "LGW": 11, "ORY": 11, "CGH": 11, "LED": 11}
 PRIMARY_AIRPORTS = {
     "PRG", "BUD", "BTS", "OTP", "SOF", "ZAG", "BEG", "VIE", "ZRH", "DUB", "LIS", "ATH",
     "ARN", "OSL", "HEL", "CPH", "LOS", "CMN", "ALG", "TUN", "ADD", "DAR", "EBB", "ACC",
@@ -593,7 +595,7 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "port_group": iata,
             # 직접 지정한 순서를 먼저 쓰고, 나머지는 대형 -> 중형 순입니다.
             "size_rank": (override[3] if override
-                          else 10 if iata in PRIMARY_AIRPORTS
+                          else PRIMARY_AIRPORT_ORDER.get(iata, 10) if iata in PRIMARY_AIRPORTS
                           else 50 if is_large else 60),
             # 국내 공항에서 직항편이 있는지. 없으면 경유 후보를 함께 보여줍니다.
             # 국내 공항은 출발지이므로 판정 대상이 아닙니다(None).
