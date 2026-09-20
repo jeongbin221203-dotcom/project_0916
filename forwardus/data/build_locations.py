@@ -121,9 +121,9 @@ KOREA_TRADE_PORTS = {
     "KRSHG": ("포항신항", "national"),
     "KRTGH": ("동해항", "national"),
     "KRMUK": ("묵호항", "national"),
+    "KRPTK": ("평택항", "national"),
+    "KRTJI": ("당진항", "national"),
     # 지방관리무역항
-    "KRPTK": ("평택항", "local"),
-    "KRTJI": ("당진항", "local"),
     "KRBOR": ("보령항", "local"),
     "KRTAN": ("태안항", "local"),
     "KRSEL": ("서울항", "local"),
@@ -151,6 +151,33 @@ KOREAN_PORT_ALIASES = {
     "KRSWD": "상왕등도항", "KRGGH": "가거항리항", "KRHHP": "화흥포항", "KRJHA": "중화항",
     "KRKDO": "국도항", "KRGDO": "갈두항", "KRSGG": "송공항", "KRYGP": "용기포항",
     "KRDDO": "독도", "KRCGY": "청양", "KRANJ": "안정", "KRBUK": "부평(인천)",
+}
+
+# 국내 항만 연간 물동량 (만 톤). 목록을 물동량이 많은 항만부터 보여주는 데 씁니다.
+# 출처: 해양수산부 항만 물동량 통계 및 보도자료.
+#   부산 46,348 / 광양 27,200 / 인천 14,782 (2024년 연간)
+#   울산 19,260 / 평택·당진 10,036 (2025년 비컨테이너 기준)
+#   동해·묵호 2,812 (2025년 연간)
+#   대산 9,010 (대산지방해양수산청 항만소개)
+# 나머지 국가관리무역항(포항·군산·목포·마산·여수·경인·장항)은 공개된 연간 수치를
+# 확인하지 못해 비워 둡니다. 값이 없으면 목록에서 뒤쪽에 표시됩니다.
+KOREA_PORT_VOLUME_MT = {
+    "KRPUS": 46348,
+    "KRKAN": 27200,
+    "KRUSN": 19260,
+    "KRINC": 14782,
+    "KRPTK": 10036,
+    "KRTSN": 9010,
+    "KRTGH": 2812,
+    "KRMUK": 2812,
+}
+
+# 부두·터미널과 모항의 관계. 물동량은 모항 값을 따르고, 목록에서는 모항 다음에 옵니다.
+KOREA_PORT_PARENT = {
+    "KRBNP": "KRPUS", "KRKCN": "KRPUS",
+    "KRONS": "KRUSN", "KRMIP": "KRUSN",
+    "KRSHG": "KRKPO", "KRDBL": "KRMOK",
+    "KRYOC": "KRYOS", "KRTJI": "KRPTK",
 }
 
 # 목록에서 함께 보여줄 안내 문구.
@@ -389,6 +416,9 @@ def build() -> list[dict]:
             "harbor_size": harbor_size,
             "port_class": KOREA_TRADE_PORTS.get(code, (None, None))[1],
             "note": PORT_NOTES.get(code, ""),
+            "cargo_volume_mt": KOREA_PORT_VOLUME_MT.get(KOREA_PORT_PARENT.get(code, code)),
+            "is_terminal": code in KOREA_PORT_PARENT,
+            "port_group": KOREA_PORT_PARENT.get(code, code),
             "major": code in display_names or harbor_size in MAIN_HARBOR_SIZES,
         })
 
@@ -409,6 +439,9 @@ def build() -> list[dict]:
             "harbor_size": None,
             "port_class": None,
             "note": "",
+            "cargo_volume_mt": None,
+            "is_terminal": False,
+            "port_group": iata,
             "major": True,
         })
 
@@ -423,6 +456,9 @@ def build() -> list[dict]:
         item["country_code"],
         not item["major"],
         class_rank.get(item["port_class"], 0),
+        -(item["cargo_volume_mt"] or 0),
+        item["port_group"],
+        item["is_terminal"],
         HARBOR_SIZE_RANK.get(item["harbor_size"], 9),
         item["code"],
     ))

@@ -98,6 +98,25 @@ def test_origin_lists_national_ports_before_local(app):
     assert by_code["KRSEL"]["port_class"] == "local"
     assert by_code["KRSEL"]["note"] == "법적 무역항"
     assert by_code["KRPUS"]["note"] == ""
+    # 평택·당진항은 항만법 시행령상 국가관리무역항입니다.
+    assert by_code["KRPTK"]["port_class"] == "national"
+    assert by_code["KRTJI"]["port_class"] == "national"
+
+
+def test_origin_sorted_by_cargo_volume(app):
+    """국가관리 무역항은 물동량이 많은 항만부터 보여줍니다."""
+
+    ports = planning_service.search_locations("", "SEA", "origin")["data"]
+    national = [item for item in ports if item["port_class"] == "national"]
+    volumes = [item["cargo_volume_mt"] for item in national if item["cargo_volume_mt"]]
+    assert volumes == sorted(volumes, reverse=True)
+
+    codes = [item["code"] for item in national]
+    assert codes[:3] == ["KRPUS", "KRBNP", "KRKCN"]  # 부산항과 소속 부두
+    for parent, terminal in [("KRPUS", "KRBNP"), ("KRUSN", "KRONS"), ("KRKPO", "KRSHG")]:
+        assert codes.index(parent) < codes.index(terminal)
+    # 물동량 수치가 없는 항만은 뒤로 보냅니다.
+    assert codes.index("KRTSN") < codes.index("KRKPO")
 
 
 def test_every_listed_port_is_classified(app):

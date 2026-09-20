@@ -179,6 +179,10 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
             item["code"].lower() != keyword,
             not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
+            # 물동량이 많은 항만부터, 같은 항만의 부두는 모항 다음에 표시합니다.
+            -(item.get("cargo_volume_mt") or 0),
+            item.get("port_group") or "",
+            bool(item.get("is_terminal")),
             HARBOR_SIZE_RANK.get(item.get("harbor_size"), 9),
             len(item["name"]),
             item["name"],
