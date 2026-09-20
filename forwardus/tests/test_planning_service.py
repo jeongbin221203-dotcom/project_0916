@@ -240,7 +240,9 @@ def test_airports_cover_major_countries(app):
     assert len({item["country_code"] for item in airports}) > 200
     codes = {item["code"] for item in airports}
     # 한국 국제공항과 주요 화물 거점
-    assert {"ICN", "GMP", "PUS", "CJU", "TAE", "CJJ", "KWJ", "MWX", "YNY"} <= codes
+    assert {"ICN", "GMP", "PUS", "CJU", "TAE", "CJJ", "MWX", "YNY"} <= codes
+    assert "KWJ" not in codes  # 광주공항: 국제선 없는 국내선 전용
+    assert {"PVG", "SHA"} <= codes  # 상하이 푸둥·훙차오
     assert {"PVG", "PEK", "CAN", "SZX", "TAO", "CGO", "HGH"} <= codes   # 중국
     assert {"LAX", "JFK", "ORD", "MIA", "ATL", "DFW", "SFO", "SEA"} <= codes  # 미국
     assert {"NRT", "KIX", "HND", "NGO", "FUK", "CTS"} <= codes          # 일본
