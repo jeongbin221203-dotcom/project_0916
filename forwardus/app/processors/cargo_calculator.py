@@ -72,3 +72,35 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
         "container_quantity": calculate_container_quantity(total_cbm, total_weight_kg, container_type),
         "source": "calculated",
     }
+
+
+def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTAINER_TYPE) -> dict:
+    """화물이 여러 건일 때 품목별 계산과 전체 합계를 함께 돌려줍니다.
+
+    컨테이너 수량과 항공 운임중량은 품목을 더한 뒤에 정해야 하므로,
+    품목별 값과 별개로 합계 기준으로 다시 계산합니다.
+    """
+
+    if container_type not in CONTAINER_SPECS:
+        container_type = DEFAULT_CONTAINER_TYPE
+
+    lines = [calculate_cargo_metrics(item, container_type) for item in items]
+    total_cbm = sum(line["total_cbm"] for line in lines)
+    total_weight_kg = sum(line["total_weight_kg"] for line in lines)
+    revenue_ton = calculate_revenue_ton(total_cbm, total_weight_kg)
+
+    return {
+        "lines": lines,
+        "line_count": len(lines),
+        "quantity": sum(line["quantity"] for line in lines),
+        "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
+        "total_cbm": round(total_cbm, 4),
+        "total_weight_kg": round(total_weight_kg, 2),
+        "revenue_ton": round(revenue_ton, 3),
+        "billable_revenue_ton": round(max(LCL_MIN_REVENUE_TON, revenue_ton), 3),
+        "volume_weight_kg": round(total_cbm * AIR_VOLUME_FACTOR, 2),
+        "chargeable_weight_kg": round(calculate_chargeable_weight(total_weight_kg, total_cbm), 2),
+        "container_type": container_type,
+        "container_quantity": calculate_container_quantity(total_cbm, total_weight_kg, container_type),
+        "source": "calculated",
+    }

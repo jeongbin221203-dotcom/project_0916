@@ -2,7 +2,8 @@
 (function () {
   "use strict";
 
-  const { escapeHtml, postJson, getJson, formatNumber, toIsoDate, plainNumber } = window.Forwardus;
+  const { escapeHtml, postJson, getJson, formatNumber, toIsoDate, plainNumber,
+        setupNumberInput } = window.Forwardus;
 
   /* ---------- Shared: segmented toggles ---------- */
   function bindToggle(group, onChange) {
@@ -78,6 +79,20 @@
   // 예상 일정 조회를 묶어서 보내기 위한 타이머. (선언 순서 문제를 피해 위쪽에 둡니다)
   let departureCheckTimer;
 
+  // 관세청 고시 환율. 운임을 원화로 함께 보여주는 데 씁니다.
+  let krwRates = null;
+  async function loadRates() {
+    const response = await getJson(urls.exchangeRate);
+    if (response.success) krwRates = response.data;
+  }
+  loadRates();
+
+  function inKrw(amount, currency = "USD") {
+    const rate = krwRates ? krwRates[currency] : null;
+    if (!rate || !amount) return "";
+    return `약 ₩${formatNumber(Math.round(amount * rate), 0)}`;
+  }
+
   const errorBox = document.querySelector("[data-form-error]");
 
   /* ----- 입력값 임시 저장: 다른 메뉴에 다녀와도 내용이 남습니다 ----- */
@@ -106,6 +121,7 @@
       transport_mode: state.transport_mode,
       sea_mode: state.sea_mode,
       departure_date: state.departure_date,
+      cargo_lines: extraCargoLines(),
       origin: state.origin,
       destination: state.destination,
       schedule_id: state.schedule_id,
@@ -268,6 +284,25 @@
   });
   renderCalendar();
 
+  /* ----- 포장 유형: 해상·항공에 맞는 것만 보여줍니다 ----- */
+  function applyPackageTypes(mode) {
+    const select = form.elements.package_type;
+    const note = document.querySelector("[data-package-note]");
+    if (!select) return;
+
+    let firstUsable = null;
+    Array.from(select.options).forEach((option) => {
+      const usable = (option.dataset.modes || "").split(",").includes(mode);
+      option.hidden = !usable;
+      option.disabled = !usable;
+      if (usable && !firstUsable) firstUsable = option.value;
+    });
+    // 고른 포장이 그 운송수단에 없으면 첫 번째 것으로 바꿉니다.
+    const current = select.selectedOptions[0];
+    if ((!current || current.disabled) && firstUsable) select.value = firstUsable;
+    if (note) note.textContent = select.selectedOptions[0]?.dataset.note || "";
+  }
+
   /* ----- Transport mode toggles ----- */
   function applyMode() {
     const isAir = state.transport_mode === "AIR";
@@ -279,6 +314,7 @@
     document.querySelectorAll("[data-sea-only-term]").forEach((card) => {
       card.classList.toggle("mismatch", isAir);
     });
+    applyPackageTypes(isAir ? "AIR" : "SEA");
     document.querySelectorAll("[data-metric-sea]").forEach((el) => { el.hidden = isAir; });
     document.querySelectorAll("[data-metric-fcl]").forEach((el) => { el.hidden = isAir || state.sea_mode !== "FCL"; });
     document.querySelectorAll("[data-metric-air]").forEach((el) => { el.hidden = !isAir; });
@@ -646,6 +682,7 @@
       state[role] = item;
       form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = `${item.name} (${item.code})`;
     });
+    (draft.cargo_lines || []).forEach((line) => addCargoLine(line));
     if (draft.departure_date) {
       state.departure_date = draft.departure_date;
       const [year, month] = draft.departure_date.split("-").map(Number);
@@ -695,6 +732,7 @@
           <span class="tariff_name">${escapeHtml(row.agreement)}</span>
           <span class="tariff_rate">${escapeHtml(rate(row.rate))}</span>
           <span class="tariff_period">${escapeHtml(period(row))}</span>
+          <span class="tariff_about">${escapeHtml(row.about || "")}</span>
           <span class="tariff_proof">${escapeHtml(row.proof)}</span>
         </div>`).join("");
     }
@@ -711,6 +749,7 @@
         + data.general.map((row) => `${escapeHtml(row.name)} ${escapeHtml(rate(row.rate))}`).join(" / ")
         + `</p>`;
     }
+    if (data.hs6_note) html += `<p class="tariff_note">${escapeHtml(data.hs6_note)}</p>`;
     if (data.note) html += `<p class="tariff_note">${escapeHtml(data.note)}</p>`;
     if (!data.available && data.message) {
       html += `<p class="tariff_plain">${escapeHtml(data.message)}</p>`;
@@ -758,9 +797,63 @@
   /* ----- Cargo calculation ----- */
   const calcMessage = document.querySelector("[data-calc-message]");
 
+  /* ----- 추가 품목 ----- */
+  const cargoLinesBox = document.querySelector("[data-cargo-lines]");
+  const LINE_FIELDS = ["quantity", "length_cm", "width_cm", "height_cm", "weight_per_package_kg"];
+
+  function packageOptions() {
+    // 운송수단에 맞는 포장만 고를 수 있게 첫 품목의 목록을 그대로 씁니다.
+    return Array.from(form.elements.package_type.options)
+      .filter((option) => !option.disabled)
+      .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.textContent.trim())}</option>`)
+      .join("");
+  }
+
+  function addCargoLine(values = {}) {
+    const row = document.createElement("div");
+    row.className = "cargo_line";
+    row.innerHTML = `
+      <input type="text" data-line="product_description" maxlength="300" placeholder="품명">
+      <select data-line="package_type">${packageOptions()}</select>
+      <input type="text" data-line="quantity" inputmode="numeric" data-number data-step="1" data-min="1" placeholder="수량">
+      <input type="text" data-line="length_cm" inputmode="decimal" data-number data-step="1" data-min="0" placeholder="가로">
+      <input type="text" data-line="width_cm" inputmode="decimal" data-number data-step="1" data-min="0" placeholder="세로">
+      <input type="text" data-line="height_cm" inputmode="decimal" data-number data-step="1" data-min="0" placeholder="높이">
+      <input type="text" data-line="weight_per_package_kg" inputmode="decimal" data-number data-step="10" data-min="0" placeholder="개당 kg">
+      <button type="button" class="link_button danger" data-remove-cargo aria-label="품목 삭제">삭제</button>`;
+    cargoLinesBox.appendChild(row);
+    row.querySelectorAll("[data-line]").forEach((input) => {
+      if (values[input.dataset.line] !== undefined) input.value = values[input.dataset.line];
+      if (input.dataset.number !== undefined) setupNumberInput(input);
+      input.addEventListener("input", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
+      input.addEventListener("change", () => { recalc(); invalidateSchedules(); saveDraftSoon(); });
+    });
+    return row;
+  }
+
+  function extraCargoLines() {
+    return Array.from(cargoLinesBox.querySelectorAll(".cargo_line")).map((row) => {
+      const item = {};
+      row.querySelectorAll("[data-line]").forEach((input) => {
+        item[input.dataset.line] = input.dataset.number === undefined
+          ? input.value : plainNumber(input.value);
+      });
+      return item;
+    }).filter((item) => LINE_FIELDS.every((key) => item[key] !== ""));
+  }
+
+  document.querySelector("[data-add-cargo]")?.addEventListener("click", () => addCargoLine());
+  cargoLinesBox?.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-remove-cargo]")) return;
+    event.target.closest(".cargo_line").remove();
+    recalc();
+    invalidateSchedules();
+    saveDraftSoon();
+  });
+
   function cargoPayload() {
     const f = form.elements;
-    return {
+    const first = {
       product_description: f.product_description.value,
       hs_code: f.hs_code.value,
       package_type: f.package_type.value,
@@ -771,6 +864,7 @@
       weight_per_package_kg: plainNumber(f.weight_per_package_kg.value),
       net_weight_kg: plainNumber(f.net_weight_kg.value),
     };
+    return { items: [first, ...extraCargoLines()] };
   }
 
   function renderMetrics(metrics) {
@@ -789,7 +883,7 @@
 
   const recalc = debounce(async () => {
     const payload = cargoPayload();
-    const filled = ["quantity", "length_cm", "width_cm", "height_cm", "weight_per_package_kg"].every((k) => payload[k] !== "");
+    const filled = LINE_FIELDS.every((k) => payload.items[0][k] !== "");
     if (!filled) {
       state.metrics = null;
       renderMetrics(null);
@@ -803,6 +897,11 @@
   }, 250);
 
   form.querySelectorAll("[data-calc]").forEach((input) => input.addEventListener("input", () => { recalc(); invalidateSchedules(); }));
+  form.elements.package_type.addEventListener("change", () => {
+    const note = document.querySelector("[data-package-note]");
+    if (note) note.textContent = form.elements.package_type.selectedOptions[0]?.dataset.note || "";
+    invalidateSchedules();
+  });
 
   /* ----- Schedules ----- */
   const scheduleList = document.querySelector("[data-schedule-list]");
@@ -852,16 +951,18 @@
               <span class="badge source_${escapeHtml(s.source)}">Data Source: ${s.source === "mock" ? "Mock" : "API"}</span>
             </div>
             <div class="schedule_route">
-              <div><small>ETD</small><b>${s.etd}</b></div>
-              <div class="line"><span>${s.transit_days}일 · ${s.direct ? "Direct" : "Transshipment"}</span></div>
-              <div><small>ETA</small><b>${s.eta}</b></div>
+              <div><small title="Estimated Time of Departure">ETD <i>출항 예정</i></small><b>${s.etd}</b></div>
+              <div class="line"><span>${s.transit_days}일 · ${s.direct ? "직항" : "환적"}</span></div>
+              <div><small title="Estimated Time of Arrival">ETA <i>도착 예정</i></small><b>${s.eta}</b></div>
             </div>
             <div class="row_between wrap">
               <span class="muted small">정시율 ${s.reliability}% · ${escapeHtml(s.freight_basis)}</span>
               ${deadline}
             </div>
           </div>
-          <div class="schedule_price"><small>Freight</small><b>USD ${formatNumber(s.freight_usd, 0)}</b></div>
+          <div class="schedule_price"><small>Freight <i>운임</i></small>
+            <b>USD ${formatNumber(s.freight_usd, 0)}</b>
+            <em>${escapeHtml(inKrw(s.freight_usd))}</em></div>
         </label>`;
     }).join("");
   }
@@ -934,7 +1035,9 @@
       ["Invoice", plainNumber(f.invoice_value.value)
         ? `${f.currency.value} ${formatNumber(Number(plainNumber(f.invoice_value.value)), 2)}` : missing],
       ["Schedule", schedule ? `${schedule.carrier} ${schedule.vessel_or_flight} · ETD ${schedule.etd} → ETA ${schedule.eta}` : missing],
-      ["Freight", schedule ? `USD ${formatNumber(schedule.freight_usd, 0)} (${schedule.source})` : missing],
+      ["Freight", schedule
+        ? `USD ${formatNumber(schedule.freight_usd, 0)} ${inKrw(schedule.freight_usd)} (${schedule.source})`.trim()
+        : missing],
     ];
     document.querySelector("[data-summary]").innerHTML = rows
       .map(([k, v]) => `<div><dt>${k}</dt><dd class="${v === missing ? "missing" : ""}">${escapeHtml(v)}</dd></div>`).join("");

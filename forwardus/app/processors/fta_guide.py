@@ -119,3 +119,37 @@ def countries_for(rate_code: str, rate_name: str, country_codes: dict[str, str])
         if full.startswith(name):
             return (iso,)
     return ()
+
+
+# 협정 종류를 우리말로 풀어 씁니다. 이름만으로는 무슨 협정인지 알기 어렵습니다.
+KIND_NOTES = (
+    ("FRC", "RCEP(역내포괄적경제동반자협정) — 아세안 10개국과 한국·중국·일본·호주·뉴질랜드가"
+            " 함께 맺은 협정입니다."),
+    ("E", "아시아·태평양 무역협정(APTA) — 아시아·태평양 개발도상국끼리 관세를 낮추기로 한"
+          " 협정입니다."),
+)
+CEPA_NOTE = "CEPA(포괄적경제동반자협정) — 상품 관세뿐 아니라 서비스·투자까지 함께 다루는 협정입니다."
+FTA_NOTE = "FTA(자유무역협정) — 두 나라 사이 관세를 낮추거나 없애기로 한 협정입니다."
+FTA_BLOC_NOTE = "FTA(자유무역협정) — 여러 나라와 함께 관세를 낮추거나 없애기로 한 협정입니다."
+
+
+def describe(rate_code: str, rate_name: str, countries: tuple[str, ...],
+             country_names: dict[str, str]) -> str:
+    """이 협정이 무엇인지 우리말로 한 줄 설명합니다.
+
+    `country_names`는 {코드: 한글 국가명}입니다. 여러 나라가 묶인 협정이면
+    어느 나라가 들어 있는지 함께 적습니다.
+    """
+
+    code = (rate_code or "").strip().upper()
+    note = next((text for prefix, text in KIND_NOTES if code.startswith(prefix)), None)
+    if note is None:
+        note = (CEPA_NOTE if "CEPA" in (rate_name or "")
+                else FTA_BLOC_NOTE if len(countries) > 1 else FTA_NOTE)
+
+    if len(countries) > 1:
+        names = [country_names.get(iso, iso) for iso in countries]
+        shown = " · ".join(names[:4])
+        more = f" 외 {len(names) - 4}개국" if len(names) > 4 else ""
+        note += f" 적용국 {len(names)}곳: {shown}{more}."
+    return note

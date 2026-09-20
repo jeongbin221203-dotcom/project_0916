@@ -10,6 +10,33 @@ from config import Config
 from app.extensions import db
 
 
+def migrate_cargo_lines(database) -> None:
+    """화물 여러 건을 담을 수 있게 cargos 표를 고칩니다.
+
+    예전 표는 Shipment 하나에 화물 하나만 달 수 있었고(shipment_pk UNIQUE)
+    line_no 칸이 없었습니다. SQLite는 제약을 지우지 못하므로 새 표를 만들어
+    기존 행을 옮긴 뒤 이름을 바꿉니다. 이미 고쳐진 DB에서는 아무 것도 하지 않습니다.
+    """
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "cargos" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("cargos")}
+    if "line_no" in columns:
+        return
+
+    old_columns = ", ".join(sorted(columns - {"id"}))
+    with database.engine.begin() as connection:
+        connection.execute(text("ALTER TABLE cargos RENAME TO cargos_old"))
+        database.metadata.tables["cargos"].create(connection)
+        connection.execute(text(
+            f"INSERT INTO cargos (id, line_no, {old_columns}) "
+            f"SELECT id, 1, {old_columns} FROM cargos_old"))
+        connection.execute(text("DROP TABLE cargos_old"))
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     """Create and configure the Flask application."""
 
@@ -29,6 +56,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     with flask_app.app_context():
         db.create_all()
+        migrate_cargo_lines(db)
 
     @flask_app.get("/health")
     def health():

@@ -58,6 +58,13 @@ def api_hs_codes():
     return jsonify(result), (200 if result["success"] else 502)
 
 
+@planning_bp.get("/api/exchange-rate")
+def api_exchange_rate():
+    """통화별 원화 환율. 운임을 원화로 환산해 보여주는 데 씁니다."""
+
+    return jsonify(planning_service.exchange_rates())
+
+
 @planning_bp.get("/api/tariff")
 def api_tariff():
     """고른 품목과 도착국에 적용되는 협정·세율."""

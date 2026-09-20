@@ -7,7 +7,7 @@ from datetime import date
 from app.collectors import customs_client, exchange_client, location_client, schedule_client
 from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
-from app.processors.cargo_calculator import calculate_cargo_metrics
+from app.processors.cargo_calculator import calculate_cargo_lines, calculate_cargo_metrics
 from app.processors.cost_calculator import INCOTERMS_INFO, calculate_logistics_cost
 from app.processors import fta_guide
 from app.processors import transit_calculator
@@ -23,7 +23,7 @@ from app.processors.schedule_calculator import (
 from app.repositories import buyer_repository, shipment_repository
 from app.services import ServiceError
 from app.validators import ValidationError
-from app.validators.cargo_validator import PACKAGE_TYPES
+from app.validators.cargo_validator import PACKAGE_TYPE_INFO, PACKAGE_TYPES
 from app.validators.shipment_validator import (
     optional_text,
     parse_date,
@@ -52,7 +52,7 @@ def get_form_options() -> dict:
 
     return {
         "incoterms": INCOTERMS_INFO,
-        "package_types": PACKAGE_TYPES,
+        "package_types": PACKAGE_TYPE_INFO,
         "sort_options": SORT_OPTIONS,
         "currencies": exchange_client.list_currencies(),
     }
@@ -112,6 +112,13 @@ def search_hs_codes(query: str) -> dict:
     return customs_client.search_hs_codes(query)
 
 
+def exchange_rates() -> dict:
+    """통화별 원화 환율. 관세청 고시 환율을 씁니다."""
+
+    result = exchange_client.fetch_krw_rates()
+    return {"success": result["success"], "data": result["data"], "source": result["source"]}
+
+
 def tariff_guide(hs_code: str, country_code: str) -> dict:
     """고른 품목과 도착국에 맞는 협정·세율을 정리합니다.
 
@@ -132,15 +139,19 @@ def tariff_guide(hs_code: str, country_code: str) -> dict:
 
     codes = customs_client.fetch_country_codes()
     country_codes = codes["data"] if codes["success"] else {}
+    # {코드: 한글 국가명} — 여러 나라가 묶인 협정을 설명할 때 씁니다.
+    by_code = {iso: name for name, iso in country_codes.items()}
 
     matched, general = [], []
     for row in result["data"]:
         if row["code"] in fta_guide.GENERAL_RATES:
             general.append({**row, "description": fta_guide.GENERAL_RATES[row["code"]]})
             continue
-        if country in fta_guide.countries_for(row["code"], row["name"], country_codes):
+        countries = fta_guide.countries_for(row["code"], row["name"], country_codes)
+        if country in countries:
             matched.append({**row,
                             "agreement": fta_guide.agreement_label(row["name"]),
+                            "about": fta_guide.describe(row["code"], row["name"], countries, by_code),
                             "proof": fta_guide.proof_for(row["code"])})
 
     # 같은 협정에서 선택1·선택2가 함께 오면 세율이 낮은 쪽만 남깁니다.
@@ -150,9 +161,15 @@ def tariff_guide(hs_code: str, country_code: str) -> dict:
         if not current or _rate_value(row["rate"]) < _rate_value(current["rate"]):
             best[row["agreement"]] = row
 
+    digits = hs_code.replace(".", "").replace("-", "").replace(" ", "")
     return {
         "available": True,
-        "hs_code": customs_client.format_hs_code(hs_code.replace(".", "").replace("-", "")),
+        "hs_code": customs_client.format_hs_code(digits),
+        # HS 앞 6자리는 세계 공통(WCO)이고, 뒤 4자리는 나라마다 다릅니다.
+        "hs6": f"{digits[:4]}.{digits[4:6]}" if len(digits) >= 6 else "",
+        "hs6_note": (f"앞 6자리 {digits[:4]}.{digits[4:6]}까지는 세계 공통입니다."
+                     f" 뒤 4자리는 나라마다 달라, {country_name}에서 쓰는 전체 부호는"
+                     f" 그 나라 관세율표에서 확인해야 합니다.") if len(digits) >= 6 else "",
         "country": country_name,
         "country_code": country,
         "agreements": sorted(best.values(), key=lambda row: _rate_value(row["rate"])),
@@ -277,6 +294,11 @@ def _resolve_locations(route: dict, payload: dict) -> tuple[dict, dict]:
 
 
 def calculate_cargo(payload: dict) -> dict:
+    """화물 계산. 품목 하나만 보내던 예전 방식과 여러 품목 모두 받습니다."""
+
+    if isinstance(payload, dict) and (payload.get("cargo") or payload.get("items")):
+        return calculate_cargo_lines(cargo_items(
+            payload if payload.get("cargo") else {"cargo": payload.get("items")}))
     return calculate_cargo_metrics(payload)
 
 
@@ -299,7 +321,7 @@ def search_schedules(payload: dict) -> dict:
 
     route = validate_route(payload)
     origin, destination = _resolve_locations(route, payload)
-    metrics = calculate_cargo_metrics(payload.get("cargo") or {})
+    metrics = cargo_metrics(payload)
     buyer_required_date = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", required=False,
                                      field="buyer_required_date")
 
@@ -655,6 +677,26 @@ def reverse_schedule(payload: dict) -> dict:
     }
 
 
+def cargo_items(payload: dict) -> list[dict]:
+    """화물 입력을 품목 목록으로 만듭니다.
+
+    화면에서 품목을 여러 개 보낼 수 있고, 예전처럼 한 건만 보내도 그대로 받습니다.
+    """
+
+    cargo = payload.get("cargo") or {}
+    if isinstance(cargo, list):
+        items = cargo
+    else:
+        items = cargo.get("items")
+    return [item for item in (items or [cargo]) if item]
+
+
+def cargo_metrics(payload: dict) -> dict:
+    """품목이 하나든 여럿이든 같은 모양의 계산 결과를 돌려줍니다."""
+
+    return calculate_cargo_lines(cargo_items(payload))
+
+
 def create_shipment(payload: dict) -> Shipment:
     """Create a quoted Shipment from the planning wizard.
 
@@ -667,8 +709,9 @@ def create_shipment(payload: dict) -> Shipment:
     terms = validate_trade_terms(payload, route["transport_mode"])
     parties = validate_parties(payload)
 
-    cargo_payload = payload.get("cargo") or {}
-    metrics = calculate_cargo_metrics(cargo_payload)
+    items = cargo_items(payload)
+    metrics = calculate_cargo_lines(items)
+    cargo_payload = items[0]
     product_description = optional_text(cargo_payload.get("product_description"), max_length=300)
     if not product_description:
         raise ValidationError("품명(Product Description)을 입력해주세요.", "product_description")
@@ -740,23 +783,30 @@ def create_shipment(payload: dict) -> Shipment:
         schedule_source=schedule["source"],
         status="quoted",
     )
-    shipment.cargo = Cargo(
-        product_description=product_description,
-        hs_code=hs_code,
-        package_type=metrics["package_type"],
-        length_cm=metrics["length_cm"],
-        width_cm=metrics["width_cm"],
-        height_cm=metrics["height_cm"],
-        quantity=metrics["quantity"],
-        weight_per_package_kg=metrics["weight_per_package_kg"],
-        net_weight_kg=net_weight,
-        total_cbm=metrics["total_cbm"],
-        total_weight_kg=metrics["total_weight_kg"],
-        revenue_ton=metrics["revenue_ton"],
-        chargeable_weight_kg=metrics["chargeable_weight_kg"],
-        container_type=metrics["container_type"] if route["sea_mode"] == "FCL" else None,
-        container_quantity=metrics["container_quantity"] if route["sea_mode"] == "FCL" else None,
-    )
+    is_fcl = route["sea_mode"] == "FCL"
+    shipment.cargos = [
+        Cargo(
+            line_no=index,
+            product_description=optional_text(item.get("product_description"), max_length=300)
+            or product_description,
+            hs_code=optional_text(item.get("hs_code"), max_length=20) or hs_code,
+            package_type=line["package_type"],
+            length_cm=line["length_cm"],
+            width_cm=line["width_cm"],
+            height_cm=line["height_cm"],
+            quantity=line["quantity"],
+            weight_per_package_kg=line["weight_per_package_kg"],
+            net_weight_kg=net_weight if index == 1 else None,
+            total_cbm=line["total_cbm"],
+            total_weight_kg=line["total_weight_kg"],
+            revenue_ton=line["revenue_ton"],
+            chargeable_weight_kg=line["chargeable_weight_kg"],
+            # 컨테이너는 화물을 모두 더한 뒤에 정해지므로 첫 품목에만 적습니다.
+            container_type=metrics["container_type"] if is_fcl and index == 1 else None,
+            container_quantity=metrics["container_quantity"] if is_fcl and index == 1 else None,
+        )
+        for index, (item, line) in enumerate(zip(items, metrics["lines"]), start=1)
+    ]
     shipment_repository.add(shipment)
     shipment_repository.replace_costs(shipment, costs["lines"])
     shipment_repository.commit()

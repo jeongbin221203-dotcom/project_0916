@@ -180,8 +180,12 @@
           <label class="field">
             <span class="field_label">포장 유형</span>
             <select name="package_type">
-              {% for key, label in options.package_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+              {% for key, info in options.package_types.items() %}
+                <option value="{{ key }}" data-modes="{{ info.modes|join(',') }}"
+                        data-note="{{ info.note }}">{{ info.label }}</option>
+              {% endfor %}
             </select>
+            <small class="field_hint" data-package-note></small>
           </label>
           <label class="field">
             <span class="field_label">수량 (Quantity)</span>
@@ -224,6 +228,16 @@
               </select>
               <input type="text" name="invoice_value" inputmode="decimal" autocomplete="off" data-number data-step="100" data-min="0">
             </div>
+          </div>
+
+          <div class="field span2 cargo_lines">
+            <div class="row_between">
+              <span class="field_label">추가 품목 <small class="muted">(선택)</small></span>
+              <button type="button" class="link_button" data-add-cargo>+ 품목 추가</button>
+            </div>
+            <small class="field_hint">한 건에 여러 품목을 실을 때 아래에 더합니다.
+              CBM·중량·컨테이너 수량은 모든 품목을 더해서 계산합니다.</small>
+            <div data-cargo-lines></div>
           </div>
         </div>
         <aside class="calc_panel" data-calc-panel>
@@ -296,6 +310,7 @@
       scheduleOutlook: "{{ url_for('planning.api_schedule_outlook') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
       tariff: "{{ url_for('planning.api_tariff') }}",
+      exchangeRate: "{{ url_for('planning.api_exchange_rate') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",
       create: "{{ url_for('planning.api_create_shipment') }}"

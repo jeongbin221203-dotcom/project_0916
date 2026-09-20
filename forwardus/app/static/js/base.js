@@ -99,7 +99,7 @@
   document.querySelectorAll("input[data-number]").forEach(setupNumberInput);
 
   window.Forwardus = { escapeHtml, getJson, postJson, formatNumber, toIsoDate,
-                       plainNumber, groupDigits };
+                       plainNumber, groupDigits, setupNumberInput };
 
   const toggle = document.querySelector("[data-nav-toggle]");
   const nav = document.querySelector("[data-nav]");

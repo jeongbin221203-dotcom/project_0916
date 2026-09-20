@@ -970,3 +970,119 @@ def test_selected_date_chips_are_small(app):
     # 화면 전체를 줄이는 설정은 두지 않습니다.
     base = Path("app/static/css/base.css").read_text(encoding="utf-8")
     assert "zoom" not in base
+
+
+def test_multiple_cargo_lines(app):
+    """화물이 여러 건이면 품목별로 담고 합계로 컨테이너를 정합니다."""
+
+    from app.processors.cargo_calculator import calculate_cargo_lines
+
+    result = calculate_cargo_lines([
+        {"package_type": "carton", "quantity": 21, "length_cm": 50, "width_cm": 50,
+         "height_cm": 50, "weight_per_package_kg": 24},
+        {"package_type": "pallet", "quantity": 4, "length_cm": 120, "width_cm": 100,
+         "height_cm": 150, "weight_per_package_kg": 600},
+    ])
+    assert result["line_count"] == 2
+    # 합계는 품목을 더한 값입니다.
+    assert result["total_cbm"] == pytest.approx(2.625 + 7.2, abs=0.001)
+    assert result["total_weight_kg"] == pytest.approx(21 * 24 + 4 * 600)
+    assert result["quantity"] == 25
+    # 컨테이너는 합계 기준으로 정합니다. (품목별로 따로 세지 않습니다)
+    assert result["container_quantity"] >= 1
+
+    # 한 건만 보내던 예전 방식도 그대로 받습니다.
+    single = planning_service.calculate_cargo({
+        "package_type": "carton", "quantity": 21, "length_cm": 50, "width_cm": 50,
+        "height_cm": 50, "weight_per_package_kg": 24})
+    assert single["total_cbm"] == pytest.approx(2.625, abs=0.001)
+
+
+def test_create_shipment_stores_every_cargo_line(app):
+    """Shipment를 만들면 품목 수만큼 화물이 저장됩니다."""
+
+    today = date.today()
+    payload = {
+        "project_name": "품목 2건", "transport_mode": "SEA", "sea_mode": "FCL",
+        "origin_code": "KRPUS", "destination_code": "NLRTM",
+        "requested_departure_date": (today + timedelta(days=7)).isoformat(),
+        "incoterms": "FOB", "currency": "USD", "invoice_value": "30000",
+        "exporter_name": "포워더스", "exporter_address": "서울시 강남구",
+        "buyer": {"name": "Buyer BV", "country": "NL", "address": "Rotterdam"},
+        "cargo": {"items": [
+            {"product_description": "기초화장품", "hs_code": "3304.99-1000",
+             "package_type": "carton", "quantity": "21", "length_cm": "50", "width_cm": "50",
+             "height_cm": "50", "weight_per_package_kg": "24", "net_weight_kg": "480"},
+            {"product_description": "포장 상자", "package_type": "pallet", "quantity": "4",
+             "length_cm": "120", "width_cm": "100", "height_cm": "150",
+             "weight_per_package_kg": "600"},
+        ]},
+    }
+    payload["schedule_id"] = planning_service.search_schedules(payload)["items"][0]["schedule_id"]
+    shipment = planning_service.create_shipment(payload)
+
+    assert [cargo.line_no for cargo in shipment.cargos] == [1, 2]
+    assert [cargo.product_description for cargo in shipment.cargos] == ["기초화장품", "포장 상자"]
+    # 컨테이너 수량은 합계 기준이라 첫 품목에만 적습니다.
+    assert shipment.cargos[0].container_quantity and shipment.cargos[1].container_quantity is None
+    # 서류·요약에서 쓰는 대표 화물은 첫 품목입니다.
+    assert shipment.cargo.product_description == "기초화장품"
+    assert len(shipment.to_dict()["cargos"]) == 2
+
+
+def test_package_types_differ_by_transport_mode(app, client):
+    """포장 유형은 해상·항공에서 쓸 수 있는 것이 다릅니다."""
+
+    from app.validators.cargo_validator import package_types_for
+
+    sea, air = package_types_for("SEA"), package_types_for("AIR")
+    # 톤백은 해상에만, ULD는 항공에만 씁니다.
+    assert "flexible_bag" in sea and "flexible_bag" not in air
+    assert "uld" in air and "uld" not in sea
+    assert "carton" in sea and "carton" in air
+
+    html = client.get("/planning/new").get_data(as_text=True)
+    assert 'data-modes="SEA,AIR"' in html and 'data-modes="AIR"' in html
+    # 포장마다 주의할 점을 함께 알려줍니다.
+    assert "IPPC" in html and "IATA" in html
+
+
+def test_schedule_shows_krw_and_explains_etd_eta(app, client):
+    """운임은 원화로도 보여주고 ETD·ETA는 우리말로 풀어 씁니다."""
+
+    from pathlib import Path
+
+    js = Path("app/static/js/planning.js").read_text(encoding="utf-8")
+    assert "출항 예정" in js and "도착 예정" in js
+    assert "inKrw" in js and "운임" in js
+
+    # 환율은 관세청 고시 환율을 씁니다.
+    rates = client.get("/planning/api/exchange-rate").get_json()
+    assert rates["success"] and rates["data"]["USD"] > 100
+    assert rates["data"]["KRW"] == 1.0
+
+
+def test_tariff_guide_explains_agreement_in_korean(app):
+    """협정이 무엇인지 우리말로 풀어 주고, 여러 나라 협정은 대상국도 적습니다."""
+
+    netherlands = planning_service.tariff_guide("3304991000", "NL")
+    about = netherlands["agreements"][0]["about"]
+    assert "자유무역협정" in about
+    # EU처럼 여러 나라가 묶인 협정은 적용국 수와 나라 이름을 함께 적습니다.
+    assert "적용국 27곳" in about and "네덜란드" not in about[:20]
+
+    canada = planning_service.tariff_guide("3304991000", "CA")
+    assert "두 나라 사이" in canada["agreements"][0]["about"]
+
+    # HS 앞 6자리가 세계 공통이라는 점을 알려줍니다.
+    assert netherlands["hs6"] == "3304.99"
+    assert "세계 공통" in netherlands["hs6_note"] and "네덜란드" in netherlands["hs6_note"]
+
+
+def test_english_hs_search_fills_korean_name(app, client):
+    """영문으로 찾아도 한글 품명을 함께 보여줍니다."""
+
+    result = client.get("/planning/api/hs-codes?q=skin").get_json()
+    assert result["source"] == "api" and result["data"]
+    assert all(item["name"] for item in result["data"]), "한글 품명이 비어 있습니다"
+    assert any("화장" in item["name"] for item in result["data"])

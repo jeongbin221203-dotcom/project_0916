@@ -9,7 +9,9 @@ class Cargo(db.Model):
     __tablename__ = "cargos"
 
     id = db.Column(db.Integer, primary_key=True)
-    shipment_pk = db.Column(db.Integer, db.ForeignKey("shipments.id"), nullable=False, unique=True)
+    shipment_pk = db.Column(db.Integer, db.ForeignKey("shipments.id"), nullable=False)
+    # 화물이 여러 건일 때 입력한 순서를 지킵니다.
+    line_no = db.Column(db.Integer, nullable=False, default=1)
 
     product_description = db.Column(db.String(300), nullable=False)
     hs_code = db.Column(db.String(20), nullable=False, default="")
@@ -29,7 +31,7 @@ class Cargo(db.Model):
     container_type = db.Column(db.String(10), nullable=True)
     container_quantity = db.Column(db.Integer, nullable=True)
 
-    shipment = db.relationship("Shipment", back_populates="cargo")
+    shipment = db.relationship("Shipment", back_populates="cargos")
 
     def to_dict(self) -> dict:
         return {

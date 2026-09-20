@@ -103,7 +103,30 @@ def search_hs_codes(query: str) -> dict:
         }
         if len(items) >= MAX_HS_RESULTS:
             break
+
+    # 영문으로 찾으면 한글품명이 비어 옵니다. 부호로 다시 물어 한글 이름을 채웁니다.
+    if params.get("koenTp") == "2":
+        _fill_korean_names(key, items)
     return ok(list(items.values()), "api")
+
+
+def _fill_korean_names(key: str, items: dict[str, dict]) -> None:
+    """영문 검색 결과에 한글품명을 채워 넣습니다. (부호별 재조회)"""
+
+    for code, item in items.items():
+        if item["name"]:
+            continue
+        result = request_text("GET", UNIPASS_HS_URL,
+                              params={"crkyCn": key, "hsSgn": code, "koenTp": "1"})
+        if not result["success"]:
+            return
+        try:
+            root = ET.fromstring(result["data"])
+        except ET.ParseError:
+            return
+        row = root.find("hsSgnSrchRsltVo")
+        if row is not None:
+            item["name"] = (row.findtext("korePrnm") or "").strip()
 
 
 def format_hs_code(code: str) -> str:

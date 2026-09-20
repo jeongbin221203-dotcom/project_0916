@@ -13,20 +13,62 @@ MAX_QUANTITY = 100_000
 MAX_WEIGHT_PER_PACKAGE_KG = 40_000
 MAX_INVOICE_VALUE = 1_000_000_000
 
-PACKAGE_TYPES = {
-    "carton": "Carton (CTN)",
-    "pallet": "Pallet (PLT)",
-    "wooden_crate": "Wooden Crate (CRT)",
-    "drum": "Drum (DRM)",
-    "flexible_bag": "Flexible Bag (BAG)",
+# 포장 유형. 해상·항공에서 쓸 수 있는 것이 다르고 주의할 점도 달라
+# modes와 안내 문구를 함께 둡니다.
+PACKAGE_TYPE_INFO = {
+    "carton": {
+        "label": "Carton (CTN) · 종이 상자",
+        "modes": ("SEA", "AIR"),
+        "note": "가장 많이 쓰는 포장입니다. 항공은 상자째 ULD에 싣습니다.",
+    },
+    "pallet": {
+        "label": "Pallet (PLT) · 팔레트",
+        "modes": ("SEA", "AIR"),
+        "note": "목재 팔레트는 수출 전 소독(IPPC 마크)이 필요합니다. "
+                "항공은 팔레트 높이가 낮은 화물기 규격(보통 160cm 이하)에 맞아야 합니다.",
+    },
+    "wooden_crate": {
+        "label": "Wooden Crate (CRT) · 나무 상자",
+        "modes": ("SEA", "AIR"),
+        "note": "목재 포장재는 수출 전 소독(IPPC 마크)이 필요합니다. "
+                "무거워서 항공에서는 운임이 크게 오릅니다.",
+    },
+    "drum": {
+        "label": "Drum (DRM) · 드럼",
+        "modes": ("SEA", "AIR"),
+        "note": "액체·분말에 씁니다. 위험물이면 해상은 IMDG, 항공은 IATA 규정을 따르며 "
+                "항공은 적재 가능 수량이 훨씬 적습니다.",
+    },
+    "flexible_bag": {
+        "label": "Flexible Bag (BAG) · 톤백",
+        "modes": ("SEA",),
+        "note": "곡물·수지 같은 벌크 화물용입니다. 형태가 일정하지 않아 항공에는 쓰지 않습니다.",
+    },
+    "uld": {
+        "label": "ULD · 항공 단위탑재용기",
+        "modes": ("AIR",),
+        "note": "항공사가 주는 컨테이너·팔레트에 직접 싣는 방식입니다. "
+                "기종마다 규격이 달라 항공사에 확인해야 합니다.",
+    },
+    "bulk": {
+        "label": "Bulk · 무포장 산적",
+        "modes": ("SEA",),
+        "note": "포장 없이 선창에 바로 싣습니다. 컨테이너가 아닌 벌크선을 씁니다.",
+    },
 }
 
+PACKAGE_TYPES = {key: info["label"] for key, info in PACKAGE_TYPE_INFO.items()}
+
+
+def package_types_for(transport_mode: str) -> dict:
+    """운송 모드에서 쓸 수 있는 포장 유형만 골라 돌려줍니다."""
+
+    mode = (transport_mode or "SEA").upper()
+    return {key: info for key, info in PACKAGE_TYPE_INFO.items() if mode in info["modes"]}
+
 PACKAGE_UNITS = {
-    "carton": "CTN",
-    "pallet": "PLT",
-    "wooden_crate": "CRT",
-    "drum": "DRM",
-    "flexible_bag": "BAG",
+    "carton": "CTN", "pallet": "PLT", "wooden_crate": "CRT", "drum": "DRM",
+    "flexible_bag": "BAG", "uld": "ULD", "bulk": "BLK",
 }
 
 
