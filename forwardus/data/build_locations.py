@@ -33,6 +33,24 @@ ISO_URL = "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regio
 KOREAN_COUNTRY_URL = "https://raw.githubusercontent.com/umpirsky/country-list/master/data/ko/country.json"
 WPI_URL = "https://msi.nga.mil/api/publications/world-port-index?output=json"
 
+# 내륙국(바다에 접하지 않는 국가)은 강·운하 항만만 있어 해상 수출 목적지가 될 수
+# 없으므로 제외합니다. 항공 목적지는 MAJOR_AIRPORTS에서 따로 관리합니다.
+LANDLOCKED_COUNTRIES = {
+    "AD", "AF", "AM", "AT", "AZ", "BF", "BI", "BO", "BT", "BW", "BY", "CF", "CH", "CZ",
+    "ET", "HU", "KG", "KZ", "LA", "LI", "LS", "LU", "MD", "MK", "ML", "MN", "MW", "NE",
+    "NP", "PY", "RS", "RW", "SI", "SK", "SM", "SS", "SZ", "TD", "TJ", "TM", "UG", "UZ",
+    "VA", "XK", "ZM", "ZW",
+}
+# 슬로베니아(SI)는 코페르항이 있는 연안국이므로 제외 대상에서 되돌립니다.
+LANDLOCKED_COUNTRIES.discard("SI")
+
+# 남극(AQ)은 연구기지 기항지라 무역항이 아닙니다.
+EXCLUDED_COUNTRIES = LANDLOCKED_COUNTRIES | {"AQ"}
+
+# 같은 항만이 옛 로마자 표기로 중복 등록된 코드입니다.
+# KRTGA(Tonghae) = KRTGH(동해항)
+DUPLICATE_CODES = {"KRTGA"}
+
 # UN/LOCODE function codes: 1 = seaport, 4 = airport.
 PORT_FUNCTION = "1"
 AIRPORT_FUNCTION = "4"
@@ -272,8 +290,10 @@ def build() -> list[dict]:
         info = country_info.get(country_code)
         if not info or PORT_FUNCTION not in (row["Function"] or ""):
             continue
+        if country_code in EXCLUDED_COUNTRIES:
+            continue
         code = f"{country_code}{row['Location']}"
-        if code in seen:
+        if code in seen or code in DUPLICATE_CODES:
             continue
         seen.add(code)
         name_en = title_case(row["NameWoDiacritics"] or row["Name"])
@@ -365,3 +385,6 @@ if __name__ == "__main__":
           f"countries {len({item['country_code'] for item in items}):,})")
     print(f"  주요 항구 {len(mains):,}곳 / 기타 항구 {len(ports) - len(mains):,}곳 "
           f"(주요 항구 보유 국가 {len({item['country_code'] for item in mains}):,}개국)")
+    without_main = {item["country_code"] for item in ports} - {item["country_code"] for item in mains}
+    if without_main:
+        print(f"  주요 항구 미분류 국가 {len(without_main)}곳: {', '.join(sorted(without_main))}")

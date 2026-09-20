@@ -72,6 +72,9 @@ def test_origin_covers_every_korean_port(app):
         if item["country_code"] == "KR" and item["kind"] == "port"
     ]
     assert len(all_kr_ports) > 70
+    # 옛 로마자 표기로 중복 등록된 코드는 제외합니다. (KRTGA = KRTGH 동해항)
+    assert "KRTGA" not in all_kr_ports
+    assert "KRTGH" in all_kr_ports
     for code in ("KRPUS", "KRINC", "KRKAN", "KRUSN", "KRPTK", "KRMAS", "KRKPO", "KRMOK"):
         assert code in all_kr_ports
         assert planning_service.search_locations(code, "SEA", "origin")["data"][0]["code"] == code
@@ -80,9 +83,11 @@ def test_origin_covers_every_korean_port(app):
 def test_destination_countries_and_country_filter(app):
     countries = planning_service.list_countries("SEA", "destination")["data"]
     codes = {c["code"] for c in countries}
-    assert len(countries) > 200
+    assert len(countries) > 150
     assert "KR" not in codes
-    assert {"US", "VN", "DE", "AE", "ZA", "BR"} <= codes
+    assert {"US", "VN", "DE", "AE", "ZA", "BR", "SI"} <= codes
+    # 내륙국과 남극은 해상 목적지가 될 수 없습니다.
+    assert not ({"AT", "CH", "NP", "HU", "RS", "UZ", "AQ"} & codes)
 
     vietnam = planning_service.search_locations("", "SEA", "destination", country="VN")["data"]
     assert vietnam and all(item["country_code"] == "VN" for item in vietnam)
