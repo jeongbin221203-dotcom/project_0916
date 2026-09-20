@@ -244,6 +244,9 @@
         </div>
         <aside class="calc_panel" data-calc-panel>
           <p class="eyebrow">자동 계산 <span class="badge source_calculated">Calculated</span></p>
+          {# 품목이 둘 이상이면 품목별 계산을 먼저 보여주고 아래에 합계를 둡니다. #}
+          <div class="calc_lines" data-calc-lines hidden></div>
+          <p class="calc_total_title" data-calc-total-title hidden>합계 (Total)</p>
           <dl>
             <div><dt>Total CBM</dt><dd data-metric="total_cbm">-</dd></div>
             <div><dt>Total Weight</dt><dd data-metric="total_weight_kg">-</dd></div>

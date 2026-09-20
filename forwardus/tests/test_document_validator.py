@@ -86,30 +86,37 @@ def test_documents_follow_standard_form_fields(create_shipment):
     assert next(f for f in view if f["key"] == "po_no")["wide"] is False
 
 
-def test_packing_list_uses_the_order_form_with_an_item_table(create_shipment):
-    """패킹리스트는 주문 서식(ORDER # / SHIPPED TO / 품목표 / PACKED BY)을 씁니다."""
+def test_packing_list_follows_the_korean_standard_form(create_shipment):
+    """포장명세서는 표준 서식(①Seller ~ ⑩Signed by)을 그대로 따릅니다."""
 
     shipment = create_shipment()
     document_service.generate_documents(shipment)
     doc = document_service.get_document(shipment, "packing_list")
 
-    assert {"order_no", "date_ordered", "customer_order_no", "date_shipped", "attention",
-            "shipped_via", "container_no", "invoice_no", "comments", "packed_by"} <= set(doc.data)
-    assert doc.data["order_no"] == shipment.shipment_id
-    assert doc.data["packed_by"] == shipment.exporter_name
-    assert doc.data["invoice_no"] == f"CI-{shipment.shipment_id}"
+    # ①~⑥ 왼쪽 칸, ⑦~⑨ 오른쪽 칸
+    assert {"exporter", "consignee", "etd", "vessel_or_flight", "pol", "pod",
+            "doc_no", "doc_date", "buyer", "other_references"} <= set(doc.data)
+    # 예전 주문 서식의 칸은 남아 있지 않습니다.
+    assert not {"order_no", "packed_by", "shipped_via", "attention"} & set(doc.data)
+    assert doc.data["exporter"] == shipment.exporter_name
+    assert doc.data["signed_by"] == shipment.exporter_name
+
+    labels = {f["key"]: f["label"] for f in document_service.document_view(doc)}
+    assert labels["exporter"].endswith("Seller")
+    assert labels["pol"].endswith("From") and labels["pod"].endswith("To")
 
     items = document_service.document_items(doc)
     assert [c["label"] for c in items["columns"]] == [
-        "ITEM NUMBER", "QUANTITY", "SHIPPED", "BACKORDERED", "DESCRIPTION",
-        "UNIT WEIGHT", "TOTAL WEIGHT"]
+        "Shipping Marks", "No. & kind of packages", "Goods description",
+        "Quantity or net weight", "Gross Weight", "Measurement"]
     assert len(items["rows"]) == len(shipment.cargos)
     first = items["rows"][0]
-    assert first["quantity"] == shipment.cargos[0].quantity
-    assert first["shipped"] == first["quantity"] and first["backordered"] == 0
     assert first["total_weight"] == shipment.cargos[0].total_weight_kg
-    # 서식에 인쇄된 안내 문구도 함께 내려줍니다.
-    assert "order #" in items["note"]
+    assert first["measurement"] == shipment.cargos[0].total_cbm
+    # ⑧칸은 "수량 또는 순중량"입니다.
+    cargo = shipment.cargos[0]
+    assert first["net_quantity"] == (f"{cargo.net_weight_kg} kg" if cargo.net_weight_kg is not None
+                                     else f"{cargo.quantity} CARTON")
 
 
 def test_item_tables_cover_every_document_that_lists_goods(create_shipment):
@@ -129,9 +136,9 @@ def test_item_cells_can_be_edited(create_shipment):
 
     shipment = create_shipment()
     document_service.generate_documents(shipment)
-    document_service.update_document(shipment, "packing_list", {"item-0-backordered": "5"})
+    document_service.update_document(shipment, "packing_list", {"item-0-shipping_marks": "N/M"})
     rows = document_service.get_document(shipment, "packing_list").data["items"]
-    assert rows[0]["backordered"] == "5"
+    assert rows[0]["shipping_marks"] == "N/M"
     # 표에 없는 칸 이름은 무시합니다.
     document_service.update_document(shipment, "packing_list", {"item-9-quantity": "1"})
     assert len(document_service.get_document(shipment, "packing_list").data["items"]) == len(rows)
@@ -178,7 +185,8 @@ def test_stale_documents_are_rebuilt_with_the_current_form(create_shipment):
     doc = document_service.get_document(shipment, "packing_list")
 
     # 예전 서식으로 만들어진 문서를 흉내 냅니다. (칸 구성이 지금과 다름)
-    doc.data = {"doc_no": "PL-OLD", "consignee": "ABC", "comments": "사람이 적은 메모"}
+    doc.data = {"order_no": "PL-OLD", "consignee": "ABC", "remarks_old": "사람이 적은 메모",
+                "shipping_marks": "사람이 적은 화인"}
     document_service.shipment_repository.commit()
     assert document_service.is_outdated(doc) is True
 
@@ -186,8 +194,10 @@ def test_stale_documents_are_rebuilt_with_the_current_form(create_shipment):
     rebuilt = document_service.get_document(shipment, "packing_list")
     assert set(rebuilt.data) - {"items"} == set(document_service.DOCUMENT_FIELDS["packing_list"])
     assert rebuilt.data["items"]                           # 품목 표가 생깁니다.
-    assert rebuilt.data["comments"] == "사람이 적은 메모"    # 사람이 적은 값은 살립니다.
-    assert "doc_no" not in rebuilt.data                    # 새 서식에 없는 칸은 버립니다.
+    # 새 서식에도 있는 칸이면 사람이 적은 값을 살립니다.
+    assert rebuilt.data["shipping_marks"] == "사람이 적은 화인"
+    assert "order_no" not in rebuilt.data                  # 새 서식에 없는 칸은 버립니다.
+    assert "remarks_old" not in rebuilt.data
 
     # 최신 서식이면 다시 만들지 않습니다.
     assert document_service.is_outdated(rebuilt) is False
@@ -223,13 +233,14 @@ def test_document_sections_follow_the_printed_form(create_shipment):
     sections = document_service.document_sections(
         document_service.get_document(shipment, "packing_list"))
 
-    # 첫 묶음은 ORDER # / DATE, 그다음이 SHIPPED TO입니다.
-    assert [f["key"] for f in sections[0]["fields"]] == ["order_no", "doc_date"]
-    assert sections[1]["title"] == "SHIPPED TO"
-    assert "order #" in sections[1]["note"]
+    # 표준 서식은 왼쪽 ①~⑥과 오른쪽 ⑦~⑨을 나란히 인쇄합니다.
+    assert [f["key"] for f in sections[0]["fields"]] == [
+        "exporter", "doc_no", "exporter_address", "doc_date",
+        "consignee", "buyer", "consignee_address", "other_references"]
+    assert [f["key"] for f in sections[1]["fields"]] == ["etd", "vessel_or_flight", "pol", "pod"]
     # 품목 표 자리가 중간에 한 번 들어갑니다.
     assert [s["items"] for s in sections].count(True) == 1
-    assert sections[-1]["fields"][-1]["key"] == "packed_by"
+    assert sections[-1]["fields"][-1]["key"] == "signed_by"
 
 
 def test_edit_creates_warning_and_blocks_finalize(create_shipment):

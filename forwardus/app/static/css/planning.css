@@ -279,3 +279,14 @@
 .ac_tariff.agreement { color: var(--green); }
 .ac_tariff.none { color: var(--muted); }
 .ac_tariff.unknown { color: var(--muted); font-weight: 600; }
+
+/* 품목별 자동 계산 (품목이 둘 이상일 때만) */
+.calc_lines { display: grid; gap: 8px; margin: 10px 0 4px; }
+.calc_line { padding: 9px 11px; border-radius: 11px; background: #fff; border: 1px solid var(--line); }
+.calc_line_title { margin: 0 0 5px; font-size: 12px; font-weight: 800; color: var(--blue_dark); }
+.calc_line_title small { margin-left: 5px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.calc_line dl { margin: 0; display: grid; gap: 4px; }
+.calc_line dt { font-size: 11.5px; }
+.calc_line dd { font-size: 12.5px; }
+.calc_total_title { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line);
+  font-size: 12px; font-weight: 800; color: var(--ink); }

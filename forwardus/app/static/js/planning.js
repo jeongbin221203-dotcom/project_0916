@@ -1236,8 +1236,30 @@
     return { items: [first, ...extras.map(({ item }) => item)] };
   }
 
+  const calcLinesBox = document.querySelector("[data-calc-lines]");
+  const calcTotalTitle = document.querySelector("[data-calc-total-title]");
+
+  // 품목이 둘 이상이면 품목별 CBM·중량을 따로 보여주고 아래에 합계를 둡니다.
+  function renderMetricLines(metrics) {
+    const lines = (metrics && metrics.lines) || [];
+    const show = lines.length > 1;
+    calcLinesBox.hidden = !show;
+    calcTotalTitle.hidden = !show;
+    if (!show) { calcLinesBox.innerHTML = ""; return; }
+    calcLinesBox.innerHTML = lines.map((line, index) => `
+      <div class="calc_line">
+        <p class="calc_line_title">품목 ${index + 1}${line.product_description
+          ? ` <small>${escapeHtml(line.product_description)}</small>` : ""}</p>
+        <dl>
+          <div><dt>CBM</dt><dd>${formatNumber(line.total_cbm, 3)} CBM</dd></div>
+          <div><dt>중량</dt><dd>${formatNumber(line.total_weight_kg, 1)} kg</dd></div>
+        </dl>
+      </div>`).join("");
+  }
+
   function renderMetrics(metrics) {
     const set = (key, text) => { document.querySelector(`[data-metric=${key}]`).textContent = text; };
+    renderMetricLines(metrics);
     if (!metrics) {
       ["total_cbm", "total_weight_kg", "revenue_ton", "container", "volume_weight_kg", "chargeable_weight_kg"].forEach((k) => set(k, "-"));
       return;

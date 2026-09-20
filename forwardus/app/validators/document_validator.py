@@ -47,8 +47,6 @@ EDITABLE_FIELDS = [
     "po_no", "final_destination", "carriage_by", "country_of_origin", "shipment_time", "bank_info",
     "booking_no", "container_seal_no", "notify_party_2", "contact", "service_contract_no", "hs6",
     "routing_remark", "reefer", "prepaid_at", "collect_at", "confirmation_to",
-    "order_no", "consignee_city_zip", "date_ordered", "customer_order_no", "date_shipped",
-    "attention", "shipped_via", "container_no", "invoice_no", "comments", "packed_by",
     "dangerous_goods",
 ]
 

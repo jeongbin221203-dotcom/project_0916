@@ -1194,3 +1194,23 @@ def test_where_to_get_origin_certificate(app):
     assert steps["what"] == "기관발급 원산지증명서"
     assert steps["where"] and steps["form"] == "통일서식(AK)" and steps["valid_for"] == "1년"
     assert fta_guide.certificate_steps({}) == {}
+
+
+def test_cargo_metrics_keeps_each_item_name_for_the_panel(app):
+    """오른쪽 계산 패널이 '품목 1 · 샴푸'처럼 품목별로 보여주려면 이름이 필요합니다."""
+
+    with app.app_context():
+        result = planning_service.calculate_cargo({"cargo": [
+            {"product_description": "샴푸", "length_cm": 40, "width_cm": 30, "height_cm": 25,
+             "quantity": 100, "weight_per_package_kg": 12, "package_type": "carton"},
+            {"product_description": "화장품 세트", "length_cm": 60, "width_cm": 40, "height_cm": 40,
+             "quantity": 30, "weight_per_package_kg": 18, "package_type": "carton"},
+        ]})
+
+    assert [line["product_description"] for line in result["lines"]] == ["샴푸", "화장품 세트"]
+    assert [line["total_cbm"] for line in result["lines"]] == [3.0, 2.88]
+    assert [line["total_weight_kg"] for line in result["lines"]] == [1200.0, 540.0]
+    # 합계는 품목을 더한 값이고, 컨테이너 수량은 합계로 다시 정합니다.
+    assert result["total_cbm"] == 5.88
+    assert result["total_weight_kg"] == 1740.0
+    assert result["container_quantity"] == 1

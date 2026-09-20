@@ -76,6 +76,8 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
 
     return {
         **cargo,
+        # 화면에서 품목별 계산을 "품목 1 · 샴푸"처럼 이름과 함께 보여줍니다.
+        "product_description": str(payload.get("product_description") or "").strip()[:300],
         "net_weight_kg": net_weight,
         "net_weight_warning": net_warning,
         "total_cbm": round(total_cbm, 4),
