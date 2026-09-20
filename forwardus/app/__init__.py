@@ -80,6 +80,22 @@ TARIFF_COST_CODES = ("origin_trucking", "terminal_handling", "documentation",
                      "export_customs", "destination_charge")
 
 
+def migrate_requirement_documents(database) -> None:
+    """원산지증명서의 협정 칸을 기존 DB에 덧붙입니다."""
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "requirement_documents" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("requirement_documents")}
+    if "agreement" not in columns:
+        with database.engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE requirement_documents ADD COLUMN agreement VARCHAR(120) "
+                "NOT NULL DEFAULT ''"))
+
+
 def migrate_cost_sources(database) -> None:
     """이미 저장된 비용 줄의 출처 표기를 고칩니다. 운임은 그대로 둡니다."""
 
@@ -117,6 +133,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         migrate_cargo_lines(db)
         migrate_shipment_columns(db)
         migrate_cost_sources(db)
+        migrate_requirement_documents(db)
 
     @flask_app.get("/health")
     def health():

@@ -62,13 +62,20 @@ def requirements_for(shipment) -> dict:
     }
 
 
+def origin_certificates(shipment) -> list[RequirementDocument]:
+    """이 건에 등록한 원산지증명서."""
+
+    return [doc for doc in shipment.requirement_documents if doc.requirement_key == "origin"]
+
+
 def _upload_root() -> Path:
     root = Path.cwd() / UPLOAD_DIR
     root.mkdir(parents=True, exist_ok=True)
     return root
 
 
-def upload(shipment, file_storage, requirement_key: str) -> RequirementDocument:
+def upload(shipment, file_storage, requirement_key: str,
+           agreement: str = "") -> RequirementDocument:
     """증빙 서류를 저장합니다. 분석은 저장한 뒤 따로 부릅니다."""
 
     if file_storage is None or not (file_storage.filename or "").strip():
@@ -99,6 +106,7 @@ def upload(shipment, file_storage, requirement_key: str) -> RequirementDocument:
         stored_name=stored_name,
         content_type=(file_storage.mimetype or "")[:120],
         size_bytes=len(data),
+        agreement=str(agreement or "").strip()[:120],
     )
     shipment_repository.add(document)
     shipment_repository.commit()
@@ -118,6 +126,10 @@ def _get_upload(shipment, document_id: int) -> RequirementDocument:
     if document is None:
         raise ServiceError("올린 서류를 찾을 수 없습니다.", "NOT_FOUND")
     return document
+
+
+def requirement_key_of(shipment, document_id: int) -> str:
+    return _get_upload(shipment, document_id).requirement_key
 
 
 def extract_text(path: Path, suffix: str) -> str:
@@ -194,6 +206,8 @@ def analyze(shipment, document_id: int) -> RequirementDocument:
 
     context = shipment_context(shipment)
     context["확인하려는_요건"] = document.requirement_title
+    if document.agreement:
+        context["적용하려는_협정"] = document.agreement
     result = ai_client.review_document(_clean(text), context)
 
     if not result["success"]:

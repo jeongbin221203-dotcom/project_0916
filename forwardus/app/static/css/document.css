@@ -132,3 +132,16 @@
 .finding_list li.verdict_missing { border-left-color: var(--amber); }
 .finding_list li.verdict_differs { border-left-color: #dc2626; }
 .finding_list li b { font-size: 12px; }
+
+/* 원산지증명서 신청 링크와 등록 */
+.origin_apply { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.origin_apply_label { font-size: 11.5px; font-weight: 800; color: var(--muted); }
+.origin_upload_box { margin-top: 18px; padding: 16px; border: 1px solid var(--line);
+  border-radius: 16px; background: #f8fafc; }
+.origin_upload_box > p { margin: 6px 0 12px; }
+.origin_upload_form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px; align-items: end; }
+.origin_upload_form .field { margin-bottom: 0; }
+.origin_upload_form input[type=file] { font-size: 12.5px; }
+.origin_upload_box .upload_list { margin-top: 14px; }
+@media (max-width: 760px) { .origin_upload_form { grid-template-columns: 1fr; } }

@@ -129,6 +129,78 @@ WHERE_AUTHORITY = ("세관(관세청 UNI-PASS 전자통관 → 원산지증명�
                    " 대한상공회의소 무역인증서비스센터(cert.korcham.net)에서 발급받습니다.")
 WHERE_SELF = "수출자가 협정이 정한 서식(또는 송장 등 상업서류)에 원산지 문안을 적고 서명합니다."
 
+# 실제로 신청하는 곳. 화면에서 새 창으로 엽니다.
+APPLY_AUTHORITY = [
+    {
+        "label": "대한상공회의소 무역인증서비스센터",
+        "url": "https://cert.korcham.net",
+        "note": "비특혜(일반) 원산지증명서와 상당수 FTA 원산지증명서를 여기서 신청합니다. "
+                "회원 가입과 서명용 인증서가 필요합니다.",
+    },
+    {
+        "label": "관세청 UNI-PASS 전자통관",
+        "url": "https://unipass.customs.go.kr",
+        "note": "세관이 발급하는 FTA 원산지증명서를 신청합니다. "
+                "전자통관시스템 이용신청을 먼저 해야 합니다.",
+    },
+    {
+        "label": "관세청 FTA 포털",
+        "url": "https://www.customs.go.kr/ftaportalkor/main.do",
+        "note": "협정별 서식과 발급 요건, 원산지 판정 기준을 확인합니다.",
+    },
+]
+
+APPLY_SELF = [
+    {
+        "label": "관세청 FTA 포털 · 협정별 서식",
+        "url": "https://www.customs.go.kr/ftaportalkor/main.do",
+        "note": "자율발급이라도 협정이 정한 문안과 서식을 그대로 써야 합니다.",
+    },
+    {
+        "label": "FTA-PASS 원산지관리시스템",
+        "url": "https://www.ftapass.or.kr",
+        "note": "원산지 판정 근거(소요부품자재명세서 등)를 만들어 두는 무료 프로그램입니다. "
+                "사후 검증에서 이 자료를 요구합니다.",
+    },
+]
+
+
+# 비특혜(일반) 원산지증명서. 협정과 무관하게 바이어가 요구할 수 있습니다.
+NON_PREFERENTIAL = {
+    "label": "비특혜(일반) 원산지증명서",
+    "issuer": "대한상공회의소 · 한국무역협회",
+    "about": "FTA와 상관없이 '이 물건은 한국산'임을 증명하는 서류입니다. "
+             "관세 혜택은 없지만 수입국 통관·입찰·L/C 조건에서 요구하는 경우가 많습니다.",
+    "url": "https://cert.korcham.net",
+}
+
+
+def all_apply_links() -> list[dict]:
+    """협정을 가리지 않고 쓰는 신청 창구 전부. 서류 센터의 등록 칸에서 씁니다."""
+
+    return APPLY_AUTHORITY + APPLY_SELF[1:]
+
+
+def apply_links(method: str) -> list[dict]:
+    """발급 방식에 맞는 신청 창구를 돌려줍니다."""
+
+    text = method or ""
+    links = []
+    if "기관" in text:
+        links += APPLY_AUTHORITY
+    if "자율" in text:
+        links += APPLY_SELF
+    if not links:
+        links = APPLY_AUTHORITY + APPLY_SELF[1:]
+    # 같은 주소가 두 번 나오지 않게 합니다.
+    seen, unique = set(), []
+    for link in links:
+        if link["url"] in seen:
+            continue
+        seen.add(link["url"])
+        unique.append(link)
+    return unique
+
 
 def where_to_get(method: str) -> str:
     """발급방식 문구("기관발급", "자율발급", "자율/기관발급")로 발급처를 정합니다."""
@@ -156,6 +228,7 @@ def certificate_steps(info: dict) -> dict:
         "issuer": info.get("issuer", ""),
         "form": info.get("form", ""),
         "valid_for": info.get("valid_for", ""),
+        "apply_links": apply_links(info.get("method", "")),
     }
 
 

@@ -583,13 +583,21 @@ def origin_certificate_guide(shipment) -> dict:
     cargo = shipment.cargo
     hs_code = (cargo.hs_code if cargo else "") or ""
     country = shipment.destination_country or ""
+    from app.processors import fta_guide
+    from app.services import requirement_service
+
+    uploaded = requirement_service.origin_certificates(shipment)
+    # 신청 창구와 비특혜 증명서 안내는 협정을 못 찾아도 늘 보여줍니다.
+    common = {"uploads": uploaded, "agreement_names": [],
+              "apply_links": fta_guide.all_apply_links(),
+              "non_preferential": fta_guide.NON_PREFERENTIAL}
     if not hs_code or not country:
-        return {"available": False,
+        return {**common, "available": False,
                 "reason": "HS부호와 도착국이 있어야 적용 협정을 확인할 수 있습니다."}
 
     guide = planning_service.tariff_guide(hs_code, country)
     if not guide.get("available"):
-        return {"available": False, "reason": guide.get("message", ""),
+        return {**common, "available": False, "reason": guide.get("message", ""),
                 "country": guide.get("country", country)}
 
     agreements = [{
@@ -601,10 +609,12 @@ def origin_certificate_guide(shipment) -> dict:
     } for row in guide["agreements"]]
 
     return {
+        **common,
         "available": True,
         "country": guide["country"],
         "hs_code": guide["hs_code"],
         "agreements": agreements,
+        "agreement_names": [row["agreement"] for row in agreements],
         "note": ("원산지증명서는 협정이 정한 서식으로 발급받아야 합니다."
                  " 기관발급은 세관 또는 상공회의소에, 자율발급은 수출자가 직접 작성합니다."),
         "source": "관세청 FTA 포털",

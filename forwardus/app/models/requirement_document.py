@@ -23,6 +23,8 @@ class RequirementDocument(db.Model):
     # export_requirements의 규칙 key (food, strategic, dangerous ...)
     requirement_key = db.Column(db.String(40), nullable=False, default="")
     requirement_title = db.Column(db.String(120), nullable=False, default="")
+    # 원산지증명서는 어느 협정으로 받은 것인지가 핵심입니다. ("한·중 FTA")
+    agreement = db.Column(db.String(120), nullable=False, default="")
 
     filename = db.Column(db.String(300), nullable=False)
     stored_name = db.Column(db.String(300), nullable=False)

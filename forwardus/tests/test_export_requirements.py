@@ -168,3 +168,51 @@ class _Upload:
 
 def _file(data: bytes, filename: str) -> _Upload:
     return _Upload(data, filename)
+
+
+def test_origin_certificate_always_shows_where_to_apply(app, create_shipment):
+    """협정이 자율발급이어도 상공회의소·세관 창구는 늘 보여줍니다.
+
+    비특혜(일반) 원산지증명서는 FTA와 무관하게 바이어가 요구할 수 있습니다.
+    """
+
+    from app.services import document_service
+
+    with app.app_context():
+        shipment = create_shipment()
+        guide = document_service.origin_certificate_guide(shipment)
+
+    labels = [link["label"] for link in guide["apply_links"]]
+    assert "대한상공회의소 무역인증서비스센터" in labels
+    assert "관세청 UNI-PASS 전자통관" in labels
+    assert all(link["url"].startswith("https://") for link in guide["apply_links"])
+    assert guide["non_preferential"]["url"] == "https://cert.korcham.net"
+
+
+def test_issued_certificate_is_registered_against_its_agreement(app, create_shipment, monkeypatch):
+    """발급받은 원산지증명서는 어느 협정으로 받은 것인지와 함께 등록합니다."""
+
+    seen = {}
+
+    def fake_review(text, context):
+        seen.update(context)
+        return {"success": True, "source": "api", "data": {
+            "document_type": "원산지증명서", "status": "ok",
+            "summary": "이 건과 맞습니다.", "findings": []}}
+
+    monkeypatch.setattr(requirement_service.ai_client, "review_document", fake_review)
+
+    with app.app_context():
+        shipment = create_shipment()
+        document = requirement_service.upload(
+            shipment, _file("CERTIFICATE OF ORIGIN\nKOREA".encode(), "co.txt"),
+            "origin", "한·EU FTA")
+        assert document.agreement == "한·EU FTA"
+        assert requirement_service.origin_certificates(shipment) == [document]
+
+        requirement_service.analyze(shipment, document.id)
+        # 어느 협정으로 받은 것인지도 대조 기준에 넣습니다.
+        assert seen["적용하려는_협정"] == "한·EU FTA"
+
+        requirement_service.delete_upload(shipment, document.id)
+        assert requirement_service.origin_certificates(shipment) == []

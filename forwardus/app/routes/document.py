@@ -41,34 +41,49 @@ def upload_requirement(shipment_id: str):
     shipment = load_shipment(shipment_id)
     try:
         document = requirement_service.upload(
-            shipment, request.files.get("file"), request.form.get("requirement_key", ""))
+            shipment, request.files.get("file"), request.form.get("requirement_key", ""),
+            request.form.get("agreement", ""))
         # 올리자마자 읽어 이 건과 맞는지 봅니다. 키가 없으면 그렇다고 알려 줍니다.
         requirement_service.analyze(shipment, document.id)
         flash(f"{document.filename}을(를) 올렸습니다.", "success")
+        if document.requirement_key == "origin":
+            return redirect(url_for("document.center", shipment_id=shipment_id))
     except ValidationError as error:
         flash(str(error), "error")
+        if request.form.get("requirement_key") == "origin":
+            return redirect(url_for("document.center", shipment_id=shipment_id))
     return redirect(url_for("document.requirements", shipment_id=shipment_id))
 
 
 @document_bp.post("/<shipment_id>/requirements/<int:document_id>/analyze")
 def analyze_requirement(shipment_id: str, document_id: int):
     shipment = load_shipment(shipment_id)
+    key = ""
     try:
-        requirement_service.analyze(shipment, document_id)
+        key = requirement_service.analyze(shipment, document_id).requirement_key
     except ServiceError as error:
         flash(str(error), "error")
-    return redirect(url_for("document.requirements", shipment_id=shipment_id))
+    return redirect(_back_to(shipment_id, key))
 
 
 @document_bp.post("/<shipment_id>/requirements/<int:document_id>/delete")
 def delete_requirement(shipment_id: str, document_id: int):
     shipment = load_shipment(shipment_id)
+    key = ""
     try:
+        key = requirement_service.requirement_key_of(shipment, document_id)
         requirement_service.delete_upload(shipment, document_id)
         flash("올린 서류를 지웠습니다.", "success")
     except ServiceError as error:
         flash(str(error), "error")
-    return redirect(url_for("document.requirements", shipment_id=shipment_id))
+    return redirect(_back_to(shipment_id, key))
+
+
+def _back_to(shipment_id: str, requirement_key: str) -> str:
+    """원산지증명서는 서류 센터에서 다루므로 온 자리로 돌려보냅니다."""
+
+    page = "document.center" if requirement_key == "origin" else "document.requirements"
+    return url_for(page, shipment_id=shipment_id)
 
 
 @document_bp.get("/<shipment_id>/customs-filing")
