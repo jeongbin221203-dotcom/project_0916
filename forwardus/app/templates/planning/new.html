@@ -170,9 +170,13 @@
           </label>
           <div class="field autocomplete span2" data-autocomplete="hs_code">
             <span class="field_label">HS CODE <small class="muted">(선택)</small></span>
-            <input type="text" name="hs_code" autocomplete="off" placeholder="3304.99 또는 화장품" data-ac-input>
+            <input type="text" name="hs_code" autocomplete="off" placeholder="립스틱, 샴푸 또는 HS부호 10자리" data-ac-input>
             <ul class="ac_list" data-ac-list hidden></ul>
+            <small class="field_hint">관세청 HS부호검색으로 찾습니다. 품명은 한글·영문 모두 되고,
+              HS부호는 10자리를 모두 입력해야 조회됩니다.</small>
           </div>
+
+          <div class="tariff span2" data-tariff hidden></div>
           <label class="field">
             <span class="field_label">포장 유형</span>
             <select name="package_type">
@@ -291,6 +295,7 @@
       transitEstimate: "{{ url_for('planning.api_transit_estimate') }}",
       scheduleOutlook: "{{ url_for('planning.api_schedule_outlook') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
+      tariff: "{{ url_for('planning.api_tariff') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",
       create: "{{ url_for('planning.api_create_shipment') }}"

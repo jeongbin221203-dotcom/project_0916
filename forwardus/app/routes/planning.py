@@ -58,6 +58,14 @@ def api_hs_codes():
     return jsonify(result), (200 if result["success"] else 502)
 
 
+@planning_bp.get("/api/tariff")
+def api_tariff():
+    """고른 품목과 도착국에 적용되는 협정·세율."""
+
+    return jsonify({"success": True, "data": planning_service.tariff_guide(
+        request.args.get("hs", ""), request.args.get("country", ""))})
+
+
 @planning_bp.post("/api/cargo")
 def api_cargo():
     try:

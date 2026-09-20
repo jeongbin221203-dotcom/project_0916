@@ -880,3 +880,55 @@ def test_currency_list_covers_customs_published_currencies(app):
     assert not [c for c in codes if c.startswith("X")]
     # 이름이 비어 있는 통화는 없습니다.
     assert all(c["name"] for c in currencies)
+
+
+def test_tariff_guide_matches_destination_country(app):
+    """도착국에 맞는 협정만 골라서 보여줍니다."""
+
+    netherlands = planning_service.tariff_guide("3304991000", "NL")
+    assert netherlands["available"] and netherlands["country"] == "네덜란드"
+    names = [row["agreement"] for row in netherlands["agreements"]]
+    assert names == ["한·EU FTA"]
+    assert "인증수출자" in netherlands["agreements"][0]["proof"]
+    # 기본세율·WTO세율은 참고로 함께 줍니다.
+    assert {row["code"] for row in netherlands["general"]} == {"A", "C"}
+
+    # 베트남은 한·아세안, 한·베트남, RCEP이 모두 발효 중입니다.
+    vietnam = planning_service.tariff_guide("3304991000", "VN")
+    assert {"한·아세안 FTA", "한·베트남 FTA"} <= set(vietnam["in_force"])
+    # 세율이 낮은 협정을 먼저 보여줍니다.
+    rates = [float(row["rate"]) for row in vietnam["agreements"]]
+    assert rates == sorted(rates)
+
+    # 협정이 없는 나라는 발효 목록이 비어 있습니다.
+    assert planning_service.tariff_guide("3304991000", "RU")["in_force"] == []
+
+
+def test_tariff_guide_lists_agreements_without_rate_rows(app):
+    """이 품목에 협정세율이 없어도 발효 중인 협정은 알려줍니다."""
+
+    japan = planning_service.tariff_guide("3304991000", "JP")
+    assert japan["in_force"] == ["RCEP (일본)"]
+    assert japan["without_rate"] == ["RCEP (일본)"]
+
+
+def test_fta_country_mapping(app):
+    """협정 대상국 매핑이 협정별로 맞아야 합니다."""
+
+    from app.processors import fta_guide
+
+    assert fta_guide.match_agreement("FEU1")[0] == "한·EU FTA"
+    assert fta_guide.match_agreement("FUS1")[1] == ("US",)
+    # 긴 코드를 먼저 맞춰 아세안과 상호대응세율을 구분합니다.
+    assert fta_guide.match_agreement("FASPH1")[0].startswith("한·아세안 FTA 상호대응")
+    assert fta_guide.match_agreement("FAS1")[0] == "한·아세안 FTA"
+    assert fta_guide.match_agreement("FRCJP1")[0] == "RCEP (일본)"
+    assert fta_guide.match_agreement("ZZZ") is None
+
+    # 나라별로 발효 중인 협정을 찾습니다.
+    assert fta_guide.agreements_for("DE") == ["한·EU FTA"]
+    assert "RCEP (중국)" in fta_guide.agreements_for("CN")
+    assert "한·중국 FTA" in fta_guide.agreements_for("CN")
+    assert fta_guide.agreements_for("RU") == []
+    # EU 27개국과 아세안 10개국을 모두 담습니다.
+    assert len(fta_guide.EU_COUNTRIES) == 27 and len(fta_guide.ASEAN_COUNTRIES) == 10

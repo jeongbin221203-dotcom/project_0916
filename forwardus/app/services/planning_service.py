@@ -9,6 +9,7 @@ from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
 from app.processors.cargo_calculator import calculate_cargo_metrics
 from app.processors.cost_calculator import INCOTERMS_INFO, calculate_logistics_cost
+from app.processors import fta_guide
 from app.processors import transit_calculator
 from app.processors.transit_calculator import great_circle_km
 from app.processors.schedule_calculator import (
@@ -109,6 +110,70 @@ def search_unlocode(query: str, role: str | None = None, country: str | None = N
 
 def search_hs_codes(query: str) -> dict:
     return customs_client.search_hs_codes(query)
+
+
+def tariff_guide(hs_code: str, country_code: str) -> dict:
+    """고른 품목과 도착국에 맞는 협정·세율을 정리합니다.
+
+    관세청이 주는 세율은 한국으로 수입할 때의 세율입니다. 수출할 때 상대국이
+    매기는 관세는 그 나라가 정하므로, 여기서는 "어떤 협정을 쓸 수 있고 어떤
+    원산지증명이 필요한지"를 먼저 보여주고 세율은 참고값으로 함께 적습니다.
+    """
+
+    country = (country_code or "").strip().upper()
+    location = location_client.find_location(country) if len(country) > 2 else None
+    if location:
+        country = location["country_code"]
+    country_name = location_client.country_name(country) or country
+
+    result = customs_client.fetch_tariff_rates(hs_code)
+    if not result["success"]:
+        return {"available": False, "message": result["message"],
+                "country": country_name, "agreements": agreement_names(country)}
+
+    matched, general = [], []
+    for row in result["data"]:
+        if row["code"] in fta_guide.GENERAL_RATES:
+            general.append({**row, "description": fta_guide.GENERAL_RATES[row["code"]]})
+            continue
+        agreement = fta_guide.match_agreement(row["code"])
+        if agreement and country in agreement[1]:
+            matched.append({**row, "agreement": agreement[0], "proof": agreement[2]})
+
+    # 같은 협정에서 선택1·선택2가 함께 오면 세율이 낮은 쪽만 남깁니다.
+    best: dict[str, dict] = {}
+    for row in matched:
+        current = best.get(row["agreement"])
+        if not current or _rate_value(row["rate"]) < _rate_value(current["rate"]):
+            best[row["agreement"]] = row
+
+    # 이 품목에 세율 행이 없더라도 발효 중인 협정은 알려줍니다.
+    in_force = fta_guide.agreements_for(country)
+    return {
+        "available": True,
+        "hs_code": customs_client.format_hs_code(hs_code.replace(".", "").replace("-", "")),
+        "country": country_name,
+        "country_code": country,
+        "agreements": sorted(best.values(), key=lambda row: _rate_value(row["rate"])),
+        "in_force": in_force,
+        "without_rate": [name for name in in_force if name not in best],
+        "general": general,
+        "note": "세율은 한국으로 수입할 때 기준입니다. 도착국이 매기는 관세는 그 나라가 정합니다.",
+        "source": "api",
+    }
+
+
+def agreement_names(country_code: str) -> list[str]:
+    """세율을 못 가져와도 협정 이름만은 알려줍니다."""
+
+    return fta_guide.agreements_for(country_code)
+
+
+def _rate_value(rate: str) -> float:
+    try:
+        return float(rate)
+    except (TypeError, ValueError):
+        return 999.0
 
 
 def _resolve_location(payload: dict, role: str, kind: str) -> dict:

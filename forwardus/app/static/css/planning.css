@@ -184,3 +184,16 @@
 
 /* 입력칸 아래 작은 안내 */
 .field_hint { display: block; margin-top: 6px; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
+
+/* 도착국에 적용되는 협정·세율 */
+.tariff { margin-top: 4px; padding: 14px 16px; border-radius: 14px; background: var(--blue_soft); display: grid; gap: 6px; }
+.tariff_head { margin: 0 0 4px; font-size: 13px; font-weight: 800; color: var(--blue_dark); }
+.tariff_head .mono { margin-left: 6px; font-size: 12px; opacity: .8; }
+.tariff_row { display: grid; grid-template-columns: 200px 56px 1fr; gap: 2px 12px; align-items: baseline;
+  padding: 9px 12px; border-radius: 11px; background: #fff; }
+.tariff_name { font-size: 12.5px; font-weight: 800; color: var(--ink); }
+.tariff_rate { font-size: 13px; font-weight: 800; color: var(--blue); text-align: right; }
+.tariff_period { font-size: 11px; font-weight: 600; color: var(--muted); }
+.tariff_proof { grid-column: 1 / -1; margin-top: 2px; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
+.tariff_plain { margin: 0; font-size: 12px; font-weight: 700; color: var(--blue_dark); }
+.tariff_note { margin: 2px 0 0; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
