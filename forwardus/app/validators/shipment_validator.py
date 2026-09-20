@@ -56,9 +56,11 @@ def validate_route(payload: dict) -> dict:
         if sea_mode not in SEA_MODES:
             raise ValidationError("해상 운송 방식(FCL / LCL)을 선택해주세요.", "sea_mode")
 
-    origin_code = require_text(payload.get("origin_code"), "출발지", max_length=10, field="origin_code").upper()
-    destination_code = require_text(payload.get("destination_code"), "도착지", max_length=10, field="destination_code").upper()
-    if origin_code == destination_code:
+    # 코드는 직접 입력 시 비어 있을 수 있습니다. 실제 확인은 planning_service에서
+    # 목록 조회 또는 직접 입력 값으로 처리합니다.
+    origin_code = optional_text(payload.get("origin_code"), max_length=10).upper()
+    destination_code = optional_text(payload.get("destination_code"), max_length=10).upper()
+    if origin_code and origin_code == destination_code:
         raise ValidationError("출발지와 도착지가 같습니다.", "destination_code")
 
     return {

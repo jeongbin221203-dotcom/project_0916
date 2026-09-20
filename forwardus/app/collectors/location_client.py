@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from functools import lru_cache
+from hashlib import sha1
 
 from app.collectors.base_client import fail, load_mock, ok
 
@@ -46,6 +47,24 @@ def _countries() -> dict[str, dict]:
         })
         entry["port_count" if item["kind"] == "port" else "airport_count"] += 1
     return countries
+
+
+def generate_code(country_code: str, name: str) -> str:
+    """직접 입력한 항구에 부여할 임시 코드.
+
+    UN/LOCODE에 없는 항구이므로 국가코드 + ZZ + 이름 해시 한 글자로 만듭니다.
+    같은 이름이면 항상 같은 코드가 나오고, 기존 코드와 겹치면 다음 글자를 씁니다.
+    """
+
+    alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    digest = sha1(name.strip().upper().encode("utf-8")).hexdigest()
+    start = int(digest[:8], 16) % len(alphabet)
+    known = _by_code()
+    for offset in range(len(alphabet)):
+        code = f"{country_code}ZZ{alphabet[(start + offset) % len(alphabet)]}"
+        if code not in known:
+            return code
+    return f"{country_code}ZZZ"
 
 
 def find_location(code: str) -> dict | None:

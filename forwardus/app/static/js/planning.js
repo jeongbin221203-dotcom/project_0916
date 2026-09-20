@@ -284,13 +284,18 @@
       const name = box.querySelector("[data-custom-name]").value.trim();
       const countrySelect = box.querySelector("[data-custom-country]");
       const countryCode = countrySelect ? countrySelect.value : "KR";
-      if (!code || !name || !countryCode) {
-        showError("직접 입력하려면 코드, 이름, 국가를 모두 채워주세요.");
+      if (!name) {
+        showError("직접 입력하려면 항구·공항 이름을 입력해주세요.");
+        return;
+      }
+      if (!countryCode) {
+        showError("직접 입력하려면 국가를 선택해주세요.");
         return;
       }
       showError("");
+      // 코드는 선택 사항입니다. 비우면 서버가 이름을 기준으로 임시 코드를 부여합니다.
       state[role] = { code, name, country_code: countryCode, custom: true };
-      input.value = `${name} (${code})`;
+      input.value = code ? `${name} (${code})` : name;
       box.hidden = true;
       invalidateSchedules();
     });

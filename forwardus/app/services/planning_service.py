@@ -101,6 +101,7 @@ def _resolve_location(payload: dict, role: str, kind: str) -> dict:
     else:
         raise ValidationError("목록에서 선택하거나 직접 입력해주세요.", field)
 
+
     if role == "origin" and location["country_code"] != "KR":
         raise ValidationError("수출 견적은 국내 항구·공항에서 출발합니다.", field)
     if role == "destination" and location["country_code"] == "KR":
@@ -109,12 +110,9 @@ def _resolve_location(payload: dict, role: str, kind: str) -> dict:
 
 
 def _build_custom_location(code: str, custom: dict, role: str, kind: str) -> dict:
-    field = f"{role}_code"
-    if not code.isalnum() or not location_client.CODE_MIN_LENGTH <= len(code) <= location_client.CODE_MAX_LENGTH:
-        raise ValidationError(
-            f"코드는 영문·숫자 {location_client.CODE_MIN_LENGTH}~{location_client.CODE_MAX_LENGTH}자로 입력해주세요. (예: KRPUS)",
-            field)
+    """직접 입력한 항구·공항. 코드를 비우면 이름으로 임시 코드를 부여합니다."""
 
+    field = f"{role}_code"
     country_code = "KR" if role == "origin" else str(custom.get("country_code") or "").strip().upper()
     country = location_client.get_country(country_code)
     if not country:
@@ -123,6 +121,13 @@ def _build_custom_location(code: str, custom: dict, role: str, kind: str) -> dic
     name = optional_text(custom.get("name"), max_length=200)
     if not name:
         raise ValidationError("항구·공항 이름을 입력해주세요.", f"{role}_name")
+
+    if not code:
+        code = location_client.generate_code(country_code, name)
+    elif not code.isalnum() or not location_client.CODE_MIN_LENGTH <= len(code) <= location_client.CODE_MAX_LENGTH:
+        raise ValidationError(
+            f"코드는 영문·숫자 {location_client.CODE_MIN_LENGTH}~{location_client.CODE_MAX_LENGTH}자로 "
+            f"입력하거나 비워두세요. (비우면 자동 부여)", field)
 
     return {
         "code": code,

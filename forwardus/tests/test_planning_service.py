@@ -155,6 +155,35 @@ def test_direct_input_location_accepted(app, shipment_payload):
     assert shipment.destination_country == "US"
 
 
+def test_direct_input_accepts_name_only(app, shipment_payload):
+    """코드를 비우면 이름으로 임시 코드를 부여합니다."""
+
+    payload = {
+        **shipment_payload,
+        "destination_code": "",
+        "destination_custom": {"name": "Private Terminal", "country_code": "US"},
+    }
+    schedules = planning_service.search_schedules(payload)
+    assert schedules["items"]
+    payload["schedule_id"] = schedules["items"][0]["schedule_id"]
+    shipment = planning_service.create_shipment(payload)
+    assert shipment.destination_name == "Private Terminal"
+    assert shipment.destination_code.startswith("USZZ")
+    assert shipment.destination_country == "US"
+
+    # 같은 이름이면 조회할 때마다 같은 코드가 나옵니다.
+    again = planning_service.search_schedules(payload)
+    assert again["items"][0]["destination_code"] == shipment.destination_code
+
+
+def test_generated_code_does_not_clash_with_unlocode(app):
+    from app.collectors import location_client
+
+    code = location_client.generate_code("KR", "인천 신외항")
+    assert location_client.find_location(code) is None
+    assert code == location_client.generate_code("KR", "인천 신외항")
+
+
 @pytest.mark.parametrize("custom,field", [
     ({"name": "No Country", "country_code": ""}, "destination_country"),
     ({"name": "", "country_code": "US"}, "destination_name"),
