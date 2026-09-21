@@ -263,24 +263,23 @@ def test_health_check_tells_real_answers_apart_from_fallbacks(app, monkeypatch):
 
     from app.services import lookup_service
 
-    answers = iter([
-        {"success": True, "source": "api", "data": [1, 2]},      # 진짜 응답
-        {"success": True, "source": "mock", "data": [1]},        # 예시로 대체
-        {"success": False, "source": "api", "data": None,
-         "message": "키가 없습니다."},                             # 안 됨
-    ])
+    # 검사마다 제 답을 따로 줍니다.
+    #
+    # 예전에는 반복자 하나를 셋이 나눠 next()로 꺼냈는데, health_check가
+    # 스레드로 한꺼번에 돌리는 바람에 누가 무엇을 받을지가 그때그때 달랐습니다.
+    # 그래서 이 테스트가 이따금 실패했습니다.
+    def answer(result):
+        return lambda *args, **kwargs: result
 
-    def one(*args, **kwargs):
-        try:
-            return next(answers)
-        except StopIteration:
-            return {"success": True, "source": "api", "data": []}
+    real = answer({"success": True, "source": "api", "data": [1, 2]})
+    mocked = answer({"success": True, "source": "mock", "data": [1]})
+    broken = answer({"success": False, "source": "api", "data": None,
+                     "message": "키가 없습니다."})
 
     monkeypatch.setattr(lookup_service, "HEALTH_CHECKS",
-                        [("가짜1", "E1", one), ("가짜2", "E2", one), ("가짜3", "E3", one)])
-    # 뒤에 덧붙는 검사들도 같은 답을 주게 둡니다.
-    for module, name in (("customs_client", "search_hs_codes"),):
-        pass
+                        [("가짜1", "E1", real),
+                         ("가짜2", "E2", mocked),
+                         ("가짜3", "E3", broken)])
 
     with app.app_context():
         with patch("httpx.request", side_effect=lambda *a, **k: httpx.Response(
