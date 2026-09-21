@@ -1,0 +1,7 @@
+# 데이터 생성 전용 의존성입니다. 앱 실행에는 필요하지 않습니다.
+#   pip install -r data/requirements-build.txt
+#   python data/build_locations.py
+#   python data/build_sea_routes.py
+httpx>=0.27,<1
+searoute>=1.6        # 해상 항로망(marnet)과 항만 좌표
+networkx>=3.0        # 최단 항로 계산

@@ -22,11 +22,16 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from pathlib import Path
 
 import httpx
 
 from airport_names_ko import AIRPORT_NAMES_KO
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.processors.transit_calculator import great_circle_km
 
 DATA_DIR = Path(__file__).resolve().parent
 RAW_DIR = DATA_DIR / "raw"
@@ -40,6 +45,9 @@ KOREAN_COUNTRY_URL = "https://raw.githubusercontent.com/umpirsky/country-list/ma
 WPI_URL = "https://msi.nga.mil/api/publications/world-port-index?output=json"
 AIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 ROUTES_URL = "https://raw.githubusercontent.com/Jonty/airline-route-data/main/airline_routes.json"
+# 국가물류통합정보센터 「항만별 물동량 통계」. 원자료는 해양수산부 통합 PORT-MIS입니다.
+PORT_VOLUME_URL = "https://www.nlic.go.kr/nlic/seaHarborGtqy.action"
+PORT_VOLUME_YEAR = 2025
 
 # 내륙국(바다에 접하지 않는 국가)은 강·운하 항만만 있어 해상 수출 목적지가 될 수
 # 없으므로 제외합니다. 항공 목적지는 MAJOR_AIRPORTS에서 따로 관리합니다.
@@ -159,24 +167,78 @@ KOREAN_PORT_ALIASES = {
     "KRDDO": "독도", "KRCGY": "청양", "KRANJ": "안정", "KRBUK": "부평(인천)",
 }
 
-# 국내 항만 연간 물동량 (만 톤). 목록을 물동량이 많은 항만부터 보여주는 데 씁니다.
-# 출처: 해양수산부 항만 물동량 통계 및 보도자료.
-#   부산 46,348 / 광양 27,200 / 인천 14,782 (2024년 연간)
-#   울산 19,260 / 평택·당진 10,036 (2025년 비컨테이너 기준)
-#   동해·묵호 2,812 (2025년 연간)
-#   대산 9,010 (대산지방해양수산청 항만소개)
-# 나머지 국가관리무역항(포항·군산·목포·마산·여수·경인·장항)은 공개된 연간 수치를
-# 확인하지 못해 비워 둡니다. 값이 없으면 목록에서 뒤쪽에 표시됩니다.
-KOREA_PORT_VOLUME_MT = {
-    "KRPUS": 46348,
-    "KRKAN": 27200,
-    "KRUSN": 19260,
-    "KRINC": 14782,
-    "KRPTK": 10036,
-    "KRTSN": 9010,
-    "KRTGH": 2812,
-    "KRMUK": 2812,
+# 통계에 쓰는 항만 이름과 우리가 쓰는 UN/LOCODE의 대응.
+# 평택·당진과 동해·묵호는 통계에서 합산 집계되므로 두 코드에 같은 값이 들어갑니다.
+PORT_VOLUME_NAMES = {
+    "부산": ["KRPUS"], "광양": ["KRKAN"], "울산": ["KRUSN"], "인천": ["KRINC"],
+    "평택.당진": ["KRPTK", "KRTJI"], "대산": ["KRTSN"], "포항": ["KRKPO"],
+    "마산": ["KRMAS"], "동해.묵호": ["KRTGH", "KRMUK"], "목포": ["KRMOK"],
+    "보령": ["KRBOR"], "군산": ["KRKUV"], "제주": ["KRCHA"], "호산": ["KRHAS"],
+    "태안": ["KRTAN"], "삼천포": ["KRSCP"], "고현": ["KRKHN"], "옥포": ["KROKP"],
+    "옥계": ["KROKK"], "완도": ["KRWND"], "삼척": ["KRSUK"], "여수": ["KRYOS"],
+    "진해": ["KRCHF"], "경인항": ["KRGIN"], "장항": ["KRCHG"], "서귀포": ["KRSPO"],
+    "속초": ["KRSHO"], "통영": ["KRTYG"],
+    # "하동"·"장승포"·"기타"는 법정 무역항 목록에 없어 쓰지 않습니다.
 }
+
+# 통계 사이트에 닿지 못할 때 쓰는 값 (2025년 연간 확정치, 만 톤).
+# 아래 load_port_volumes()가 받아오는 값과 같습니다.
+KOREA_PORT_VOLUME_FALLBACK = {
+    "KRPUS": 46753, "KRKAN": 26416, "KRUSN": 19730, "KRINC": 14377,
+    "KRPTK": 11497, "KRTJI": 11497, "KRTSN": 9072, "KRKPO": 4668,
+    "KRMAS": 3042, "KRTGH": 2812, "KRMUK": 2812, "KRMOK": 2482,
+    "KRBOR": 2447, "KRKUV": 2161, "KRCHA": 2151, "KRHAS": 1036,
+    "KRTAN": 1022, "KRSCP": 903, "KRKHN": 773, "KROKP": 697,
+    "KROKK": 560, "KRWND": 542, "KRSUK": 537, "KRYOS": 249,
+    "KRCHF": 126, "KRGIN": 66, "KRCHG": 53, "KRSPO": 35,
+    "KRSHO": 14, "KRTYG": 10,
+    # 서울항(KRSEL)은 화물 집계 대상이 아니라 값이 없습니다.
+}
+
+
+def load_port_volumes() -> dict[str, int]:
+    """국내 항만의 연간 물동량(만 톤)을 받아옵니다.
+
+    출처: 국가물류통합정보센터 「항만별 물동량 통계」(원자료 해양수산부 통합 PORT-MIS).
+    단위는 R/T(Revenue Ton)이며, 화면에서는 항만을 물동량이 많은 순으로 보여주는
+    데만 씁니다. 기준월을 12월로 두면 그 해 연간 확정치가 나옵니다.
+
+    여수항은 여수·광양 통합 물동량이 대부분 '광양'으로 잡혀 단독 실적만 반영됩니다.
+    """
+
+    try:
+        html = download_post(PORT_VOLUME_URL, f"port_volume_{PORT_VOLUME_YEAR}.html",
+                             {"command": "LIST", "S_HARBOR_CODE": "",
+                              "S_YEAR": str(PORT_VOLUME_YEAR), "S_MONTH": "12"}).decode("utf-8", "replace")
+    except httpx.HTTPError as error:
+        print(f"경고: 항만 물동량 통계를 받지 못해 보관된 값을 씁니다 ({error})")
+        return dict(KOREA_PORT_VOLUME_FALLBACK)
+
+    volumes: dict[str, int] = {}
+    total = 0
+    # 항만 이름 블록마다 "합계" 행이 있고, 그 두 번째 숫자가 연간 누계입니다.
+    for chunk in re.split(r'<li class="con_list2"[^>]*>', html)[1:]:
+        name = re.sub(r"<[^>]+>", "", chunk.split("</li>")[0]).strip()
+        row = re.search(r'<li class="list_num_03"[^>]*>\s*합계\s*</li>(.{0,2000}?)'
+                        r'(?=<li class="list_num_03"|<li class="con_list2"|$)', chunk, re.S)
+        if not row:
+            continue
+        numbers = re.findall(r'<li class="list_num_02"[^>]*>\s*([\-\d,.]+)\s*</li>', row.group(1))
+        if len(numbers) < 2:
+            continue
+        tons = int(numbers[1].replace(",", ""))
+        if name == "합계":
+            total = tons
+            continue
+        for code in PORT_VOLUME_NAMES.get(name, []):
+            volumes[code] = round(tons / 10_000)
+
+    if not volumes:
+        print("경고: 항만 물동량 표를 읽지 못해 보관된 값을 씁니다")
+        return dict(KOREA_PORT_VOLUME_FALLBACK)
+    print(f"  {PORT_VOLUME_YEAR}년 항만 물동량 {len(volumes)}개 코드 · 전국 합계 {total:,} t")
+    return volumes
+
 
 # 부두·터미널과 모항의 관계. 물동량은 모항 값을 따르고, 목록에서는 모항 다음에 옵니다.
 KOREA_PORT_PARENT = {
@@ -189,6 +251,8 @@ KOREA_PORT_PARENT = {
 # 목록에서 함께 보여줄 안내 문구.
 PORT_NOTES = {
     "KRSEL": "법적 무역항",
+    # 통계상 여수·광양 물동량이 대부분 광양항으로 잡혀 순서가 뒤로 밀립니다.
+    "KRYOS": "수출 물량은 광양항으로 집계",
 }
 
 KOREAN_NAMES = {
@@ -224,16 +288,28 @@ KOREAN_NAMES = {
 # Major cargo airports (IATA code → Korean name). UN/LOCODE airport rows are
 # noisy, so international airports used for air freight are curated here.
 # 항공화물 거점 공항.
-# - KE: 대한항공 화물이 취항한다고 공식 소개 페이지에 밝힌 도시
-#   (cargo.koreanair.com, 2025.08 기준 25개국 44개 도시)
+# - KE: 대한항공 화물(여객기 벨리 포함) 취항지.
+#   출처: cargo.koreanair.com 소개 페이지(2025.08 기준 25개국 44개 도시)와
+#   위키백과 List of Korean Air destinations의 화물 표기 노선.
+#   콜럼버스(Rickenbacker/LCK), 시카고 록퍼드(RFD), 나보이(NVI)는 공항 데이터에 없어
+#   제외했고, 모스크바(SVO)는 운항 종료로 제외했습니다.
 # - HUB: 전 세계 항공화물 처리량 상위 공항과 특송사 허브
 # 여객 노선만 있는 공항과 구분해 목록 위에 표시합니다.
 KOREAN_AIR_CARGO = {
-    "LAX", "JFK", "ORD", "SFO",              # 북미
-    "GDL",                                    # 중남미
-    "LHR", "FRA", "AMS", "VIE", "OSL", "ZAZ", "BUD",  # 유럽
-    "NRT", "KIX", "CGO",                      # 동북아
-    "SIN", "SGN", "HAN",                      # 동남아
+    # 북미
+    "ANC", "ATL", "ORD", "DFW", "LAX", "MIA", "JFK", "SFO", "SEA",
+    "YEG", "YHZ", "YYZ", "YVR",
+    # 중남미
+    "VCP", "SCL", "BOG", "GDL", "LIM",
+    # 유럽
+    "VIE", "BRU", "BSL", "FRA", "CDG", "MXP", "MAD", "ZAZ", "ARN", "ZRH", "AMS", "LHR",
+    "OSL", "BUD",
+    # 중앙아시아
+    "TAS",
+    # 동북아
+    "NRT", "KIX", "KKJ", "PEK", "PVG", "CAN", "SHE", "TSN", "XIY", "CGO", "CTU", "HKG",
+    # 동남아·남아시아
+    "SIN", "BKK", "KUL", "PEN", "CGK", "DPS", "MNL", "HAN", "SGN", "DEL", "MAA", "DAC",
 }
 GLOBAL_CARGO_HUBS = {
     # 북미
@@ -258,6 +334,8 @@ KOREA_AIRPORTS = {"ICN", "GMP", "PUS", "CJU", "TAE", "CJJ", "MWX", "YNY"}
 
 # 국가별 대표 관문 공항. AIRPORT_OVERRIDES에 없는 국가에서 이 공항이 먼저
 # 보이도록 순서를 앞당깁니다.
+# 값은 노출 순위(작을수록 위). 한 나라에 관문이 둘 이상이면 순서를 지정합니다.
+PRIMARY_AIRPORT_ORDER = {"ALA": 10, "NQZ": 11, "FCO": 10, "LGW": 11, "ORY": 11, "CGH": 11, "LED": 11}
 PRIMARY_AIRPORTS = {
     "PRG", "BUD", "BTS", "OTP", "SOF", "ZAG", "BEG", "VIE", "ZRH", "DUB", "LIS", "ATH",
     "ARN", "OSL", "HEL", "CPH", "LOS", "CMN", "ALG", "TUN", "ADD", "DAR", "EBB", "ACC",
@@ -349,6 +427,18 @@ AIRPORT_OVERRIDES = {
 }
 
 
+def download_post(url: str, filename: str, data: dict) -> bytes:
+    """POST로만 받을 수 있는 자료를 한 번만 받아 data/raw/에 담아 둡니다."""
+
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    cached = RAW_DIR / filename
+    if cached.exists():
+        return cached.read_bytes()
+    content = httpx.post(url, data=data, timeout=120, follow_redirects=True).content
+    cached.write_bytes(content)
+    return content
+
+
 def download(url: str, filename: str) -> bytes:
     """Download once and cache under data/raw/."""
 
@@ -369,6 +459,94 @@ def normalize_name(name: str) -> str:
     return "".join(ch for ch in (name or "").lower() if ch.isalnum())
 
 
+# World Port Index에서 모은 실제 선석 좌표
+PORT_COORDS: dict[str, tuple[float, float]] = {}
+# 해상 네트워크의 항구를 좌표로 맞출 때 같은 항구로 보는 거리(km)
+SEA_MATCH_KM = 30.0
+
+
+def load_sea_network() -> dict[str, dict]:
+    """searoute의 항만 데이터(UN/LOCODE + 좌표 + 실제 연결 국가)를 읽습니다.
+
+    `to_cty`는 실제 운항 기록에서 모은 연결 국가 목록이라, 항공의 노선
+    데이터처럼 "한국에서 직기항 선박이 있는 항구"를 가려내는 데 씁니다.
+    """
+
+    import searoute
+
+    ports = searoute.get_graphs()[1]
+    return {data["port"]: data for _, data in ports.nodes(data=True) if data.get("port")}
+
+
+def match_sea_port(code: str, coord: tuple[float, float] | None, network: dict[str, dict],
+                   index: list[tuple[float, float, dict]]) -> dict | None:
+    """해상 네트워크에서 같은 항구를 찾습니다.
+
+    UN/LOCODE가 서로 다른 경우가 있어(상하이 CNSGH ↔ CNSHA) 코드로 못 찾으면
+    같은 나라에서 좌표가 가장 가까운 항구를 씁니다.
+    """
+
+    if code in network:
+        return network[code]
+    if not coord:
+        return None
+    lat, lon = coord
+    nearest, best = None, SEA_MATCH_KM
+    for other_lat, other_lon, data in index:
+        if data["port"][:2] != code[:2]:
+            continue
+        km = great_circle_km((lat, lon), (other_lat, other_lon))
+        if km < best:
+            nearest, best = data, km
+    return nearest
+
+
+def build_sea_transfers(network: dict[str, dict]) -> dict[str, list[str]]:
+    """한국 직기항이 없는 항구마다 갈아탈 수 있는 환적항을 찾습니다.
+
+    한국에서 직기항이 있으면서 그 항구가 있는 나라와도 항로가 이어진 곳을
+    고릅니다. 환적항으로 표시된 곳과 항로가 많은 곳을 먼저 둡니다.
+    """
+
+    hubs = [data for data in network.values() if "KR" in (data.get("to_cty") or [])]
+
+    transfers: dict[str, list[str]] = {}
+    for code, data in network.items():
+        if "KR" in (data.get("to_cty") or []) or code.startswith("KR"):
+            continue
+        country = code[:2]
+        candidates = [h for h in hubs
+                      if country in (h.get("to_cty") or []) and h["port"] != code]
+        # 가까운 환적항을 먼저 두고, 같은 거리면 항로가 많은 곳을 씁니다.
+        candidates.sort(key=lambda h: (round(great_circle_km((data["y"], data["x"]), (h["y"], h["x"])) / 500),
+                                       not h.get("t"), -len(h.get("to_cty") or [])))
+        if candidates:
+            transfers[code] = [h["port"] for h in candidates[:MAX_TRANSFER_HUBS]]
+    return transfers
+
+
+def parse_dms(value: str) -> float | None:
+    """World Port Index의 35°06'00"N 형식을 십진수 좌표로 바꿉니다."""
+
+    numbers = re.findall(r"[\d.]+", value or "")
+    hemisphere = re.search(r"[NSEW]", value or "")
+    if not numbers or not hemisphere:
+        return None
+    degrees = sum(float(part) / 60 ** index for index, part in enumerate(numbers[:3]))
+    return -degrees if hemisphere.group() in "SW" else degrees
+
+
+def parse_unlocode_coord(value: str) -> tuple[float, float] | None:
+    """UN/LOCODE의 '3508N 12903E' 형식을 (위도, 경도)로 바꿉니다."""
+
+    match = re.fullmatch(r"(\d{2})(\d{2})([NS])\s+(\d{3})(\d{2})([EW])", (value or "").strip())
+    if not match:
+        return None
+    lat = int(match[1]) + int(match[2]) / 60
+    lon = int(match[4]) + int(match[5]) / 60
+    return (-lat if match[3] == "S" else lat, -lon if match[6] == "W" else lon)
+
+
 def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
     """UN/LOCODE → World Port Index harbour size (L/M/S/V).
 
@@ -387,8 +565,6 @@ def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
     sizes: dict[str, str] = {}
     for port in ports:
         size = port.get("harborSize")
-        if not size:
-            continue
         # Container terminals count as main ports regardless of harbour size.
         if port.get("loContainer") == "Y":
             size = "L"
@@ -401,7 +577,11 @@ def load_harbor_sizes(unlocode_rows: list[dict]) -> dict[str, str]:
                     break
         if not code:
             continue
-        if HARBOR_SIZE_RANK.get(size, 9) < HARBOR_SIZE_RANK.get(sizes.get(code), 9):
+        # 좌표는 해상 항로 거리 계산에 씁니다. 선석 위치라 UN/LOCODE보다 정확합니다.
+        lat, lon = parse_dms(port.get("latitude") or ""), parse_dms(port.get("longitude") or "")
+        if lat is not None and lon is not None:
+            PORT_COORDS.setdefault(code, (round(lat, 4), round(lon, 4)))
+        if size and HARBOR_SIZE_RANK.get(size, 9) < HARBOR_SIZE_RANK.get(sizes.get(code), 9):
             sizes[code] = size
     return sizes
 
@@ -429,6 +609,10 @@ def build() -> list[dict]:
     iso = json.loads(download(ISO_URL, "iso_3166_regions.json"))
     korean_country = json.loads(download(KOREAN_COUNTRY_URL, "country_names_ko.json"))
     harbor_sizes = load_harbor_sizes(unlocode)
+    sea_network = load_sea_network()
+    port_volumes = load_port_volumes()
+    sea_index = [(d["y"], d["x"], d) for d in sea_network.values()]
+    sea_transfers = build_sea_transfers(sea_network)
 
     country_info = {
         row["alpha-2"]: {
@@ -444,6 +628,8 @@ def build() -> list[dict]:
 
     locations = []
     seen = set()
+    # 해상 네트워크의 항구 코드 -> 우리가 쓰는 UN/LOCODE (상하이 CNSHA -> CNSGH 등)
+    sea_code_map: dict[str, str] = {}
 
     for row in unlocode:
         country_code = row["Country"]
@@ -461,6 +647,14 @@ def build() -> list[dict]:
         seen.add(code)
         name_en = title_case(row["NameWoDiacritics"] or row["Name"])
         harbor_size = harbor_sizes.get(code)
+        # 선석 좌표(WPI)를 먼저 쓰고, 해상 네트워크 → UN/LOCODE 순으로 채웁니다.
+        coord = (PORT_COORDS.get(code)
+                 or ((sea_network[code]["y"], sea_network[code]["x"]) if code in sea_network else None)
+                 or parse_unlocode_coord(row.get("Coordinates", "")))
+        sea = match_sea_port(code, coord, sea_network, sea_index)
+        if sea and (sea["port"] == code or sea["port"] not in sea_code_map):
+            # 코드가 같은 항구를 우선합니다. 좌표로 맞춘 항구는 빈자리만 채웁니다.
+            sea_code_map[sea["port"]] = code
         display_names = {**KOREAN_NAMES, **{code: name for code, (name, _) in KOREA_TRADE_PORTS.items()}}
         locations.append({
             "code": code,
@@ -475,7 +669,15 @@ def build() -> list[dict]:
             "kind": "port",
             "status": row["Status"],
             "harbor_size": harbor_size,
+            "lat": round(coord[0], 4) if coord else None,
+            "lon": round(coord[1], 4) if coord else None,
+            # 실제 운항 기록에 한국 직기항이 있는 항구. 없으면 환적 일수를 더합니다.
+            "sea_direct": ("KR" in (sea.get("to_cty") or [])) if sea else None,
+            # 직기항이 없을 때 갈아탈 수 있는 환적항. 아래에서 우리 코드·이름으로 바꿉니다.
+            "sea_transfer_via": sea_transfers.get(sea["port"], []) if sea else [],
             "direct_from_korea": None,
+            "direct_from": [],
+            "flight_minutes": {},
             "cargo_hub": False,
             "korean_air_cargo": False,
             "transfer_via": [],
@@ -483,7 +685,7 @@ def build() -> list[dict]:
             "port_class": KOREA_TRADE_PORTS.get(code, (None, None))[1],
             "note": PORT_NOTES.get(code, ""),
             "size_rank": None,
-            "cargo_volume_mt": KOREA_PORT_VOLUME_MT.get(KOREA_PORT_PARENT.get(code, code)),
+            "cargo_volume_mt": port_volumes.get(KOREA_PORT_PARENT.get(code, code)),
             "is_terminal": code in KOREA_PORT_PARENT,
             "port_group": KOREA_PORT_PARENT.get(code, code),
             "major": code in display_names or harbor_size in MAIN_HARBOR_SIZES,
@@ -492,6 +694,7 @@ def build() -> list[dict]:
     locations.extend(build_airports(country_info))
 
     attach_transfer_hub_names(locations)
+    attach_sea_hub_names(locations, sea_code_map)
     promote_main_ports(locations)
     # 항만 규모 정보가 없고 주요 항구도 아닌 곳은 제외합니다. 무역에 쓰이지 않는
     # 소규모 선착장이 대부분이며, 필요하면 화면에서 "직접 입력"으로 지정합니다.
@@ -520,16 +723,26 @@ def build() -> list[dict]:
 MAX_TRANSFER_HUBS = 3
 
 
-def load_route_data() -> tuple[set[str], dict[str, list[str]]]:
-    """국내 직항 공항 목록과, 환승 공항별 경유 후보를 만듭니다.
+def load_route_data() -> tuple[set[str], dict[str, list[str]], dict[str, dict[str, int]], dict[str, list[str]]]:
+    """국내 직항 목록, 출발 공항별 직항 노선, 환승 공항별 경유 후보를 만듭니다.
 
     경유 후보는 "국내에서 직항으로 갈 수 있고, 그곳에서 목적 공항까지
     다시 직항편이 있는" 공항입니다. 운항 항공사 수가 많은 곳을 먼저 둡니다.
     """
 
     data = json.loads(download(ROUTES_URL, "airline_routes.json"))
-    direct = {route["iata"] for code in KOREA_AIRPORTS
-              for route in data.get(code, {}).get("routes", [])} - KOREA_AIRPORTS
+    # 목적 공항 -> 직항편이 있는 국내 출발 공항 목록
+    direct_from: dict[str, list[str]] = {}
+    # 목적 공항 -> 출발 공항별 실제 운항 시간(분). 소요일 계산에 씁니다.
+    flight_minutes: dict[str, dict[str, int]] = {}
+    for code in KOREA_AIRPORTS:
+        for route in data.get(code, {}).get("routes", []):
+            if route["iata"] in KOREA_AIRPORTS:
+                continue
+            direct_from.setdefault(route["iata"], []).append(code)
+            if route.get("min"):
+                flight_minutes.setdefault(route["iata"], {})[code] = int(route["min"])
+    direct = set(direct_from)
 
     transfers: dict[str, list[str]] = {}
     for iata, airport in data.items():
@@ -540,7 +753,7 @@ def load_route_data() -> tuple[set[str], dict[str, list[str]]]:
         hubs.sort(key=lambda item: (-item[0], item[1]))
         if hubs:
             transfers[iata] = [code for _, code in hubs[:MAX_TRANSFER_HUBS]]
-    return direct, transfers
+    return direct, direct_from, flight_minutes, transfers
 
 
 def build_airports(country_info: dict[str, dict]) -> list[dict]:
@@ -552,7 +765,9 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
 
     rows = list(csv.DictReader(io.StringIO(
         download(AIRPORTS_URL, "ourairports_airports.csv").decode("utf-8", "replace"))))
-    direct_routes, transfer_hubs = load_route_data()
+    direct_routes, direct_from, flight_minutes, transfer_hubs = load_route_data()
+    # 정기 국제선이 실제로 있는 국내 공항. 없는 곳은 출발지 목록에서 안내합니다.
+    korea_outbound = {code for codes in direct_from.values() for code in codes}
 
     airports = []
     seen = set()
@@ -585,21 +800,32 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
             "region": info["region"],
             "kind": "airport",
             "status": "",
+            "lat": round(float(row["latitude_deg"]), 4),
+            "lon": round(float(row["longitude_deg"]), 4),
+            "sea_direct": None,
+            "sea_transfer_via": [],
             "harbor_size": None,
             "port_class": None,
-            "note": "",
+            "note": ("" if country_code != "KR" or iata in korea_outbound
+                     else "정기 국제선 없음 · 인천·김해 이용"),
             "cargo_volume_mt": None,
             "is_terminal": False,
             "port_group": iata,
             # 직접 지정한 순서를 먼저 쓰고, 나머지는 대형 -> 중형 순입니다.
             "size_rank": (override[3] if override
-                          else 10 if iata in PRIMARY_AIRPORTS
+                          else PRIMARY_AIRPORT_ORDER.get(iata, 10) if iata in PRIMARY_AIRPORTS
                           else 50 if is_large else 60),
             # 국내 공항에서 직항편이 있는지. 없으면 경유 후보를 함께 보여줍니다.
-            "direct_from_korea": iata in direct_routes,
+            # 국내 공항은 출발지이므로 판정 대상이 아닙니다(None).
+            "direct_from_korea": None if country_code == "KR" else iata in direct_routes,
+            # 어느 국내 공항에서 직항편이 오는지 (예: ["ICN", "PUS"])
+            "direct_from": [] if country_code == "KR" else sorted(direct_from.get(iata, [])),
+            # 출발 공항별 실제 운항 시간(분). 공표 시간표에서 가져옵니다.
+            "flight_minutes": {} if country_code == "KR" else flight_minutes.get(iata, {}),
             "cargo_hub": iata in CARGO_HUBS,
             "korean_air_cargo": iata in KOREAN_AIR_CARGO,
-            "transfer_via": [] if iata in direct_routes else transfer_hubs.get(iata, []),
+            "transfer_via": ([] if country_code == "KR" or iata in direct_routes
+                             else transfer_hubs.get(iata, [])),
             "gateway_only": False,
             "major": is_large or bool(override),
         })
@@ -615,6 +841,19 @@ def build_airports(country_info: dict[str, dict]) -> list[dict]:
     if unknown_ko:
         print(f"경고: 한글 표기만 있고 데이터에 없는 공항 {len(unknown_ko)}개 -> {', '.join(unknown_ko)}")
     return airports
+
+
+def attach_sea_hub_names(locations: list[dict], sea_code_map: dict[str, str]) -> None:
+    """환적항 코드를 우리가 쓰는 UN/LOCODE와 한글 이름으로 바꿉니다."""
+
+    names = {item["code"]: item["name"] for item in locations if item["kind"] == "port"}
+    for item in locations:
+        hubs = []
+        for hub in item.get("sea_transfer_via") or []:
+            code = sea_code_map.get(hub, hub)
+            if code in names:
+                hubs.append([code, names[code]])
+        item["sea_transfer_via"] = hubs
 
 
 def attach_transfer_hub_names(locations: list[dict]) -> None:
@@ -634,6 +873,8 @@ def attach_transfer_hub_names(locations: list[dict]) -> None:
             gateways[item["country_code"]] = {"score": score, "item": item}
 
     for item in airports:
+        if item["direct_from_korea"] is None:
+            continue  # 국내 공항(출발지)에는 환승 안내를 붙이지 않습니다.
         if item["transfer_via"]:
             item["transfer_via"] = [[code, names.get(code, code)] for code in item["transfer_via"]
                                     if code in names]

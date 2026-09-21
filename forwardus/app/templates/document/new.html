@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}서류 작성{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ static_url('css/home.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Trade Documents</p>
+      <h1>서류 작성</h1>
+      <p class="muted">상업송장과 포장명세서가 요구하는 칸을 직접 채웁니다.
+        말로 적어 만들고 싶으시면 <a href="{{ url_for('home.index') }}">시작 화면</a>에서
+        <b>서류 작성</b>을 눌러 대화로 하셔도 됩니다.</p>
+    </div>
+  </div>
+
+  {% include "document/_form.html" %}
+{% endblock %}
+{% block scripts %}
+  <script>
+    window.FORWARDUS_DOC = {
+      locationsUrl: "{{ url_for('planning.api_locations') }}",
+      schedulesUrl: "{{ url_for('planning.api_schedules') }}",
+      startUrl: "{{ url_for('document.start') }}",
+      originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}"
+    };
+  </script>
+  <script src="{{ static_url('js/doc_form.js') }}"></script>
+{% endblock %}

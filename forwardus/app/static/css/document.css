@@ -23,3 +23,150 @@
   body { background: #fff; }
   .paper { box-shadow: none; border: 0; padding: 0; max-width: none; }
 }
+
+/* 원산지증명서 안내 */
+.origin_card h2 small { margin-left: 8px; font-size: 13px; font-weight: 700; }
+.origin_row { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; }
+.origin_rate { font-size: 13px; font-weight: 800; color: var(--blue); }
+.origin_about { margin: 6px 0 0; font-size: 12.5px; font-weight: 600; line-height: 1.6; color: var(--muted); }
+.origin_detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 18px; margin: 10px 0 0; }
+.origin_detail dt { font-size: 11.5px; font-weight: 800; color: var(--muted); }
+.origin_detail dd { margin: 2px 0 0; font-size: 12.5px; font-weight: 600; line-height: 1.55; }
+.origin_card em { font-style: normal; margin-left: 6px; font-size: 11px; font-weight: 700; color: #b45309; background: #fff1e6; padding: 2px 8px; border-radius: 999px; }
+.origin_detail .wide { grid-column: 1 / -1; }
+
+/* 서류의 품목 표 (패킹리스트·상업송장·견적송장) */
+.doc_items_wrap { max-width: 100%; overflow-x: auto; margin: 6px 0 18px; }
+.doc_items { width: 100%; border-collapse: collapse; font-size: 12px; }
+.doc_items th { padding: 7px 8px; border: 1px solid var(--line); background: #f8fafc;
+  font-size: 11px; font-weight: 800; color: var(--muted); text-align: left; white-space: nowrap; }
+.doc_items td { padding: 6px 8px; border: 1px solid var(--line); font-weight: 600; vertical-align: top; }
+.doc_items td:first-child, .doc_items th:first-child { width: 34px; text-align: center; }
+.doc_items input { width: 100%; min-width: 80px; padding: 5px 7px; border: 1px solid var(--line);
+  border-radius: 8px; font-size: 12px; font-weight: 600; }
+.doc_items input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(43,102,246,.14); }
+.paper_note { margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: #fffbeb;
+  border: 1px solid #fde68a; font-size: 11.5px; font-weight: 700; color: #92400e; }
+
+/* 실제 무역서식처럼 칸을 테두리로 묶어 보여줍니다. */
+.doc_section { margin: 0 0 18px; }
+.doc_section_title { margin: 0 0 6px; font-size: 11px; font-weight: 900; letter-spacing: .08em;
+  color: var(--muted); text-transform: uppercase; }
+.doc_boxes { display: grid; border: 1px solid var(--ink); border-radius: 2px; overflow: hidden; }
+.doc_boxes.cols1 { grid-template-columns: minmax(0, 1fr); }
+.doc_boxes.cols2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.doc_boxes.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.doc_boxes.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.doc_box { padding: 8px 11px 10px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  min-width: 0; }
+.doc_box.wide { grid-column: 1 / -1; }
+.doc_box_label { display: block; margin-bottom: 3px; font-size: 10px; font-weight: 800;
+  letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+.doc_box b { font-size: 13.5px; font-weight: 700; word-break: break-word; }
+.doc_box input { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
+  font-size: 13px; font-weight: 600; }
+.doc_box input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(43,102,246,.14); }
+.doc_empty { text-align: center; color: var(--muted); font-weight: 600; }
+@media (max-width: 820px) {
+  .doc_boxes.cols3, .doc_boxes.cols4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 서류가 어떤 성격인지 (필수 / 참고용 / 예시 양식) */
+.doc_role { justify-self: start; padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; }
+.doc_role_required { background: #fee2e2; color: #b91c1c; }
+.doc_role_reference { background: #e0f2fe; color: #0369a1; }
+.doc_role_sample { background: #f1f5f9; color: #475569; }
+.doc_role_note { margin: 0; line-height: 1.55; }
+.doc_card.role_sample { border-style: dashed; }
+
+/* 관세사 전달용 수출신고 자료 */
+.filing_section_title { margin: 20px 0 8px; font-size: 14px; font-weight: 800; color: var(--blue_dark); }
+.filing_rows { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.filing_rows > div { padding: 10px 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.filing_rows > div.blank { border-style: dashed; background: #fffbeb; }
+.filing_rows dt { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 3px; }
+.filing_rows dd { margin: 0; font-size: 13.5px; font-weight: 700; }
+.filing_rows dd small { display: block; margin-top: 4px; font-weight: 600; line-height: 1.5; }
+.filing_rows > div.blank dd { color: #b45309; }
+.filing_form { margin-top: 16px; }
+.filing_text { margin: 0; padding: 16px; border-radius: 14px; background: #0f172a; color: #e2e8f0;
+  font-size: 12.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
+.table_scroll { overflow-x: auto; }
+
+/* 수출요건 확인 */
+.req_item { padding: 11px 14px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; }
+.req_item p { margin: 5px 0 0; }
+.req_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; margin-top: 14px; }
+.req_card { display: grid; gap: 9px; align-content: start; padding: 16px;
+  border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.req_card.has_upload { border-color: var(--green); }
+.req_why { margin: 0; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+.req_meta { margin: 0; display: grid; gap: 6px; }
+.req_meta > div { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: baseline; }
+.req_meta dt { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.req_meta dd { margin: 0; font-size: 12.5px; font-weight: 600; line-height: 1.6; }
+.req_link { font-size: 12.5px; font-weight: 800; color: var(--blue); text-decoration: none; }
+.req_link:hover { text-decoration: underline; }
+.req_upload { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding-top: 10px; border-top: 1px solid var(--line); }
+.req_upload input[type=file] { flex: 1 1 150px; min-width: 0; font-size: 12px; }
+
+/* 올린 서류와 AI 분석 결과 */
+.upload_list { display: grid; gap: 12px; margin-top: 12px; }
+.upload_card { display: grid; gap: 9px; padding: 16px; border: 1px solid var(--line);
+  border-radius: 16px; background: #fff; }
+.upload_card.status_ok { border-left: 4px solid var(--green); }
+.upload_card.status_check { border-left: 4px solid var(--amber); }
+.upload_card.status_mismatch, .upload_card.status_failed { border-left: 4px solid #dc2626; }
+.upload_card b { display: block; }
+.upload_summary { margin: 0; font-size: 13px; line-height: 1.7; }
+.badge.review_ok { background: var(--green_soft); color: var(--green); }
+.badge.review_check { background: var(--amber_soft); color: #8a4f00; }
+.badge.review_mismatch, .badge.review_failed { background: #fee2e2; color: #b91c1c; }
+.badge.review_pending { background: #f1f5f9; color: #475569; }
+.finding_list { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.finding_list li { display: grid; gap: 2px; padding: 9px 12px; border-radius: 11px; background: #f8fafc;
+  font-size: 12.5px; line-height: 1.65; border-left: 3px solid #cbd5e1; }
+.finding_list li.verdict_match { border-left-color: var(--green); }
+.finding_list li.verdict_missing { border-left-color: var(--amber); }
+.finding_list li.verdict_differs { border-left-color: #dc2626; }
+.finding_list li b { font-size: 12px; }
+
+/* 원산지증명서 신청 링크와 등록 */
+.origin_apply { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.origin_apply_label { font-size: 11.5px; font-weight: 800; color: var(--muted); }
+.origin_upload_box { margin-top: 18px; padding: 16px; border: 1px solid var(--line);
+  border-radius: 16px; background: #f8fafc; }
+.origin_upload_box > p { margin: 6px 0 12px; }
+.origin_upload_form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px; align-items: end; }
+.origin_upload_form .field { margin-bottom: 0; }
+.origin_upload_form input[type=file] { font-size: 12.5px; }
+.origin_upload_box .upload_list { margin-top: 14px; }
+@media (max-width: 760px) { .origin_upload_form { grid-template-columns: 1fr; } }
+
+/* 관세청이 직접 답한 수출요건 (우리 규칙표보다 앞섭니다) */
+.req_official { margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+  background: var(--blue_soft); border-left: 3px solid var(--blue); }
+.req_official > b { font-size: 12.5px; color: var(--blue_dark); }
+.req_official p { margin: 4px 0 8px; }
+.req_law_list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.req_law_list li { display: grid; gap: 2px; padding: 8px 11px; border-radius: 9px;
+  background: #fff; font-size: 12.5px; line-height: 1.55; }
+.req_law_list li b { font-size: 13px; }
+.req_law_list li span { font-weight: 700; color: var(--muted); }
+.req_official_none { margin: 8px 0 0; font-size: 12.5px; color: var(--green); font-weight: 700; }
+
+/* 연결된 자료원 현황 */
+.src_grid { display: grid; gap: 6px; margin-top: 12px; }
+.src_row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px) 130px;
+  gap: 12px; align-items: center; padding: 9px 13px; border-radius: 10px;
+  background: #f8fafc; font-size: 13px; }
+.src_row.no_key { background: var(--amber_soft); }
+.src_row b { font-weight: 700; }
+.src_env { font-size: 11.5px; color: var(--muted); }
+.src_state { text-align: right; white-space: nowrap; }
+.src_state a { margin-left: 6px; font-size: 11.5px; font-weight: 800; color: var(--blue); }
+@media (max-width: 760px) { .src_row { grid-template-columns: 1fr; gap: 3px; }
+  .src_state { text-align: left; } }

@@ -20,16 +20,27 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+
+/* 화면 배율. 글자만 키우면 칸과 여백이 그대로라 빽빽해 보입니다.
+   zoom은 글자·칸·여백을 함께 키웁니다. 좁은 화면에서는 가로 스크롤이
+   생기지 않도록 배율을 낮춥니다. */
+:root { --ui_scale: 1.15; }
+@media (max-width: 1280px) { :root { --ui_scale: 1.08; } }
+@media (max-width: 900px) { :root { --ui_scale: 1; } }
+
 body {
   margin: 0; min-width: 320px; background: var(--surface); color: var(--ink);
   font-family: Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  zoom: var(--ui_scale);
 }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 [hidden] { display: none !important; }
+/* 숫자 입력칸은 우리 코드가 숨기는 일이 없습니다. 바깥 스크립트가 hidden을 붙여도 보이게 둡니다. */
+input.text_input[data-number][hidden], .cargo_line input[data-number][hidden] { display: block !important; }
 h1, h2, h3 { letter-spacing: -.03em; line-height: 1.3; }
 h1 { font-size: clamp(24px, 3vw, 30px); margin: 4px 0; }
 h2 { font-size: 19px; margin: 0 0 12px; }
@@ -53,7 +64,11 @@ p { margin: 0 0 10px; }
 .header_inner { width: min(1160px, calc(100% - 32px)); height: 62px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 900; font-size: 18px; letter-spacing: -.4px; }
 .brand:hover { text-decoration: none; }
-.brand_mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: var(--blue); color: #fff; font-size: 19px; }
+/* 마크는 그림 파일입니다. 바탕을 깔지 않습니다 — 올리신 로고가 어떤
+   모양이든 제 배경색이 뒤에 비치면 지저분해집니다. */
+.brand_mark { width: 34px; height: 34px; object-fit: contain; }
+/* 전체 로고를 올리면 글자까지 들어 있으므로 높이만 맞춥니다. */
+.brand_logo { height: 34px; width: auto; max-width: 240px; object-fit: contain; }
 .main_nav { display: flex; gap: 4px; }
 .main_nav a { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; }
 .main_nav a:hover, .main_nav a.active { background: var(--blue_soft); color: var(--blue_dark); text-decoration: none; }
@@ -122,9 +137,14 @@ p { margin: 0 0 10px; }
 .alert.warn { background: var(--amber_soft); color: #8a4f00; }
 
 /* Forms */
-.field { display: grid; gap: 6px; margin-bottom: 14px; min-width: 0; }
+/* align-content: start가 없으면, 같은 줄의 옆 칸에 설명문이 붙어 줄이 높아질 때
+   이쪽 입력칸이 늘어나 옆 칸보다 커집니다. (수량 칸이 포장 유형보다 높던 문제) */
+.field { display: grid; gap: 6px; margin-bottom: 14px; min-width: 0; align-content: start; }
 .field_label { font-size: 13px; font-weight: 800; color: #334155; }
-input[type=text], input[type=number], input[type=date], input[type=email], select {
+/* 입력칸 모양. 타입 선택자에만 기대면 타입을 바꿀 때 스타일이 빠지므로
+   .text_input 클래스도 함께 받습니다. */
+input[type=text], input[type=number], input[type=date], input[type=email],
+input.text_input, select {
   width: 100%; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; outline: none; transition: border-color .15s, box-shadow .15s;
 }
 input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(43,102,246,.15); }
@@ -221,3 +241,69 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   .kpi_row { grid-template-columns: 1fr; }
   .page { padding-top: 22px; }
 }
+/* 표준단가 표에서 뽑은 추정값. Mock(가짜)과 구분합니다. */
+.badge.source_tariff { background: #ede9fe; color: #6d28d9; }
+/* 자동으로 채워져 고칠 수 없는 칸 (Notify Party = Buyer와 동일 등) */
+.text_input.is_locked { background: #f1f5f9; color: var(--muted); }
+
+/* 고객 상담 — 화면 오른쪽 아래에 떠 있는 버튼과 상담창 */
+/* 고객 상담 단추. 고래 그림 하나만 둡니다.
+   바탕을 깔지 않습니다 — 투명한 그림 뒤에 색이 비치면 테두리가 각지게 보입니다.
+   그림자는 그림 모양을 따라가도록 filter로 줍니다. */
+.support_fab { position: fixed; right: 26px; bottom: 26px; z-index: 60;
+  display: grid; place-items: center;
+  width: 88px; height: 88px; padding: 0; border: 0; border-radius: 50%;
+  background: none; color: #fff; font-size: 15px; font-weight: 800;
+  filter: drop-shadow(0 10px 18px rgba(15,23,42,.24));
+  cursor: pointer; transition: transform .15s, filter .15s; }
+/* 그림이 없을 때만 쓰는 예비 모양 */
+.support_fab:has(.support_word) { width: auto; height: auto; padding: 15px 26px;
+  border-radius: 999px; background: var(--blue);
+  box-shadow: 0 12px 30px rgba(43,102,246,.35); filter: none; }
+.support_fab:hover { transform: translateY(-3px) scale(1.05);
+  filter: drop-shadow(0 14px 24px rgba(15,23,42,.32)); }
+.support_face { width: 88px; height: 88px; object-fit: contain; }
+.support_fab.is_open { transform: scale(.92); }
+
+.support_panel { position: fixed; right: 26px; bottom: 96px; z-index: 61;
+  display: flex; flex-direction: column; width: 380px; max-width: calc(100vw - 32px);
+  height: 540px; max-height: calc(100vh - 140px);
+  border-radius: 20px; background: #fff; border: 1px solid var(--line);
+  box-shadow: 0 26px 60px rgba(15,23,42,.24); overflow: hidden; }
+.support_head { display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 18px; background: var(--blue); color: #fff; }
+.support_head b { display: block; font-size: 15px; }
+.support_head small { display: block; margin-top: 2px; font-size: 12px; opacity: .85; }
+.support_close { border: 0; background: rgba(255,255,255,.18); color: #fff;
+  width: 30px; height: 30px; border-radius: 9px; font-size: 20px; line-height: 1; cursor: pointer; }
+.support_close:hover { background: rgba(255,255,255,.3); }
+
+.support_log { flex: 1; overflow-y: auto; padding: 16px; display: flex;
+  flex-direction: column; gap: 10px; background: #f8fafc; }
+.support_msg { max-width: 86%; padding: 11px 14px; border-radius: 14px;
+  font-size: 13.5px; line-height: 1.7; word-break: break-word; }
+.support_bot { align-self: flex-start; background: #fff; border: 1px solid var(--line); }
+.support_user { align-self: flex-end; background: var(--blue); color: #fff; font-weight: 600; }
+.support_waiting { color: var(--muted); font-style: italic; }
+.support_offline { background: var(--amber_soft); border-color: #fcd34d; color: #8a4f00; }
+
+.support_chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; background: #f8fafc; }
+.support_chips:empty { display: none; }
+.support_chip { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: #fff; font-size: 12px; font-weight: 700; color: var(--blue_dark); cursor: pointer; }
+.support_chip:hover { border-color: var(--blue); background: var(--blue_soft); }
+
+.support_form { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.support_form .text_input { flex: 1; min-width: 0; }
+.support_form button { white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .support_fab { right: 16px; bottom: 16px; width: 70px; height: 70px; }
+  .support_face { width: 70px; height: 70px; }
+  .support_panel { right: 16px; left: 16px; bottom: 80px; width: auto; }
+}
+
+/* 단독으로 연 화면에서 돌아가는 길. 위쪽 메뉴가 없으니 이것뿐입니다. */
+.back_home { display: inline-block; margin-bottom: 6px; font-size: 13.5px; font-weight: 700; }
+/* 단독 화면은 머리말이 없으므로 위쪽 여백을 스스로 만듭니다. */
+body.standalone .page { padding-top: 28px; }

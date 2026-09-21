@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import source_badge, shipment_tabs, shipment_header %}
 {% block title %}AI Assistant · {{ shipment.shipment_id }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/assistant.css') }}">{% endblock %}
 {% block content %}
   {{ shipment_header(shipment) }}
   {{ shipment_tabs(shipment, 'assistant') }}
@@ -9,7 +9,9 @@
   <section class="card ask_card">
     <p class="eyebrow">AI Export Assistant</p>
     <h2>이 Shipment에 대해 질문하기</h2>
-    <p class="muted small">답변은 Shipment 데이터, 계산 엔진 결과, 규제 데이터(Mock)만 사용해 규칙 기반으로 구성됩니다. 수출 가능 여부나 인증 면제를 단정하지 않습니다.</p>
+    <p class="muted small">이 건의 계산 결과를 AI에게 그대로 넘겨 답합니다.
+      숫자는 우리가 계산한 값만 씁니다. 수출 가능 여부나 인증 면제를 단정하지 않습니다.
+      키가 없거나 호출이 실패하면 규칙 기반 답으로 돌아갑니다.</p>
     <form class="ask_form" data-ask-form data-url="{{ url_for('assistant.api_ask', shipment_id=shipment.shipment_id) }}">
       <input type="text" name="question" maxlength="500" placeholder="예: 이 화장품을 미국으로 수출하려면 무엇을 확인해야 해?" required>
       <button class="button primary">질문</button>
@@ -100,4 +102,4 @@
     </section>
   </div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/assistant.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('js/assistant.js') }}"></script>{% endblock %}

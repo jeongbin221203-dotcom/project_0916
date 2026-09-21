@@ -9,6 +9,7 @@ from copy import deepcopy
 from functools import lru_cache
 
 from app.collectors.base_client import fail, load_mock, ok
+from app.processors.transit_calculator import great_circle_km
 
 # 목록에는 주요 항구·공항만 노출합니다. 그 밖의 항구는 화면의 "직접 입력"에서
 # UN/LOCODE 전체 색인(search_unlocode)으로 찾습니다.
@@ -179,11 +180,11 @@ def find_unlocode_by_name(country_code: str, name: str, limit: int = 5) -> list[
 
 
 def find_location(code: str) -> dict | None:
-    return deepcopy(_by_code().get((code or "").strip().upper()))
+    return deepcopy(_by_code().get(str(code or "").strip().upper()))
 
 
 def get_country(country_code: str) -> dict | None:
-    return deepcopy(_countries().get((country_code or "").strip().upper()))
+    return deepcopy(_countries().get(str(country_code or "").strip().upper()))
 
 
 def list_countries(kind: str, exclude: list[str] | None = None) -> dict:
@@ -200,7 +201,21 @@ def list_countries(kind: str, exclude: list[str] | None = None) -> dict:
     return ok(items, "mock")
 
 
-def search_locations(query: str, kind: str | None = None, country: str | None = None) -> dict:
+def apply_origin(items: list[dict], origin_code: str | None) -> list[dict]:
+    """출발 공항을 알면 그 공항 기준으로 직항 여부를 다시 계산합니다."""
+
+    origin_code = (origin_code or "").strip().upper()
+    if not origin_code:
+        return items
+    for item in items:
+        if item["kind"] != "airport" or item.get("direct_from_korea") is None:
+            continue
+        item["direct_from_korea"] = origin_code in (item.get("direct_from") or [])
+    return items
+
+
+def search_locations(query: str, kind: str | None = None, country: str | None = None,
+                     origin_code: str | None = None) -> dict:
     """Match on code, Korean/English name, city, or country."""
 
     try:
@@ -229,25 +244,169 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
                 continue
         results.append(item)
 
-    # Exact code, then names starting with the keyword, then harbour size.
-    # Shorter names win so that "부산" lists 부산항 before 부산신항.
+    # 정렬 순서
+    #   1) 코드가 정확히 일치 / 이름이 검색어로 시작
+    #   2) 국내 무역항 구분, 항공화물 거점·직항 구분
+    #   3) 대표 항만·공항(지정 순위 10위 이내)
+    #   4) 한글 이름(가나다순) -> 영문 이름(알파벳순)
+    CURATED_LIMIT = 10
+
     def rank(item: dict) -> tuple:
+        has_korean = item["name"] != item["name_en"]
+        curated = item.get("size_rank") or 99
         return (
             item["code"].lower() != keyword,
             not (item["name"].lower().startswith(keyword) or item["name_en"].lower().startswith(keyword)),
-            # 항공화물 거점 -> 직항 -> 나머지 순으로 보여줍니다.
+            # 항공화물 거점 -> 직항 -> 나머지
             not (item.get("cargo_hub") and item.get("direct_from_korea")),
             item.get("direct_from_korea") is False,
+            # 도착 항구도 같은 순서로: 한국 직기항 -> 항로 기록 없음 -> 환적 필요.
+            # 출발지인 국내 무역항은 아래의 관리주체·물동량 순서를 씁니다.
+            0 if item["country_code"] == "KR" else {True: 0, None: 1, False: 2}[item.get("sea_direct")],
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
-            # 공항은 국가 안에서 규모가 큰 곳부터.
-            item.get("size_rank") or 99,
-            # 물동량이 많은 항만부터, 같은 항만의 부두는 모항 다음에 표시합니다.
+            # 국내 무역항은 물동량 순서를 유지합니다.
             -(item.get("cargo_volume_mt") or 0),
-            item.get("port_group") or "",
+            # 부두를 모항 옆에 붙이는 용도로만 씁니다. (국내 무역항)
+            item.get("port_group") if item.get("cargo_volume_mt") else "",
             bool(item.get("is_terminal")),
-            HARBOR_SIZE_RANK.get(item.get("harbor_size"), 9),
-            len(item["name"]),
-            item["name"],
+            # 지정 순위가 있는 대표 공항까지만 순서를 고정합니다.
+            curated if curated <= CURATED_LIMIT else CURATED_LIMIT + 1,
+            # 한글 이름을 먼저(가나다순), 영문 이름은 그 뒤(알파벳순)
+            not has_korean,
+            item["name"] if has_korean else item["name_en"].lower(),
         )
 
-    return ok(deepcopy(sorted(results, key=rank)[:MAX_MAIN_RESULTS]), "mock")
+    items = apply_origin(deepcopy(sorted(results, key=rank)), origin_code)
+    if origin_code:
+        # 직항 여부가 바뀌었으므로 다시 정렬합니다.
+        items.sort(key=rank)
+    return ok(items, "mock")
+
+
+# 지금 정기편이 뜨지 않는 국내 공항. 여기서 출발한다고 소요일을 내면
+# 예약할 수 없는 일정을 알려 주는 셈이 됩니다.
+# 확인: 한국공항공사 운항스케줄 페이지 (출발·도착 표가 모두 비어 있음)
+SUSPENDED_AIRPORTS = {
+    "MWX": {
+        "reason": "무안국제공항은 정기편 운항이 멈춰 있습니다.",
+        "detail": "한국공항공사 운항스케줄에 등록된 정기편이 없습니다. "
+                  "재개 시점이 정해지지 않아 인천·김해에서 보내야 합니다.",
+        "checked_on": "2026-09-20",
+        "source": "한국공항공사 무안국제공항 운항스케줄",
+    },
+}
+
+
+@lru_cache(maxsize=1)
+def korean_air_gateways() -> tuple[str, ...]:
+    """국제선이 실제로 뜨는 국내 공항. 직항 목적지가 많은 곳을 먼저 둡니다.
+
+    수출 화물을 보낼 공항을 고를 때 씁니다. 거리만 보면 무안·제주처럼
+    국제 화물을 보낼 수 없는 공항이 뽑힙니다.
+    """
+
+    counts: dict[str, int] = {}
+    for item in _all_locations():
+        if item["kind"] != "airport":
+            continue
+        for code in item.get("direct_from") or []:
+            counts[code] = counts.get(code, 0) + 1
+    ordered = sorted((code for code in counts if code not in SUSPENDED_AIRPORTS),
+                     key=lambda code: -counts[code])
+    return tuple(ordered)
+
+
+def airport_service_status(code: str) -> dict:
+    """그 공항이 지금 정기편을 띄우는지. 모르면 운항 중으로 봅니다."""
+
+    stopped = SUSPENDED_AIRPORTS.get((code or "").strip().upper())
+    return {"operating": False, **stopped} if stopped else {"operating": True}
+
+
+def sea_links() -> dict:
+    """국내 항구별로 실제 항로가 이어진 나라 목록.
+
+    data/build_sea_links.py가 searoute 항만 네트워크에서 뽑은 값입니다.
+    """
+
+    try:
+        return load_mock("sea_links")
+    except (OSError, ValueError):
+        return {"origins": {}, "by_country": {}}
+
+
+def sea_lane_direct(origin_code: str, destination_country: str) -> dict:
+    """이 출발항에서 그 나라로 가는 배가 실제로 있는지 봅니다.
+
+    예전에는 도착항만 보고 "한국에서 직기항이 있는 항구"인지 판정했습니다.
+    그러면 광양항처럼 멕시코 항로가 없는 항구에서도 직기항이라고 나왔습니다.
+    출발항이 그 나라와 이어져 있는지를 함께 봐야 맞습니다.
+
+    `known`이 False면 자료가 없다는 뜻이고, 없다고 단정하지 않습니다.
+    """
+
+    links = sea_links()
+    origin = (origin_code or "").strip().upper()
+    country = (destination_country or "").strip().upper()
+    countries = links.get("origins", {}).get(origin)
+    if countries is None or not country:
+        return {"known": False}
+    if country in countries:
+        return {"known": True, "direct": True, "origin": origin, "alternatives": []}
+    # 같은 나라로 가는 배가 있는 다른 국내 항구를 알려 줍니다.
+    others = [code for code in links.get("by_country", {}).get(country, []) if code != origin]
+    return {"known": True, "direct": False, "origin": origin, "alternatives": others}
+
+
+def sea_route(origin_code: str, destination_code: str) -> dict | None:
+    """미리 계산해 둔 실제 해상 항로 거리와 지나는 길목을 돌려줍니다.
+
+    data/build_sea_routes.py가 searoute 해상 항로망에서 구한 값입니다.
+    """
+
+    try:
+        routes = load_mock("sea_routes")["routes"]
+    except (OSError, ValueError, KeyError):
+        return None
+    leg = routes.get(origin_code, {}).get(destination_code)
+    if not leg:
+        return None
+    return {"distance_km": leg[0], "passages": leg[1] if len(leg) > 1 else []}
+
+
+def nearest(location: dict, kind: str, country_code: str | None = None) -> dict | None:
+    """같은 나라에서 좌표가 가장 가까운 항구(또는 공항)를 찾습니다.
+
+    해상 모드에서 항공 소요시간을, 항공 모드에서 해상 소요시간을 함께 보여줄 때
+    짝이 되는 지점을 고르는 데 씁니다.
+    """
+
+    if not location or location.get("lat") is None:
+        return None
+    country_code = country_code or location["country_code"]
+    here = (location["lat"], location["lon"])
+    candidates = [item for item in _all_locations()
+                  if item["kind"] == kind and item["country_code"] == country_code
+                  and item["lat"] is not None and item.get("major")
+                  and (kind != "airport" or item["code"] not in SUSPENDED_AIRPORTS)]
+    if kind == "airport" and country_code == "KR":
+        # 국제선이 뜨는 공항만 고릅니다. 무안·제주처럼 화물을 보낼 수 없는
+        # 공항이 거리만으로 뽑히면 예약할 수 없는 일정을 알려 주게 됩니다.
+        gateways = set(korean_air_gateways())
+        candidates = [item for item in candidates if item["code"] in gateways] or candidates
+    # 한국에서 실제로 직기항·직항이 있는 곳을 먼저 고릅니다.
+    key = "sea_direct" if kind == "port" else "direct_from_korea"
+    candidates = [item for item in candidates if item.get(key)] or candidates
+    if not candidates:
+        return None
+    return deepcopy(min(candidates, key=lambda item: great_circle_km(here, (item["lat"], item["lon"]))))
+
+
+def country_name(country_code: str) -> str:
+    """국가코드의 한글 이름. 목록에 없으면 코드를 그대로 돌려줍니다."""
+
+    code = (country_code or "").strip().upper()
+    for item in _all_locations():
+        if item["country_code"] == code:
+            return item["country"]
+    return code

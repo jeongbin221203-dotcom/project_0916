@@ -17,6 +17,7 @@ ERROR_MESSAGES = {
     "API_AUTH_FAILED": "외부 API 인증에 실패했습니다. API Key를 확인해주세요.",
     "API_RATE_LIMITED": "외부 API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.",
     "API_HTTP_ERROR": "외부 API 요청이 실패했습니다.",
+    "API_NOT_FOUND": "외부 API에 해당 자료가 없습니다.",
     "API_SERVER_ERROR": "외부 API 서버에 일시적인 오류가 발생했습니다.",
     "API_EMPTY_RESPONSE": "외부 API 응답이 비어 있습니다.",
     "API_INVALID_RESPONSE": "외부 API 응답 형식이 올바르지 않습니다.",
@@ -57,7 +58,8 @@ def request_text(method: str, url: str, **kwargs) -> dict:
 def _request(method: str, url: str, **kwargs):
     """Perform the call and map every failure mode to an error result."""
 
-    timeout = get_config("API_TIMEOUT_SECONDS", 8)
+    # 느린 외부 API(WITS 등)는 호출하는 쪽에서 더 긴 시간을 줄 수 있습니다.
+    timeout = kwargs.pop("timeout", None) or get_config("API_TIMEOUT_SECONDS", 8)
     try:
         response = httpx.request(method, url, timeout=timeout, **kwargs)
     except httpx.TimeoutException:
@@ -71,6 +73,8 @@ def _request(method: str, url: str, **kwargs):
         return fail("API_RATE_LIMITED", "api")
     if response.status_code >= 500:
         return fail("API_SERVER_ERROR", "api")
+    if response.status_code == 404:
+        return fail("API_NOT_FOUND", "api")
     if response.status_code >= 400:
         return fail("API_HTTP_ERROR", "api")
     if not response.content:

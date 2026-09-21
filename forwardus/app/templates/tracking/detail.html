@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% from "_macros.html" import source_badge, shipment_tabs, shipment_header %}
+{% from "tracking/_container.html" import container_result %}
 {% block title %}Tracking · {{ shipment.shipment_id }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/tracking.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/tracking.css') }}">{% endblock %}
 {% block content %}
   {{ shipment_header(shipment) }}
   {{ shipment_tabs(shipment, 'tracking') }}
@@ -76,6 +77,39 @@
       </section>
     </aside>
   </div>
+
+  <section class="card">
+    <div class="row_between wrap">
+      <div>
+        <h2>컨테이너 · 통관 조회</h2>
+        <p class="muted">관세청 UNI-PASS에서 실제 값을 받아옵니다.</p>
+      </div>
+      <a class="button ghost" href="{{ url_for('tracking.container_lookup') }}">번호로 직접 조회</a>
+    </div>
+
+    <form method="post" class="ctr_numbers"
+          action="{{ url_for('tracking.save_numbers', shipment_id=shipment.shipment_id) }}">
+      <label class="field">
+        <span class="field_label">B/L번호</span>
+        <input class="text_input" type="text" name="bl_no" value="{{ shipment.bl_no }}"
+               maxlength="30" autocomplete="off" placeholder="부킹 뒤 선사가 줍니다">
+      </label>
+      <label class="field">
+        <span class="field_label">수출신고번호</span>
+        <input class="text_input" type="text" name="export_declaration_no"
+               value="{{ shipment.export_declaration_no }}" maxlength="20" inputmode="numeric"
+               autocomplete="off" placeholder="숫자 15자리">
+      </label>
+      <label class="field">
+        <span class="field_label">화물관리번호 <small class="muted">(선택)</small></span>
+        <input class="text_input" type="text" name="cargo_no" value="{{ shipment.cargo_no }}"
+               maxlength="20" autocomplete="off" placeholder="15~19자리">
+      </label>
+      <button class="button primary">저장하고 조회</button>
+    </form>
+
+    {{ container_result(container) }}
+  </section>
 
   <section class="card">
     <h2>Event Log</h2>
