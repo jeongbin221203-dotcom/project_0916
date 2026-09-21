@@ -247,7 +247,6 @@ Chargeable Weight = max(Actual Weight, Volume Weight)
 ```
 
 항공사별 Volume Factor 차이를 고려할 수 있도록 상수 또는 설정값으로 분리합니다.
-
 ---
 
 ## 4.4 Schedule Search
