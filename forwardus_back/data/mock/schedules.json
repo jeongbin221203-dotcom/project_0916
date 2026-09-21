@@ -1,0 +1,203 @@
+{
+ "FCL": [
+  {
+   "code": "HMM-PX",
+   "carrier": "HMM",
+   "vessel_or_flight": "HMM ALGECIRAS",
+   "service": "Pacific Express",
+   "weekday": 2,
+   "direct": true,
+   "reliability": 96,
+   "transit_days": {
+    "asia": 4,
+    "americas": 13,
+    "europe": 30,
+    "oceania": 14
+   },
+   "rate_usd": {
+    "asia": 520,
+    "americas": 1580,
+    "europe": 2250,
+    "oceania": 1350
+   }
+  },
+  {
+   "code": "ONE-PB",
+   "carrier": "ONE",
+   "vessel_or_flight": "ONE COMMITMENT",
+   "service": "Pink Bridge",
+   "weekday": 4,
+   "direct": true,
+   "reliability": 92,
+   "transit_days": {
+    "asia": 5,
+    "americas": 15,
+    "europe": 32,
+    "oceania": 15
+   },
+   "rate_usd": {
+    "asia": 480,
+    "americas": 1460,
+    "europe": 2120,
+    "oceania": 1290
+   }
+  },
+  {
+   "code": "MSK-TP",
+   "carrier": "MAERSK",
+   "vessel_or_flight": "MAERSK EINDHOVEN",
+   "service": "TP Eco",
+   "weekday": 0,
+   "direct": false,
+   "reliability": 94,
+   "transit_days": {
+    "asia": 6,
+    "americas": 17,
+    "europe": 34,
+    "oceania": 18
+   },
+   "rate_usd": {
+    "asia": 450,
+    "americas": 1390,
+    "europe": 1990,
+    "oceania": 1220
+   }
+  }
+ ],
+ "LCL": [
+  {
+   "code": "HMM-LCL",
+   "carrier": "HMM",
+   "vessel_or_flight": "HMM BLESSING",
+   "service": "Weekly Consolidation",
+   "weekday": 3,
+   "direct": true,
+   "reliability": 95,
+   "minimum_usd": 60,
+   "transit_days": {
+    "asia": 6,
+    "americas": 16,
+    "europe": 33,
+    "oceania": 17
+   },
+   "rate_usd": {
+    "asia": 28,
+    "americas": 68,
+    "europe": 85,
+    "oceania": 62
+   }
+  },
+  {
+   "code": "SKR-LCL",
+   "carrier": "SINOKOR",
+   "vessel_or_flight": "SINOKOR TOKYO",
+   "service": "Smart LCL",
+   "weekday": 1,
+   "direct": false,
+   "reliability": 89,
+   "minimum_usd": 50,
+   "transit_days": {
+    "asia": 7,
+    "americas": 19,
+    "europe": 36,
+    "oceania": 19
+   },
+   "rate_usd": {
+    "asia": 22,
+    "americas": 55,
+    "europe": 74,
+    "oceania": 51
+   }
+  },
+  {
+   "code": "ONE-LCL",
+   "carrier": "ONE",
+   "vessel_or_flight": "ONE HARMONY",
+   "service": "Priority LCL",
+   "weekday": 5,
+   "direct": true,
+   "reliability": 93,
+   "minimum_usd": 70,
+   "transit_days": {
+    "asia": 5,
+    "americas": 14,
+    "europe": 31,
+    "oceania": 16
+   },
+   "rate_usd": {
+    "asia": 34,
+    "americas": 79,
+    "europe": 96,
+    "oceania": 70
+   }
+  }
+ ],
+ "AIR": [
+  {
+   "code": "KE-CP",
+   "carrier": "KOREAN AIR",
+   "vessel_or_flight": "KE9201",
+   "service": "Cargo Priority",
+   "weekday": 0,
+   "direct": true,
+   "reliability": 98,
+   "minimum_usd": 120,
+   "transit_days": {
+    "asia": 1,
+    "americas": 1,
+    "europe": 1,
+    "oceania": 1
+   },
+   "rate_usd": {
+    "asia": 2.6,
+    "americas": 4.9,
+    "europe": 5.4,
+    "oceania": 4.6
+   }
+  },
+  {
+   "code": "OZ-CS",
+   "carrier": "ASIANA CARGO",
+   "vessel_or_flight": "OZ0204",
+   "service": "Cargo Standard",
+   "weekday": 2,
+   "direct": true,
+   "reliability": 96,
+   "minimum_usd": 110,
+   "transit_days": {
+    "asia": 1,
+    "americas": 2,
+    "europe": 2,
+    "oceania": 2
+   },
+   "rate_usd": {
+    "asia": 2.3,
+    "americas": 4.4,
+    "europe": 4.9,
+    "oceania": 4.2
+   }
+  },
+  {
+   "code": "CX-CN",
+   "carrier": "CATHAY CARGO",
+   "vessel_or_flight": "CX0331",
+   "service": "Connect via HKG",
+   "weekday": 4,
+   "direct": false,
+   "reliability": 93,
+   "minimum_usd": 100,
+   "transit_days": {
+    "asia": 2,
+    "americas": 3,
+    "europe": 3,
+    "oceania": 3
+   },
+   "rate_usd": {
+    "asia": 2.0,
+    "americas": 3.9,
+    "europe": 4.3,
+    "oceania": 3.8
+   }
+  }
+ ]
+}

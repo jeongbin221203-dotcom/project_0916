@@ -27,6 +27,43 @@ def _database_url() -> str:
     return url
 
 
+# UNI-PASS (관세청) OpenAPI: each service has its own key, read from UNIPASS_KEY_<NAME>.
+UNIPASS_SERVICES = {
+    "HS_NAVIGATION": "HS CODE 내비게이션",
+    "HS_CODE_SEARCH": "HS부호검색",
+    "SIMPLE_REFUND_COMPANY": "간이정액적용비적용업체조회",
+    "SIMPLE_REFUND_RATE": "간이정액환급율표조회",
+    "INSPECTION_QUARANTINE": "검사검역내역조회",
+    "TARIFF_RATE": "관세율기본조회",
+    "CUSTOMS_EXCHANGE_RATE": "관세환율정보조회",
+    "SHIPPING_COMPANY_DETAIL": "선박회사내역조회",
+    "SHIPPING_COMPANY_LIST": "선박회사목록조회",
+    "EXPORT_PERFORMANCE_BY_DECLARATION": "수출신고번호별수출이행내역조회",
+    "EXPORT_DECLARATION_VERIFY": "수출신고필증검증",
+    "EXPORT_PERIOD_SHORTENING_ITEM": "수출이행기간단축대상품목조회",
+    "EXPORT_PERFORMANCE_BY_VIN": "수출이행내역차대번호조회",
+    "DECLARATION_ATTACHMENT_SUBMISSION": "수출입신고 첨부서류사후제출 유무",
+    "DECLARATION_CORRECTION_STATUS": "수출입신고서 정정신청 처리상태 제공",
+    "REQUIREMENT_APPROVAL": "수출입요건승인내역조회",
+    "ENTRY_DEPARTURE_REPORT": "입출항보고내역조회",
+    "ARRIVAL_REPORT_AIR": "입항보고내역조회(항공)",
+    "ARRIVAL_REPORT_SEA": "입항보고내역조회(해상)",
+    "REEXPORT_COMPLETION_REPORT": "재수출 이행 완료보고 처리정보 제공",
+    "REEXPORT_CONDITIONAL_IMPORT_DEADLINE": "재수출 조건부 수입의 수출이행 기한 정보제공",
+    "REEXPORT_EXEMPTION_BALANCE": "재수출면세이행잔량조회",
+    "DEPARTURE_PERMIT_AIR": "출항허가항공 조회",
+    "DEPARTURE_PERMIT_SEA": "출항허가해상 조회",
+    "CONTAINER_DETAIL": "컨테이너내역조회",
+    "STATISTICS_CODE": "통계부호내역조회",
+    "CUSTOMS_CLEARANCE_CODE": "통관고유부호조회",
+    "AIRLINE_DETAIL": "항공사내역조회",
+    "AIRLINE_LIST": "항공사목록조회",
+    "FORWARDER_DETAIL": "화물운송주선업자내역조회",
+    "FORWARDER_LIST": "화물운송주선업자목록조회",
+    "CARGO_CLEARANCE_PROGRESS": "화물통관진행정보조회",
+}
+
+
 class Config:
     """Base configuration loaded from environment variables."""
 
@@ -43,11 +80,33 @@ class Config:
     EXCHANGE_RATE_USD_KRW = float(os.getenv("EXCHANGE_RATE_USD_KRW", "1380"))
     API_TIMEOUT_SECONDS = float(os.getenv("API_TIMEOUT_SECONDS", "8"))
 
+    # 선사·항공사 실스케줄. 둘 다 무료이고 따로 신청해야 합니다.
+    # HMM_API_KEY: apiportal.hmm21.com (해상 항구간 스케줄, 시간당 300회)
+    # DATA_GO_KR_SERVICE_KEY: data.go.kr 인천국제공항공사 화물기 운항 일정
+    HMM_API_KEY = os.getenv("HMM_API_KEY", "")
+    DATA_GO_KR_SERVICE_KEY = os.getenv("DATA_GO_KR_SERVICE_KEY", "")
+
     SCHEDULE_API_KEY = os.getenv("SCHEDULE_API_KEY", "")
     TRACKING_API_KEY = os.getenv("TRACKING_API_KEY", "")
     CUSTOMS_API_KEY = os.getenv("CUSTOMS_API_KEY", "")
     EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY", "")
     AI_API_KEY = os.getenv("AI_API_KEY", "")
+
+    UNIPASS_API_KEYS = {name: os.getenv(f"UNIPASS_KEY_{name}", "") for name in UNIPASS_SERVICES}
+
+
+    # 시작 화면을 잠급니다.
+    #
+    # 왼쪽 줄, 탭, 적는 칸, 고객 상담 단추가 모두 눌리지 않습니다.
+    # 위쪽 메뉴(운송 계획 · Shipments · 일정 역산 · 컨테이너 조회 ·
+    # 관세청 조회 · Dashboard)만 그대로 씁니다.
+    #
+    # 보여 주기용으로 시작 화면만 막아 둘 때 씁니다.
+    #
+    # 기본은 열어 둡니다. 시작 화면이 이제 대화하는 주 화면이라, 잠근 채로
+    # 두면 이 서비스의 본체가 통째로 안 보입니다.
+    # 발표나 시연 때만 .env에 HOME_LOCKED=1 을 넣어 잠그세요.
+    HOME_LOCKED = os.getenv("HOME_LOCKED", "0") == "1"
 
 
 class TestConfig(Config):
@@ -55,3 +114,23 @@ class TestConfig(Config):
 
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
+    # 시험할 때는 열어 둡니다. 잠근 채로 돌리면 평소 경로를 아무도 보지
+    # 않게 되어, 잠금을 푸는 날 무엇이 깨졌는지 알 수 없습니다.
+    # 잠금 자체를 보는 테스트는 그때만 켜서 봅니다.
+    HOME_LOCKED = False
+
+    # 테스트는 OpenAI를 부르지 않습니다.
+    #
+    # 키가 있으면 대화 창구가 실제로 바깥을 부릅니다. 느려지고, 돈이 나가고,
+    # 무엇보다 남의 서버 사정에 따라 테스트가 됐다 안 됐다 합니다.
+    # (실제로 이것 때문에 한 번 실패했습니다)
+    # AI를 보는 테스트는 ai_client.chat을 흉내 내서 씁니다.
+    AI_API_KEY = ""
+
+    # 기관이 막혀 있으면 연결이 끊길 때까지 기다립니다. 기본 8초인데,
+    # Shipment를 만드는 테스트마다 한 번씩 물어보니 전체가 한 시간을 넘겼습니다.
+    # 테스트는 우리 코드가 맞는지 보는 것이지 기관이 살아 있는지 보는 것이
+    # 아닙니다. 못 받으면 예시 값으로 넘어가는 길이 이미 있습니다.
+    # (실데이터를 확인하는 테스트는 needs_customs_api로 건너뜁니다)
+    API_TIMEOUT_SECONDS = 2.0

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Reverse Schedule Planner{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/planning.css') }}">{% endblock %}
 {% block content %}
   <div class="page_head">
     <div>
@@ -26,7 +26,7 @@
       </div>
       <label class="field">
         <span class="field_label">운송 기간(일) <small class="muted">비우면 SEA 14일 / AIR 2일</small></span>
-        <input type="number" name="transit_days" min="1" max="90" step="1">
+        <input class="text_input" type="text" name="transit_days" inputmode="numeric" autocomplete="off" data-number data-step="1" data-min="1" data-max="90">
       </label>
       <div class="form_error" data-form-error hidden></div>
       <button type="submit" class="button primary block">역산하기</button>
@@ -37,4 +37,4 @@
     </section>
   </div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/planning.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('js/planning.js') }}"></script>{% endblock %}

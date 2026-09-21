@@ -1,0 +1,387 @@
+{
+ "source": "searoute 항만 네트워크 (실제 운항 기록 기반 연결 국가)",
+ "note": "국가 단위 연결입니다. 특정 선사가 그 구간에 정기선을 넣는지는 선사에 확인해야 합니다.",
+ "origins": {
+  "KRINC": [
+   "CN",
+   "HK",
+   "ID",
+   "JP",
+   "MY",
+   "PH",
+   "SG",
+   "TH",
+   "TW",
+   "US",
+   "VN"
+  ],
+  "KRTSN": [],
+  "KRKUV": [
+   "CN",
+   "HK"
+  ],
+  "KRMOK": [],
+  "KRYOS": [],
+  "KRKAN": [
+   "BJ",
+   "CN",
+   "DE",
+   "ES",
+   "GH",
+   "HK",
+   "ID",
+   "IN",
+   "MY",
+   "NA",
+   "NG",
+   "PH",
+   "PK",
+   "PL",
+   "SG",
+   "TG",
+   "TH",
+   "TW",
+   "US",
+   "VN"
+  ],
+  "KRPUS": [
+   "AE",
+   "AR",
+   "AS",
+   "AU",
+   "BE",
+   "BR",
+   "BS",
+   "CA",
+   "CL",
+   "CN",
+   "CO",
+   "DE",
+   "DK",
+   "DO",
+   "EC",
+   "EG",
+   "ES",
+   "FJ",
+   "FR",
+   "GH",
+   "GR",
+   "GT",
+   "HK",
+   "HR",
+   "ID",
+   "IL",
+   "IN",
+   "IT",
+   "JM",
+   "JO",
+   "JP",
+   "KI",
+   "LK",
+   "MX",
+   "MY",
+   "NC",
+   "NL",
+   "NZ",
+   "OM",
+   "PA",
+   "PE",
+   "PF",
+   "PH",
+   "PK",
+   "QA",
+   "RU",
+   "SA",
+   "SB",
+   "SE",
+   "SG",
+   "SI",
+   "TG",
+   "TH",
+   "TO",
+   "TR",
+   "TW",
+   "US",
+   "UY",
+   "VN",
+   "VU",
+   "WS"
+  ],
+  "KRMAS": [],
+  "KRUSN": [
+   "BJ",
+   "CN",
+   "EG",
+   "GH",
+   "HK",
+   "IL",
+   "MY",
+   "NA",
+   "NG",
+   "SG",
+   "TG",
+   "TH",
+   "TW",
+   "VN"
+  ],
+  "KRONS": [],
+  "KRKPO": [],
+  "KRTGH": [],
+  "KRMUK": [],
+  "KRPTK": [
+   "CN",
+   "JP",
+   "PH",
+   "TW"
+  ],
+  "KRSCP": [],
+  "KROKP": [],
+  "KRSUK": [],
+  "KRSHO": [],
+  "KROKK": []
+ },
+ "by_country": {
+  "AE": [
+   "KRPUS"
+  ],
+  "AR": [
+   "KRPUS"
+  ],
+  "AS": [
+   "KRPUS"
+  ],
+  "AU": [
+   "KRPUS"
+  ],
+  "BE": [
+   "KRPUS"
+  ],
+  "BJ": [
+   "KRKAN",
+   "KRUSN"
+  ],
+  "BR": [
+   "KRPUS"
+  ],
+  "BS": [
+   "KRPUS"
+  ],
+  "CA": [
+   "KRPUS"
+  ],
+  "CL": [
+   "KRPUS"
+  ],
+  "CN": [
+   "KRINC",
+   "KRKAN",
+   "KRKUV",
+   "KRPTK",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "CO": [
+   "KRPUS"
+  ],
+  "DE": [
+   "KRKAN",
+   "KRPUS"
+  ],
+  "DK": [
+   "KRPUS"
+  ],
+  "DO": [
+   "KRPUS"
+  ],
+  "EC": [
+   "KRPUS"
+  ],
+  "EG": [
+   "KRPUS",
+   "KRUSN"
+  ],
+  "ES": [
+   "KRKAN",
+   "KRPUS"
+  ],
+  "FJ": [
+   "KRPUS"
+  ],
+  "FR": [
+   "KRPUS"
+  ],
+  "GH": [
+   "KRKAN",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "GR": [
+   "KRPUS"
+  ],
+  "GT": [
+   "KRPUS"
+  ],
+  "HK": [
+   "KRINC",
+   "KRKAN",
+   "KRKUV",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "HR": [
+   "KRPUS"
+  ],
+  "ID": [
+   "KRINC",
+   "KRKAN",
+   "KRPUS"
+  ],
+  "IL": [
+   "KRPUS",
+   "KRUSN"
+  ],
+  "IN": [
+   "KRKAN",
+   "KRPUS"
+  ],
+  "IT": [
+   "KRPUS"
+  ],
+  "JM": [
+   "KRPUS"
+  ],
+  "JO": [
+   "KRPUS"
+  ],
+  "JP": [
+   "KRINC",
+   "KRPTK",
+   "KRPUS"
+  ],
+  "KI": [
+   "KRPUS"
+  ],
+  "LK": [
+   "KRPUS"
+  ],
+  "MX": [
+   "KRPUS"
+  ],
+  "MY": [
+   "KRINC",
+   "KRKAN",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "NA": [
+   "KRKAN",
+   "KRUSN"
+  ],
+  "NC": [
+   "KRPUS"
+  ],
+  "NG": [
+   "KRKAN",
+   "KRUSN"
+  ],
+  "NL": [
+   "KRPUS"
+  ],
+  "NZ": [
+   "KRPUS"
+  ],
+  "OM": [
+   "KRPUS"
+  ],
+  "PA": [
+   "KRPUS"
+  ],
+  "PE": [
+   "KRPUS"
+  ],
+  "PF": [
+   "KRPUS"
+  ],
+  "PH": [
+   "KRINC",
+   "KRKAN",
+   "KRPTK",
+   "KRPUS"
+  ],
+  "PK": [
+   "KRKAN",
+   "KRPUS"
+  ],
+  "PL": [
+   "KRKAN"
+  ],
+  "QA": [
+   "KRPUS"
+  ],
+  "RU": [
+   "KRPUS"
+  ],
+  "SA": [
+   "KRPUS"
+  ],
+  "SB": [
+   "KRPUS"
+  ],
+  "SE": [
+   "KRPUS"
+  ],
+  "SG": [
+   "KRINC",
+   "KRKAN",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "SI": [
+   "KRPUS"
+  ],
+  "TG": [
+   "KRKAN",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "TH": [
+   "KRINC",
+   "KRKAN",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "TO": [
+   "KRPUS"
+  ],
+  "TR": [
+   "KRPUS"
+  ],
+  "TW": [
+   "KRINC",
+   "KRKAN",
+   "KRPTK",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "US": [
+   "KRINC",
+   "KRKAN",
+   "KRPUS"
+  ],
+  "UY": [
+   "KRPUS"
+  ],
+  "VN": [
+   "KRINC",
+   "KRKAN",
+   "KRPUS",
+   "KRUSN"
+  ],
+  "VU": [
+   "KRPUS"
+  ],
+  "WS": [
+   "KRPUS"
+  ]
+ }
+}

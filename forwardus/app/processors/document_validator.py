@@ -35,22 +35,30 @@ def _equal(expected, actual) -> bool:
     return expected == actual
 
 
-def validate_documents(documents: dict[str, dict], reference: dict, labels: dict[str, str] | None = None) -> dict:
+def validate_documents(documents: dict[str, dict], reference: dict,
+                       labels: dict[str, str] | None = None,
+                       form_fields: dict[str, list] | None = None) -> dict:
     """Compare each document's fields against the shipment reference values.
 
     ``documents`` maps doc_type → field data. ``reference`` holds the expected
     values taken from the Shipment record (the single source of truth).
+    ``form_fields`` is the current서식 definition; a document made before the
+    서식 changed can still hold keys the form no longer has, and comparing those
+    reports mismatches for boxes nobody can see or fix. So we only compare what
+    the current 서식 actually shows.
     Returns an overall status and a list of findings.
     """
 
     labels = labels or {}
+    form_fields = form_fields or {}
     findings = []
     for field, field_label in VALIDATION_FIELDS.items():
         if field not in reference or reference[field] in (None, ""):
             continue
         expected = _normalize(reference[field])
         for doc_type, data in documents.items():
-            if field not in data:
+            shown = form_fields.get(doc_type)
+            if field not in data or (shown is not None and field not in shown):
                 continue
             actual = _normalize(data[field])
             if actual == "":
