@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from datetime import date
+from time import monotonic
 
 from app.collectors.base_client import fail, get_config, load_mock, ok, request_text
 
@@ -99,23 +100,76 @@ def _as_iso(yyyymmdd: str) -> str:
             if len(yyyymmdd) == 8 and yyyymmdd.isdigit() else "")
 
 
+# 받아 둔 것을 잠시 기억해 둡니다.
+#
+# 관세환율은 하루에 한 번 고시되는데, 화면을 열 때마다 관세청에 물어보고
+# 있었습니다. 기관이 멈추면 연결이 끊길 때까지(8초) 기다리고, 한 화면에서
+# 두 번 물어보니 열 때마다 16초가 걸렸습니다. 운송 계획 화면이 그랬습니다.
+#
+# 실패도 잠깐 기억합니다. 안 되는 곳을 매번 8초씩 다시 두드릴 이유가 없습니다.
+_CACHE: dict[str, tuple[float, object]] = {}
+LIVE_TTL = 3_600       # 고시환율은 하루 한 번 바뀝니다.
+FAILED_TTL = 60        # 기관이 멈췄을 때 다시 두드리기까지.
+
+
+def clear_cache() -> None:
+    """기억해 둔 것을 버립니다. (테스트에서 씁니다)"""
+
+    _CACHE.clear()
+
+
+def _remember(key: str, make):
+    """make()는 (값, 살려 둘 초)를 돌려줍니다."""
+
+    now = monotonic()
+    found = _CACHE.get(key)
+    if found and now < found[0]:
+        return found[1]
+    value, ttl = make()
+    _CACHE[key] = (now + ttl, value)
+    return value
+
+
 def fetch_krw_rates() -> dict:
     """통화별 원화 환율. 관세청 고시 환율을 쓰고, 못 받으면 고정 환율로 버팁니다."""
 
+    return _remember("rates", _read_krw_rates)
+
+
+def _read_krw_rates() -> tuple[dict, float]:
     result = fetch_unipass_rates()
     if result["success"]:
-        return result
+        return result, LIVE_TTL
 
     rates = dict(load_mock("exchange_rates")["krw_per_unit"])
     rates["USD"] = float(get_config("EXCHANGE_RATE_USD_KRW", rates["USD"]))
     rates["KRW"] = 1.0
-    return {**ok(rates, "mock"), "applied_date": ""}
+    # 예시 환율로 답하는 동안에도 기관이 살아났는지 이따금 다시 봅니다.
+    return {**ok(rates, "mock"), "applied_date": ""}, FAILED_TTL
+
+
+def currency_options() -> list[dict]:
+    """통화를 고르는 칸에 넣을 목록. **바깥을 부르지 않습니다.**
+
+    고를 수 있는 통화가 무엇인지는 거의 바뀌지 않습니다. 그런데 이걸
+    관세청에 물어보느라 화면이 통째로 기다리고 있었습니다. 기관이 막히면
+    운송 계획 화면 한 번 여는 데 16초가 걸렸습니다.
+
+    실제 환산에 쓰는 환율은 fetch_krw_rates()로 따로 받습니다. 그쪽은
+    숫자가 맞아야 하니 기관을 부르는 것이 맞습니다.
+    """
+
+    order = {code: index for index, code in enumerate(MAJOR_CURRENCIES)}
+    codes = sorted(FALLBACK_CURRENCY_NAMES,
+                   key=lambda code: (order.get(code, len(order)), code))
+    return [{"code": code, "name": FALLBACK_CURRENCY_NAMES[code],
+             "major": code in MAJOR_CURRENCIES} for code in codes]
 
 
 def list_currencies() -> list[dict]:
-    """화면에 보여줄 통화 목록. 관세청 고시 통화를 그대로 씁니다.
+    """관세청이 실제로 고시한 통화 목록. 기관을 부릅니다.
 
-    주요 결제 통화를 먼저 두고, 나머지는 코드 알파벳순입니다.
+    화면의 고르는 칸에는 currency_options()를 쓰세요.
     """
 
     names = fetch_currency_names()
@@ -129,6 +183,16 @@ def list_currencies() -> list[dict]:
 def fetch_currency_names() -> dict[str, str]:
     """통화 코드 -> 이름. 관세청 응답의 통화 단위명을 씁니다."""
 
+    return _remember("names", _read_currency_names)
+
+
+def _read_currency_names() -> tuple[dict, float]:
+    names = _fetch_currency_names_now()
+    # 기관에서 받아온 이름이면 오래 두고, 우리 기본 이름이면 잠깐만 둡니다.
+    return names, (FAILED_TTL if names == FALLBACK_CURRENCY_NAMES else LIVE_TTL)
+
+
+def _fetch_currency_names_now() -> dict[str, str]:
     key = _unipass_key()
     if not key:
         return dict(FALLBACK_CURRENCY_NAMES)

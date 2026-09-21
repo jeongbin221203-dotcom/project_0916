@@ -1,0 +1,358 @@
+/* 시작 화면. 갈 곳은 왼쪽 줄로 모으고, 가운데는 적는 칸 하나만 둡니다.
+   색·글꼴·버튼은 base.css의 것을 그대로 씁니다. */
+
+:root { --rail_w: 92px; }
+.home_main { padding: 0 0 72px; }
+
+.home_shell { display: flex; align-items: flex-start; }
+
+/* ----- 왼쪽 줄 ----- */
+.home_rail {
+  position: sticky; top: 0; flex: 0 0 var(--rail_w);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 20px 8px; min-height: 100vh;
+  background: var(--white); border-right: 1px solid var(--line);
+}
+.rail_item { position: relative; width: 100%; }
+.rail_item > a, .rail_item > button, a.rail_item {
+  display: grid; justify-items: center; gap: 5px; width: 100%;
+  padding: 10px 4px; border: 0; border-radius: 14px;
+  background: none; color: var(--muted); text-align: center;
+}
+a.rail_item:hover, .rail_item > button:hover { background: var(--surface); text-decoration: none; }
+a.rail_item.active { color: var(--ink); }
+a.rail_item.active .rail_icon { background: var(--surface); }
+.rail_item small { font-size: 12px; font-weight: 700; line-height: 1.2; }
+
+.rail_icon {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 13px; font-size: 19px; background: var(--surface);
+}
+.rail_icon.blue { background: var(--blue_soft); }
+.rail_icon.green { background: var(--green_soft); }
+.rail_icon.amber { background: var(--amber_soft); }
+
+/* 최근 Shipment는 내용이 있어 옆으로 펼칩니다. 줄 안에 넣기엔 넓습니다. */
+.rail_flyout {
+  position: absolute; left: calc(100% + 10px); top: 0; z-index: 30;
+  width: 310px; padding: 16px; text-align: left;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--white); box-shadow: 0 12px 36px rgba(15, 23, 42, .14);
+}
+.rail_flyout > .row_between { margin-bottom: 10px; }
+.rail_flyout > .row_between b { font-size: 14px; }
+.rail_flyout > .row_between a { font-size: 12.5px; }
+.rail_ship {
+  display: grid; gap: 3px; padding: 11px 13px; margin-bottom: 8px;
+  border: 1px solid var(--line); border-radius: 13px; color: inherit; font-size: 12.5px;
+}
+.rail_ship:last-child { margin-bottom: 0; }
+.rail_ship:hover { border-color: #c7d7fd; background: var(--blue_soft); text-decoration: none; }
+.rail_ship b { font-size: 13.5px; }
+.rail_ship .mono { font-size: 12px; }
+
+/* ----- 가운데 ----- */
+/* home_stage는 남는 자리를 다 차지하고, 실제 내용 폭은 home_center가 정합니다.
+   폭을 home_stage에 걸면 flex-grow가 이겨서 화면 끝까지 늘어납니다. */
+.home_stage {
+  flex: 1 1 auto; min-width: 0;
+  padding: clamp(36px, 8vh, 88px) 16px 0;
+  text-align: center;
+}
+.home_center { width: min(720px, 100%); margin-inline: auto; }
+
+/* ----- 이름 (그대로 둡니다) ----- */
+.home_brand { display: inline-flex; align-items: center; gap: 12px; }
+.home_brand b { font-size: clamp(30px, 5vw, 42px); font-weight: 900; letter-spacing: -.045em; }
+.home_mark {
+  display: grid; place-items: center; width: 44px; height: 44px;
+  border-radius: 14px; background: var(--blue); color: #fff;
+  font-size: 24px; font-weight: 900;
+}
+.home_tagline { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
+
+/* ----- 무엇을 적을지 고르는 자리 ----- */
+.home_tabs {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  margin: 28px 0 16px;
+}
+.home_tabs button {
+  padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--white); color: var(--muted);
+  font-size: 13.5px; font-weight: 700; white-space: nowrap;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.home_tabs button:hover { border-color: #c7d7fd; color: var(--ink); }
+.home_tabs button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
+
+/* ----- 적는 칸 (두 배로 키웠습니다) ----- */
+.home_box {
+  padding: 24px 26px 18px; border: 1px solid var(--line); border-radius: 28px;
+  background: var(--white); box-shadow: var(--shadow); text-align: left;
+  transition: border-color .15s, box-shadow .15s;
+}
+.home_box:focus-within { border-color: #a9c4fd; box-shadow: 0 10px 34px rgba(43, 102, 246, .13); }
+.home_box textarea {
+  display: block; width: 100%; min-height: 96px; max-height: 340px;
+  border: 0; outline: none; background: none; resize: none;
+  font-size: 18px; line-height: 1.7;
+}
+.home_box textarea::placeholder { color: #94a3b8; }
+.home_box_foot { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+
+/* 자주 묻는 질문은 한 줄로 늘어놓습니다. 줄바꿈되면 칸이 위아래로 커져
+   보내기 단추가 멀어집니다. 넘치면 옆으로 밀어 봅니다. */
+.home_chips {
+  display: flex; flex-wrap: nowrap; gap: 7px;
+  flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.home_chips::-webkit-scrollbar { display: none; }
+.home_chips button {
+  flex: 0 0 auto;
+  padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 600;
+  max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.home_chips button:hover { border-color: #c7d7fd; color: var(--blue_dark); background: var(--blue_soft); }
+
+.home_send {
+  flex: 0 0 auto; width: 50px; height: 50px; border: 0; border-radius: 50%;
+  background: var(--navy); color: #fff; font-size: 22px; line-height: 1;
+}
+.home_send:hover { background: var(--blue); }
+.home_send:disabled { background: #cbd5e1; cursor: default; }
+
+.home_hint { margin: 14px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+
+/* ----- 상담 답변 -----
+   물어본 말만 말풍선에 담고, 답은 말풍선 없이 본문 글로 둡니다.
+   답이 길어지면 말풍선 안의 글은 읽기 어렵습니다. */
+.home_log { margin-top: 28px; text-align: left; display: grid; gap: 22px; }
+
+.home_msg.me {
+  justify-self: end; max-width: 80%;
+  padding: 11px 16px; border-radius: 16px;
+  background: #e8edf5; color: var(--ink);
+  font-size: 14.5px; line-height: 1.7; white-space: pre-wrap;
+}
+
+.home_msg.bot { justify-self: stretch; font-size: 15px; line-height: 1.85; }
+.home_msg.bot p { margin: 0 0 13px; }
+.home_msg.bot > :last-child { margin-bottom: 0; }
+.home_msg.bot ul, .home_msg.bot ol { margin: 0 0 13px; padding-left: 22px; }
+.home_msg.bot li { margin-bottom: 7px; }
+.home_msg.bot li:last-child { margin-bottom: 0; }
+.home_msg.bot b { font-weight: 800; }
+.home_msg.bot h4 { margin: 18px 0 8px; font-size: 15.5px; font-weight: 800; }
+.home_msg.bot code {
+  padding: 2px 6px; border-radius: 6px; background: var(--surface);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em;
+}
+.home_msg.bot a { text-decoration: underline; }
+
+.home_msg.wait { color: var(--muted); font-size: 14.5px; }
+.home_msg.bad {
+  justify-self: stretch; padding: 12px 16px; border-radius: 14px;
+  background: var(--red_soft); color: var(--red); font-size: 14.5px; line-height: 1.7;
+}
+
+/* 좁은 화면에서는 줄을 가로로 눕힙니다. 세로로 두면 본문이 밀립니다. */
+@media (max-width: 860px) {
+  :root { --rail_w: 0px; }
+  .home_shell { flex-direction: column; }
+  .home_rail {
+    position: static; flex: none; flex-direction: row; width: 100%; min-height: 0;
+    justify-content: center; gap: 2px; padding: 10px 8px; overflow-x: auto;
+    border-right: 0; border-bottom: 1px solid var(--line);
+  }
+  .rail_item { width: auto; }
+  .rail_item > a, .rail_item > button, a.rail_item { padding: 6px 10px; }
+  .rail_flyout { left: auto; right: 0; top: calc(100% + 8px); width: min(310px, 90vw); }
+  .home_stage { padding-top: 40px; }
+  .home_box textarea { min-height: 80px; font-size: 16.5px; }
+}
+
+/* ----- 서류 작성 칸 -----
+   가운데 폭(720px)보다 넓어야 칸이 두 줄로 들어갑니다. */
+.home_doc { width: min(920px, 100vw - 32px); margin: 8px auto 0; text-align: left; }
+
+.doc_head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+.doc_head h2 { margin: 0 0 4px; }
+.doc_head p { margin: 0; line-height: 1.6; }
+.doc_score { flex: 0 0 auto; padding: 8px 16px; border-radius: 14px; background: var(--white);
+  border: 1px solid var(--line); white-space: nowrap; }
+.doc_score b { font-size: 20px; color: var(--blue); }
+.doc_score span { margin-left: 3px; color: var(--muted); font-size: 13px; }
+
+.doc_must { color: var(--red); font-style: normal; margin-left: 2px; }
+
+.doc_group { padding: 20px 22px; margin-bottom: 14px; border: 1px solid var(--line);
+  border-radius: var(--radius); background: var(--white); }
+.doc_group h3 { margin: 0 0 4px; font-size: 15px; }
+.doc_note { margin: 0 0 16px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+
+.doc_grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.doc_field { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.doc_field.wide { grid-column: 1 / -1; }
+.doc_label { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.doc_hint { color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.doc_field input[type=text], .doc_field input[type=date], .doc_field select {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px;
+  background: var(--white); font-size: 14px;
+}
+.doc_field input:focus, .doc_field select:focus { outline: none; border-color: #a9c4fd; }
+
+.doc_choice { display: flex; gap: 6px; }
+.doc_choice button { padding: 9px 14px; border: 1px solid var(--line); border-radius: 11px;
+  background: var(--white); font-size: 13.5px; font-weight: 700; color: var(--muted); }
+.doc_choice button.active { border-color: var(--blue); background: var(--blue_soft); color: var(--blue_dark); }
+
+/* 출발지·도착지 찾기 */
+.doc_place { position: relative; }
+.doc_place_list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 260px; overflow-y: auto; margin: 0; padding: 6px; list-style: none;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--white); box-shadow: var(--shadow); }
+.doc_place_list button { display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 9px;
+  background: none; text-align: left; font-size: 13.5px; }
+.doc_place_list button:hover { background: var(--blue_soft); }
+.doc_place_list small { color: var(--muted); }
+.doc_place_list .empty { padding: 10px; color: var(--muted); font-size: 13px; }
+
+/* 품목 */
+.doc_item { padding: 16px; margin-bottom: 12px; border: 1px solid var(--line);
+  border-radius: 14px; background: var(--surface); }
+.doc_item_head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.doc_item_head b { font-size: 13.5px; }
+
+/* 스케줄 */
+.doc_schedules { display: grid; gap: 8px; margin-top: 12px; }
+.doc_schedule { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line);
+  border-radius: 13px; background: var(--white); cursor: pointer; font-size: 13px; }
+.doc_schedule:has(input:checked) { border-color: var(--blue); background: var(--blue_soft); }
+.doc_schedule input { margin-bottom: 4px; accent-color: var(--blue); }
+.doc_schedule b { font-size: 14px; }
+
+.doc_actions { display: grid; gap: 12px; margin-top: 18px; justify-items: center; }
+.doc_error, .doc_error_line { width: 100%; padding: 12px 16px; border-radius: 13px;
+  background: var(--red_soft); color: var(--red); font-size: 13.5px; line-height: 1.6; }
+
+/* 결과 */
+.doc_result { padding: 22px; margin-top: 18px; border: 1px solid var(--green);
+  border-radius: var(--radius); background: var(--green_soft); }
+.doc_result h3 { margin: 0 0 4px; }
+.doc_result .button { margin-top: 14px; }
+.doc_all_set { margin: 12px 0 0; color: var(--green); font-weight: 700; font-size: 13.5px; }
+.doc_empty { margin-top: 14px; padding: 14px 16px; border-radius: 13px; background: var(--white); }
+.doc_empty b { font-size: 13.5px; color: var(--amber); }
+.doc_empty ul { margin: 8px 0 0; padding-left: 20px; }
+.doc_empty li { font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+
+@media (max-width: 720px) {
+  .doc_grid { grid-template-columns: 1fr; }
+  .doc_head { flex-direction: column; gap: 10px; }
+}
+
+/* ----- 대화가 시작되면 -----
+   인사는 접고, 적는 칸을 화면 아래에 붙입니다. 답이 쌓이는 동안에도
+   묻는 자리가 늘 같은 곳에 있어야 다시 묻기 쉽습니다. */
+.home_center.talking { padding-bottom: 210px; }
+.home_center.talking .home_hello { display: none; }
+.home_center.talking .home_log { margin-top: 8px; }
+
+.home_center.talking .home_composer {
+  position: fixed; left: var(--rail_w); right: 0; bottom: 0; z-index: 25;
+  padding: 18px 16px 18px;
+  /* 위로 흘러 올라간 답이 칸 뒤로 비쳐 보이지 않게 덮습니다. */
+  background: linear-gradient(to bottom, rgba(244, 247, 251, 0), var(--surface) 30%);
+}
+.home_center.talking .home_box,
+.home_center.talking .home_hint { width: min(720px, 100%); margin-inline: auto; }
+.home_center.talking .home_box textarea { min-height: 56px; font-size: 16px; }
+.home_center.talking .home_hint { margin-top: 8px; text-align: center; }
+
+@media (max-width: 860px) {
+  .home_center.talking { padding-bottom: 190px; }
+}
+
+/* ----- 환율 계산기 ----- */
+.rail_flyout > b { display: block; margin-bottom: 12px; font-size: 14px; }
+.fx_row { display: flex; gap: 8px; }
+.fx_row select {
+  flex: 0 0 86px; padding: 10px 8px; border: 1px solid var(--line);
+  border-radius: 11px; background: var(--white); font-size: 13.5px; font-weight: 700;
+}
+.fx_amount, .fx_result {
+  flex: 1 1 auto; min-width: 0; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 11px; background: var(--white);
+  font-size: 15px; font-weight: 700; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.fx_result { display: block; background: var(--blue_soft); border-color: #c7d7fd; color: var(--blue_dark); }
+.fx_amount:focus { outline: none; border-color: #a9c4fd; }
+.fx_swap {
+  display: block; margin: 7px auto; width: 30px; height: 30px; line-height: 1;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--white);
+  color: var(--muted); font-size: 15px;
+}
+.fx_swap:hover { border-color: #c7d7fd; color: var(--blue); }
+/* 무슨 환율로 계산했는지. 이게 없으면 숫자를 믿을 수 없습니다. */
+.fx_basis { margin: 12px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+.fx_basis.is_mock { color: var(--amber); }
+
+/* ----- 일정 달력 ----- */
+.cal { padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); }
+.cal_head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.cal_head b { font-size: 14px; }
+.cal_nav { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--white); color: var(--muted); line-height: 1; }
+.cal_nav:hover { border-color: #c7d7fd; color: var(--blue); }
+.cal_months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.cal_month > b { display: block; margin-bottom: 10px; text-align: center; font-size: 13.5px; }
+.cal_week, .cal_days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal_week span { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.cal_week span:first-child { color: var(--red); }
+.cal_days { margin-top: 4px; }
+.cal_day { display: grid; place-items: center; height: 32px; border: 0; border-radius: 9px;
+  background: none; font-size: 13px; color: var(--ink); }
+.cal_day:hover { background: var(--blue_soft); }
+.cal_day.past { color: #cbd5e1; cursor: default; }
+.cal_day.past:hover { background: none; }
+.cal_day.between { background: #eef4ff; border-radius: 0; }
+.cal_day.seller { background: var(--blue); color: #fff; font-weight: 800; }
+.cal_day.buyer { background: var(--amber); color: #fff; font-weight: 800; }
+
+.cal_legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 12.5px; }
+.cal_legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.cal_legend b { color: var(--ink); }
+.cal_legend .dot { width: 9px; height: 9px; border-radius: 50%; }
+.cal_legend .dot.seller { background: var(--blue); }
+.cal_legend .dot.buyer { background: var(--amber); }
+
+/* ----- 원산지증명서 ----- */
+.origin_pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.origin_pick select { padding: 9px 12px; border: 1px solid var(--line); border-radius: 11px;
+  background: var(--white); font-size: 13.5px; }
+.origin_links { display: flex; flex-wrap: wrap; gap: 8px; }
+.origin_list { display: grid; gap: 8px; }
+.origin_row { display: grid; gap: 2px; padding: 11px 14px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--surface); }
+.origin_row b { font-size: 13.5px; }
+.origin_row small { font-size: 12px; line-height: 1.55; }
+.origin_rate { font-size: 12.5px; font-weight: 700; color: var(--blue_dark); }
+.origin_upload { display: grid; gap: 10px; margin-top: 14px; }
+.origin_upload input[type=file] { font-size: 13px; }
+
+.doc_after { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+@media (max-width: 720px) {
+  .cal_months { grid-template-columns: 1fr; }
+}
+
+/* 서류 초안 채우기는 자주 묻는 질문과 성격이 달라 눈에 띄게 둡니다. */
+.home_chips .chip_fill {
+  border-color: #c7d7fd; background: var(--blue_soft);
+  color: var(--blue_dark); font-weight: 800;
+}
+.home_chips .chip_fill:hover { background: #dbe7ff; }
+.home_chips .chip_fill:disabled { opacity: .5; cursor: default; }

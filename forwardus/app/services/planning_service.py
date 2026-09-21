@@ -56,7 +56,8 @@ def get_form_options() -> dict:
         "incoterms": INCOTERMS_INFO,
         "package_types": PACKAGE_TYPE_INFO,
         "sort_options": SORT_OPTIONS,
-        "currencies": exchange_client.list_currencies(),
+        # 고르는 칸이라 바깥을 부르지 않습니다. 환율은 exchange_rates()로 따로 받습니다.
+        "currencies": exchange_client.currency_options(),
         "dg_classes": dangerous_goods.classes(),
         "packing_groups": PACKING_GROUPS,
     }

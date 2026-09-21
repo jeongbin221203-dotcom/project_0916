@@ -52,7 +52,12 @@
     </footer>
     {# 어느 화면에서나 열 수 있는 고객상담 창 #}
     <button type="button" class="support_fab" data-support-open aria-haspopup="dialog">
-      <span aria-hidden="true">💬</span> 고객 상담
+      {% if support_icon %}
+        <img class="support_face" src="{{ support_icon }}" alt="" width="30" height="30">
+      {% else %}
+        <span aria-hidden="true">💬</span>
+      {% endif %}
+      고객 상담
     </button>
     <div class="support_panel" data-support-panel hidden role="dialog" aria-label="고객 상담">
       <header class="support_head">

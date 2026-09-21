@@ -249,6 +249,10 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   background: var(--blue); color: #fff; font-size: 15px; font-weight: 800;
   box-shadow: 0 12px 30px rgba(43,102,246,.35); cursor: pointer; transition: .15s; }
 .support_fab:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(43,102,246,.42); }
+/* 그림을 흰 동그라미에 담습니다. 파란 단추 위에 파란 고래를 그냥 올리면
+   테두리가 묻힙니다. 올리신 그림이 어떤 바탕이든 이러면 또렷합니다. */
+.support_face { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  background: #fff; object-fit: cover; }
 .support_fab.is_open { background: var(--ink); box-shadow: 0 12px 30px rgba(15,23,42,.3); }
 
 .support_panel { position: fixed; right: 26px; bottom: 96px; z-index: 61;

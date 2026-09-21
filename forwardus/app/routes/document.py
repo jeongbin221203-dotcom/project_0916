@@ -5,12 +5,24 @@ from __future__ import annotations
 from flask import (Blueprint, flash, jsonify, redirect, render_template,
                    request, url_for)
 
-from app.routes import load_shipment
+from app.routes import error_response, load_shipment
 from app.services import (ServiceError, customs_filing_service, document_service,
-                          requirement_service)
+                          document_start_service, requirement_service)
 from app.validators import ValidationError
 
 document_bp = Blueprint("document", __name__, url_prefix="/documents")
+
+
+@document_bp.post("/start")
+def start():
+    """시작 화면에서 채운 내용으로 Shipment와 서류를 한 번에 만듭니다."""
+
+    try:
+        result = document_start_service.create(request.get_json(silent=True) or {})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    result["url"] = url_for("document.center", shipment_id=result["shipment_id"])
+    return jsonify({"success": True, "data": result})
 
 
 @document_bp.get("/<shipment_id>")
@@ -23,6 +35,25 @@ def center(shipment_id: str):
         validation=document_service.check_documents(shipment),
         origin_certificate=document_service.origin_certificate_guide(shipment),
     )
+
+
+@document_bp.get("/<shipment_id>/origin-guide")
+def origin_guide(shipment_id: str):
+    """이 건에 쓸 수 있는 협정과 신청 창구. 시작 화면이 씁니다."""
+
+    shipment = load_shipment(shipment_id)
+    guide = document_service.origin_certificate_guide(shipment)
+    return jsonify({"success": True, "data": {
+        **guide,
+        # 올린 서류는 그대로 넘길 수 없어 화면에 필요한 것만 추립니다.
+        "uploads": [{"id": row.id, "filename": row.filename,
+                     "agreement": row.agreement or "",
+                     "status": row.review_status, "status_label": row.review_label,
+                     "summary": row.review_summary or ""}
+                    for row in guide["uploads"]],
+        "upload_url": url_for("document.upload_requirement", shipment_id=shipment_id),
+        "shipment_id": shipment.shipment_id,
+    }})
 
 
 @document_bp.get("/<shipment_id>/requirements")

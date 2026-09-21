@@ -149,7 +149,21 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         from app.services import support_chat_service
 
         return {"nav_active": request.blueprint or "", "static_url": static_url,
-                "support_chat_intro": support_chat_service.intro()}
+                "support_chat_intro": support_chat_service.intro(),
+                "support_icon": support_icon()}
+
+    # 고객 상담 단추에 쓸 그림.
+    # 직접 만든 그림을 app/static/images/ 에 support_whale.png 로 올려 두면
+    # 코드를 고치지 않아도 그쪽을 씁니다. 없으면 기본 그림(svg)을 씁니다.
+    SUPPORT_ICONS = ("support_whale.png", "support_whale.webp",
+                     "support_whale.jpg", "support_whale.svg")
+
+    def support_icon() -> str:
+        folder = Path(flask_app.static_folder or "") / "images"
+        for name in SUPPORT_ICONS:
+            if (folder / name).exists():
+                return static_url(f"images/{name}")
+        return ""
 
     def static_url(filename: str) -> str:
         """정적 파일 URL에 수정 시각을 붙입니다.

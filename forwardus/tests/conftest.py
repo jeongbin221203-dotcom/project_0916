@@ -15,6 +15,21 @@ from app.extensions import db  # noqa: E402
 from config import TestConfig  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _fresh_exchange_cache():
+    """환율은 한 번 받으면 한 시간 기억해 둡니다.
+
+    테스트끼리는 그 기억이 넘어가면 안 됩니다. 앞 테스트가 흉내 낸 응답이
+    다음 테스트에 그대로 남으면, 무엇을 보고 통과한 것인지 알 수 없습니다.
+    """
+
+    from app.collectors import exchange_client
+
+    exchange_client.clear_cache()
+    yield
+    exchange_client.clear_cache()
+
+
 @pytest.fixture()
 def app():
     flask_app = create_app(TestConfig)
