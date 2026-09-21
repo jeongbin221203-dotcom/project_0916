@@ -27,11 +27,12 @@ def quick_actions() -> list[dict]:
          "placeholder": "수출하면서 막히는 것을 물어보세요",
          "hint": "관세율·운임 같은 숫자는 짐작해서 답하지 않고 조회 화면으로 안내합니다.",
          "opener": "수출 절차에서 막히는 것을 물어보세요. 어떤 것이든 좋습니다.",
+         # 원산지증명서는 답이 길어 맨 뒤에 둡니다. 앞의 짧은 것부터 보이게.
          "examples": ["수출할 때 꼭 필요한 서류가 뭔가요?",
                       "FOB랑 CIF는 어떻게 다른가요?",
-                      "원산지증명서는 어디서 받나요?",
                       "인코텀즈는 어떻게 고르나요?",
-                      "적재의무기한이 뭔가요?"]},
+                      "적재의무기한이 뭔가요?",
+                      "원산지증명서는 어디서 받나요?"]},
         {"key": "planning", "icon": "📦", "label": "운송 계획",
          "placeholder": "어디서 어디로, 무엇을 언제 보내시나요",
          "hint": "출발·도착지와 화물을 알려 주시면 스케줄과 물류비를 찾아 드립니다.",
@@ -48,10 +49,11 @@ def quick_actions() -> list[dict]:
                    "적으신 뒤 **적은 내용으로 칸 채우기**를 눌러 주세요.",
          # 적은 글에서 값을 뽑아 서류 작성 화면의 칸을 채웁니다.
          "fill_label": "📄 적은 내용으로 칸 채우기",
-         "examples": ["패킹리스트만 만들어줘",
-                      "상업송장만 작성해줘",
-                      "부산에서 LA로 치약 500박스, 한 박스 40x30x25cm에 12kg",
-                      "마시는 수액 HS코드 알려줘"]},
+         "examples": ["패킹리스트만 만들어줘", "상업송장만 작성해줘"],
+         # 빈 서식 PDF를 그대로 내려받는 자리. 대화를 시작하는 칩과 성격이
+         # 달라 따로 둡니다. (파일은 아직 안 붙였습니다)
+         "downloads": [{"label": "패킹리스트(PDF)", "kind": "packing_list_std"},
+                       {"label": "상업송장(PDF)", "kind": "commercial_invoice"}]},
     ]
 
 
@@ -107,10 +109,11 @@ def api_agent():
         return error_response(exc)
 
     # 다 그렸으면 그림까지 함께 보냅니다. 대화창에 바로 붙습니다.
+    # 서류가 둘이면 둘 다 그립니다. 수출에는 함께 내는 것이라 따로 볼 이유가 없습니다.
     if result.get("stage") == "made":
-        result["preview"] = draft_document_service.preview(
-            result["kind"], result["draft"])
-        result["file_url"] = url_for("document.draft_file", kind=result["kind"])
+        for row in result.get("documents", []):
+            row["preview"] = draft_document_service.preview(row["kind"], result["draft"])
+            row["file_url"] = url_for("document.draft_file", kind=row["kind"])
     return jsonify({"success": True, "data": result})
 
 

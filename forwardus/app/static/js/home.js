@@ -37,9 +37,14 @@
     const fill = action.fill_label
       ? `<button type="button" class="chip_fill" data-home-fill>${escapeHtml(action.fill_label)}</button>`
       : "";
+    // 빈 서식 PDF를 받는 칩. 대화를 시작하는 칩과 성격이 달라 모양도 다릅니다.
+    const files = (action.downloads || [])
+      .map((row) => `<button type="button" class="chip_file"`
+        + ` data-home-file="${escapeHtml(row.kind)}">${escapeHtml(row.label)}</button>`)
+      .join("");
     chipsBox.innerHTML = fill + (action.examples || [])
       .map((text) => `<button type="button" data-home-chip>${escapeHtml(text)}</button>`)
-      .join("");
+      .join("") + files;
     if (logEl.children.length) logEl.hidden = false;
 
     // 사람이 무엇부터 적어야 할지 모르는 것이 가장 흔한 막힘입니다.
@@ -64,13 +69,37 @@
     });
   });
 
+  // 눌렀다는 것이 보여야 합니다. 값은 적는 칸으로 들어가는데 단추 쪽에
+  // 아무 변화가 없으면, 눌린 건지 아닌지 몰라 또 누르게 됩니다.
+  function flash(button) {
+    button.classList.add("just_used");
+    setTimeout(() => button.classList.remove("just_used"), 700);
+  }
+
   chipsBox.addEventListener("click", (event) => {
-    if (event.target.closest("[data-home-fill]")) { fillDocDraft(); return; }
+    const fill = event.target.closest("[data-home-fill]");
+    if (fill) { flash(fill); fillDocDraft(); return; }
+
+    const file = event.target.closest("[data-home-file]");
+    if (file) {
+      flash(file);
+      // 빈 서식 파일은 아직 안 붙였습니다. 없는 것을 있는 척하지 않습니다.
+      say("bot", "빈 서식 PDF는 아직 준비 중입니다.\n\n"
+        + `지금은 **${file.textContent.replace("(PDF)", "")}**를 대화로 만들어 `
+        + "PDF로 받으실 수 있습니다. 아래에 적어 보내 주세요.");
+      input.value = file.textContent.replace("(PDF)", "").trim() + " 만들어줘";
+      resize();
+      input.focus();
+      return;
+    }
+
     const chip = event.target.closest("[data-home-chip]");
     if (!chip) return;
+    flash(chip);
     input.value = chip.textContent;
     resize();
     input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   });
 
   /* ----- 적은 글로 서류 초안 채우기 ----- */
@@ -81,11 +110,14 @@
       return;
     }
     const button = chipsBox.querySelector("[data-home-fill]");
+    const label = button.textContent;
     button.disabled = true;
+    button.textContent = "읽는 중…";
     const waiting = say("bot wait", "적으신 내용을 읽고 있습니다…");
 
     const response = await postJson(config.intakeUrl, { text }, 60000);
     button.disabled = false;
+    button.textContent = label;
     waiting.remove();
 
     if (!response.success) {
@@ -142,6 +174,13 @@
       // {{ }}로 감싼 것은 빨갛게. 꼭 있어야 하는 칸과 운송 계획에서
       // 정해지는 칸을 눈에 띄게 하려는 표시입니다.
       .replace(/\{\{(.+?)\}\}/g, '<em class="need">$1</em>')
+      // [글](주소). 주소는 http(s)만 받습니다. javascript: 같은 것이
+      // 들어오면 링크로 만들지 않고 글자 그대로 둡니다.
+      .replace(/\[([^\]]+)\]\((https?:&#x2F;&#x2F;[^)\s]+|https?:\/\/[^)\s]+)\)/g,
+        (whole, label, url) => {
+          const clean = url.replace(/&#x2F;/g, "/");
+          return `<a href="${clean}" target="_blank" rel="noopener">${label}</a>`;
+        })
       .replace(/`([^`]+)`/g, "<code>$1</code>");
   }
 
@@ -211,9 +250,11 @@
     say("me", message);
     const waiting = say("bot wait", "보고 있습니다…");
     sendButton.disabled = true;
+    sendButton.classList.add("working");
 
     const response = await postJson(config.agentUrl, { message, draft: docDraft }, 90000);
     sendButton.disabled = false;
+    sendButton.classList.remove("working");
     waiting.remove();
 
     if (!response.success) {
@@ -229,7 +270,22 @@
     // 틀린 값이 그대로 서류가 됩니다.
     (data.notes || []).forEach((note) => say("bad", note));
 
-    if (data.preview) showDraft(data);
+    if (data.documents) {
+      // 적으신 내용을 임시로 둡니다. 운송 일정을 넣는 화면이 이걸 집어 가
+      // 출항일·선박명까지 채운 정식 서류로 만듭니다.
+      // 탭을 새로 열면 사라지는 것이 맞습니다 — 아직 확정이 아닙니다.
+      try {
+        const fields = { ...docDraft };
+        delete fields.items;
+        delete fields.kind;
+        window.sessionStorage.setItem("forwardus:doc-draft",
+          JSON.stringify({ fields, items: docDraft.items || [] }));
+      } catch (error) {
+        /* 저장 공간이 없으면 링크만 드립니다. */
+      }
+      data.documents.forEach(showDraft);
+      showNextStep();
+    }
   }
 
   // 칸 목록을 세 열로 보여 줍니다. 구분 · 서식의 영문 칸 이름 · 기재 내용.
@@ -268,44 +324,66 @@
     row.addEventListener("click", (event) => {
       if (event.target.closest("[data-pick-all]")) {
         // 아직 안 적은 칸만 넣습니다. 이미 적은 것을 또 물으면 지웁니다.
-        addTemplate(fields
-          .filter((f) => f.field !== "items" && !f.value)
-          .map((f) => f.en));
+        addTemplate(fields.filter((f) => f.field !== "items" && !f.value), true);
         return;
       }
       const line = event.target.closest("[data-pick]");
-      if (line) addTemplate([line.dataset.pick]);
+      if (line) addTemplate([{ en: line.dataset.pick, group: "" }]);
     });
   }
 
+  // 이 줄 아래는 지금 안 적어도 됩니다. 운송 일정을 넣으면 그때 채워지고,
+  // 만든 서류에서 고칠 수도 있습니다. 한 번에 다 적으라고 하면 부담이 큽니다.
+  const LATER_LINE = "----------하단은 운송계획 입력 후 뒤에서 수정 가능합니다----------";
+
   // 적는 칸에 "칸 이름: " 줄을 붙입니다. 이미 있는 줄은 다시 넣지 않습니다.
-  function addTemplate(names) {
+  function addTemplate(rows, withDivider = false) {
     const have = new Set(input.value.split("\n")
       .map((line) => line.split(":")[0].trim().toLowerCase()));
-    const added = names.filter((name) => !have.has(name.toLowerCase()))
-      .map((name) => `${name}: `);
-    if (!added.length) { input.focus(); return; }
+    const fresh = rows.filter((row) => !have.has(row.en.toLowerCase()));
+    if (!fresh.length) { input.focus(); return; }
+
+    const lines = [];
+    let dividerDone = false;
+    fresh.forEach((row) => {
+      // 보내는 쪽·받는 쪽이 먼저고, 나머지는 구분선 아래로 내립니다.
+      if (withDivider && !dividerDone && row.group !== "기본 정보") {
+        dividerDone = true;
+        if (lines.length) lines.push(LATER_LINE);
+      }
+      lines.push(`${row.en}: `);
+    });
 
     const before = input.value.replace(/\s+$/, "");
-    input.value = (before ? before + "\n" : "") + added.join("\n");
+    input.value = (before ? before + "\n" : "") + lines.join("\n");
     resize();
     input.focus();
     // 마지막 줄 끝으로 커서를 보냅니다. 바로 이어 적을 수 있게.
     input.setSelectionRange(input.value.length, input.value.length);
   }
 
-  function showDraft(data) {
+  function showDraft(doc) {
     const row = say("bot", "");
     row.innerHTML = `
+      <p class="draft_name">${escapeHtml(doc.title)}</p>
       <figure class="draft_sheet">
-        <img src="${data.preview}" alt="${escapeHtml(data.title)} 초안">
+        <img src="${doc.preview}" alt="${escapeHtml(doc.title)} 초안">
       </figure>
       <div class="draft_actions">
         <button type="button" class="button primary" data-draft-pdf>PDF로 받기</button>
-        <a class="button" href="${escapeHtml(config.planningUrl)}">운송 계획 잡기 →</a>
       </div>`;
     row.querySelector("[data-draft-pdf]").addEventListener("click", (event) =>
-      downloadPdf(event.currentTarget, data));
+      downloadPdf(event.currentTarget, doc));
+  }
+
+  // 다음에 할 일을 한 번만 보여 줍니다. 서류마다 붙이면 같은 단추가 겹칩니다.
+  function showNextStep() {
+    const row = say("bot", "");
+    row.innerHTML = `
+      <div class="draft_actions">
+        <a class="button primary" href="${escapeHtml(config.docFormUrl)}">
+          운송 일정 넣고 정식 서류 만들기 →</a>
+      </div>`;
   }
 
   async function downloadPdf(button, data) {

@@ -365,36 +365,68 @@ def turn(payload: dict) -> dict:
     return {**make(kind, draft), "draft": draft, "notes": notes}
 
 
+# 수출에 반드시 내야 하는 서류 두 장입니다. 칸의 대부분을 함께 씁니다
+# (보내는 쪽·받는 쪽·출발지·도착지·품목). 그래서 하나만 말씀하셔도 둘을
+# 같이 만들어 둡니다. 어차피 둘 다 필요하고, 값은 이미 다 모였습니다.
+TOGETHER = {
+    "packing_list_std": ["packing_list_std", "commercial_invoice"],
+    "commercial_invoice": ["commercial_invoice", "packing_list_std"],
+    "proforma_invoice": ["proforma_invoice"],
+}
+
+
 def make(kind: str, draft: dict) -> dict:
     """초안을 그립니다. 품목이 없으면 서류가 안 되니 되묻습니다."""
 
     if not (draft.get("items") or []):
         return {"reply": "품목을 알려 주셔야 서류가 나옵니다.\n\n" + ITEM_NOTE,
-                "stage": "ask", "fields": ask_list(kind)}
+                "stage": "ask", "fields": ask_list(kind, draft)}
 
-    rendered = drafts.render(kind, draft)
-    return {"reply": _done_message(rendered), "stage": "made",
-            "kind": kind, "title": rendered["title"],
-            "missing": rendered["missing"], "undecided": rendered["undecided"]}
+    made = []
+    for one in TOGETHER.get(kind, [kind]):
+        rendered = drafts.render(one, draft)
+        made.append({"kind": one, "title": rendered["title"],
+                     "missing": rendered["missing"],
+                     "undecided": rendered["undecided"]})
+
+    first = made[0]
+    return {"reply": _done_message(made), "stage": "made",
+            "documents": made,
+            # 처음 말씀하신 서류를 대표로 둡니다.
+            "kind": first["kind"], "title": first["title"],
+            "missing": first["missing"], "undecided": first["undecided"]}
 
 
-def _done_message(rendered: dict) -> str:
+def _done_message(made: list[dict]) -> str:
     """다 만든 뒤에 건네는 말. 무엇이 비었는지 숨기지 않습니다."""
 
-    lines = [f"**{rendered['title']}** 초안입니다.", ""]
+    def short(title):
+        return title.split(" (")[0]
 
-    if rendered["undecided"]:
-        lines.append("운송 계획이 없어서 아직 못 채운 칸이 있습니다. "
+    lines = [f"**{' · '.join(short(row['title']) for row in made)}** 초안입니다.", ""]
+
+    if len(made) > 1:
+        lines.append("수출에는 이 둘을 함께 냅니다. 칸의 대부분을 같이 쓰기 때문에 "
+                     "한 번 적으신 것으로 둘 다 만들었습니다.")
+        lines.append("")
+
+    if any(row["undecided"] for row in made):
+        lines.append("운송 일정이 없어서 아직 못 채운 칸이 있습니다. "
                      "출항일·선박명은 스케줄을 고르면 채워집니다.")
         lines.append("")
-    if rendered["missing"]:
-        names = ", ".join(row["label"] for row in rendered["missing"][:6])
-        more = f" 외 {len(rendered['missing']) - 6}개" if len(rendered["missing"]) > 6 else ""
-        lines.append(f"아직 빈 칸: {names}{more}")
-        lines.append("적어 주시면 다시 그려 드립니다.")
+
+    for row in made:
+        if not row["missing"]:
+            continue
+        names = ", ".join(item["label"] for item in row["missing"][:5])
+        more = f" 외 {len(row['missing']) - 5}개" if len(row["missing"]) > 5 else ""
+        lines.append(f"- {short(row['title'])} 빈 칸: {names}{more}")
+    if any(row["missing"] for row in made):
         lines.append("")
-    lines.append("**PDF로 받기**를 누르시면 파일로 내려받습니다.")
+
+    lines.append("**PDF로 받기**로 지금 내려받으실 수 있습니다. "
+                 "적으신 내용은 **임시로 저장해 두었습니다.**")
     lines.append("")
-    lines.append("이제 **운송 계획**을 잡으시면 출항일·선박명까지 채운 "
-                 "정식 서류로 만들 수 있습니다.")
+    lines.append("이제 **운송 일정**을 넣으시면, 저장해 둔 내용에 출항일·선박명까지 "
+                 "채워서 정식 서류로 만듭니다.")
     return "\n".join(lines)

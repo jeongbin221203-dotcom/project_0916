@@ -66,6 +66,44 @@ def available() -> bool:
     return ai_client.available()
 
 
+# 원산지증명서를 어디서 받는지 묻는 말들.
+ORIGIN_WORDS = ("원산지증명서", "원산지 증명서", "c/o", "certificate of origin", "코오")
+ORIGIN_ASKING = ("어디서", "어디에", "어떻게", "발급", "신청", "받", "떼", "구하")
+
+
+def _asks_about_origin(text: str) -> bool:
+    lowered = text.lower()
+    return (any(word in lowered for word in ORIGIN_WORDS)
+            and any(word in lowered for word in ORIGIN_ASKING))
+
+
+def origin_answer() -> str:
+    """원산지증명서 신청 창구를 그 자리에서 알려 줍니다.
+
+    "어느 화면으로 가세요"라고 미루지 않습니다. 물어본 자리에서 답이
+    나와야 합니다. 주소는 우리가 들고 있는 값을 그대로 쓰고, AI에게
+    받아 적게 하지 않습니다. AI가 기억으로 주소를 만들면 없는 주소가
+    나오고, 사람은 그걸 믿고 헤맵니다.
+    """
+
+    from app.processors import fta_guide
+
+    lines = ["원산지증명서는 **발급 기관이 따로 있습니다.** 저희가 대신 만들어 드릴 수 "
+             "없고, 협정마다 서식과 발급처가 다릅니다.", "",
+             "**신청 창구**", ""]
+    for row in fta_guide.all_apply_links():
+        lines.append(f"- [{row['label']}]({row['url']})")
+        lines.append(f"  {row['note']}")
+    non = fta_guide.NON_PREFERENTIAL
+    lines += ["", f"**{non['label']}**", "",
+              non["about"], "", f"발급: {non['issuer']}", "",
+              "어느 협정으로 받아야 하는지는 **HS부호와 도착국**에 따라 갈립니다. "
+              "품목과 보내실 나라를 알려 주시면 이 건에 쓸 수 있는 협정을 찾아 드립니다.", "",
+              "발급받으신 PDF는 서류 화면에 올리시면 이 건의 품명·HS부호·수출자와 "
+              "맞는지 대조해 드립니다."]
+    return "\n".join(lines)
+
+
 def ask(question: str, history: list | None = None) -> dict:
     """질문 하나에 답합니다. history는 [{role, content}] 형태입니다."""
 
@@ -74,6 +112,12 @@ def ask(question: str, history: list | None = None) -> dict:
         raise ServiceError("무엇이 궁금한지 적어주세요.", "VALIDATION_ERROR")
     if len(text) > MAX_QUESTION:
         raise ServiceError(f"질문은 {MAX_QUESTION:,}자까지 보낼 수 있습니다.", "VALIDATION_ERROR")
+
+    # 주소가 걸린 질문은 우리가 직접 답합니다. AI에게 맡기면 없는 주소를
+    # 지어낼 수 있고, 기관 주소는 틀리면 사람이 그대로 헤맵니다.
+    if _asks_about_origin(text):
+        return {"success": True, "source": "calculated",
+                "data": {"answer": origin_answer()}}
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "system", "content": _incoterms_reference()}]

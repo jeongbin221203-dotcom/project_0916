@@ -181,11 +181,11 @@ def test_빈_말은_지금_것으로_그리라는_뜻이다():
     assert agent_service.wants_to_finish("보내는 곳은 ABC입니다") is False
 
 
-def test_다_만들면_운송_계획을_안내한다(app):
+def test_다_만들면_다음에_할_일을_안내한다(app):
     out = agent_service.turn({"message": "그냥 만들어줘",
                               "draft": {**DRAFT, "kind": "packing_list_std"}})
 
-    assert "운송 계획" in out["reply"]
+    assert "운송 일정" in out["reply"]
     assert "PDF" in out["reply"]
 
 
@@ -200,8 +200,9 @@ def test_창구가_칸_목록과_초안을_돌려준다(app, client):
     second = client.post("/api/agent", json={"message": "그냥 만들어줘",
                                              "draft": draft}).get_json()["data"]
     assert second["stage"] == "made"
-    assert second["preview"].startswith("data:image/png;base64,")
-    assert second["file_url"].endswith(".pdf")
+    first_doc = second["documents"][0]
+    assert first_doc["preview"].startswith("data:image/png;base64,")
+    assert first_doc["file_url"].endswith(".pdf")
 
 
 def test_PDF를_파일로_받는다(app, client):
@@ -300,3 +301,87 @@ def test_영문으로_적으라고_안내한다(app):
     out = agent_service.turn({"message": "상업송장만 작성해줘", "draft": {}})
 
     assert "영문" in out["reply"]
+
+
+# --- 하나만 말해도 둘을 만든다 ------------------------------------------------------
+
+def test_패킹리스트만_말해도_상업송장까지_만든다(app):
+    """수출에는 둘을 함께 냅니다. 칸도 대부분 같아서 따로 물을 이유가 없습니다."""
+
+    out = agent_service.turn({"message": "그냥 만들어줘",
+                              "draft": {**DRAFT, "kind": "packing_list_std"}})
+
+    kinds = [row["kind"] for row in out["documents"]]
+    assert kinds == ["packing_list_std", "commercial_invoice"]
+    # 처음 말씀하신 것이 앞에 옵니다.
+    assert out["kind"] == "packing_list_std"
+
+
+def test_상업송장부터_말하면_그쪽이_앞에_온다(app):
+    out = agent_service.turn({"message": "그냥 만들어줘",
+                              "draft": {**DRAFT, "kind": "commercial_invoice"}})
+
+    assert [row["kind"] for row in out["documents"]] == [
+        "commercial_invoice", "packing_list_std"]
+
+
+def test_견적송장은_혼자_만든다(app):
+    """견적송장은 주문 전에 쓰는 것이라 포장명세서와 짝이 아닙니다."""
+
+    out = agent_service.turn({"message": "그냥 만들어줘",
+                              "draft": {**DRAFT, "kind": "proforma_invoice"}})
+
+    assert [row["kind"] for row in out["documents"]] == ["proforma_invoice"]
+
+
+def test_임시저장하고_운송일정을_안내한다(app):
+    out = agent_service.turn({"message": "그냥 만들어줘",
+                              "draft": {**DRAFT, "kind": "packing_list_std"}})
+
+    assert "임시" in out["reply"]
+    assert "운송 일정" in out["reply"]
+
+
+def test_창구가_두_서류의_그림을_모두_보낸다(app, client):
+    body = client.post("/api/agent", json={
+        "message": "그냥 만들어줘",
+        "draft": {**DRAFT, "kind": "packing_list_std"}}).get_json()["data"]
+
+    assert len(body["documents"]) == 2
+    for row in body["documents"]:
+        assert row["preview"].startswith("data:image/png;base64,")
+        assert row["file_url"].endswith(".pdf")
+
+
+# --- 원산지증명서는 챗봇이 그 자리에서 답한다 ----------------------------------------
+
+def test_원산지증명서는_창구를_바로_알려_준다(app):
+    """"어느 화면으로 가세요"라고 미루지 않습니다. 물어본 자리에서 답합니다."""
+
+    from app.services import support_chat_service
+
+    answer = support_chat_service.ask("원산지증명서는 어디서 받나요?")["data"]["answer"]
+
+    assert "대한상공회의소" in answer
+    assert "https://cert.korcham.net" in answer
+    assert "FTA 포털" in answer
+
+
+def test_원산지_답은_AI를_거치지_않는다(app):
+    """기관 주소를 AI에게 받아 적게 하면 없는 주소가 나옵니다."""
+
+    from app.services import support_chat_service
+
+    result = support_chat_service.ask("원산지증명서 발급 어떻게 하나요")
+
+    assert result["source"] == "calculated"
+
+
+def test_원산지를_그냥_언급만_하면_평소대로_답한다(app):
+    """"원산지증명서가 뭔가요"는 발급처를 묻는 말이 아닙니다."""
+
+    from app.services import support_chat_service
+
+    assert support_chat_service._asks_about_origin("원산지증명서는 어디서 받나요?") is True
+    assert support_chat_service._asks_about_origin("원산지증명서 신청 방법") is True
+    assert support_chat_service._asks_about_origin("원산지증명서가 뭔가요?") is False
