@@ -82,6 +82,13 @@ class Config:
     EXCHANGE_RATE_USD_KRW = float(os.getenv("EXCHANGE_RATE_USD_KRW", "1380"))
     API_TIMEOUT_SECONDS = float(os.getenv("API_TIMEOUT_SECONDS", "8"))
 
+    # 닿지 않은 기관을 이만큼 건너뜁니다. 0을 넣으면 매번 다시 부릅니다.
+    #
+    # 관세청이 막혀 있을 때 HS 검색 한 번이 여덟 번을 부르며 30초를 썼습니다.
+    # 화면은 20초에 끊으므로 아무것도 못 봤습니다. 한 번 닿지 않으면
+    # 그다음부터는 기다리지 않고 가지고 있는 자료로 답합니다.
+    API_OUTAGE_SECONDS = float(os.getenv("API_OUTAGE_SECONDS", "60"))
+
     # 선사·항공사 실스케줄. 둘 다 무료이고 따로 신청해야 합니다.
     # HMM_API_KEY: apiportal.hmm21.com (해상 항구간 스케줄, 시간당 300회)
     # DATA_GO_KR_SERVICE_KEY: data.go.kr 인천국제공항공사 화물기 운항 일정
@@ -140,3 +147,10 @@ class TestConfig(Config):
     # 아닙니다. 못 받으면 예시 값으로 넘어가는 길이 이미 있습니다.
     # (실데이터를 확인하는 테스트는 needs_customs_api로 건너뜁니다)
     API_TIMEOUT_SECONDS = 2.0
+
+    # 건너뛰기는 꺼 둡니다.
+    #
+    # 테스트는 일부러 끊긴 응답을 여러 번 흉내 냅니다. 켜 두면 첫 번째만
+    # 진짜로 불리고 나머지는 건너뛰어, 무엇을 보려던 테스트인지 알 수 없게
+    # 됩니다. 건너뛰기 자체를 보는 테스트는 그때만 켜서 봅니다.
+    API_OUTAGE_SECONDS = 0.0

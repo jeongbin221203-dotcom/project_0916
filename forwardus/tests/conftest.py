@@ -45,6 +45,17 @@ def _isolated_file_cache(tmp_path, monkeypatch):
     hs_open_client.clear_cache()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_outages():
+    """닿지 않은 기관을 건너뛴 기록이 테스트 사이에 넘어가지 않게 합니다."""
+
+    from app.collectors import base_client
+
+    base_client.clear_outages()
+    yield
+    base_client.clear_outages()
+
+
 @pytest.fixture()
 def app():
     flask_app = create_app(TestConfig)
