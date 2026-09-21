@@ -882,6 +882,7 @@
   let lastHsQuery = "";
   let lastHsError = "";
   let lastHsSearchedAs = "";
+  let lastHsPartial = "";      // 관세청이 아닌 곳에서 6자리만 찾았을 때의 안내
 
   // 품명(한글·영문)이나 HS부호로 관세청에서 찾습니다.
   async function fetchHsCodes(query, fallback) {
@@ -893,6 +894,7 @@
     const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: text })}`);
     // 영문·오타로 적어 다른 낱말로 바꿔 찾았으면 그 사실을 알려 줍니다.
     if (response.searched_as) lastHsSearchedAs = response.searched_as;
+    lastHsPartial = response.partial_note || "";
     if (!response.success) {
       // 결과가 없는 것과 조회가 안 된 것은 다릅니다. 섞어서 알리면 안 됩니다.
       lastHsError = response.message || "관세청 조회에 실패했습니다. 잠시 후 다시 시도해주세요.";
@@ -903,13 +905,27 @@
 
   // 영문·오타를 다른 낱말로 바꿔 찾았으면 목록 맨 위에 그 사실을 적습니다.
   function hsSearchedAsRow() {
-    if (!lastHsSearchedAs) return "";
-    return `<li class="ac_group">"${escapeHtml(lastHsQuery)}"를 `
-      + `<b>${escapeHtml(lastHsSearchedAs)}</b>로 보고 찾았습니다`
-      + `<small>관세청은 관세율표에 적힌 한글 품명으로만 찾습니다</small></li>`;
+    let html = "";
+    if (lastHsSearchedAs) {
+      html += `<li class="ac_group">"${escapeHtml(lastHsQuery)}"를 `
+        + `<b>${escapeHtml(lastHsSearchedAs)}</b>로 보고 찾았습니다`
+        + `<small>관세청은 관세율표에 적힌 한글 품명으로만 찾습니다</small></li>`;
+    }
+    // 관세청이 아닌 곳에서 찾으면 6자리까지만 나옵니다. 신고에 그대로 못 씁니다.
+    if (lastHsPartial) {
+      html += `<li class="ac_group ac_group_other"><b>앞 6자리만 찾았습니다</b>`
+        + `<small>${escapeHtml(lastHsPartial)}</small></li>`;
+    }
+    return html;
   }
 
   function renderHsItem(item) {
+    if (item.partial) {
+      return `<span class="ac_title"><b class="mono">${escapeHtml(item.code)}</b>`
+        + `<span class="badge warn">6자리</span></span>`
+        + `<small>${escapeHtml(item.name_en || item.name || "")}`
+        + (item.from ? ` · ${escapeHtml(item.from)}` : "") + `</small>`;
+    }
     const sub = [item.name_en, item.weight_unit ? `중량단위 ${item.weight_unit}` : "",
       item.source === "api" ? "관세청 HS부호" : "예시 목록"].filter(Boolean).join(" · ");
     return `<span class="mono">${escapeHtml(item.code)}</span>`

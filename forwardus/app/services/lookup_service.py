@@ -90,6 +90,13 @@ LOOKUPS = {
         "field": "보는 각도",
         "about": "어느 항구·공항으로 수출이 몰리는지, 어느 대륙으로 많이 나가는지 봅니다.",
     },
+    "hs_open": {
+        "label": "HS부호 (국제 출처 · 관세청 없이)",
+        "hint": "영문 품명이나 숫자로 찾습니다. UN·미국·영국을 함께 봅니다.",
+        "example": "shampoo",
+        "field": "품명(영문) 또는 HS부호",
+        "about": "관세청이 멈춰도 찾을 수 있습니다. 다만 앞 6자리까지만 나옵니다.",
+    },
     "hs_code": {
         "label": "HS부호",
         "hint": "품명(한글)이나 HS부호 10자리로 찾습니다.",
@@ -116,6 +123,9 @@ OTHER_KEYS = {"trade_stats": "DATA_GO_KR_SERVICE_KEY",
               "busiest_ports": "DATA_GO_KR_SERVICE_KEY",
               "trade_view": "DATA_GO_KR_SERVICE_KEY"}
 
+# 키가 아예 필요 없는 조회. 관세청이 멈춰도 됩니다.
+NO_KEY_NEEDED = {"hs_open"}
+
 # 결과 표의 칸. (키, 보여 줄 이름)
 COLUMNS = {
     "shipping_company": [("code", "선사부호"), ("korean_name", "한글 상호"),
@@ -132,6 +142,8 @@ COLUMNS = {
                     ("amount_krw", "환급액(원)"), ("basis", "기준"), ("start_date", "적용일")],
     "shortened_period": [("hs_code", "HS부호"), ("product", "품명"),
                          ("spec", "규격"), ("deadline", "이행기한")],
+    "hs_open": [("hs6", "HS 6자리"), ("name", "품명(영문)"),
+                ("from", "출처"), ("codes", "각 나라 부호")],
     "hs_code": [("code", "HS부호"), ("name", "품명"),
                 ("quantity_unit", "수량단위"), ("weight_unit", "중량단위")],
     "trade_view": [("name", "구분"), ("export_usd_thousand", "수출액(천달러)"),
@@ -154,7 +166,9 @@ def catalog() -> list[dict]:
     keys = get_config("UNIPASS_API_KEYS", {}) or {}
     rows = []
     for key, info in LOOKUPS.items():
-        if key in OTHER_KEYS:
+        if key in NO_KEY_NEEDED:
+            env, ready = "", True
+        elif key in OTHER_KEYS:
             env = OTHER_KEYS[key]
             ready = bool(get_config(env, ""))
         else:
@@ -186,6 +200,7 @@ def run(kind: str, query: str) -> dict:
         "refund_rate": lambda: customs_extra_client.refund_rate(text),
         "shortened_period": lambda: customs_extra_client.shortened_loading_period(text),
         "hs_code": lambda: customs_client.search_hs_codes(text),
+        "hs_open": lambda: _hs_open_rows(text),
         "trade_stats": lambda: _trade_rows(text),
         "busiest_ports": lambda: _port_rows(),
         "trade_view": lambda: _trade_view_rows(text),
@@ -213,6 +228,23 @@ def _port_rows() -> dict:
     if not result["success"]:
         return result
     return {**result, "data": result["data"]["rows"]}
+
+
+def _hs_open_rows(query: str) -> dict:
+    """무료 국제 출처에서 HS 6자리. 결과를 표에 맞게 폅니다."""
+
+    from app.collectors import hs_open_client
+
+    result = hs_open_client.search(query, limit=25)
+    if not result["success"]:
+        return result
+    rows = [{
+        "hs6": row["hs6"],
+        "name": row["names"][0] if row["names"] else "",
+        "from": " · ".join(row["sources"]),
+        "codes": " · ".join(row["codes"][:3]),
+    } for row in result["data"]["rows"]]
+    return {**result, "data": rows}
 
 
 def _trade_view_rows(view: str) -> dict:

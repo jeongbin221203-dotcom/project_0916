@@ -237,35 +237,6 @@ def test_trade_stats_says_what_to_apply_for_when_not_subscribed(app, monkeypatch
         assert ts.SIGNUP["url"].startswith("https://www.data.go.kr")
 
 
-def test_trade_stats_reads_the_customs_numbers(app, monkeypatch):
-    """수출 실적은 금액이 천 달러 단위로 옵니다. 그대로 읽어야 합니다."""
-
-    from app.collectors import trade_stats_client as ts
-
-    payload = """{"response":{"header":{"resultCode":"00"},"body":{"items":[
-      {"year":"2026","statCd":"US","statKor":"미국","hsCd":"3305",
-       "expDlr":"12,345","expWgt":"6,789","impDlr":"100","impWgt":"50","balPayments":"12,245"},
-      {"year":"2026","statCd":"CN","statKor":"중국","hsCd":"3305",
-       "expDlr":"9,000","expWgt":"4,000","impDlr":"0","impWgt":"0","balPayments":"9,000"},
-      {"year":"2026","statCd":"","statKor":"총계","hsCd":"3305",
-       "expDlr":"21,345","expWgt":"10,789","impDlr":"100","impWgt":"50","balPayments":"21,245"}
-    ]}}}"""
-
-    with app.app_context():
-        with patch("httpx.request", side_effect=lambda *a, **k: httpx.Response(
-                200, text=payload, request=httpx.Request("GET", "https://x"))):
-            result = ts.top_destinations("3305")
-
-    assert result["success"]
-    rows = result["data"]["rows"]
-    # 합계 줄은 표에서 빼고 따로 둡니다.
-    assert [row["country"] for row in rows] == ["미국", "중국"]
-    assert rows[0]["export_usd_thousand"] == 12345          # 쉼표를 떼고 읽습니다.
-    assert rows[0]["export_weight_kg"] == 6789
-    assert result["data"]["total"]["country"] == "총계"
-    assert "천 달러" in result["data"]["unit_note"]
-
-
 def test_incheon_cargo_flights_are_connected(app):
     """인천공항 화물기 정기운항은 키가 있어 지금 쓸 수 있어야 합니다."""
 

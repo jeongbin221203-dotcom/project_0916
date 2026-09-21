@@ -1007,9 +1007,13 @@ def test_selected_date_chips_are_small(app):
 
     css = Path("app/static/css/planning.css").read_text(encoding="utf-8")
     assert ".selected_date .date_item {" in css and "font-size: 11px" in css
-    # 화면 전체를 줄이는 설정은 두지 않습니다.
+
+    # 화면 전체는 키워 둡니다. 다만 좁은 화면에서는 배율을 낮춰
+    # 가로 스크롤이 생기지 않게 합니다.
     base = Path("app/static/css/base.css").read_text(encoding="utf-8")
-    assert "zoom" not in base
+    assert "--ui_scale: 1.15" in base
+    assert "zoom: var(--ui_scale)" in base
+    assert "@media (max-width: 900px) { :root { --ui_scale: 1; } }" in base
 
 
 def test_multiple_cargo_lines(app):

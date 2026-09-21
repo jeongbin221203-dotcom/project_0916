@@ -20,10 +20,19 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+
+/* 화면 배율. 글자만 키우면 칸과 여백이 그대로라 빽빽해 보입니다.
+   zoom은 글자·칸·여백을 함께 키웁니다. 좁은 화면에서는 가로 스크롤이
+   생기지 않도록 배율을 낮춥니다. */
+:root { --ui_scale: 1.15; }
+@media (max-width: 1280px) { :root { --ui_scale: 1.08; } }
+@media (max-width: 900px) { :root { --ui_scale: 1; } }
+
 body {
   margin: 0; min-width: 320px; background: var(--surface); color: var(--ink);
   font-family: Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  zoom: var(--ui_scale);
 }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }

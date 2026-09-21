@@ -170,21 +170,100 @@ def _hs_name_hints(query: str) -> list[str]:
 
 
 def search_hs_codes(query: str) -> dict:
-    """관세청 HS부호검색. 못 찾으면 품명을 바꿔 한 번 더 찾습니다."""
+    """관세청 HS부호검색. 못 찾으면 품명을 바꿔 한 번 더 찾습니다.
+
+    관세청이 멈추면 무료 국제 출처(UN·미국·영국)로 6자리라도 찾아 줍니다.
+    6자리는 신고에 그대로 쓸 수 없으므로 그렇다고 밝힙니다.
+    """
 
     text = (query or "").strip()
     found = customs_client.search_hs_codes(text)
-    if not found["success"] or found["data"] or not text:
+
+    # 관세청이 실데이터를 줬으면 그대로 씁니다.
+    if found["success"] and found["data"] and found["source"] == "api":
+        return found
+    if not text:
         return found
 
-    for name in _hs_name_hints(text):
-        if name == text:
+    if found["success"] and not found["data"]:
+        for name in _hs_name_hints(text):
+            if name == text:
+                continue
+            retry = customs_client.search_hs_codes(name)
+            if retry["success"] and retry["data"]:
+                # 무슨 낱말로 바꿔 찾았는지 화면에서 밝혀 줍니다.
+                return {**retry, "searched_as": name, "original_query": text}
+
+    # 관세청이 답하지 않거나 예시로 대체됐으면 국제 출처를 봅니다.
+    fallback = _hs_from_open_sources(text)
+    return fallback if fallback else found
+
+
+def _hs_from_open_sources(query: str) -> dict | None:
+    """무료 국제 출처에서 HS 6자리를 찾습니다. (키가 필요 없습니다)
+
+    관세청은 한글 품명으로만 찾고, 이쪽은 영문으로만 찾습니다. 그래서 한글로
+    적었으면 먼저 영문 품명으로 바꿔 봅니다.
+    """
+
+    from app.collectors import hs_open_client
+
+    candidates = [query]
+    if any("가" <= ch <= "힣" for ch in query):
+        candidates = _hs_english_hints(query) + candidates
+
+    for text in candidates:
+        result = hs_open_client.search(text, limit=10)
+        if not result["success"] or not result["data"]["rows"]:
             continue
-        retry = customs_client.search_hs_codes(name)
-        if retry["success"] and retry["data"]:
-            # 무슨 낱말로 바꿔 찾았는지 화면에서 밝혀 줍니다.
-            return {**retry, "searched_as": name, "original_query": text}
-    return found
+        rows = [{
+            "code": row["hs6"],
+            "name": row["names"][0] if row["names"] else "",
+            "name_en": row["names"][0] if row["names"] else "",
+            "quantity_unit": "", "weight_unit": "",
+            "partial": True,                 # 6자리라 신고에 그대로 못 씁니다.
+            "from": " · ".join(row["sources"]),
+        } for row in result["data"]["rows"]]
+        return {
+            "success": True, "source": "open", "data": rows,
+            "searched_as": text if text != query else "",
+            "original_query": query,
+            "partial_note": result["data"]["limit_note"],
+        }
+    return None
+
+
+HS_ENGLISH_PROMPT = """사용자가 수출할 물건의 이름을 한국어로 적었습니다.
+국제 HS 품목분류(영문)에서 그 물건을 찾을 때 쓸 영어 낱말을 최대 3개 고르세요.
+
+규칙
+- 관세율표에서 쓰는 일반 명사로만 답하세요. (치약 -> toothpaste, 가죽가방 -> leather bag)
+- 상표명은 빼고 물건 자체의 이름만 남기세요.
+- 무슨 물건인지 알 수 없으면 빈 목록을 주세요. 지어내지 마세요.
+
+JSON만 답하세요: {"words": ["toothpaste"]}"""
+
+
+def _hs_english_hints(query: str) -> list[str]:
+    """한글 품명을 국제 분류에서 찾을 영어 낱말로 바꿉니다."""
+
+    import json
+
+    from app.collectors import ai_client
+
+    if not ai_client.available():
+        return []
+    result = ai_client.chat([
+        {"role": "system", "content": HS_ENGLISH_PROMPT},
+        {"role": "user", "content": query[:200]},
+    ], max_tokens=100)
+    if not result["success"]:
+        return []
+    try:
+        words = json.loads(result["data"]).get("words") or []
+    except ValueError:
+        return []
+    return [str(word).strip()[:40] for word in words[:3] if str(word).strip()]
 
 
 def exchange_rates() -> dict:
