@@ -29,7 +29,7 @@ UN_JSON = """{"results":[
 
 
 def test_un_gives_six_digit_codes_that_are_the_same_worldwide(app):
-    hs._un_table.cache_clear()
+    hs.clear_cache()
     with app.app_context():
         with patch("httpx.request", side_effect=_reply(UN_JSON)):
             result = hs.search_un("shampoo")
@@ -44,7 +44,7 @@ def test_un_gives_six_digit_codes_that_are_the_same_worldwide(app):
 def test_un_search_by_number_narrows_from_the_top(app):
     """숫자로 찾으면 큰 갈래(류·호)부터 보여 줍니다."""
 
-    hs._un_table.cache_clear()
+    hs.clear_cache()
     with app.app_context():
         with patch("httpx.request", side_effect=_reply(UN_JSON)):
             rows = hs.search_un("3305")["data"]
@@ -68,7 +68,7 @@ def test_usitc_keeps_the_first_six_digits_separately(app):
 def test_search_merges_the_three_sources(app):
     """세 곳에서 같이 나온 부호를 먼저 보여 줍니다. 더 믿을 만합니다."""
 
-    hs._un_table.cache_clear()
+    hs.clear_cache()
 
     def route(method, url, **kwargs):
         if "comtradeapi" in url:
@@ -94,7 +94,7 @@ def test_search_merges_the_three_sources(app):
 def test_search_keeps_going_when_one_source_is_down(app):
     """한 곳이 죽어도 나머지로 답해야 합니다. 그게 이 기능의 목적입니다."""
 
-    hs._un_table.cache_clear()
+    hs.clear_cache()
 
     def route(method, url, **kwargs):
         if "comtradeapi" in url:

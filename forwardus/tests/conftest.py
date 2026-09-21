@@ -30,6 +30,21 @@ def _fresh_exchange_cache():
     exchange_client.clear_cache()
 
 
+@pytest.fixture(autouse=True)
+def _isolated_file_cache(tmp_path, monkeypatch):
+    """받아 둔 참고자료 파일(data/cache)을 테스트마다 빈 폴더로 바꿉니다.
+
+    실제 캐시가 남아 있으면 흉내 낸 응답 대신 그 파일을 읽어 버립니다.
+    """
+
+    from app.collectors import file_cache, hs_open_client
+
+    monkeypatch.setattr(file_cache, "cache_dir", lambda: tmp_path / "cache")
+    hs_open_client.clear_cache()
+    yield
+    hs_open_client.clear_cache()
+
+
 @pytest.fixture()
 def app():
     flask_app = create_app(TestConfig)

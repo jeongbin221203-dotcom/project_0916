@@ -47,7 +47,7 @@ SERVICES = {
     "departure_air": ("DEPARTURE_PERMIT_AIR", "tkofWrprQry", "retrieveFlghTkofPerm"),
     "departure_sea": ("DEPARTURE_PERMIT_SEA", "tkofWrprQry", "retrieveTkofWrpr"),
     "entry_departure": ("ENTRY_DEPARTURE_REPORT", "ioprRprtQry", "retrieveIoprRprtBrkd"),
-    "hs_navigation": ("HS_NAVIGATION", "hsSgnQry", "searchHsSgn"),
+    "hs_navigation": ("HS_NAVIGATION", "cmtrStatsQry", "retrieveCmtrStats"),
     "reexport_balance": ("REEXPORT_EXEMPTION_BALANCE", "expCmdtRsqtyInfoQry",
                          "retrieveExpCmdtRsqtyInfo"),
     "vin_export": ("EXPORT_PERFORMANCE_BY_VIN", "expFfmnBrkdCbnoQry",
@@ -76,6 +76,32 @@ def _call(name: str, params: dict, label: str, timeout: int = 25) -> dict:
 
 def _text(node, tag: str) -> str:
     return (node.findtext(tag) or "").strip()
+
+
+def hs_navigation(hs_code: str) -> dict:
+    """API043: ranked product-line counts for one HSK, not declaration counts."""
+    digits = "".join(ch for ch in hs_code if ch.isdigit())
+    if len(digits) != 10:
+        return fail("VALIDATION_ERROR", "api", "HS부호 10자리가 필요합니다.")
+    result = _call("hs_navigation", {"hsSgn": digits}, "HS 내비게이션", timeout=8)
+    if not result["success"]:
+        return result
+    root = result["data"]
+    if root.tag != "cmtrStatsQryRtnVo":
+        return fail("API_INVALID_RESPONSE", "api")
+    notice = _text(root, "ntceInfo")
+    if notice:
+        return fail("API_INVALID_REQUEST", "api", notice)
+    rows = []
+    for row in root.findall("cmtrStatsQryRsltVo"):
+        code = _text(row, "hs10Sgn")
+        count = _text(row, "prlstLnCnt").replace(",", "")
+        rank = _text(row, "acrsTcntRnk")
+        if code != digits or not count.isascii() or not count.isdigit():
+            return fail("API_INVALID_RESPONSE", "api", "내비게이션 건수를 확인할 수 없습니다.")
+        rows.append({"code": code, "name": _text(row, "prlstNm"),
+                     "count": int(count), "rank": int(rank) if rank.isdigit() else None})
+    return ok(rows, "api")
 
 
 def _iso(value: str) -> str:

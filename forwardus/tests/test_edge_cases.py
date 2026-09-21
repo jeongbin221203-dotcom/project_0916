@@ -237,15 +237,15 @@ def test_external_api_failures_never_break_the_page(app):
                     # 모양이 무너지면 화면이 다음 줄에서 죽습니다.
                     assert isinstance(result, dict) and "success" in result
 
-        # 끊기거나 느려도 마찬가지입니다. 예시 데이터로 넘어가면 그렇다고
-        # 표시해야 하고(source=mock), 넘어갈 것이 없으면 이유를 알려야 합니다.
+        # 끊기거나 느려도 마찬가지입니다. 내부 품목표나 예시 데이터로 넘어가면
+        # 그렇다고 표시해야 하고(source=internal/mock), 넘어갈 것이 없으면 이유를 알려야 합니다.
         for error in (httpx.ReadTimeout("느림"), httpx.ConnectError("끊김")):
             with patch("httpx.request", side_effect=error):
                 result = customs_client.search_hs_codes("샴푸")
                 assert isinstance(result, dict) and "success" in result
-                assert result["source"] in ("mock", "api")
+                assert result["source"] in ("mock", "internal", "api")
                 if result["success"]:
-                    assert result["source"] == "mock", "실데이터인 척하면 안 됩니다"
+                    assert result["source"] in ("mock", "internal"), "실데이터인 척하면 안 됩니다"
                 else:
                     assert result["message"]
 

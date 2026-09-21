@@ -22,7 +22,11 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from app.collectors import file_cache
 from app.collectors.base_client import fail, ok, request_text
+
+# WITS(UNCTAD TRAINS) 세율은 1년 단위 자료입니다.
+WITS_REFRESH_DAYS = 90
 
 WITS_URL = ("https://wits.worldbank.org/API/V1/SDMX/V21/rest/data/DF_WITS_Tariff_TRAINS/"
             "A.{reporter}.{partner}.{hs6}.reported/")
@@ -129,20 +133,33 @@ def _parse_wits(xml: str) -> dict | None:
     return latest
 
 
-@lru_cache(maxsize=512)
-def fetch_wits(reporter: str, partner: str, hs6: str) -> dict:
-    """도착국(reporter)이 partner산 물품에 매기는 HS6 세율. 최근 연도 값."""
+def fetch_wits(reporter: str, partner: str, hs6: str, *, timeout: float = 30) -> dict:
+    """도착국(reporter)이 partner산 물품에 매기는 HS6 세율. 최근 연도 값.
 
-    if not reporter or len(hs6) != 6:
+    WITS 세율은 1년에 한 번 갱신되므로 받은 값을 파일에 두고 WITS_REFRESH_DAYS 동안
+    다시 씁니다. 기한이 지나 새로 받지 못하면 예전 값을 씁니다(source="cache").
+    실패(시간 초과 등)는 저장하지 않아 다음 호출에서 다시 시도합니다.
+    """
+
+    if not reporter or len(hs6) != 6 or not hs6.isdigit():
         return fail("VALIDATION_ERROR", "api", "국가코드와 HS 6자리가 필요합니다.")
+    name = f"wits/{reporter}_{partner}_{hs6}"
+    cached = file_cache.read(name)
+    if cached and cached[1] <= WITS_REFRESH_DAYS:
+        return ok(cached[0], "api")
     result = request_text("GET", WITS_URL.format(reporter=reporter, partner=partner, hs6=hs6),
-                          timeout=30)
-    if not result["success"]:
+                          timeout=timeout)
+    if result["success"]:
+        row = _parse_wits(result["data"])
+    elif result.get("error_code") == "API_NOT_FOUND":
         # 자료가 없으면 404가 옵니다. 오류가 아니라 "없음"으로 돌려줍니다.
-        if result.get("error_code") == "API_NOT_FOUND":
-            return ok(None, "api")
+        row = None
+    elif cached:
+        return ok(cached[0], "cache")
+    else:
         return result
-    return ok(_parse_wits(result["data"]), "api")
+    file_cache.write(name, row)
+    return ok(row, "api")
 
 
 def fetch_us_hts(hs_prefix: str) -> dict:

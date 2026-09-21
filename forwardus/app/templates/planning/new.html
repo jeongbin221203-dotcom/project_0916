@@ -176,10 +176,18 @@
           </label>
           <div class="field autocomplete span2" data-autocomplete="hs_code">
             <span class="field_label">HS CODE <small class="muted">(선택)</small></span>
-            <input class="text_input" type="text" name="hs_code" autocomplete="off" placeholder="립스틱, 샴푸 또는 HS부호 10자리" data-ac-input>
+            <div class="hs_input_row">
+              <input class="text_input" type="text" name="hs_code" autocomplete="off" placeholder="립스틱, 샴푸 또는 HS부호 10자리" data-ac-input>
+              {# 적합도가 늘 먼저이고, 그다음 기준만 고릅니다. #}
+              <select class="hs_order" data-hs-order aria-label="HS 후보 정렬 기준 (적합도 다음)"
+                      title="적합도가 같은 후보끼리의 정렬 기준">
+                <option value="frequency">건수 많은 순</option>
+                <option value="tariff">관세 낮은 순</option>
+              </select>
+            </div>
             <ul class="ac_list" data-ac-list hidden></ul>
-            <small class="field_hint">관세청 HS부호검색으로 찾습니다. 품명은 한글·영문 모두 되고,
-              HS부호는 10자리를 모두 입력해야 조회됩니다.</small>
+            <small class="field_hint">AI가 품명을 해석하고 관세청에서 확인한 후보의 적합도·품목란 건수·도착국 관세를 비교합니다.
+              AI 적합도는 확정 분류가 아닙니다. 필요한 재질·성분·용도를 함께 적어주세요.</small>
           </div>
 
           <div class="tariff span2" data-tariff hidden></div>

@@ -71,7 +71,9 @@ def api_unlocode():
 
 @planning_bp.get("/api/hs-codes")
 def api_hs_codes():
-    result = planning_service.search_hs_codes(request.args.get("q", ""))
+    result = planning_service.search_hs_codes(request.args.get("q", ""), compare_navigation=True,
+                                             country=request.args.get("country", ""),
+                                             order=request.args.get("order", "frequency"))
     return jsonify(result), (200 if result["success"] else 502)
 
 

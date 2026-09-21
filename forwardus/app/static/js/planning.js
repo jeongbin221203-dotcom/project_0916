@@ -371,18 +371,22 @@
     const input = container.querySelector("[data-ac-input]");
     const list = container.querySelector("[data-ac-list]");
     let items = [];
+    let searchVersion = 0;
 
     let overrideQuery = null;
 
     const search = debounce(async () => {
-      list.innerHTML = `<li class="empty">검색 중…</li>`;
+      const version = ++searchVersion;
+      list.innerHTML = `<li class="empty">${escapeHtml(options.loadingMessage || "검색 중…")}</li>`;
       list.hidden = false;
       const query = overrideQuery === null ? input.value.trim() : overrideQuery;
       overrideQuery = null;
-      items = await fetchItems(query);
+      const fetched = await fetchItems(query);
+      if (version !== searchVersion) return;
+      items = fetched;
       if (!items.length) {
         const message = options.emptyMessage
-          ? options.emptyMessage()
+          ? options.emptyMessage(items)
           : `검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.`;
         list.innerHTML = `<li class="empty">${escapeHtml(message)}</li>`;
         return;
@@ -419,20 +423,20 @@
         });
       }
       // 목록 맨 위에 덧붙일 안내가 있으면 함께 그립니다. (예: 영문을 한글로 바꿔 찾음)
-      if (options.leadRow) html = options.leadRow() + html;
+      if (options.leadRow) html = options.leadRow(items) + html;
       list.innerHTML = html;
       // 목록을 그린 뒤 덧붙일 것이 있으면 (예: HS 후보별 협정) 이어서 채웁니다.
       if (options.afterRender) options.afterRender(items, list);
-    }, 200);
+    }, options.delayMs || 200);
 
-    input.addEventListener("input", () => { onSelect(null, input); search(); });
+    input.addEventListener("input", () => { ++searchVersion; onSelect(null, input); search(); });
     // 이미 고른 항구가 있어도 다시 누르면 전체 목록을 보여줍니다.
     input.addEventListener("focus", () => {
       input.select();
       overrideQuery = "";
       search();
     });
-    input.addEventListener("blur", () => setTimeout(() => { list.hidden = true; }, 150));
+    input.addEventListener("blur", () => { if (!options.keepOpen) setTimeout(() => { list.hidden = true; }, 150); });
     list.addEventListener("mousedown", (event) => {
       const li = event.target.closest("li[data-index]");
       if (!li) return;
@@ -442,13 +446,14 @@
     return {
       search,
       showAll() {
+        ++searchVersion;
         overrideQuery = "";
         search();
       },
       // 목록이 열려 있을 때만 다시 그립니다. 닫혀 있는데 다시 검색하면
       // 이미 고른 값("로테르담항 (NLRTM)")으로 검색해 빈 목록이 떠 버립니다.
       refresh() {
-        if (!list.hidden) search();
+        if (!list.hidden) { ++searchVersion; search(); }
       },
     };
   }
@@ -777,6 +782,16 @@
     }));
   }
 
+  // ? 아이콘. 마우스를 올리거나 키보드·탭으로 고르면 자세한 설명이 뜹니다.
+  // 화면에는 핵심만 두고, 긴 설명은 여기로 옮깁니다. lines는 빈 값을 건너뜁니다.
+  function infoTip(title, lines, { start = false } = {}) {
+    const body = lines.filter(Boolean).map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+    if (!body) return "";
+    return `<span class="info_tip${start ? " start" : ""}" tabindex="0" role="button" aria-label="${escapeHtml(title)} 자세히">`
+      + `<i aria-hidden="true">?</i><span class="info_tip_body" role="tooltip">`
+      + `<b>${escapeHtml(title)}</b>${body}</span></span>`;
+  }
+
   async function renderTariffFor(hs, country, slot) {
     if (!slot) return;
     const response = await getJson(`${urls.tariff}?${new URLSearchParams({ hs, country })}`);
@@ -791,18 +806,20 @@
     const period = (row) => (row.start_date
       ? `${row.start_date.slice(0, 4)}-${row.start_date.slice(4, 6)}-${row.start_date.slice(6)} 적용` : "");
 
-    let html = `<p class="tariff_head"><b>${escapeHtml(data.country)}</b>에 수출할 때 쓸 수 있는 협정`
-      + (data.hs_code ? ` <span class="mono">${escapeHtml(data.hs_code)}</span>` : "") + `</p>`;
+    // 제목 옆 ?에는 HS 6자리·세율 기준 같은 공통 안내를 넣습니다.
+    let html = `<p class="tariff_head"><span><b>${escapeHtml(data.country)}</b>에 수출할 때 쓸 수 있는 협정`
+      + (data.hs_code ? ` <span class="mono">${escapeHtml(data.hs_code)}</span>` : "") + `</span>`
+      + infoTip("협정세율 안내", [data.hs6_note, data.note], { start: true }) + `</p>`;
 
     if (data.agreements && data.agreements.length) {
+      // 한 줄에는 협정명·세율·적용일만. 협정 설명·증명서·발급처는 ?에 넣습니다.
       html += data.agreements.map((row) => `
         <div class="tariff_row">
           <span class="tariff_name">${escapeHtml(row.agreement)}</span>
           <span class="tariff_rate">${escapeHtml(rate(row.rate))}</span>
           <span class="tariff_period">${escapeHtml(period(row))}</span>
-          <span class="tariff_about">${escapeHtml(row.about || "")}</span>
-          <span class="tariff_proof">${escapeHtml(row.proof)}</span>
-          ${row.steps && row.steps.where ? `<span class="tariff_where">어디서: ${escapeHtml(row.steps.where)}</span>` : ""}
+          ${infoTip(row.agreement, [row.about, row.proof && `원산지증명: ${row.proof}`,
+            row.steps && row.steps.where && `발급처: ${row.steps.where}`])}
         </div>`).join("");
     }
     if (!data.agreements || !data.agreements.length) {
@@ -814,8 +831,10 @@
         + data.general.map((row) => `${escapeHtml(row.name)} ${escapeHtml(rate(row.rate))}`).join(" / ")
         + `</p>`;
     }
-    if (data.hs6_note) html += `<p class="tariff_note">${escapeHtml(data.hs6_note)}</p>`;
-    if (data.note) html += `<p class="tariff_note">${escapeHtml(data.note)}</p>`;
+    // 위 숫자를 도착국 관세로 오해하지 않게 이 한 줄은 늘 보입니다. (자세한 설명은 제목 옆 ?)
+    if (data.note) {
+      html += `<p class="tariff_note">위 세율은 한국 수입 기준입니다. ${escapeHtml(data.country)}이(가) 매기는 관세는 아래를 보세요.</p>`;
+    }
     if (!data.available && data.message) {
       html += `<p class="tariff_plain">${escapeHtml(data.message)}</p>`;
     }
@@ -846,8 +865,10 @@
     const spread = (row) => (row.lines > 1 && row.min !== row.max
       ? `${pct(row.min)}~${pct(row.max)} · 세분 ${row.lines}줄 · ` : "");
 
-    let html = `<p class="tariff_head">${escapeHtml(data.country)}에서 이 물품에 매기는 관세`
-      + ` <span class="mono">HS ${escapeHtml(data.hs6)}</span></p>`;
+    // 세율 출처·세분 부호 안내는 제목 옆 ?로 옮깁니다. 화면에는 세율과 조언만 둡니다.
+    let html = `<p class="tariff_head"><span>${escapeHtml(data.country)}에서 이 물품에 매기는 관세`
+      + ` <span class="mono">HS ${escapeHtml(data.hs6)}</span></span>`
+      + infoTip("도착국 관세 안내", [data.rate_note, data.national_note], { start: true }) + `</p>`;
 
     if (data.rates.length) {
       html += `<div class="dest_rates">` + data.rates.map((row) => (row.rate === null
@@ -859,8 +880,6 @@
     if (data.advice) {
       html += `<p class="dest_advice ${escapeHtml(data.advice.kind)}">${escapeHtml(data.advice.text)}</p>`;
     }
-    html += `<p class="tariff_note">${escapeHtml(data.rate_note)}</p>`;
-
     if (data.national) {
       const n = data.national;
       html += `<p class="dest_sub">${escapeHtml(n.label)} <small>${escapeHtml(n.digits)}${n.edition ? ` · ${escapeHtml(n.edition)} 기준` : ""}</small></p>`;
@@ -871,45 +890,65 @@
           + n.columns.map((c) => `<td>${cell(line[c.key])}</td>`).join("") + `</tr>`).join("")
         + `</tbody></table></div>`;
     }
-    html += `<p class="tariff_note">${escapeHtml(data.national_note)}</p>`
-      + `<a class="dest_link" href="${escapeHtml(data.link.url)}" target="_blank" rel="noopener noreferrer">`
+    html += `<a class="dest_link"href="${escapeHtml(data.link.url)}" target="_blank" rel="noopener noreferrer">`
       + `${escapeHtml(data.link.label)} 열기 <span aria-hidden="true">↗</span>`
       + `<small>새 창에서 열립니다</small></a>`;
     slot.innerHTML = html;
   }
 
   /* ----- HS부호 찾기 (첫 품목과 추가 품목이 같은 방식을 씁니다) ----- */
-  let lastHsQuery = "";
-  let lastHsError = "";
-  let lastHsSearchedAs = "";
-  let lastHsPartial = "";      // 관세청이 아닌 곳에서 6자리만 찾았을 때의 안내
+  const hsOrder = form.querySelector("[data-hs-order]");
+  const hsControllers = [];
 
   // 품명(한글·영문)이나 HS부호로 관세청에서 찾습니다.
   async function fetchHsCodes(query, fallback) {
     const text = (query || "").trim() || (fallback || "").trim();
-    lastHsQuery = text;
-    lastHsError = "";
-    lastHsSearchedAs = "";
-    if (!text) return [];
-    const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: text })}`);
-    // 영문·오타로 적어 다른 낱말로 바꿔 찾았으면 그 사실을 알려 줍니다.
-    if (response.searched_as) lastHsSearchedAs = response.searched_as;
-    lastHsPartial = response.partial_note || "";
-    if (!response.success) {
-      // 결과가 없는 것과 조회가 안 된 것은 다릅니다. 섞어서 알리면 안 됩니다.
-      lastHsError = response.message || "관세청 조회에 실패했습니다. 잠시 후 다시 시도해주세요.";
-      return [];
-    }
-    return response.data.map((item) => ({ ...item, source: response.source }));
+    if (text.length < 2) return Object.assign([], { hsMeta: { query: text } });
+    const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: text,
+      country: state.destination?.country_code || "", order: hsOrder?.value || "frequency" })}`, 120000);
+    const items = response.success ? response.data.map((item) => ({ ...item, source: response.source })) : [];
+    return Object.assign(items, { hsMeta: { ...response, query: text,
+      error: response.success ? "" : (response.message || "관세청 조회에 실패했습니다.") } });
   }
 
   // 영문·오타를 다른 낱말로 바꿔 찾았으면 목록 맨 위에 그 사실을 적습니다.
-  function hsSearchedAsRow() {
+  function hsSearchedAsRow(items) {
+    const meta = items.hsMeta || {};
+    const {query: lastHsQuery, searched_as: lastHsSearchedAs, ai_analysis: lastHsAnalysis,
+      ranking: lastHsRanking, ai_review: lastHsReview, navigation_summary: lastHsNavigation,
+      partial_note: lastHsPartial, offline_note: lastHsOffline} = meta;
     let html = "";
+    // 관세청이 멈춰 공개 품목표(기준일 있음)로 찾았으면 맨 위에 밝힙니다.
+    if (lastHsOffline) {
+      html += `<li class="ac_group ac_group_other"><b>내부 품목표로 찾았습니다</b>`
+        + `<small>${escapeHtml(lastHsOffline)}</small></li>`;
+    }
     if (lastHsSearchedAs) {
       html += `<li class="ac_group">"${escapeHtml(lastHsQuery)}"를 `
-        + `<b>${escapeHtml(lastHsSearchedAs)}</b>로 보고 찾았습니다`
-        + `<small>관세청은 관세율표에 적힌 한글 품명으로만 찾습니다</small></li>`;
+        + `<b>${escapeHtml(lastHsSearchedAs)}</b>로 넓혀 검색했습니다`
+        + `<small>검색어 후보입니다. 성분·용도에 맞는 품목을 선택하세요.</small></li>`;
+    }
+    if (lastHsAnalysis?.available) {
+      html += `<li class="ac_group"><b>AI 품명 해석</b><small>${escapeHtml(lastHsAnalysis.summary)}</small>`
+        + `<small>${escapeHtml([lastHsAnalysis.use && `용도: ${lastHsAnalysis.use}`,
+          lastHsAnalysis.material && `재질: ${lastHsAnalysis.material}`,
+          lastHsAnalysis.form && `형태: ${lastHsAnalysis.form}`].filter(Boolean).join(" · "))}</small>`
+        + (lastHsAnalysis.missing_details?.length
+          ? `<small>추가 확인: ${escapeHtml(lastHsAnalysis.missing_details.join(" / "))}</small>` : "") + `</li>`;
+    } else if (lastHsAnalysis?.message) {
+      html += `<li class="ac_group"><small>${escapeHtml(lastHsAnalysis.message)}</small></li>`;
+    }
+    if (lastHsReview && !lastHsReview.available && lastHsReview.message) {
+      html += `<li class="ac_group"><small>적합도 미확인: ${escapeHtml(lastHsReview.message)}</small></li>`;
+    }
+    if (lastHsRanking) {
+      html += `<li class="ac_group"><b>정렬: ${escapeHtml(lastHsRanking.label)}</b>`
+        + (lastHsRanking.mixed_years ? `<small>세율 기준연도가 달라 관세로 순서를 비교하지 않았습니다.</small>` : "") + `</li>`;
+    }
+    if (lastHsNavigation) {
+      html += `<li class="ac_group"><details><summary>통계·관세 비교 기준 · ${lastHsNavigation.compared}개 후보</summary>`
+        + `<small>${escapeHtml(lastHsNavigation.note)}</small>`
+        + `<small>${escapeHtml(lastHsRanking?.tariff_note || "")}</small></details></li>`;
     }
     // 관세청이 아닌 곳에서 찾으면 6자리까지만 나옵니다. 신고에 그대로 못 씁니다.
     if (lastHsPartial) {
@@ -926,14 +965,46 @@
         + `<small>${escapeHtml(item.name_en || item.name || "")}`
         + (item.from ? ` · ${escapeHtml(item.from)}` : "") + `</small>`;
     }
-    const sub = [item.name_en, item.weight_unit ? `중량단위 ${item.weight_unit}` : "",
-      item.source === "api" ? "관세청 HS부호" : "예시 목록"].filter(Boolean).join(" · ");
-    return `<span class="mono">${escapeHtml(item.code)}</span>`
-      + ` <b>${escapeHtml(item.name || item.name_en)}</b><small>${escapeHtml(sub)}</small>`;
+    // 내부 품목표에서 온 행은 기준일을 붙입니다. (AI 부호 확인에 쓴 행도 여기 해당)
+    const origin = item.base_date ? `관세청 품목표 · ${item.base_date} 기준`
+      : (item.source === "api" ? "관세청 HS부호" : "예시 목록");
+    const sub = [item.name_en, item.weight_unit ? `중량단위 ${item.weight_unit}` : "", origin]
+      .filter(Boolean).join(" · ");
+    // "기타"만으로는 무슨 물건인지 모릅니다. 상위 분류를 함께 보여 줍니다.
+    const pathLine = item.path?.length > 1
+      ? `<small>분류: ${escapeHtml(item.path.slice(1).join(" › "))}</small>` : "";
+    let stats = "";
+    const nav = item.navigation;
+    if (nav && nav.available) {
+      stats = `<small class="hs_stats"><b>조회 품목란 ${Number(nav.count).toLocaleString()}건</b>`;
+      if (nav.share !== null) stats += ` · 비교 후보 내 ${nav.share.toFixed(1)}%`
+        + (nav.gap_pp > 0 ? ` · 최다 후보와 ${nav.gap_pp.toFixed(1)}%p 차이` : " · 최다 건수");
+      stats += `</small><small>신고 품명 예: ` + nav.names.map((row) =>
+        `${escapeHtml(row.name)} (${Number(row.count).toLocaleString()}건)`).join(" · ") + `</small>`;
+    } else if (nav) {
+      stats = `<small>통계 확인 불가: ${escapeHtml(nav.message)}</small>`;
+    }
+    const tax = item.tariff;
+    if (tax?.available) {
+      stats += `<small class="hs_stats">${escapeHtml(tax.country)} · ${escapeHtml(tax.label)} `
+        + `<b>${escapeHtml(String(tax.rate))}%</b> · ${escapeHtml(String(tax.year))}년`
+        + (tax.min != null && tax.max != null ? ` · 범위 ${tax.min}~${tax.max}%` : "") + `</small>`;
+    } else if (tax) {
+      stats += `<small>관세 미확인: ${escapeHtml(tax.message)}</small>`;
+    }
+    const relevance = item.relevance;
+    const reason = relevance ? `<small><b>${escapeHtml(item.relevance_label)}</b> · ${escapeHtml(relevance.reason)}</small>`
+      + (relevance.missing_details?.length ? `<small>확인할 정보: ${escapeHtml(relevance.missing_details.join(" / "))}</small>` : "") : "";
+    return (item.priority ? `<span class="badge">${item.priority}순위</span> ` : "")
+      + `<span class="mono">${escapeHtml(item.code)}</span>`
+      + ` <b>${escapeHtml(item.name || item.name_en)}</b>${pathLine}${reason}<small>${escapeHtml(sub)}</small>${stats}`;
   }
 
-  function hsEmptyMessage() {
+  function hsEmptyMessage(items) {
+    const {query: lastHsQuery = "", error: lastHsError, ai_analysis: lastHsAnalysis} = items.hsMeta || {};
     if (lastHsError) return lastHsError;
+    if (lastHsAnalysis?.missing_details?.length) return `후보를 찾으려면 확인이 필요합니다: ${lastHsAnalysis.missing_details.join(" / ")}`;
+    if (lastHsQuery.length === 1) return "품명을 두 글자 이상 입력하세요.";
     const digits = lastHsQuery.replace(/[.\-\s]/g, "");
     if (/^\d+$/.test(digits) && digits.length !== 10) {
       return "HS부호는 10자리를 모두 입력해야 조회됩니다. 품명으로 찾아보세요.";
@@ -954,26 +1025,17 @@
     },
     {
       leadRow: hsSearchedAsRow,
-      // 도착국을 골랐으면 후보마다 그 나라에 쓸 수 있는 협정을 한 줄씩 붙입니다.
-      // 어느 부호를 골라야 유리한지 목록에서 바로 비교할 수 있습니다.
-      afterRender: async (items, list) => {
-        if (!state.destination || !items.length) return;
-        const codes = items.map((item) => item.code.replace(/[.\-\s]/g, "")).filter(Boolean);
-        const response = await getJson(`${urls.tariffSummary}?${new URLSearchParams({
-          hs: codes.join(","), country: state.destination.country_code })}`);
-        if (!response.success) return;
-        list.querySelectorAll("li[data-index]").forEach((li) => {
-          const item = items[Number(li.dataset.index)];
-          const summary = item && response.data[item.code.replace(/[.\-\s]/g, "")];
-          if (!summary) return;
-          li.insertAdjacentHTML("beforeend",
-            `<small class="ac_tariff ${escapeHtml(summary.status)}">`
-            + `${escapeHtml(state.destination.country)} · ${escapeHtml(summary.text)}</small>`);
-        });
-      },
+      keepOpen: true,
+      delayMs: 650,
+      loadingMessage: "AI 품명 해석·후보 적합도·건수·관세를 비교 중…",
       emptyMessage: hsEmptyMessage,
     },
   );
+  hsControllers.push(hsSearch);
+  hsOrder?.addEventListener("change", () => {
+    hsSearch.showAll();
+    hsControllers.slice(1).forEach((controller) => controller.refresh());
+  });
 
   // 품명을 한글로 적으면 HS부호 후보를 바로 띄웁니다. (고르는 것은 사람이 합니다)
   const suggestHsFromName = debounce(() => {
@@ -1271,8 +1333,10 @@
       (q) => fetchHsCodes(q, nameInput.value),
       renderHsItem,
       (item, input) => { if (item) { input.value = item.code; refreshTariff(); } },
-      { emptyMessage: hsEmptyMessage, leadRow: hsSearchedAsRow },
+      { emptyMessage: hsEmptyMessage, leadRow: hsSearchedAsRow, delayMs: 650, keepOpen: true,
+        loadingMessage: "AI 품명 해석·후보 적합도·건수·관세를 비교 중…" },
     );
+    hsControllers.push(hsRow);
     const suggest = debounce(() => {
       if (hsBox.querySelector("[data-ac-input]").value.trim()) return;
       if (nameInput.value.trim().length >= 2) hsRow.showAll();
