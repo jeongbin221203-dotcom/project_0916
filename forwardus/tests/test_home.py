@@ -11,43 +11,52 @@ from unittest.mock import patch
 from app.routes import home
 
 
-TABS = ["chat", "doc", "origin", "plan", "when"]
+ACTIONS = ["consult", "planning", "documents"]
 
 
-def test_다섯_갈래가_모두_있다(client):
+def test_빠른_시작_세_단추가_순서대로_있다(client):
+    import re
+
     html = client.get("/").get_data(as_text=True)
 
     assert "data-home-form" in html          # 적는 칸
-    for key in TABS:
-        assert f'data-home-tab="{key}"' in html
-        # 상담 말고는 펼쳐질 칸이 있어야 합니다.
-        if key != "chat":
-            assert f'data-doc-tab="{key}"' in html
+    assert re.findall(r'data-home-action="(\w+)"', html) == ACTIONS
+    # 단추는 적는 칸 **위**에 있어야 합니다. 아래에 있으면 눌러 볼 일이 없습니다.
+    assert html.index('class="home_actions"') < html.index("data-home-input")
 
 
-def test_탭_구성이_화면과_어긋나지_않는다(app):
+def test_단추_구성이_화면과_어긋나지_않는다(app):
     with app.test_request_context():
-        tabs = home._tabs()
+        actions = home.quick_actions()
 
-    assert [tab["key"] for tab in tabs] == TABS
-    # 상담만 적는 칸이고 나머지 넷은 서식 칸을 펼칩니다.
-    assert [tab["form"] for tab in tabs] == [False, True, True, True, True]
+    assert [row["key"] for row in actions] == ACTIONS
+    for row in actions:
+        # 누르면 우리가 먼저 말을 겁니다. 무엇부터 적을지 모르는 것이 가장 흔한 막힘입니다.
+        assert row["opener"]
+        assert row["examples"]
+        assert row["placeholder"]
 
 
-def test_상담은_이_화면에서_바로_답한다(app):
-    """상담만 넘어갈 자리가 없습니다. 여기서 답이 나와야 합니다."""
-
+def test_서류_작성에는_칸_채우기_길이_따로_있다(app):
     with app.test_request_context():
-        chat = home._tabs()[0]
+        documents = home.quick_actions()[2]
 
-    assert chat["go"] == ""
-    assert chat["examples"]
-    # 물어보는 것 말고 화물을 적어 칸을 채우는 길도 있어야 합니다.
-    assert chat["fill_label"]
+    assert documents["key"] == "documents"
+    assert documents["fill_label"]
+
+
+def test_홈에는_서식_칸을_두지_않는다(client):
+    """홈은 대화하는 자리입니다. 칸은 사이드바 화면으로 옮겼습니다."""
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert "data-doc-panel" not in html
+    assert "data-doc-input" not in html
+    assert "data-cal" not in html
 
 
 def test_일정과_운송과_서류가_같은_초안을_나눠_쓴다(app):
-    """탭이 갈렸다고 칸이 갈리면 안 됩니다. 한 건을 만드는 중이니까요."""
+    """갈래가 나뉘었다고 칸이 갈리면 안 됩니다. 한 건을 만드는 중이니까요."""
 
     from app.services import document_start_service as start
 
@@ -55,12 +64,27 @@ def test_일정과_운송과_서류가_같은_초안을_나눠_쓴다(app):
     assert tabs == {"when", "plan", "doc"}
 
 
-def test_일정_탭에_달력과_두_날짜가_있다(client):
-    html = client.get("/").get_data(as_text=True)
+def test_서류_작성_화면에_칸이_모두_모여_있다(client):
+    """홈에서 뺀 것들이 사라진 게 아니라 이리로 왔는지 봅니다."""
 
-    assert "data-cal" in html
+    import re
+
+    html = client.get("/documents/new").get_data(as_text=True)
+
+    assert re.findall(r'data-doc-nav="(\w+)"', html) == ["when", "plan", "doc", "origin"]
+    assert "data-cal" in html                                  # 일정 달력
     assert 'name="requested_departure_date"' in html
     assert 'name="buyer_required_date"' in html
+    for name in ("exporter_name", "buyer_name", "payment_terms", "shipping_marks", "lc_no"):
+        assert f'name="{name}"' in html, name
+
+
+def test_사이드바_서류_작성이_그_화면을_가리킨다(app, client):
+    from flask import url_for
+
+    with app.test_request_context():
+        assert url_for(home.RAIL_URLS["shipment"]) == "/documents/new"
+    assert "/documents/new" in client.get("/").get_data(as_text=True)
 
 
 def test_원산지증명서_창구가_이_건의_협정을_알려_준다(app, client, create_shipment):
@@ -205,13 +229,12 @@ def test_잠그면_시작_화면의_단추가_모두_막힌다(app, client):
     html = _locked(client)
 
     assert 'class="home_shell is_locked"' in html
-    # 탭 다섯 개가 전부 막혀야 합니다. 하나라도 열려 있으면 그리로 들어갑니다.
-    tabs = re.findall(r'<button type="button" role="tab".*?>', html, re.S)
-    assert len(tabs) == 5
-    assert all("disabled" in tab for tab in tabs)
+    # 세 단추가 전부 막혀야 합니다. 하나라도 열려 있으면 그리로 들어갑니다.
+    buttons = re.findall(r'<button type="button" role="tab".*?>', html, re.S)
+    assert len(buttons) == len(ACTIONS)
+    assert all("disabled" in button for button in buttons)
     assert re.search(r"<textarea[^>]*disabled", html)
     assert re.search(r'class="home_send"[^>]*disabled', html, re.S)
-    assert re.search(r'class="support_fab"[^>]*disabled', html, re.S)
     # 왼쪽 줄은 a와 button이 섞여 있어 감싸는 자리에서 막습니다.
     assert "inert" in html
 

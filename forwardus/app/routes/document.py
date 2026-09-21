@@ -7,10 +7,23 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
 
 from app.routes import error_response, load_shipment
 from app.services import (ServiceError, customs_filing_service, document_service,
-                          document_start_service, requirement_service)
+                          document_start_service, requirement_service, shipment_service)
 from app.validators import ValidationError
 
 document_bp = Blueprint("document", __name__, url_prefix="/documents")
+
+
+@document_bp.get("/new")
+def new():
+    """서식이 요구하는 칸을 직접 채워 서류를 만드는 화면.
+
+    예전에는 시작 화면 안에 있었는데, 홈은 대화하는 자리로 두고
+    칸을 채우는 일은 이리로 옮겼습니다. 사이드바 "서류 작성"이 여기입니다.
+    """
+
+    return render_template("document/new.html",
+                           checklist=document_start_service.checklist(),
+                           recent=shipment_service.list_shipments()[:3])
 
 
 @document_bp.post("/start")

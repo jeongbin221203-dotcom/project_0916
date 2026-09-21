@@ -70,19 +70,19 @@ a.rail_item.active .rail_icon { background: var(--surface); }
   max-height: 88px; margin: 0 auto; object-fit: contain; }
 .home_tagline { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
 
-/* ----- 무엇을 적을지 고르는 자리 ----- */
-.home_tabs {
+/* ----- 빠른 시작 셋 (적는 칸 바로 위) ----- */
+.home_actions {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-  margin: 28px 0 16px;
+  margin: 0 0 12px;
 }
-.home_tabs button {
+.home_actions button {
   padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px;
   background: var(--white); color: var(--muted);
   font-size: 13.5px; font-weight: 700; white-space: nowrap;
   transition: border-color .15s, color .15s, background .15s;
 }
-.home_tabs button:hover { border-color: #c7d7fd; color: var(--ink); }
-.home_tabs button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
+.home_actions button:hover { border-color: #c7d7fd; color: var(--ink); }
+.home_actions button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
 
 /* ----- 적는 칸 (두 배로 키웠습니다) ----- */
 .home_box {
@@ -174,7 +174,16 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 
 /* ----- 서류 작성 칸 -----
    가운데 폭(720px)보다 넓어야 칸이 두 줄로 들어갑니다. */
-.home_doc { width: min(920px, 100vw - 32px); margin: 8px auto 0; text-align: left; }
+/* 서류 작성 화면(/documents/new). 칸이 두 줄로 들어가려면 넓어야 합니다. */
+.doc_page { width: min(920px, 100%); margin: 0 auto; text-align: left; }
+.doc_nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.doc_nav button {
+  padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--white); color: var(--muted);
+  font-size: 13.5px; font-weight: 700; white-space: nowrap;
+}
+.doc_nav button:hover { border-color: #c7d7fd; color: var(--ink); }
+.doc_nav button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
 
 .doc_head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .doc_head h2 { margin: 0 0 4px; }
@@ -363,18 +372,18 @@ a.rail_item.active .rail_icon { background: var(--surface); }
    흐리게만 두면 안 됩니다. 눌러 보고 아무 일도 안 일어나면 고장으로
    보입니다. 그래서 커서까지 "안 됨"으로 바꾸고, 왜 그런지 적어 둡니다. */
 .home_shell.is_locked .home_rail,
-.home_shell.is_locked .home_tabs,
+.home_shell.is_locked .home_actions,
 .home_shell.is_locked .home_box {
   opacity: .5;
   filter: grayscale(.55);
 }
 .home_shell.is_locked .home_rail,
-.home_shell.is_locked .home_tabs button,
+.home_shell.is_locked .home_actions button,
 .home_shell.is_locked .home_box {
   pointer-events: none;
   user-select: none;
 }
-.home_shell.is_locked .home_tabs button,
+.home_shell.is_locked .home_actions button,
 .home_shell.is_locked .home_send,
 .home_shell.is_locked .home_box textarea { cursor: not-allowed; }
 .home_shell.is_locked .home_box { box-shadow: none; background: #f8fafc; }

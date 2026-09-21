@@ -1,10 +1,10 @@
-/* 시작 화면의 서식 칸.
-   일정선택 · 운송계획 · 서류작성 · 원산지증명서 네 탭이 form 하나를 나눠 씁니다.
+/* 서류 작성 화면(/documents/new)의 서식 칸.
+   일정 · 운송 · 서류 · 원산지증명서 네 갈래가 form 하나를 나눠 씁니다.
    한 곳에 적은 값이 다른 곳에서 그대로 쓰이게 하려는 것입니다. */
 (function () {
   "use strict";
 
-  const config = window.FORWARDUS_HOME;
+  const config = window.FORWARDUS_DOC;
   const panel = document.querySelector("[data-doc-panel]");
   if (!config || !panel) return;
 
@@ -37,19 +37,26 @@
       + "어디서 어떤 서식으로 받는지 알려 드리고, 받으신 PDF를 등록하면 이 건과 맞는지 봅니다."],
   };
 
-  // home.js가 탭을 바꿀 때 부릅니다.
   function showDocTab(key) {
     panel.querySelectorAll("[data-doc-tab]").forEach((box) => {
       box.hidden = box.dataset.docTab !== key;
     });
+    panel.querySelectorAll("[data-doc-nav]").forEach((button) => {
+      const on = button.dataset.docNav === key;
+      button.classList.toggle("active", on);
+      button.setAttribute("aria-selected", on ? "true" : "false");
+    });
     const about = ABOUT[key] || ABOUT.doc;
     titleEl.textContent = about[0];
     leadEl.innerHTML = about[1];
-    // form은 서류/일정/운송 탭에서만 씁니다. 원산지는 이 건이 있어야 해서 밖에 있습니다.
+    // form은 서류/일정/운송에서만 씁니다. 원산지는 이 건이 있어야 해서 밖에 있습니다.
     form.hidden = key === "origin";
     if (key === "origin") openOrigin();
   }
-  window.FORWARDUS_DOC_TAB = showDocTab;
+
+  panel.querySelectorAll("[data-doc-nav]").forEach((button) => {
+    button.addEventListener("click", () => showDocTab(button.dataset.docNav));
+  });
 
   /* ----- 고르는 칸 (해상/항공, FCL/LCL) ----- */
   panel.querySelectorAll("[data-doc-choice]").forEach((group) => {
@@ -293,7 +300,7 @@
   const originPick = panel.querySelector("[data-origin-pick]");
 
   panel.querySelector("[data-origin-goto-doc]")?.addEventListener("click", () => {
-    document.querySelector('[data-home-tab="doc"]')?.click();
+    showDocTab("doc");
   });
   originPick?.addEventListener("change", () => {
     if (originPick.value) loadOrigin(originPick.value);
@@ -420,7 +427,7 @@
       </div>`;
     resultEl.hidden = false;
     resultEl.querySelector("[data-go-origin]").addEventListener("click", () => {
-      document.querySelector('[data-home-tab="origin"]')?.click();
+      showDocTab("origin");
     });
     resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -474,5 +481,18 @@
   addItem();
   applyMode("SEA");
   drawCalendar();
+  showDocTab("doc");
   score();
+
+  // 시작 화면에서 "적은 내용으로 칸 채우기"를 누르고 넘어온 경우.
+  // 한 번만 집어 가고 지웁니다. 새로고침 때마다 되살아나면 방금 고친 값을 덮습니다.
+  try {
+    const stashed = window.sessionStorage.getItem("forwardus:doc-draft");
+    if (stashed) {
+      window.sessionStorage.removeItem("forwardus:doc-draft");
+      window.FORWARDUS_DOC_FILL(JSON.parse(stashed));
+    }
+  } catch (error) {
+    /* 저장 공간이 없거나 내용이 깨졌으면 빈 칸으로 시작합니다. */
+  }
 })();

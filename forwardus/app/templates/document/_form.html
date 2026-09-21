@@ -1,6 +1,8 @@
 {# 서류가 요구하는 칸. 목록은 document_start_service.checklist()가 정합니다.
-   탭 넷(일정선택·운송계획·서류작성·원산지증명서)이 form 하나를 나눠 씁니다.
-   한 곳에 적은 값이 다른 곳에서 그대로 쓰이게 하려는 것입니다. #}
+
+   네 갈래(일정·운송·서류·원산지증명서)가 form 하나를 나눠 씁니다.
+   한 곳에 적은 값이 다른 곳에서 그대로 쓰이게 하려는 것입니다.
+   일정에서 고른 날짜로 운송에서 스케줄을 찾고, 그 출항일이 서류에 인쇄됩니다. #}
 
 {% macro doc_field(field, prefix='') %}
   {% set name = prefix ~ field.name %}
@@ -54,7 +56,15 @@
   </section>
 {% endmacro %}
 
-<div class="home_doc" data-doc-panel hidden>
+<div class="doc_page" data-doc-panel>
+  {# 네 갈래를 오가는 줄. 순서는 사람이 실제로 정하는 순서입니다. #}
+  <div class="doc_nav" role="tablist" aria-label="무엇부터 채울까요">
+    <button type="button" role="tab" data-doc-nav="when">🗓 일정</button>
+    <button type="button" role="tab" data-doc-nav="plan">🚢 운송</button>
+    <button type="button" role="tab" data-doc-nav="doc" class="active">📄 서류</button>
+    <button type="button" role="tab" data-doc-nav="origin">🏅 원산지증명서</button>
+  </div>
+
   <div class="doc_head">
     <div>
       <h2 data-doc-title>서류에 필요한 것</h2>

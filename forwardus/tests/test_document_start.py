@@ -154,10 +154,11 @@ def test_빈_내용을_보내면_거절한다(app, client):
     assert response.get_json()["success"] is False
 
 
-def test_시작_화면에_서류_칸이_펼쳐져_있다(client):
-    html = client.get("/").get_data(as_text=True)
+def test_서류_작성_화면에_칸이_펼쳐져_있다(client):
+    """칸은 홈이 아니라 사이드바의 서류 작성 화면에 있습니다."""
 
-    assert 'data-home-tab="doc"' in html
+    html = client.get("/documents/new").get_data(as_text=True)
+
     assert "data-doc-panel" in html
     # 서식이 요구하는 칸 이름이 실제로 화면에 있어야 합니다.
     for name in ("exporter_name", "buyer_name", "payment_terms", "shipping_marks", "lc_no"):

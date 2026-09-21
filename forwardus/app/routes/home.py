@@ -5,43 +5,53 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
-from app.services import (ServiceError, document_start_service, intake_service,
-                          shipment_service, support_chat_service)
+from app.services import (ServiceError, intake_service, shipment_service,
+                          support_chat_service)
 from app.validators import ValidationError
 
 home_bp = Blueprint("home", __name__)
 
 
-def _tabs() -> list[dict]:
-    """시작 화면의 다섯 갈래.
+def quick_actions() -> list[dict]:
+    """적는 칸 바로 위의 세 단추.
 
-    상담만 적는 칸 하나로 끝나고, 나머지 넷은 서식 칸을 펼칩니다.
-    넷은 **같은 초안 하나**를 나눠 씁니다. 일정에서 고른 날짜가 운송계획의
-    스케줄 조회에 쓰이고, 그 결과가 서류의 출항일이 되는 식입니다.
+    누르면 그 모드로 대화가 시작됩니다. 칸을 펼치지 않습니다 — 칸은
+    사이드바의 화면에 있고, 여기는 말로 하는 자리입니다.
+
+    `opener`는 눌렀을 때 AI가 먼저 건네는 말입니다. 사람이 무엇부터 적어야
+    할지 모르는 것이 가장 흔한 막힘이라, 첫 질문을 우리가 던집니다.
     """
 
     return [
-        # 여기 적은 글로 두 가지를 합니다. 물어보거나, 서류 초안을 채우거나.
-        {"key": "chat", "icon": "💬", "label": "상담", "go": "", "form": False,
-         "placeholder": ("궁금한 것을 물어보세요. 보내실 화물을 적으면 서류 칸을 채워 드립니다.\n"
-                         "예) 부산에서 LA로 11월 초에 치약 500박스, 한 박스 40x30x25cm에 "
-                         "12kg, 전부 25,000달러 FOB로 보냅니다"),
-         "hint": ("관세율·운임 같은 숫자는 짐작해서 답하지 않고 조회 화면으로 안내합니다. "
-                  "화물을 적으셨다면 <b>서류 초안 채우기</b>를 눌러 주세요."),
-         "fill_label": "📄 서류 초안 채우기",
+        {"key": "consult", "icon": "💬", "label": "무역 상담",
+         "placeholder": "수출하면서 막히는 것을 물어보세요",
+         "hint": "관세율·운임 같은 숫자는 짐작해서 답하지 않고 조회 화면으로 안내합니다.",
+         "opener": "수출 절차에서 막히는 것을 물어보세요. 어떤 것이든 좋습니다.",
          "examples": ["수출할 때 꼭 필요한 서류가 뭔가요?",
                       "FOB랑 CIF는 어떻게 다른가요?",
                       "원산지증명서는 어디서 받나요?",
                       "인코텀즈는 어떻게 고르나요?",
                       "적재의무기한이 뭔가요?"]},
-        {"key": "doc", "icon": "📄", "label": "서류작성", "go": "", "form": True,
-         "placeholder": "", "hint": "", "examples": []},
-        {"key": "origin", "icon": "🏅", "label": "원산지증명서", "go": "", "form": True,
-         "placeholder": "", "hint": "", "examples": []},
-        {"key": "plan", "icon": "📦", "label": "운송계획", "go": "", "form": True,
-         "placeholder": "", "hint": "", "examples": []},
-        {"key": "when", "icon": "🗓", "label": "일정선택", "go": "", "form": True,
-         "placeholder": "", "hint": "", "examples": []},
+        {"key": "planning", "icon": "📦", "label": "운송 계획",
+         "placeholder": "어디서 어디로, 무엇을 언제 보내시나요",
+         "hint": "출발·도착지와 화물을 알려 주시면 스케줄과 물류비를 찾아 드립니다.",
+         "opener": "어디서 어디로 보내시나요? 출발지와 도착지를 알려 주세요.",
+         "examples": ["부산에서 로스앤젤레스로 11월 초에 보냅니다",
+                      "치약 500박스, 한 박스 40x30x25cm에 12kg입니다",
+                      "항공으로 보내면 얼마나 걸리나요?"]},
+        {"key": "documents", "icon": "📄", "label": "서류 작성",
+         "placeholder": "어떤 서류가 필요하신가요",
+         "hint": "필요한 서류만 골라 그 서류에 들어가는 것만 여쭤봅니다.",
+         "opener": "어떤 서류가 필요하신가요? 상업송장·포장명세서 중에 고르셔도 되고, "
+                   "둘 다 필요하시면 그렇게 말씀해 주세요.\n\n"
+                   "보내실 화물을 한 번에 적어 주시면 서류 칸을 채워 드립니다. "
+                   "적으신 뒤 **적은 내용으로 칸 채우기**를 눌러 주세요.",
+         # 적은 글에서 값을 뽑아 서류 작성 화면의 칸을 채웁니다.
+         "fill_label": "📄 적은 내용으로 칸 채우기",
+         "examples": ["패킹리스트만 만들어줘",
+                      "상업송장만 작성해줘",
+                      "부산에서 LA로 치약 500박스, 한 박스 40x30x25cm에 12kg",
+                      "마시는 수액 HS코드 알려줘"]},
     ]
 
 
@@ -55,19 +65,17 @@ RAIL = [
      "note": "Buyer 납기일에서 거꾸로 언제 보내야 하는지 계산합니다"},
 ]
 
-RAIL_URLS = {"planning": "planning.new", "shipment": "shipment.index",
+RAIL_URLS = {"planning": "planning.new", "shipment": "document.new",
              "reverse": "planning.index"}
 
 
 @home_bp.get("/")
 def index():
     rail = [{**item, "url": url_for(RAIL_URLS[item["key"]])} for item in RAIL]
-    # 통화 목록은 여기서 채우지 않습니다. 관세청에서 받아오는 값이라 기관이
-    # 멈추면 시작 화면이 통째로 기다리게 됩니다. 환율 계산기를 펼칠 때
-    # 따로 받아 옵니다.
+    # 서식 칸은 더 이상 여기서 만들지 않습니다. 사이드바의 "서류 작성"
+    # 화면(/documents/new)으로 옮겼습니다. 홈은 대화하는 자리입니다.
     return render_template("home/index.html", recent=shipment_service.list_shipments()[:3],
-                           tabs=_tabs(), rail=rail,
-                           checklist=document_start_service.checklist())
+                           actions=quick_actions(), rail=rail)
 
 
 @home_bp.post("/api/intake")

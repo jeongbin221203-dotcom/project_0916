@@ -5,7 +5,7 @@
 {% block main_class %}home_main{% endblock %}
 {% block content %}
   <div class="home_shell {{ 'is_locked' if home_locked }}">
-    {# 왼쪽 줄. 가운데는 적는 칸만 남기고 갈 곳은 전부 이리로 모았습니다. #}
+    {# 왼쪽 줄. 칸을 채우는 화면들은 전부 이리로 모았습니다. #}
     <aside class="home_rail" aria-label="바로가기"
            {% if home_locked %}aria-disabled="true" inert{% endif %}>
       <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page">
@@ -81,44 +81,41 @@
         <p class="home_tagline">수출, 처음이어도 됩니다</p>
       </div>
 
-      {# 무엇을 적을 자리인지 고릅니다. 셋 다 글을 적어 쓰는 기능입니다. #}
-      <div class="home_tabs" role="tablist" aria-label="무엇을 하시겠어요">
-        {% for tab in tabs %}
-          <button type="button" role="tab" data-home-tab="{{ tab.key }}"
-                  class="{{ 'active' if loop.first }}"
-                  aria-selected="{{ 'true' if loop.first else 'false' }}"
-                  {{ 'disabled' if home_locked }}>
-            <span aria-hidden="true">{{ tab.icon }}</span> {{ tab.label }}
-          </button>
-        {% endfor %}
-      </div>
-
-      {# 상담 답변이 쌓이는 자리. 다른 탭은 해당 화면으로 넘어갑니다. #}
+      {# 대화가 쌓이는 자리 #}
       <div class="home_log" data-home-log hidden></div>
 
-      {# 대화를 시작하면 이 덩어리가 화면 아래에 붙습니다. #}
+      {# 적는 칸 덩어리. 대화를 시작하면 화면 아래에 붙습니다. #}
       <div class="home_composer" data-home-composer>
+        {# 빠른 시작 셋. 적는 칸 바로 위에 둡니다. #}
+        <div class="home_actions" role="tablist" aria-label="무엇을 도와드릴까요">
+          {% for action in actions %}
+            <button type="button" role="tab" data-home-action="{{ action.key }}"
+                    class="{{ 'active' if loop.first }}"
+                    aria-selected="{{ 'true' if loop.first else 'false' }}"
+                    {{ 'disabled' if home_locked }}>
+              <span aria-hidden="true">{{ action.icon }}</span> {{ action.label }}
+            </button>
+          {% endfor %}
+        </div>
+
         <form class="home_box" data-home-form>
           <textarea data-home-input rows="3" maxlength="2000"
                     {{ 'disabled' if home_locked }}
-                    placeholder="{{ tabs[0].placeholder }}"
+                    placeholder="{{ actions[0].placeholder }}"
                     aria-label="물어볼 내용"></textarea>
           <div class="home_box_foot">
             <div class="home_chips" data-home-chips></div>
             <button class="home_send" type="submit" aria-label="보내기"
-                  {{ 'disabled' if home_locked }}>↑</button>
+                    {{ 'disabled' if home_locked }}>↑</button>
           </div>
         </form>
         {% if home_locked %}
-        <p class="home_hint locked_note">이 화면은 지금 보기 전용입니다.
-          <b>위쪽 메뉴</b>로 이용해 주세요.</p>
-      {% else %}
-        <p class="home_hint" data-home-hint>{{ tabs[0].hint }}</p>
-      {% endif %}
+          <p class="home_hint locked_note">이 화면은 지금 보기 전용입니다.
+            <b>위쪽 메뉴</b>로 이용해 주세요.</p>
+        {% else %}
+          <p class="home_hint" data-home-hint>{{ actions[0].hint }}</p>
+        {% endif %}
       </div>
-
-      {# "서류 작성" 탭에서만 펼쳐지는 칸들 #}
-      {% include "home/_doc_form.html" %}
      </div>
     </div>
   </div>
@@ -126,14 +123,11 @@
 {% block scripts %}
   <script>
     window.FORWARDUS_HOME = {
-      tabs: {{ tabs|tojson }},
+      actions: {{ actions|tojson }},
       chatUrl: "{{ url_for('home.api_support_chat') }}",
       ratesUrl: "{{ url_for('planning.api_exchange_rate') }}",
       intakeUrl: "{{ url_for('home.api_intake') }}",
-      locationsUrl: "{{ url_for('planning.api_locations') }}",
-      schedulesUrl: "{{ url_for('planning.api_schedules') }}",
-      startUrl: "{{ url_for('document.start') }}",
-      originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}",
+      docFormUrl: "{{ url_for('document.new') }}",
       locked: {{ 'true' if home_locked else 'false' }}
     };
   </script>
@@ -141,6 +135,5 @@
      보이기만 그런 것이 아니라 실제로 아무 일도 하지 않아야 합니다. #}
   {% if not home_locked %}
     <script src="{{ static_url('js/home.js') }}"></script>
-    <script src="{{ static_url('js/doc_form.js') }}"></script>
   {% endif %}
 {% endblock %}

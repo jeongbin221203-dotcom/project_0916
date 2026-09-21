@@ -102,8 +102,11 @@ class Config:
     # 관세청 조회 · Dashboard)만 그대로 씁니다.
     #
     # 보여 주기용으로 시작 화면만 막아 둘 때 씁니다.
-    # .env에 HOME_LOCKED=0 을 넣으면 다시 열립니다.
-    HOME_LOCKED = os.getenv("HOME_LOCKED", "1") == "1"
+    #
+    # 기본은 열어 둡니다. 시작 화면이 이제 대화하는 주 화면이라, 잠근 채로
+    # 두면 이 서비스의 본체가 통째로 안 보입니다.
+    # 발표나 시연 때만 .env에 HOME_LOCKED=1 을 넣어 잠그세요.
+    HOME_LOCKED = os.getenv("HOME_LOCKED", "0") == "1"
 
 
 class TestConfig(Config):

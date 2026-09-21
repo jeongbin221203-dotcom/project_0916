@@ -1,4 +1,5 @@
-/* 시작 화면. 적는 칸 하나로 상담·컨테이너 조회·HS부호 찾기를 나눠 보냅니다. */
+/* 시작 화면. 대화가 중심이고, 칸을 채우는 화면은 사이드바에 있습니다.
+   적는 칸 위의 세 단추가 무엇에 대해 이야기할지를 정합니다. */
 (function () {
   "use strict";
 
@@ -13,14 +14,13 @@
   const sendButton = stage.querySelector(".home_send");
   const hintEl = document.querySelector("[data-home-hint]");
   const logEl = document.querySelector("[data-home-log]");
-
-  let current = config.tabs[0];
-  // 상담은 앞선 대화를 이어서 봅니다. 서버가 뒤쪽 몇 개만 씁니다.
-  const history = [];
-
-  const docPanel = document.querySelector("[data-doc-panel]");
   const centerEl = document.querySelector("[data-home-center]");
-  const composerEl = document.querySelector("[data-home-composer]");
+
+  let current = config.actions[0];
+  // 대화는 이어서 봅니다. 서버가 뒤쪽 몇 개만 씁니다.
+  const history = [];
+  // 어느 모드에서 처음 인사를 건넸는지. 같은 말을 두 번 하지 않으려고 둡니다.
+  const greeted = new Set();
 
   // 한 번 묻고 나면 인사를 접고 적는 칸을 화면 아래에 붙입니다.
   // 답이 쌓이는 동안에도 다시 묻는 자리가 늘 같은 곳에 있어야 합니다.
@@ -28,48 +28,38 @@
     centerEl.classList.add("talking");
   }
 
-  /* ----- 탭 ----- */
-  function showTab(tab) {
-    current = tab;
-
-    // "서류 작성"은 한 줄로 받을 수 없어 적는 칸 대신 서식 칸을 펼칩니다.
-    const asForm = Boolean(tab.form);
-    composerEl.hidden = asForm;
-    hintEl.hidden = asForm;
-    if (docPanel) docPanel.hidden = !asForm;
-    if (asForm) {
-      logEl.hidden = true;
-      // 서식 칸 네 탭은 같은 form을 나눠 씁니다. 어느 쪽을 펼칠지 알려 줍니다.
-      if (window.FORWARDUS_DOC_TAB) window.FORWARDUS_DOC_TAB(tab.key);
-      return;
-    }
-
-    input.placeholder = tab.placeholder;
-    hintEl.innerHTML = tab.hint;
-    // 서류 초안 채우기를 맨 앞에 두고, 자주 묻는 질문을 그 옆으로 한 줄에 늘어놓습니다.
-    const fill = tab.fill_label
-      ? `<button type="button" class="chip_fill" data-home-fill>${escapeHtml(tab.fill_label)}</button>`
+  /* ----- 무엇에 대해 이야기할지 ----- */
+  function showAction(action, { greet = false } = {}) {
+    current = action;
+    input.placeholder = action.placeholder;
+    hintEl.innerHTML = action.hint;
+    // 칸을 채우는 단추는 성격이 달라 맨 앞에 따로 둡니다.
+    const fill = action.fill_label
+      ? `<button type="button" class="chip_fill" data-home-fill>${escapeHtml(action.fill_label)}</button>`
       : "";
-    chipsBox.innerHTML = fill + (tab.examples || [])
+    chipsBox.innerHTML = fill + (action.examples || [])
       .map((text) => `<button type="button" data-home-chip>${escapeHtml(text)}</button>`)
       .join("");
-    // 상담이 아닌 탭은 그 화면으로 넘어가므로 답변 자리를 비워 둡니다.
-    if (tab.go) {
-      logEl.hidden = true;
-    } else if (logEl.children.length) {
-      logEl.hidden = false;
+    if (logEl.children.length) logEl.hidden = false;
+
+    // 사람이 무엇부터 적어야 할지 모르는 것이 가장 흔한 막힘입니다.
+    // 단추를 누르면 우리가 먼저 말을 겁니다.
+    if (greet && action.opener && !greeted.has(action.key)) {
+      greeted.add(action.key);
+      say("bot", action.opener);
     }
     resize();
   }
 
-  document.querySelectorAll("[data-home-tab]").forEach((button) => {
+  document.querySelectorAll("[data-home-action]").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll("[data-home-tab]").forEach((other) => {
+      document.querySelectorAll("[data-home-action]").forEach((other) => {
         const on = other === button;
         other.classList.toggle("active", on);
         other.setAttribute("aria-selected", on ? "true" : "false");
       });
-      showTab(config.tabs.find((tab) => tab.key === button.dataset.homeTab) || config.tabs[0]);
+      const picked = config.actions.find((a) => a.key === button.dataset.homeAction);
+      showAction(picked || config.actions[0], { greet: true });
       input.focus();
     });
   });
@@ -102,17 +92,26 @@
       say("bad", response.message);
       return;
     }
-    if (window.FORWARDUS_DOC_FILL) window.FORWARDUS_DOC_FILL(response.data.form);
+    // 서류 작성 화면이 집어 갈 수 있게 놓아 둡니다. 탭을 새로 열면
+    // 사라지는 것이 맞습니다 — 확정은 그 화면에서 사람이 합니다.
+    try {
+      window.sessionStorage.setItem("forwardus:doc-draft",
+                                    JSON.stringify(response.data.form));
+    } catch (error) {
+      /* 저장 공간이 없으면 링크만 드립니다. */
+    }
 
     // 무엇을 채웠고 무엇이 비었는지 말해 줍니다. 조용히 채우면 확인을 안 합니다.
     const filled = response.data.filled.length;
     const notes = response.data.notes.length
       ? "\n\n확인해 주세요\n" + response.data.notes.map((note) => `- ${note}`).join("\n")
       : "";
-    // 탭을 대신 넘기지 않습니다. 넘기면 이 안내가 가려져서, 무엇이 확인이
+    // 화면을 대신 넘기지 않습니다. 넘기면 이 안내가 가려져서, 무엇이 확인이
     // 필요한 값인지 모른 채 그대로 서류가 만들어집니다.
-    say("bot", `칸 ${filled}개를 채웠습니다. 위의 **서류작성** 탭에서 값이 맞는지 봐 주세요.`
-      + " 채운 값은 그대로 서류가 됩니다." + notes);
+    say("bot", `칸 ${filled}개를 채웠습니다.` + notes);
+    const link = say("bot", "");
+    link.innerHTML = `<a class="button primary" href="${escapeHtml(config.docFormUrl)}">`
+      + "서류 작성 화면에서 확인하기 →</a>";
     input.value = "";
     resize();
   }
@@ -201,13 +200,6 @@
     const text = input.value.trim();
     if (!text) {
       input.focus();
-      return;
-    }
-    // 적을 자리가 따로 있는 기능은 그 화면으로 글을 들고 넘어갑니다.
-    if (current.go) {
-      const url = new URL(current.go, window.location.origin);
-      url.searchParams.set("q", text);
-      window.location.href = url.pathname + url.search;
       return;
     }
     input.value = "";
@@ -309,5 +301,5 @@
     if (event.key === "Escape") flyouts.forEach((box) => setFlyout(box, false));
   });
 
-  showTab(current);
+  showAction(current);
 })();
