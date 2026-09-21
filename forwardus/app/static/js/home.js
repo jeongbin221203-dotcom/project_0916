@@ -194,6 +194,75 @@
     history.push({ role: "user", content: question }, { role: "assistant", content: answer });
   }
 
+  /* ----- 서류 만들기 -----
+     "패킹리스트만 만들어줘" 같은 말을 받으면, 그 서식이 요구하는 칸만
+     되묻고 채워지는 대로 초안을 그려 보여 줍니다. */
+  let docDraft = {};
+
+  async function askAgent(message) {
+    say("me", message);
+    const waiting = say("bot wait", "보고 있습니다…");
+    sendButton.disabled = true;
+
+    const response = await postJson(config.agentUrl, { message, draft: docDraft }, 90000);
+    sendButton.disabled = false;
+    waiting.remove();
+
+    if (!response.success) {
+      say("bad", response.message);
+      return;
+    }
+    const data = response.data;
+    docDraft = data.draft || docDraft;
+    say("bot", data.reply);
+
+    // AI가 확인 못 한 값이 있으면 같이 알려 줍니다. 조용히 넘어가면
+    // 틀린 값이 그대로 서류가 됩니다.
+    (data.notes || []).forEach((note) => say("bad", note));
+
+    if (data.preview) showDraft(data);
+  }
+
+  function showDraft(data) {
+    const row = say("bot", "");
+    row.innerHTML = `
+      <figure class="draft_sheet">
+        <img src="${data.preview}" alt="${escapeHtml(data.title)} 초안">
+      </figure>
+      <div class="draft_actions">
+        <button type="button" class="button primary" data-draft-pdf>PDF로 받기</button>
+        <a class="button" href="${escapeHtml(config.planningUrl)}">운송 계획 잡기 →</a>
+      </div>`;
+    row.querySelector("[data-draft-pdf]").addEventListener("click", (event) =>
+      downloadPdf(event.currentTarget, data));
+  }
+
+  async function downloadPdf(button, data) {
+    button.disabled = true;
+    const label = button.textContent;
+    button.textContent = "만드는 중…";
+    try {
+      const response = await fetch(data.file_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draft: docDraft }),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      // 서버에 파일을 남기지 않습니다. 받은 그대로 저장창을 띄웁니다.
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = (data.kind || "document") + "_draft.pdf";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      say("bad", "PDF를 만들지 못했습니다. 다시 눌러 주세요.");
+    }
+    button.disabled = false;
+    button.textContent = label;
+  }
+
   /* ----- 보내기 ----- */
   stage.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -204,7 +273,9 @@
     }
     input.value = "";
     resize();
-    askSupport(text);
+    // 서류 작성에서는 서류를 만드는 창구로, 나머지는 상담으로 보냅니다.
+    if (current.key === "documents") askAgent(text);
+    else askSupport(text);
   });
 
   /* ----- 환율 계산기 -----

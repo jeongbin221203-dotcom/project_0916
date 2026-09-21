@@ -1,17 +1,32 @@
 /* 시작 화면. 갈 곳은 왼쪽 줄로 모으고, 가운데는 적는 칸 하나만 둡니다.
    색·글꼴·버튼은 base.css의 것을 그대로 씁니다. */
 
-:root { --rail_w: 92px; }
+:root { --rail_w: 92px; --header_h: 62px; }
 .home_main { padding: 0 0 72px; }
 
-.home_shell { display: flex; align-items: flex-start; }
+/* 왼쪽 줄을 fixed로 띄우고, 본문은 그 폭만큼 비켜 줍니다. */
+.home_shell { display: block; }
 
 /* ----- 왼쪽 줄 ----- */
+/* 왼쪽 줄은 화면에 붙여 둡니다.
+
+   sticky로는 안 됩니다. body에 zoom: 1.15가 걸려 있어서 sticky가 스크롤
+   위치를 어긋나게 잡습니다. 반면 fixed는 같은 조건에서 잘 동작합니다 —
+   화면 아래에 붙는 적는 칸이 이미 fixed로 잘 붙어 있습니다. 그쪽과 같은
+   방식으로 맞췄습니다.
+
+   높이는 zoom을 되돌려 계산합니다. zoom이 s일 때 화면 V픽셀을 채우려면
+   이 안에서는 V/s 픽셀이어야 합니다. 머리말은 여기 기준 62px이므로
+   100vh / s - 62px 가 머리말 아래로 남는 자리입니다. */
 .home_rail {
-  position: sticky; top: 0; flex: 0 0 var(--rail_w);
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 20px 8px; min-height: 100vh;
+  position: fixed; left: 0; top: var(--header_h); z-index: 40;
+  width: var(--rail_w);
+  height: calc(100vh / var(--ui_scale) - var(--header_h));
   background: var(--white); border-right: 1px solid var(--line);
+}
+.rail_inner {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 16px 8px; height: 100%;
 }
 .rail_item { position: relative; width: 100%; }
 .rail_item > a, .rail_item > button, a.rail_item {
@@ -34,7 +49,8 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 
 /* 최근 Shipment는 내용이 있어 옆으로 펼칩니다. 줄 안에 넣기엔 넓습니다. */
 .rail_flyout {
-  position: absolute; left: calc(100% + 10px); top: 0; z-index: 30;
+  /* 화면 아래에 붙는 적는 칸(z-index 25)보다 위에 있어야 가려지지 않습니다. */
+  position: absolute; left: calc(100% + 10px); top: 0; z-index: 70;
   width: 310px; padding: 16px; text-align: left;
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--white); box-shadow: 0 12px 36px rgba(15, 23, 42, .14);
@@ -55,7 +71,7 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 /* home_stage는 남는 자리를 다 차지하고, 실제 내용 폭은 home_center가 정합니다.
    폭을 home_stage에 걸면 flex-grow가 이겨서 화면 끝까지 늘어납니다. */
 .home_stage {
-  flex: 1 1 auto; min-width: 0;
+  margin-left: var(--rail_w); min-width: 0;
   padding: clamp(36px, 8vh, 88px) 16px 0;
   text-align: center;
 }
@@ -103,10 +119,16 @@ a.rail_item.active .rail_icon { background: var(--surface); }
    보내기 단추가 멀어집니다. 넘치면 옆으로 밀어 봅니다. */
 .home_chips {
   display: flex; flex-wrap: nowrap; gap: 7px;
-  flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none;
-  padding-bottom: 2px;
+  flex: 1 1 auto; min-width: 0; overflow-x: auto;
+  padding-bottom: 6px;
+  /* 막대를 보여 줍니다. 숨기면 옆으로 더 있다는 걸 알 수가 없습니다. */
+  scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
+  overscroll-behavior-x: contain;
 }
-.home_chips::-webkit-scrollbar { display: none; }
+.home_chips::-webkit-scrollbar { height: 6px; }
+.home_chips::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.home_chips::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.home_chips::-webkit-scrollbar-track { background: transparent; }
 .home_chips button {
   flex: 0 0 auto;
   padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px;
@@ -161,10 +183,14 @@ a.rail_item.active .rail_icon { background: var(--surface); }
   :root { --rail_w: 0px; }
   .home_shell { flex-direction: column; }
   .home_rail {
-    position: static; flex: none; flex-direction: row; width: 100%; min-height: 0;
-    justify-content: center; gap: 2px; padding: 10px 8px; overflow-x: auto;
+    position: static; width: 100%; height: auto;
     border-right: 0; border-bottom: 1px solid var(--line);
   }
+  .rail_inner {
+    flex-direction: row; justify-content: center; height: auto;
+    gap: 2px; padding: 10px 8px; overflow-x: auto;
+  }
+  .home_stage { margin-left: 0; }
   .rail_item { width: auto; }
   .rail_item > a, .rail_item > button, a.rail_item { padding: 6px 10px; }
   .rail_flyout { left: auto; right: 0; top: calc(100% + 8px); width: min(310px, 90vw); }
@@ -264,23 +290,35 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 /* ----- 대화가 시작되면 -----
    인사는 접고, 적는 칸을 화면 아래에 붙입니다. 답이 쌓이는 동안에도
    묻는 자리가 늘 같은 곳에 있어야 다시 묻기 쉽습니다. */
-.home_center.talking { padding-bottom: 210px; }
+/* 대화가 시작되면 적는 칸을 절반 높이로 줄입니다.
+   처음에는 넓은 칸이 "길게 적어도 된다"는 뜻이지만, 답이 쌓이기 시작하면
+   그 높이가 읽을 자리를 그만큼 잡아먹습니다. */
+.home_center.talking { padding-bottom: 132px; }
 .home_center.talking .home_hello { display: none; }
 .home_center.talking .home_log { margin-top: 8px; }
 
 .home_center.talking .home_composer {
   position: fixed; left: var(--rail_w); right: 0; bottom: 0; z-index: 25;
-  padding: 18px 16px 18px;
+  padding: 8px 16px 10px;
   /* 위로 흘러 올라간 답이 칸 뒤로 비쳐 보이지 않게 덮습니다. */
-  background: linear-gradient(to bottom, rgba(244, 247, 251, 0), var(--surface) 30%);
+  background: linear-gradient(to bottom, rgba(244, 247, 251, 0), var(--surface) 26%);
 }
 .home_center.talking .home_box,
-.home_center.talking .home_hint { width: min(720px, 100%); margin-inline: auto; }
-.home_center.talking .home_box textarea { min-height: 56px; font-size: 16px; }
-.home_center.talking .home_hint { margin-top: 8px; text-align: center; }
+.home_center.talking .home_actions { width: min(720px, 100%); margin-inline: auto; }
+
+.home_center.talking .home_actions { margin-bottom: 8px; }
+.home_center.talking .home_actions button { padding: 6px 13px; font-size: 12.5px; }
+
+.home_center.talking .home_box { padding: 12px 16px 8px; border-radius: 20px; }
+.home_center.talking .home_box textarea { min-height: 42px; font-size: 15.5px; }
+.home_center.talking .home_box_foot { margin-top: 8px; gap: 10px; }
+.home_center.talking .home_chips button { padding: 5px 11px; font-size: 12px; }
+.home_center.talking .home_send { width: 38px; height: 38px; font-size: 17px; }
+/* 안내 문구는 처음 한 번 읽으면 됩니다. 대화 중에는 자리만 차지합니다. */
+.home_center.talking .home_hint { display: none; }
 
 @media (max-width: 860px) {
-  .home_center.talking { padding-bottom: 190px; }
+  .home_center.talking { padding-bottom: 124px; }
 }
 
 /* ----- 환율 계산기 ----- */
@@ -395,3 +433,12 @@ a.rail_item.active .rail_icon { background: var(--surface); }
   margin-top: 16px; font-size: 13.5px; color: var(--muted);
 }
 .home_shell.is_locked .locked_note b { color: var(--ink); }
+
+/* ----- 대화창에 붙는 서류 초안 ----- */
+.draft_sheet { margin: 4px 0 0; padding: 0; }
+.draft_sheet img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: #fff; box-shadow: var(--shadow);
+}
+.draft_actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }

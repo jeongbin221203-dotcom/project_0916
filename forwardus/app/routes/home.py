@@ -5,8 +5,8 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
-from app.services import (ServiceError, intake_service, shipment_service,
-                          support_chat_service)
+from app.services import (ServiceError, agent_service, draft_document_service,
+                          intake_service, shipment_service, support_chat_service)
 from app.validators import ValidationError
 
 home_bp = Blueprint("home", __name__)
@@ -90,6 +90,28 @@ def api_intake():
         return jsonify({"success": True, "data": intake_service.read(payload.get("text", ""))})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
+
+
+@home_bp.post("/api/agent")
+def api_agent():
+    """대화로 서류를 만드는 창구.
+
+    서버는 상태를 갖지 않습니다. 지금까지 모은 값(draft)은 브라우저가
+    들고 다니고 매번 같이 보냅니다.
+    """
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = agent_service.turn(payload)
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+
+    # 다 그렸으면 그림까지 함께 보냅니다. 대화창에 바로 붙습니다.
+    if result.get("stage") == "made":
+        result["preview"] = draft_document_service.preview(
+            result["kind"], result["draft"])
+        result["file_url"] = url_for("document.draft_file", kind=result["kind"])
+    return jsonify({"success": True, "data": result})
 
 
 @home_bp.post("/api/support-chat")

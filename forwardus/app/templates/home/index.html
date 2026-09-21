@@ -8,6 +8,9 @@
     {# 왼쪽 줄. 칸을 채우는 화면들은 전부 이리로 모았습니다. #}
     <aside class="home_rail" aria-label="바로가기"
            {% if home_locked %}aria-disabled="true" inert{% endif %}>
+     {# 흰 바탕은 바깥(aside)이 끝까지 채우고, 붙어 있는 것은 안쪽입니다.
+        한 덩어리로 두면 body의 zoom 때문에 100vh 계산이 어긋나 밀려 올라갑니다. #}
+     <div class="rail_inner">
       <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page">
         <span class="rail_icon" aria-hidden="true">🏠</span>
         <small>홈</small>
@@ -64,6 +67,7 @@
           </div>
         </div>
       {% endif %}
+     </div>
     </aside>
 
     <div class="home_stage">
@@ -127,6 +131,8 @@
       chatUrl: "{{ url_for('home.api_support_chat') }}",
       ratesUrl: "{{ url_for('planning.api_exchange_rate') }}",
       intakeUrl: "{{ url_for('home.api_intake') }}",
+      agentUrl: "{{ url_for('home.api_agent') }}",
+      planningUrl: "{{ url_for('planning.new') }}",
       docFormUrl: "{{ url_for('document.new') }}",
       locked: {{ 'true' if home_locked else 'false' }}
     };

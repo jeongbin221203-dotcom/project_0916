@@ -2,15 +2,36 @@
 
 from __future__ import annotations
 
+import io
+
 from flask import (Blueprint, flash, jsonify, redirect, render_template,
-                   request, url_for)
+                   request, send_file, url_for)
 
 from app.routes import error_response, load_shipment
 from app.services import (ServiceError, customs_filing_service, document_service,
-                          document_start_service, requirement_service, shipment_service)
+                          document_start_service, draft_document_service,
+                          requirement_service, shipment_service)
 from app.validators import ValidationError
 
 document_bp = Blueprint("document", __name__, url_prefix="/documents")
+
+
+@document_bp.post("/draft/<kind>.pdf")
+def draft_file(kind: str):
+    """초안을 PDF로 내려받습니다.
+
+    저장해 둔 것을 주는 게 아니라 그때그때 그려서 줍니다. 초안은 확정이
+    아니라 서버에 남길 이유가 없습니다.
+    """
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        data = draft_document_service.pdf_bytes(kind, payload.get("draft") or {})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return send_file(io.BytesIO(data), mimetype="application/pdf",
+                     as_attachment=True,
+                     download_name=draft_document_service.file_name(kind))
 
 
 @document_bp.get("/new")

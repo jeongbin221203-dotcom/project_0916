@@ -41,7 +41,8 @@ DOCUMENT_FIELDS = {
         "consignee_address", "pol", "pod", "final_destination", "incoterms", "carriage_by",
         "country_of_origin", "shipment_time", "product_description", "hs_code", "quantity", "package_type",
         "unit_price", "invoice_value", "currency", "shipping_marks", "payment_terms", "bank_info", "remarks",
-        "signed_by",
+        # 견적송장은 서명이 둘입니다. ㉔ Buyer가 받아들이고 ㉕ Seller가 냅니다.
+        "accepted_by", "signed_by",
     ],
     "shipping_instruction": [
         "doc_no", "doc_date", "booking_no", "exporter", "exporter_address", "consignee", "consignee_address",
@@ -93,6 +94,8 @@ FIELD_LABELS = {
     "payment_terms": "Payment Terms",
     "shipping_marks": "Shipping Marks",
     "signed_by": "Signed by",
+    # 견적송장에만 있는 Buyer 쪽 서명란입니다.
+    "accepted_by": "Accepted by (Buyer)",
     "validity_date": "Validity date of P/I",
     "po_no": "Buyer's P/O Number",
     "final_destination": "Final destination",

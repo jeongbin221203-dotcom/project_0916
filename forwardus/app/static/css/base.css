@@ -247,17 +247,23 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .text_input.is_locked { background: #f1f5f9; color: var(--muted); }
 
 /* 고객 상담 — 화면 오른쪽 아래에 떠 있는 버튼과 상담창 */
+/* 고객 상담 단추. 고래 그림 하나만 둡니다.
+   바탕을 깔지 않습니다 — 투명한 그림 뒤에 색이 비치면 테두리가 각지게 보입니다.
+   그림자는 그림 모양을 따라가도록 filter로 줍니다. */
 .support_fab { position: fixed; right: 26px; bottom: 26px; z-index: 60;
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 15px 26px; border: 0; border-radius: 999px;
-  background: var(--blue); color: #fff; font-size: 15px; font-weight: 800;
-  box-shadow: 0 12px 30px rgba(43,102,246,.35); cursor: pointer; transition: .15s; }
-.support_fab:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(43,102,246,.42); }
-/* 그림을 흰 동그라미에 담습니다. 파란 단추 위에 파란 고래를 그냥 올리면
-   테두리가 묻힙니다. 올리신 그림이 어떤 바탕이든 이러면 또렷합니다. */
-.support_face { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
-  background: #fff; object-fit: cover; }
-.support_fab.is_open { background: var(--ink); box-shadow: 0 12px 30px rgba(15,23,42,.3); }
+  display: grid; place-items: center;
+  width: 88px; height: 88px; padding: 0; border: 0; border-radius: 50%;
+  background: none; color: #fff; font-size: 15px; font-weight: 800;
+  filter: drop-shadow(0 10px 18px rgba(15,23,42,.24));
+  cursor: pointer; transition: transform .15s, filter .15s; }
+/* 그림이 없을 때만 쓰는 예비 모양 */
+.support_fab:has(.support_word) { width: auto; height: auto; padding: 15px 26px;
+  border-radius: 999px; background: var(--blue);
+  box-shadow: 0 12px 30px rgba(43,102,246,.35); filter: none; }
+.support_fab:hover { transform: translateY(-3px) scale(1.05);
+  filter: drop-shadow(0 14px 24px rgba(15,23,42,.32)); }
+.support_face { width: 88px; height: 88px; object-fit: contain; }
+.support_fab.is_open { transform: scale(.92); }
 
 .support_panel { position: fixed; right: 26px; bottom: 96px; z-index: 61;
   display: flex; flex-direction: column; width: 380px; max-width: calc(100vw - 32px);
@@ -292,6 +298,7 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .support_form button { white-space: nowrap; }
 
 @media (max-width: 520px) {
-  .support_fab { right: 16px; bottom: 16px; padding: 13px 20px; font-size: 14px; }
+  .support_fab { right: 16px; bottom: 16px; width: 70px; height: 70px; }
+  .support_face { width: 70px; height: 70px; }
   .support_panel { right: 16px; left: 16px; bottom: 80px; width: auto; }
 }
