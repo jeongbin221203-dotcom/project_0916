@@ -41,30 +41,85 @@ JUST_MAKE = ("그냥", "없어", "없습니다", "없음", "빈칸", "빈 칸", 
              "생략", "건너", "패스", "바로", "지금", "이대로", "그대로", "만들어",
              "보여", "작성")
 
-# 사람이 적어 줄 수 있는 칸. 서식 칸 이름과 짝지어 둡니다.
-# (Shipment를 만들 때 쓰는 이름과 서식 칸 이름이 달라서 여기서 잇습니다)
-ASK_LABELS = {
-    "exporter_name": "보내는 회사 이름",
-    "exporter_address": "보내는 회사 주소",
-    "buyer_name": "받는 회사 이름 (Consignee)",
-    "buyer_address": "받는 회사 주소",
-    "origin_code": "출발지 (항구·공항)",
-    "destination_code": "도착지 (항구·공항)",
-    "incoterms": "거래 조건 (FOB · CIF 같은 것)",
-    "currency": "통화 (USD 같은 것)",
-    "invoice_no": "송장 번호",
-    "buyer": "Buyer (받는 곳과 다를 때만)",
-    "other_references": "기타 참조",
-    "payment_terms": "결제 조건",
-    "lc_no": "L/C 번호와 날짜",
-    "shipping_marks": "화인 (Shipping Marks)",
-    "remarks": "비고",
-    "bank_info": "은행 정보",
-    "validity_date": "견적 유효기한",
-    "po_no": "Buyer 주문번호",
-    "signed_by": "서명 (보내는 쪽)",
-    "accepted_by": "서명 (받는 쪽)",
+# 사람이 적어 줄 수 있는 칸.
+#
+# 세 가지를 같이 들고 다닙니다.
+#   ko    우리말 이름 — 무엇을 묻는지
+#   en    서식에 인쇄되는 영문 칸 이름 — 종이와 화면을 나란히 놓고 보게
+#   note  무엇을 어떻게 적는지, 조심할 것
+# group은 표에서 묶어 보여 줄 덩어리입니다.
+FIELDS = {
+    "exporter_name": {
+        "group": "기본 정보", "ko": "보내는 회사 이름", "en": "Shipper / Exporter",
+        "note": "수출자 상호. 사업자등록증의 영문 상호와 같아야 합니다"},
+    "exporter_address": {
+        "group": "기본 정보", "ko": "보내는 회사 주소", "en": "Exporter Address",
+        "note": "영문 주소, 담당자명, 연락처"},
+    "buyer_name": {
+        "group": "기본 정보", "ko": "받는 회사 이름", "en": "Consignee",
+        "note": "수입자 상호. 신용장 거래면 To order... 조건을 확인하세요"},
+    "buyer_address": {
+        "group": "기본 정보", "ko": "받는 회사 주소", "en": "Consignee Address",
+        "note": "영문 주소와 연락처"},
+    "buyer": {
+        "group": "기본 정보", "ko": "Buyer (받는 곳과 다를 때)", "en": "Buyer",
+        "note": "받는 곳과 실제 구매자가 다를 때만 적습니다"},
+
+    "invoice_no": {
+        "group": "문서 정보", "ko": "송장 번호", "en": "Invoice No. & Date",
+        "note": "송장 고유 관리번호. 비우면 날짜만 찍힙니다"},
+    "lc_no": {
+        "group": "문서 정보", "ko": "L/C 번호와 날짜", "en": "L/C No. & Date",
+        "note": "신용장 번호. 없으면 비워 두세요"},
+    "po_no": {
+        "group": "문서 정보", "ko": "Buyer 주문번호", "en": "Buyer's P/O No.",
+        "note": "구매주문서(PO) 번호"},
+    "validity_date": {
+        "group": "문서 정보", "ko": "견적 유효기한", "en": "Validity of P/I",
+        "note": "이 견적이 언제까지 유효한지"},
+    "other_references": {
+        "group": "문서 정보", "ko": "기타 참조", "en": "Other references",
+        "note": "계약서 번호 등 함께 적을 것"},
+
+    "origin_code": {
+        "group": "운송 정보", "ko": "출발지", "en": "Port of Loading (From)",
+        "note": "선적항·출발 공항. 부산이면 KRPUS"},
+    "destination_code": {
+        "group": "운송 정보", "ko": "도착지", "en": "Port of Discharge (To)",
+        "note": "양륙항·도착 공항. 로스앤젤레스면 USLAX"},
+
+    "incoterms": {
+        "group": "거래 조건", "ko": "거래 조건", "en": "Terms of Delivery",
+        "note": "FOB · CIF 같은 Incoterms 2020 조건"},
+    "currency": {
+        "group": "거래 조건", "ko": "통화", "en": "Currency",
+        "note": "USD · EUR 같은 결제 통화"},
+    "payment_terms": {
+        "group": "거래 조건", "ko": "결제 조건", "en": "Terms of Payment",
+        "note": "예: 100% T/T IN ADVANCE BEFORE SHIPMENT"},
+    "bank_info": {
+        "group": "거래 조건", "ko": "은행 정보", "en": "Bank Information",
+        "note": "은행명 · SWIFT · 계좌번호 · 예금주"},
+
+    "shipping_marks": {
+        "group": "화물 표시", "ko": "화인", "en": "Shipping Marks",
+        "note": "상자에 찍는 표시. 예: ABC / LA / C-NO 1-500 / MADE IN KOREA"},
+    "remarks": {
+        "group": "화물 표시", "ko": "비고", "en": "Remarks",
+        "note": "따로 적어 둘 것"},
+
+    "signed_by": {
+        "group": "서명", "ko": "서명 (보내는 쪽)", "en": "Signed by",
+        "note": "수출자 상호 또는 담당자명"},
+    "accepted_by": {
+        "group": "서명", "ko": "서명 (받는 쪽)", "en": "Accepted by (Buyer)",
+        "note": "견적송장에서 Buyer가 받아들였다는 표시"},
 }
+
+# 영문으로 적어야 하는 이유. 서류는 상대국 세관과 은행이 봅니다.
+ENGLISH_NOTE = ("적으실 때 **영문으로** 적어 주세요. 적으신 글자가 그대로 서류에 "
+                "인쇄됩니다. 한글로 적으면 서류에도 한글로 나오고, "
+                "상대국 세관·은행에서 받아 주지 않습니다.")
 
 # 서식마다 사람에게 물어볼 칸. 순서가 곧 물어보는 순서입니다.
 ASK_FOR = {
@@ -117,40 +172,64 @@ def wants_to_finish(text: str) -> bool:
     return any(word in written for word in JUST_MAKE)
 
 
-def ask_list(kind: str) -> list[dict]:
-    """이 서식이 요구하는 칸. 화면에 그대로 보여 줍니다."""
+# 운송 계획 화면에서 정하는 것들. 여기서 적어도 되지만, 운송 계획을 잡으면
+# 스케줄과 함께 한 번에 정해집니다. 그렇다고 화면에 적어 둡니다.
+FROM_PLANNING = {"origin_code", "destination_code", "incoterms", "currency"}
 
+PLANNING_NOTE = "운송 계획에서 작성합니다"
+
+
+def ask_list(kind: str, draft: dict | None = None) -> list[dict]:
+    """이 서식이 요구하는 칸. 화면이 표로 그립니다.
+
+    세 열로 보여 줍니다. 구분 · 영문 칸 이름 · 기재 내용.
+    영문 칸 이름을 같이 두는 이유는, 종이 서식과 화면을 나란히 놓고
+    "이 칸이 저 칸이구나"를 바로 알 수 있게 하려는 것입니다.
+    """
+
+    draft = draft or {}
     rows = []
     for name, required in ASK_FOR.get(kind, []):
-        rows.append({"field": name, "label": ASK_LABELS.get(name, name),
-                     "required": required})
+        info = FIELDS.get(name, {})
+        rows.append({
+            "field": name,
+            "group": info.get("group", ""),
+            "ko": info.get("ko", name),
+            "en": info.get("en", name),
+            "note": info.get("note", ""),
+            "required": required,
+            "from_planning": name in FROM_PLANNING,
+            "value": str(draft.get(name) or "").strip(),
+        })
+
+    items = draft.get("items") or []
+    rows.append({
+        "field": "items", "group": "품목", "ko": "품목",
+        "en": "Description of Goods",
+        "note": "품명 · 개수 · 한 상자 크기(가로x세로x높이 cm) · 한 상자 무게(kg)",
+        "required": True, "from_planning": False,
+        "value": f"{len(items)}개 적으셨습니다" if items else "",
+    })
     return rows
 
 
 def _ask_message(kind: str, draft: dict) -> str:
-    """무엇을 적어야 하는지 적은 안내. 이미 적은 것은 값까지 보여 줍니다."""
+    """표 위에 붙는 안내. 칸 목록 자체는 화면이 표로 그립니다.
+
+    {{ }}로 감싼 것은 화면에서 빨간 글씨로 나옵니다.
+    """
 
     title = drafts.FORMS[kind]
-    lines = [f"**{title}**를 만들겠습니다. 아래 내용을 알려 주세요.", ""]
-
-    for row in ask_list(kind):
-        mark = " *" if row["required"] else ""
-        value = str(draft.get(row["field"]) or "").strip()
-        lines.append(f"- {row['label']}{mark}"
-                     + (f" — 적으신 것: {value}" if value else ""))
-
-    items = draft.get("items") or []
-    lines.append("")
-    lines.append(f"- 품목{' — ' + str(len(items)) + '개 적으셨습니다' if items else ' *'}")
-    lines.append("")
-    lines.append(ITEM_NOTE)
-    lines.append("")
-    lines.append("아는 것만 한 번에 적어 주셔도 됩니다. "
-                 "**그냥 만들어줘**라고 하시면 지금 있는 것만으로 초안을 그려 드립니다. "
-                 "빈 칸은 비워 둔 채로 나옵니다.")
-    lines.append("")
-    lines.append("`*` 표시는 없으면 서류 모양이 제대로 안 나오는 칸입니다.")
-    return "\n".join(lines)
+    return "\n\n".join([
+        f"**{title}**를 만들겠습니다. 아래 내용을 알려 주세요.",
+        ENGLISH_NOTE,
+        ("{{*}} 는 없으면 서류 모양이 제대로 안 나오는 칸입니다. "
+         f"{{{{{PLANNING_NOTE}}}}} 라고 적힌 것은 여기서 적으셔도 되고, "
+         "운송 계획을 잡으면 스케줄과 함께 한 번에 정해집니다."),
+        ("아는 것만 한 번에 적어 주셔도 됩니다. "
+         "**그냥 만들어줘**라고 하시면 지금 있는 것만으로 초안을 그려 드립니다. "
+         "빈 칸은 비워 둔 채로 나옵니다."),
+    ])
 
 
 def _pick_message(reason: str = "") -> str:
@@ -168,18 +247,71 @@ def _pick_message(reason: str = "") -> str:
     return "\n".join(lines)
 
 
+def parse_filled(kind: str, text: str) -> dict:
+    """"칸 이름: 값" 꼴로 적은 것을 그대로 읽습니다.
+
+    화면에서 표를 누르면 이 꼴로 입력칸에 들어갑니다. 모양이 정해져 있으니
+    AI에게 물어볼 이유가 없습니다. 규칙으로 읽으면 빠르고, 공짜이고,
+    AI 키가 없어도 되고, 무엇보다 틀리지 않습니다.
+
+    칸 이름은 우리말·영문 어느 쪽으로 적어도 알아봅니다.
+    """
+
+    if not text or ":" not in text:
+        return {}
+
+    # 이 서식이 쓰는 칸만 봅니다. 이름 -> 칸 짝을 미리 만들어 둡니다.
+    lookup = {}
+    for name, _ in ASK_FOR.get(kind, []):
+        info = FIELDS.get(name, {})
+        for label in (info.get("ko", ""), info.get("en", ""), name):
+            if label:
+                lookup[_key(label)] = name
+
+    found = {}
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        label, _, value = line.partition(":")
+        name = lookup.get(_key(label))
+        value = value.strip()
+        if name and value:
+            found[name] = value[:500]
+    return found
+
+
+def _key(label: str) -> str:
+    """이름을 견주기 좋게 다듬습니다. 띄어쓰기·기호·대소문자를 무시합니다."""
+
+    return "".join(ch for ch in str(label).lower() if ch.isalnum())
+
+
 def _read_message(kind: str, message: str, draft: dict) -> list[str]:
     """적어 주신 글에서 값을 뽑아 draft에 넣습니다. 확인된 것만 넣습니다.
 
+    두 단계로 읽습니다.
+      1. "칸 이름: 값" 꼴은 규칙으로 그대로 읽습니다. (표를 눌러 넣은 틀)
+      2. 그러고도 안 채워진 것이 있으면 AI에게 글을 읽힙니다.
+
+    규칙을 먼저 두는 이유는, 모양이 정해진 것을 굳이 AI에게 물어볼 이유가
+    없기 때문입니다. 빠르고 공짜이고 틀리지 않습니다.
+
     돌려주는 것은 "이건 확인 못 했다"는 메모입니다.
-    AI 키가 없으면 아무 것도 안 뽑고 빈 목록을 돌려줍니다. 그래도
-    칸을 직접 채우는 길은 열려 있습니다.
     """
 
     from app.services import intake_service
 
-    if not message.strip() or not intake_service.available():
+    if not message.strip():
         return []
+
+    # 1) 틀에 맞춰 적은 것부터.
+    for name, value in parse_filled(kind, message).items():
+        draft[name] = value
+
+    if not intake_service.available():
+        return []
+
+    # 2) 남은 것은 AI가 글에서 찾아봅니다.
     try:
         read = intake_service.read(message)
     except (ValidationError, ServiceError):
@@ -220,7 +352,7 @@ def turn(payload: dict) -> dict:
     if first_time:
         notes = _read_message(kind, message, draft)
         return {"reply": _ask_message(kind, draft), "draft": draft,
-                "stage": "ask", "fields": ask_list(kind), "notes": notes}
+                "stage": "ask", "fields": ask_list(kind, draft), "notes": notes}
 
     # 3) 답을 주셨습니다. 읽어서 채웁니다.
     notes = _read_message(kind, message, draft)
@@ -228,7 +360,7 @@ def turn(payload: dict) -> dict:
     # 4) 그릴까요, 더 물을까요.
     if not wants_to_finish(message):
         return {"reply": _ask_message(kind, draft), "draft": draft,
-                "stage": "ask", "fields": ask_list(kind), "notes": notes}
+                "stage": "ask", "fields": ask_list(kind, draft), "notes": notes}
 
     return {**make(kind, draft), "draft": draft, "notes": notes}
 

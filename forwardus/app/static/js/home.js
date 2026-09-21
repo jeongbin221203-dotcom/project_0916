@@ -139,6 +139,9 @@
   function inline(escaped) {
     return escaped
       .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      // {{ }}로 감싼 것은 빨갛게. 꼭 있어야 하는 칸과 운송 계획에서
+      // 정해지는 칸을 눈에 띄게 하려는 표시입니다.
+      .replace(/\{\{(.+?)\}\}/g, '<em class="need">$1</em>')
       .replace(/`([^`]+)`/g, "<code>$1</code>");
   }
 
@@ -171,8 +174,13 @@
     logEl.hidden = false;
     logEl.appendChild(row);
     startTalking();
-    // 아래에 붙은 적는 칸이 마지막 줄을 가리지 않게 그 위까지 올립니다.
-    row.scrollIntoView({ behavior: "smooth", block: "end" });
+
+    // 물어본 말은 위로 올려 붙입니다. 답이 그 아래로 이어서 나오니
+    // 눈이 한 자리에 머뭅니다. 매번 맨 아래로 끌어내리면 글이 길 때
+    // 답의 끝부터 보이게 되어 읽을 자리를 찾느라 화면이 튑니다.
+    if (kind === "me") {
+      row.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     return row;
   }
 
@@ -215,12 +223,75 @@
     const data = response.data;
     docDraft = data.draft || docDraft;
     say("bot", data.reply);
+    if (data.fields) showFields(data.fields);
 
     // AI가 확인 못 한 값이 있으면 같이 알려 줍니다. 조용히 넘어가면
     // 틀린 값이 그대로 서류가 됩니다.
     (data.notes || []).forEach((note) => say("bad", note));
 
     if (data.preview) showDraft(data);
+  }
+
+  // 칸 목록을 세 열로 보여 줍니다. 구분 · 서식의 영문 칸 이름 · 기재 내용.
+  // 영문 칸 이름을 같이 두면 종이 서식과 화면을 나란히 놓고 볼 수 있습니다.
+  function showFields(fields) {
+    const row = say("bot", "");
+    let lastGroup = "";
+    const body = fields.map((field) => {
+      const group = field.group === lastGroup ? "" : field.group;
+      lastGroup = field.group;
+      const must = field.required ? '<i class="need">*</i>' : "";
+      const plan = field.from_planning
+        ? '<b class="need">운송 계획에서 작성합니다</b><br>' : "";
+      const done = field.value
+        ? `<span class="field_done">적으신 것: ${escapeHtml(field.value)}</span>` : "";
+      // 품목은 한 줄로 못 받아서 틀을 넣지 않습니다.
+      const pick = field.field === "items" ? "" : ` data-pick="${escapeHtml(field.en)}"`;
+      return `<tr${group ? ' class="group_top"' : ""}${pick}>
+          <th>${escapeHtml(group)}</th>
+          <td class="field_en">${escapeHtml(field.en)}${must}
+            <small>${escapeHtml(field.ko)}</small></td>
+          <td>${plan}${escapeHtml(field.note)}${done}</td>
+        </tr>`;
+    }).join("");
+    row.innerHTML = `
+      <div class="field_head">
+        <p class="muted small">줄을 누르면 아래 적는 칸에 <b>칸 이름:</b> 이 들어갑니다.
+          그 뒤에 값을 적어 보내 주세요.</p>
+        <button type="button" class="button small" data-pick-all>빈 칸 전부 넣기</button>
+      </div>
+      <table class="field_table">
+        <thead><tr><th>구분</th><th>주요 필드명 (영문)</th><th>기재 내용 및 주의사항</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("[data-pick-all]")) {
+        // 아직 안 적은 칸만 넣습니다. 이미 적은 것을 또 물으면 지웁니다.
+        addTemplate(fields
+          .filter((f) => f.field !== "items" && !f.value)
+          .map((f) => f.en));
+        return;
+      }
+      const line = event.target.closest("[data-pick]");
+      if (line) addTemplate([line.dataset.pick]);
+    });
+  }
+
+  // 적는 칸에 "칸 이름: " 줄을 붙입니다. 이미 있는 줄은 다시 넣지 않습니다.
+  function addTemplate(names) {
+    const have = new Set(input.value.split("\n")
+      .map((line) => line.split(":")[0].trim().toLowerCase()));
+    const added = names.filter((name) => !have.has(name.toLowerCase()))
+      .map((name) => `${name}: `);
+    if (!added.length) { input.focus(); return; }
+
+    const before = input.value.replace(/\s+$/, "");
+    input.value = (before ? before + "\n" : "") + added.join("\n");
+    resize();
+    input.focus();
+    // 마지막 줄 끝으로 커서를 보냅니다. 바로 이어 적을 수 있게.
+    input.setSelectionRange(input.value.length, input.value.length);
   }
 
   function showDraft(data) {

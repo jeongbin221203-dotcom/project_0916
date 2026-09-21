@@ -4,29 +4,28 @@
 :root { --rail_w: 92px; --header_h: 62px; }
 .home_main { padding: 0 0 72px; }
 
-/* 왼쪽 줄을 fixed로 띄우고, 본문은 그 폭만큼 비켜 줍니다. */
-.home_shell { display: block; }
+/* 왼쪽 줄은 제자리에 흐르게 두고 sticky로 붙입니다.
+
+   흰 기둥은 줄이 아니라 **바깥 상자의 배경**으로 그립니다. 그래야 줄
+   자체는 제 내용만큼만 높아지고, sticky가 움직일 자리가 생깁니다.
+   (줄에 height: 100vh를 주면 body의 zoom 때문에 화면보다 길어져
+    붙지 않고 같이 밀려 올라갑니다. 그게 계속 문제였습니다) */
+.home_shell {
+  display: flex; align-items: flex-start; min-height: 60vh;
+  background: linear-gradient(to right,
+    var(--white) 0, var(--white) var(--rail_w),
+    var(--line) var(--rail_w), var(--line) calc(var(--rail_w) + 1px),
+    transparent calc(var(--rail_w) + 1px));
+}
 
 /* ----- 왼쪽 줄 ----- */
-/* 왼쪽 줄은 화면에 붙여 둡니다.
-
-   sticky로는 안 됩니다. body에 zoom: 1.15가 걸려 있어서 sticky가 스크롤
-   위치를 어긋나게 잡습니다. 반면 fixed는 같은 조건에서 잘 동작합니다 —
-   화면 아래에 붙는 적는 칸이 이미 fixed로 잘 붙어 있습니다. 그쪽과 같은
-   방식으로 맞췄습니다.
-
-   높이는 zoom을 되돌려 계산합니다. zoom이 s일 때 화면 V픽셀을 채우려면
-   이 안에서는 V/s 픽셀이어야 합니다. 머리말은 여기 기준 62px이므로
-   100vh / s - 62px 가 머리말 아래로 남는 자리입니다. */
 .home_rail {
-  position: fixed; left: 0; top: var(--header_h); z-index: 40;
-  width: var(--rail_w);
-  height: calc(100vh / var(--ui_scale) - var(--header_h));
-  background: var(--white); border-right: 1px solid var(--line);
+  flex: 0 0 var(--rail_w); align-self: flex-start;
+  position: sticky; top: var(--header_h); z-index: 40;
 }
 .rail_inner {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 16px 8px; height: 100%;
+  padding: 16px 8px;
 }
 .rail_item { position: relative; width: 100%; }
 .rail_item > a, .rail_item > button, a.rail_item {
@@ -71,7 +70,7 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 /* home_stage는 남는 자리를 다 차지하고, 실제 내용 폭은 home_center가 정합니다.
    폭을 home_stage에 걸면 flex-grow가 이겨서 화면 끝까지 늘어납니다. */
 .home_stage {
-  margin-left: var(--rail_w); min-width: 0;
+  flex: 1 1 auto; min-width: 0;
   padding: clamp(36px, 8vh, 88px) 16px 0;
   text-align: center;
 }
@@ -182,15 +181,16 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 @media (max-width: 860px) {
   :root { --rail_w: 0px; }
   .home_shell { flex-direction: column; }
+  .home_shell { background: var(--white); }
   .home_rail {
-    position: static; width: 100%; height: auto;
-    border-right: 0; border-bottom: 1px solid var(--line);
+    position: static; flex: none; width: 100%;
+    border-bottom: 1px solid var(--line);
   }
   .rail_inner {
     flex-direction: row; justify-content: center; height: auto;
     gap: 2px; padding: 10px 8px; overflow-x: auto;
   }
-  .home_stage { margin-left: 0; }
+  .home_stage { background: var(--surface); }
   .rail_item { width: auto; }
   .rail_item > a, .rail_item > button, a.rail_item { padding: 6px 10px; }
   .rail_flyout { left: auto; right: 0; top: calc(100% + 8px); width: min(310px, 90vw); }
@@ -442,3 +442,52 @@ a.rail_item.active .rail_icon { background: var(--surface); }
   background: #fff; box-shadow: var(--shadow);
 }
 .draft_actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+/* 홈은 대화하는 화면입니다. 대화가 짧으면 회사 소개 푸터가 화면
+   한가운데 끼어들어 고장처럼 보입니다. 홈에서만 감춥니다.
+   (푸터의 Data Source 설명은 실제 숫자가 나오는 화면들에 그대로 있습니다) */
+.home_main ~ .site_footer { display: none; }
+
+/* 꼭 있어야 하는 칸과, 운송 계획에서 정해지는 칸. 눈에 띄어야 합니다. */
+.home_msg.bot .need {
+  font-style: normal; font-weight: 800; color: var(--red);
+}
+/* 물어본 말이 위로 붙을 때 머리말 밑으로 숨지 않게 여백을 둡니다. */
+.home_msg { scroll-margin-top: calc(var(--header_h) + 16px); }
+
+/* ----- 칸 목록 표 (구분 · 영문 칸 이름 · 기재 내용) ----- */
+.field_table { width: 100%; border-collapse: collapse; margin: 4px 0 0; font-size: 13.5px; }
+.field_table thead th {
+  padding: 0 0 10px; text-align: left; font-size: 12.5px; font-weight: 800;
+  color: var(--muted); border-bottom: 2px solid var(--line);
+}
+.field_table th, .field_table td { padding: 11px 14px 11px 0; vertical-align: top; }
+.field_table tbody th {
+  width: 88px; text-align: left; font-weight: 800; color: var(--ink);
+  white-space: nowrap;
+}
+/* 묶음이 바뀌는 줄에만 선을 그어 덩어리가 보이게 합니다. */
+.field_table tbody tr.group_top th,
+.field_table tbody tr.group_top td { border-top: 1px solid var(--line); }
+.field_en { width: 220px; font-weight: 800; color: var(--ink); }
+.field_en small { display: block; margin-top: 2px; font-weight: 600; color: var(--muted); }
+.field_table td { color: var(--muted); line-height: 1.6; }
+.field_table .need { font-style: normal; color: var(--red); margin-left: 4px; }
+.field_table b.need { display: inline-block; margin: 0 0 2px; font-size: 12.5px; }
+.field_done { display: block; margin-top: 4px; color: var(--green); font-weight: 700; }
+
+@media (max-width: 720px) {
+  .field_table, .field_table tbody, .field_table tr, .field_table td { display: block; }
+  .field_table thead { display: none; }
+  .field_table tbody th { display: block; width: auto; padding-top: 14px; }
+  .field_en { width: auto; }
+}
+
+.field_head { display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; margin-bottom: 10px; }
+.field_head p { margin: 0; }
+/* 누를 수 있는 줄이라는 것이 보여야 합니다. */
+.field_table tbody tr[data-pick] { cursor: pointer; }
+.field_table tbody tr[data-pick]:hover th,
+.field_table tbody tr[data-pick]:hover td { background: var(--blue_soft); }
+.field_table tbody tr[data-pick]:hover .field_en { color: var(--blue_dark); }

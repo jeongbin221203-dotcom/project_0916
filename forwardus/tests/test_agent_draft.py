@@ -219,3 +219,84 @@ def test_품목_없이_PDF를_부르면_거절한다(app, client):
                            json={"draft": {"exporter_name": "A"}})
 
     assert response.status_code == 400
+
+
+# --- 표를 눌러 넣은 틀 --------------------------------------------------------------
+
+def test_칸_이름_값_꼴은_AI_없이_읽는다():
+    """화면에서 표를 누르면 이 꼴로 들어갑니다. 모양이 정해졌으니 규칙으로 읽습니다."""
+
+    typed = ("Shipper / Exporter: Forward Cosmetics Co., Ltd.\n"
+             "Consignee: ABC Beauty Inc.\n"
+             "Port of Loading (From): KRPUS\n"
+             "Terms of Delivery: FOB")
+
+    got = agent_service.parse_filled("commercial_invoice", typed)
+
+    assert got["exporter_name"] == "Forward Cosmetics Co., Ltd."
+    assert got["buyer_name"] == "ABC Beauty Inc."
+    assert got["origin_code"] == "KRPUS"
+    assert got["incoterms"] == "FOB"
+
+
+def test_우리말_칸_이름으로_적어도_읽는다():
+    got = agent_service.parse_filled("commercial_invoice", "보내는 회사 이름: 홍길동무역")
+
+    assert got["exporter_name"] == "홍길동무역"
+
+
+def test_그_서식에_없는_칸은_받지_않는다():
+    """포장명세서에 거래 조건을 적어 보내도 무시합니다. 그 서식에 없는 칸입니다."""
+
+    got = agent_service.parse_filled("packing_list_std",
+                                     "Terms of Delivery: FOB\nConsignee: ABC")
+
+    assert "incoterms" not in got
+    assert got["buyer_name"] == "ABC"
+
+
+def test_값이_비면_넣지_않는다():
+    """틀만 넣고 안 적은 줄입니다. 빈 값으로 덮어쓰면 안 됩니다."""
+
+    got = agent_service.parse_filled("commercial_invoice",
+                                     "Consignee:   \nShipper / Exporter: ABC")
+
+    assert "buyer_name" not in got
+    assert got["exporter_name"] == "ABC"
+
+
+def test_AI_키가_없어도_틀은_읽힌다(app):
+    """시험 설정에는 AI 키가 없습니다. 그래도 여기까지는 동작해야 합니다."""
+
+    from app.services import intake_service
+
+    assert intake_service.available() is False
+
+    out = agent_service.turn({
+        "message": "Shipper / Exporter: ABC Corp\nConsignee: XYZ Inc",
+        "draft": {"kind": "packing_list_std"}})
+
+    assert out["draft"]["exporter_name"] == "ABC Corp"
+    assert out["draft"]["buyer_name"] == "XYZ Inc"
+
+
+def test_칸_목록이_세_열로_나온다(app):
+    """구분 · 영문 칸 이름 · 기재 내용."""
+
+    rows = agent_service.ask_list("commercial_invoice", {"exporter_name": "ABC"})
+
+    for row in rows:
+        assert row["group"] and row["ko"] and row["en"]
+    # 이미 적은 것은 값까지 들고 옵니다.
+    exporter = next(r for r in rows if r["field"] == "exporter_name")
+    assert exporter["value"] == "ABC"
+    assert exporter["en"] == "Shipper / Exporter"
+    # 운송 계획에서 정해지는 칸은 그렇다고 표시합니다.
+    origin = next(r for r in rows if r["field"] == "origin_code")
+    assert origin["from_planning"] is True
+
+
+def test_영문으로_적으라고_안내한다(app):
+    out = agent_service.turn({"message": "상업송장만 작성해줘", "draft": {}})
+
+    assert "영문" in out["reply"]

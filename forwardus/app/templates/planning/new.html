@@ -4,7 +4,13 @@
 {% block content %}
   <div class="page_head">
     <div>
-      <p class="eyebrow">Shipment Planning</p>
+      {# 단독으로 열면 위쪽 메뉴가 없습니다. 돌아갈 길을 여기서 냅니다.
+         길 없는 화면에 가두면 새로고침밖에 할 것이 없습니다. #}
+      {% if standalone %}
+        <a class="back_home" href="{{ url_for('home.index') }}">← ForwardUs 홈</a>
+      {% else %}
+        <p class="eyebrow">Shipment Planning</p>
+      {% endif %}
       <h1>새 운송 계획</h1>
       <p class="muted">단계는 순서와 관계없이 자유롭게 이동할 수 있습니다. 필수 항목은 Shipment 생성 시 한 번에 확인합니다.</p>
     </div>

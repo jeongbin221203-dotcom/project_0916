@@ -18,7 +18,24 @@ def index():
 
 @planning_bp.get("/new")
 def new():
-    return render_template("planning/new.html", options=planning_service.get_form_options())
+    return _wizard(standalone=False)
+
+
+@planning_bp.get("/new/solo")
+def new_solo():
+    """같은 위저드를 단독으로. 머리말·푸터·상담 단추 없이 입력만 보입니다.
+
+    화면을 복사하지 않고 같은 템플릿을 씁니다. 두 벌로 두면 한쪽만
+    고치는 일이 반드시 생깁니다.
+    """
+
+    return _wizard(standalone=True)
+
+
+def _wizard(*, standalone: bool):
+    return render_template("planning/new.html",
+                           options=planning_service.get_form_options(),
+                           standalone=standalone)
 
 
 @planning_bp.get("/api/locations")

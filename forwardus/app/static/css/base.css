@@ -302,3 +302,8 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   .support_face { width: 70px; height: 70px; }
   .support_panel { right: 16px; left: 16px; bottom: 80px; width: auto; }
 }
+
+/* 단독으로 연 화면에서 돌아가는 길. 위쪽 메뉴가 없으니 이것뿐입니다. */
+.back_home { display: inline-block; margin-bottom: 6px; font-size: 13.5px; font-weight: 700; }
+/* 단독 화면은 머리말이 없으므로 위쪽 여백을 스스로 만듭니다. */
+body.standalone .page { padding-top: 28px; }
