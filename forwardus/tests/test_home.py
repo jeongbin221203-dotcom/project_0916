@@ -186,3 +186,77 @@ def test_빈_글로_초안을_부르면_거절한다(app, client):
     response = client.post("/api/intake", json={"text": ""})
 
     assert response.status_code == 400
+
+
+# --- 보여 주기용 잠금 -------------------------------------------------------------
+
+def _locked(client):
+    """잠근 상태로 시작 화면을 받아 옵니다."""
+
+    from flask import current_app
+
+    current_app.config["HOME_LOCKED"] = True
+    return client.get("/").get_data(as_text=True)
+
+
+def test_잠그면_시작_화면의_단추가_모두_막힌다(app, client):
+    import re
+
+    html = _locked(client)
+
+    assert 'class="home_shell is_locked"' in html
+    # 탭 다섯 개가 전부 막혀야 합니다. 하나라도 열려 있으면 그리로 들어갑니다.
+    tabs = re.findall(r'<button type="button" role="tab".*?>', html, re.S)
+    assert len(tabs) == 5
+    assert all("disabled" in tab for tab in tabs)
+    assert re.search(r"<textarea[^>]*disabled", html)
+    assert re.search(r'class="home_send"[^>]*disabled', html, re.S)
+    assert re.search(r'class="support_fab"[^>]*disabled', html, re.S)
+    # 왼쪽 줄은 a와 button이 섞여 있어 감싸는 자리에서 막습니다.
+    assert "inert" in html
+
+
+def test_잠그면_스크립트를_아예_붙이지_않는다(app, client):
+    """흐리게 보이기만 하면 안 됩니다. 실제로 아무 일도 하지 않아야 합니다."""
+
+    html = _locked(client)
+
+    assert "js/home.js" not in html
+    assert "js/doc_form.js" not in html
+
+
+def test_잠가도_위쪽_메뉴는_그대로_쓴다(app, client):
+    """잠그는 것은 시작 화면뿐입니다. 갈 길까지 막으면 아무것도 못 합니다."""
+
+    import re
+
+    html = _locked(client)
+    nav = re.search(r'<nav class="main_nav".*?</nav>', html, re.S).group(0)
+
+    assert "disabled" not in nav
+    for label in ("운송 계획", "Shipments", "일정 역산", "컨테이너 조회",
+                  "관세청 조회", "Dashboard"):
+        assert label in nav
+    # 메뉴가 가리키는 화면도 실제로 열려야 합니다.
+    for url in re.findall(r'href="([^"]+)"', nav):
+        assert client.get(url).status_code == 200, url
+
+
+def test_왜_안_눌리는지_말해_준다(app, client):
+    """이유 없이 막힌 화면은 고장으로 보입니다."""
+
+    html = _locked(client)
+
+    assert "보기 전용" in html
+    assert "위쪽 메뉴" in html
+
+
+def test_잠금을_풀면_원래대로_돌아온다(app, client):
+    from flask import current_app
+
+    current_app.config["HOME_LOCKED"] = False
+    html = client.get("/").get_data(as_text=True)
+
+    assert "is_locked" not in html
+    assert "js/home.js" in html
+    assert "disabled" not in html[html.find("home_tabs"):html.find("home_log")]

@@ -95,11 +95,27 @@ class Config:
     UNIPASS_API_KEYS = {name: os.getenv(f"UNIPASS_KEY_{name}", "") for name in UNIPASS_SERVICES}
 
 
+    # 시작 화면을 잠급니다.
+    #
+    # 왼쪽 줄, 탭, 적는 칸, 고객 상담 단추가 모두 눌리지 않습니다.
+    # 위쪽 메뉴(운송 계획 · Shipments · 일정 역산 · 컨테이너 조회 ·
+    # 관세청 조회 · Dashboard)만 그대로 씁니다.
+    #
+    # 보여 주기용으로 시작 화면만 막아 둘 때 씁니다.
+    # .env에 HOME_LOCKED=0 을 넣으면 다시 열립니다.
+    HOME_LOCKED = os.getenv("HOME_LOCKED", "1") == "1"
+
+
 class TestConfig(Config):
     """Configuration for automated tests (in-memory database)."""
 
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
+    # 시험할 때는 열어 둡니다. 잠근 채로 돌리면 평소 경로를 아무도 보지
+    # 않게 되어, 잠금을 푸는 날 무엇이 깨졌는지 알 수 없습니다.
+    # 잠금 자체를 보는 테스트는 그때만 켜서 봅니다.
+    HOME_LOCKED = False
 
     # 기관이 막혀 있으면 연결이 끊길 때까지 기다립니다. 기본 8초인데,
     # Shipment를 만드는 테스트마다 한 번씩 물어보니 전체가 한 시간을 넘겼습니다.

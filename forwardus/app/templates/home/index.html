@@ -4,9 +4,10 @@
 {% block head %}<link rel="stylesheet" href="{{ static_url('css/home.css') }}">{% endblock %}
 {% block main_class %}home_main{% endblock %}
 {% block content %}
-  <div class="home_shell">
+  <div class="home_shell {{ 'is_locked' if home_locked }}">
     {# 왼쪽 줄. 가운데는 적는 칸만 남기고 갈 곳은 전부 이리로 모았습니다. #}
-    <aside class="home_rail" aria-label="바로가기">
+    <aside class="home_rail" aria-label="바로가기"
+           {% if home_locked %}aria-disabled="true" inert{% endif %}>
       <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page">
         <span class="rail_icon" aria-hidden="true">🏠</span>
         <small>홈</small>
@@ -85,7 +86,8 @@
         {% for tab in tabs %}
           <button type="button" role="tab" data-home-tab="{{ tab.key }}"
                   class="{{ 'active' if loop.first }}"
-                  aria-selected="{{ 'true' if loop.first else 'false' }}">
+                  aria-selected="{{ 'true' if loop.first else 'false' }}"
+                  {{ 'disabled' if home_locked }}>
             <span aria-hidden="true">{{ tab.icon }}</span> {{ tab.label }}
           </button>
         {% endfor %}
@@ -98,14 +100,21 @@
       <div class="home_composer" data-home-composer>
         <form class="home_box" data-home-form>
           <textarea data-home-input rows="3" maxlength="2000"
+                    {{ 'disabled' if home_locked }}
                     placeholder="{{ tabs[0].placeholder }}"
                     aria-label="물어볼 내용"></textarea>
           <div class="home_box_foot">
             <div class="home_chips" data-home-chips></div>
-            <button class="home_send" type="submit" aria-label="보내기">↑</button>
+            <button class="home_send" type="submit" aria-label="보내기"
+                  {{ 'disabled' if home_locked }}>↑</button>
           </div>
         </form>
+        {% if home_locked %}
+        <p class="home_hint locked_note">이 화면은 지금 보기 전용입니다.
+          <b>위쪽 메뉴</b>로 이용해 주세요.</p>
+      {% else %}
         <p class="home_hint" data-home-hint>{{ tabs[0].hint }}</p>
+      {% endif %}
       </div>
 
       {# "서류 작성" 탭에서만 펼쳐지는 칸들 #}
@@ -124,9 +133,14 @@
       locationsUrl: "{{ url_for('planning.api_locations') }}",
       schedulesUrl: "{{ url_for('planning.api_schedules') }}",
       startUrl: "{{ url_for('document.start') }}",
-      originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}"
+      originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}",
+      locked: {{ 'true' if home_locked else 'false' }}
     };
   </script>
-  <script src="{{ static_url('js/home.js') }}"></script>
-  <script src="{{ static_url('js/doc_form.js') }}"></script>
+  {# 잠겼으면 스크립트를 아예 붙이지 않습니다. 눌리지 않는 것이
+     보이기만 그런 것이 아니라 실제로 아무 일도 하지 않아야 합니다. #}
+  {% if not home_locked %}
+    <script src="{{ static_url('js/home.js') }}"></script>
+    <script src="{{ static_url('js/doc_form.js') }}"></script>
+  {% endif %}
 {% endblock %}

@@ -58,7 +58,9 @@
       </div>
     </footer>
     {# 어느 화면에서나 열 수 있는 고객상담 창 #}
-    <button type="button" class="support_fab" data-support-open aria-haspopup="dialog">
+    {# 시작 화면을 잠갔으면 상담 단추도 같이 막습니다. #}
+    <button type="button" class="support_fab" data-support-open aria-haspopup="dialog"
+            {{ 'disabled' if home_locked and request.endpoint == 'home.index' }}>
       {% if support_icon %}
         <img class="support_face" src="{{ support_icon }}" alt="" width="30" height="30">
       {% else %}
