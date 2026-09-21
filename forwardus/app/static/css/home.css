@@ -64,11 +64,10 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 /* ----- 이름 (그대로 둡니다) ----- */
 .home_brand { display: inline-flex; align-items: center; gap: 12px; }
 .home_brand b { font-size: clamp(30px, 5vw, 42px); font-weight: 900; letter-spacing: -.045em; }
-.home_mark {
-  display: grid; place-items: center; width: 44px; height: 44px;
-  border-radius: 14px; background: var(--blue); color: #fff;
-  font-size: 24px; font-weight: 900;
-}
+.home_mark { width: 46px; height: 46px; object-fit: contain; }
+/* 전체 로고를 올리면 그것만 크게 보여 줍니다. */
+.home_logo { display: block; width: auto; max-width: min(420px, 100%);
+  max-height: 88px; margin: 0 auto; object-fit: contain; }
 .home_tagline { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
 
 /* ----- 무엇을 적을지 고르는 자리 ----- */

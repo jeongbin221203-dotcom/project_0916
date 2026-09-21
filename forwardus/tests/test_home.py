@@ -129,7 +129,7 @@ def test_Shipment가_하나도_없어도_열린다(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "FORWARDUS" in response.get_data(as_text=True)
+    assert "ForwardUs" in response.get_data(as_text=True)
 
 
 # --- 대화창으로 서류 초안 채우기 ---------------------------------------------------

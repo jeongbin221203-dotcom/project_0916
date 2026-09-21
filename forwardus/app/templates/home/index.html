@@ -69,10 +69,14 @@
      <div class="home_center" data-home-center>
       {# 대화가 시작되면 이 인사는 접히고 적는 칸이 아래로 내려갑니다. #}
       <div class="home_hello">
-        <div class="home_brand">
-          <span class="home_mark" aria-hidden="true">↗</span>
-          <b>FORWARDUS</b>
-        </div>
+        {% if brand_logo %}
+          <img class="home_logo" src="{{ brand_logo }}" alt="ForwardUs">
+        {% else %}
+          <div class="home_brand">
+            <img class="home_mark" src="{{ brand_mark }}" alt="">
+            <b>ForwardUs</b>
+          </div>
+        {% endif %}
         <p class="home_tagline">수출, 처음이어도 됩니다</p>
       </div>
 

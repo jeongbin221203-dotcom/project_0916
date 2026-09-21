@@ -64,7 +64,11 @@ p { margin: 0 0 10px; }
 .header_inner { width: min(1160px, calc(100% - 32px)); height: 62px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 900; font-size: 18px; letter-spacing: -.4px; }
 .brand:hover { text-decoration: none; }
-.brand_mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: var(--blue); color: #fff; font-size: 19px; }
+/* 마크는 그림 파일입니다. 바탕을 깔지 않습니다 — 올리신 로고가 어떤
+   모양이든 제 배경색이 뒤에 비치면 지저분해집니다. */
+.brand_mark { width: 34px; height: 34px; object-fit: contain; }
+/* 전체 로고를 올리면 글자까지 들어 있으므로 높이만 맞춥니다. */
+.brand_logo { height: 34px; width: auto; max-width: 240px; object-fit: contain; }
 .main_nav { display: flex; gap: 4px; }
 .main_nav a { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; }
 .main_nav a:hover, .main_nav a.active { background: var(--blue_soft); color: var(--blue_dark); text-decoration: none; }

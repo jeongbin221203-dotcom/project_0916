@@ -3,16 +3,23 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}FORWARDUS{% endblock %} | 수출 운영 플랫폼</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%232B66F6'/%3E%3Cpath d='M14 33h34M36 20l13 13-13 13' fill='none' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <title>{% block title %}ForwardUs{% endblock %} | 수출 운영 플랫폼</title>
+    {# 탭 아이콘도 로고 마크를 씁니다. 파일을 바꾸면 여기도 같이 바뀝니다. #}
+    <link rel="icon" type="image/svg+xml" href="{{ brand_mark }}">
     <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
     {% block head %}{% endblock %}
   </head>
   <body>
     <header class="site_header">
       <div class="header_inner">
-        <a class="brand" href="{{ url_for('home.index') }}" aria-label="FORWARDUS 홈">
-          <span class="brand_mark">↗</span><span>FORWARDUS</span>
+        {# 전체 로고를 올려 두면 그것만 쓰고, 없으면 마크 + 글자로 씁니다. #}
+        <a class="brand" href="{{ url_for('home.index') }}" aria-label="ForwardUs 홈">
+          {% if brand_logo %}
+            <img class="brand_logo" src="{{ brand_logo }}" alt="ForwardUs">
+          {% else %}
+            <img class="brand_mark" src="{{ brand_mark }}" alt="">
+            <span>ForwardUs</span>
+          {% endif %}
         </a>
         <button class="nav_toggle" type="button" aria-label="메뉴 열기" aria-expanded="false" data-nav-toggle>☰</button>
         <nav class="main_nav" data-nav>
@@ -42,7 +49,7 @@
 
     <footer class="site_footer">
       <div class="content_width">
-        <b>FORWARDUS</b> · Small Business Export Operating Platform
+        <b>ForwardUs</b> · Global Trade, Smarter Quotes
         <span class="muted">화면의 "Data Source" 표기를 확인하세요.
           <b>API</b>는 기관에서 받아온 실제 값,
           <b>표준단가</b>는 시장 평균을 본 추정치(실제 청구액은 포워더 견적으로 확정),

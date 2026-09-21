@@ -150,20 +150,26 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
         return {"nav_active": request.blueprint or "", "static_url": static_url,
                 "support_chat_intro": support_chat_service.intro(),
-                "support_icon": support_icon()}
+                "support_icon": support_icon(),
+                "brand_logo": _pick_image("logo"),
+                "brand_mark": _pick_image("logo_mark")}
 
-    # 고객 상담 단추에 쓸 그림.
-    # 직접 만든 그림을 app/static/images/ 에 support_whale.png 로 올려 두면
-    # 코드를 고치지 않아도 그쪽을 씁니다. 없으면 기본 그림(svg)을 씁니다.
-    SUPPORT_ICONS = ("support_whale.png", "support_whale.webp",
-                     "support_whale.jpg", "support_whale.svg")
+    # 화면에 쓰는 그림은 파일만 올려 두면 바뀌도록 합니다.
+    # app/static/images/ 에 아래 이름으로 넣으면 코드를 고치지 않아도 됩니다.
+    #   logo.png        회사 로고 전체 (글자까지 들어간 가로형)
+    #   logo_mark.svg   로고 마크만 (정사각형 · 좁은 자리에서 씁니다)
+    #   support_whale.png  고객 상담 단추 그림
+    IMAGE_TYPES = (".png", ".webp", ".jpg", ".jpeg", ".svg")
+
+    def _pick_image(stem: str) -> str:
+        folder = Path(flask_app.static_folder or "") / "images"
+        for suffix in IMAGE_TYPES:
+            if (folder / f"{stem}{suffix}").exists():
+                return static_url(f"images/{stem}{suffix}")
+        return ""
 
     def support_icon() -> str:
-        folder = Path(flask_app.static_folder or "") / "images"
-        for name in SUPPORT_ICONS:
-            if (folder / name).exists():
-                return static_url(f"images/{name}")
-        return ""
+        return _pick_image("support_whale")
 
     def static_url(filename: str) -> str:
         """정적 파일 URL에 수정 시각을 붙입니다.

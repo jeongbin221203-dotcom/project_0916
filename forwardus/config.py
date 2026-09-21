@@ -100,3 +100,10 @@ class TestConfig(Config):
 
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
+    # 기관이 막혀 있으면 연결이 끊길 때까지 기다립니다. 기본 8초인데,
+    # Shipment를 만드는 테스트마다 한 번씩 물어보니 전체가 한 시간을 넘겼습니다.
+    # 테스트는 우리 코드가 맞는지 보는 것이지 기관이 살아 있는지 보는 것이
+    # 아닙니다. 못 받으면 예시 값으로 넘어가는 길이 이미 있습니다.
+    # (실데이터를 확인하는 테스트는 needs_customs_api로 건너뜁니다)
+    API_TIMEOUT_SECONDS = 2.0
