@@ -53,6 +53,21 @@
 .ac_list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
 .ac_list li:hover { background: var(--blue_soft); }
 .ac_list li.empty { color: var(--muted); cursor: default; }
+/* HS 입력칸 오른쪽에 후보 정렬을 나란히 둡니다. 좁은 화면에서는 아래로 내려갑니다. */
+.hs_input_row { display: flex; gap: 8px; align-items: stretch; }
+.hs_input_row .text_input { flex: 1 1 auto; min-width: 0; }
+.hs_input_row .hs_order { flex: 0 0 auto; width: auto; min-width: 132px; font-size: 13px; }
+@media (max-width: 520px) {
+  .hs_input_row { flex-wrap: wrap; }
+  .hs_input_row .hs_order { flex: 1 1 100%; }
+}
+[data-autocomplete="hs_code"] .ac_list, [data-line-hs] .ac_list {
+  position: static; max-height: 580px; width: 100%; box-shadow: none; margin: 8px 0;
+}
+[data-autocomplete="hs_code"] .ac_list li, [data-line-hs] .ac_list li { display: block; }
+[data-autocomplete="hs_code"] .ac_list small, [data-line-hs] .ac_list small { display: block; margin-top: 4px; }
+.ac_list .hs_stats { color: var(--blue_dark); }
+.ac_list details summary { cursor: pointer; }
 
 /* Incoterms */
 .incoterm_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
@@ -190,11 +205,29 @@
 .tariff { margin-top: 4px; padding: 14px 16px; border-radius: 14px; background: var(--blue_soft); display: grid; gap: 6px; }
 .tariff_head { margin: 0 0 4px; font-size: 13px; font-weight: 800; color: var(--blue_dark); }
 .tariff_head .mono { margin-left: 6px; font-size: 12px; opacity: .8; }
-.tariff_row { display: grid; grid-template-columns: 200px 56px 1fr; gap: 2px 12px; align-items: baseline;
-  padding: 9px 12px; border-radius: 11px; background: #fff; }
-.tariff_name { font-size: 12.5px; font-weight: 800; color: var(--ink); }
-.tariff_rate { font-size: 13px; font-weight: 800; color: var(--blue); text-align: right; }
-.tariff_period { font-size: 11px; font-weight: 600; color: var(--muted); }
+/* 협정 한 줄: 이름 · 세율 · 적용일 · ?(자세히). 설명은 ?에 올리면 나옵니다. */
+.tariff_row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 11px; background: #fff; }
+.tariff_name { flex: 1 1 auto; min-width: 0; font-size: 12.5px; font-weight: 800; color: var(--ink); }
+.tariff_rate { font-size: 14px; font-weight: 800; color: var(--blue); font-variant-numeric: tabular-nums; }
+.tariff_period { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.tariff_head { display: flex; align-items: center; gap: 6px; }
+
+/* ? 아이콘: 마우스를 올리거나 키보드·탭으로 고르면 자세한 설명을 띄웁니다. */
+.info_tip { position: relative; display: inline-flex; flex: 0 0 auto; }
+.info_tip > i { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(43,102,246,.12); color: var(--blue_dark); font-style: normal; font-size: 11px; font-weight: 900; cursor: help; }
+.info_tip:focus-visible { outline: none; }
+.info_tip:focus-visible > i { box-shadow: 0 0 0 2px var(--blue); }
+.info_tip_body { position: absolute; top: calc(100% + 8px); right: -8px; z-index: 30; width: 340px; max-width: 80vw;
+  padding: 12px 14px; border-radius: 12px; background: var(--ink); color: #e2e8f0; text-align: left;
+  font-size: 12px; font-weight: 600; line-height: 1.6; box-shadow: 0 18px 40px rgba(15,23,42,.28);
+  opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .15s, transform .15s; }
+.info_tip.start .info_tip_body { right: auto; left: -8px; }
+.info_tip_body b { display: block; margin-bottom: 4px; color: #fff; font-size: 12.5px; }
+.info_tip_body p { margin: 0 0 6px; }
+.info_tip_body p:last-child { margin-bottom: 0; }
+.info_tip:hover .info_tip_body, .info_tip:focus-within .info_tip_body { opacity: 1; visibility: visible; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .info_tip_body { transition: none; } }
 .tariff_proof { grid-column: 1 / -1; margin-top: 2px; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
 .tariff_plain { margin: 0; font-size: 12px; font-weight: 700; color: var(--blue_dark); }
 .tariff_note { margin: 2px 0 0; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }

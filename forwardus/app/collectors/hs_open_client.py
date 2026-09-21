@@ -17,8 +17,9 @@
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from threading import Lock
 
+from app.collectors import file_cache
 from app.collectors.base_client import fail, ok, request_text
 
 # UN 무역통계국이 공개하는 품목분류. 키가 필요 없습니다.
@@ -50,10 +51,23 @@ def _digits(value: str) -> str:
 
 # --- 1. UN Comtrade (HS 6자리, 전 세계 공통) ------------------------------------
 
-@lru_cache(maxsize=3)
-def _un_table(edition: str) -> tuple[tuple[str, str], ...]:
-    """품목분류 전체를 한 번만 받아 기억해 둡니다. (약 1.7MB)"""
+# 품목분류표는 HS 개정(5년마다) 때만 바뀝니다. 파일은 개정판별로 따로 두고,
+# 정정분을 반영하도록 이 기간이 지나면 새로 받아 봅니다. 못 받으면 예전 것을 씁니다.
+UN_REFRESH_DAYS = 180
 
+_un_tables: dict[str, tuple[tuple[str, str], ...]] = {}
+_un_name_maps: dict[str, dict[str, str]] = {}
+_un_lock = Lock()
+
+
+def clear_cache() -> None:
+    """메모리에 올려 둔 품목분류표를 비웁니다. (파일은 그대로 둡니다)"""
+
+    _un_tables.clear()
+    _un_name_maps.clear()
+
+
+def _download_un_table(edition: str) -> tuple[tuple[str, str], ...]:
     code = UN_EDITIONS.get(edition, "H6")
     result = request_text("GET", UN_URL.format(edition=code), timeout=40)
     if not result["success"]:
@@ -71,6 +85,53 @@ def _un_table(edition: str) -> tuple[tuple[str, str], ...]:
         name = text.split(" - ", 1)[1] if " - " in text else text
         table.append((number, name.strip()))
     return tuple(table)
+
+
+def _un_table(edition: str) -> tuple[tuple[str, str], ...]:
+    """품목분류 전체(약 1.7MB). 메모리 → 파일 → UN 순서로 찾습니다.
+
+    받기에 실패하면 빈 표를 기억하지 않습니다. 다음 호출에서 다시 시도합니다.
+    """
+
+    if edition in _un_tables:
+        return _un_tables[edition]
+    with _un_lock:                      # 여러 요청이 동시에 1.7MB를 받지 않게 합니다.
+        if edition in _un_tables:
+            return _un_tables[edition]
+        name = f"un_hs/{edition}"
+        cached = file_cache.read(name)
+        stored = ()
+        if cached and isinstance(cached[0], dict):
+            stored = tuple((str(code), str(text)) for code, text in cached[0].get("rows") or ()
+                           if str(code).isdigit())
+        table = stored
+        if not stored or cached[1] > UN_REFRESH_DAYS:
+            fresh = _download_un_table(edition)
+            if fresh:
+                file_cache.write(name, {"edition": edition, "source": UN_URL.format(
+                    edition=UN_EDITIONS.get(edition, "H6")), "rows": fresh})
+                table = fresh
+        if table:
+            _un_tables[edition] = table
+        return table
+
+
+def _un_names(edition: str) -> dict[str, str]:
+    if edition not in _un_name_maps:
+        table = _un_table(edition)
+        if not table:
+            return {}
+        _un_name_maps[edition] = dict(table)
+    return _un_name_maps[edition]
+
+
+def heading_names(code: str) -> dict:
+    """HSK 끝단 품명("기타", "승용자동차용")만으로는 무슨 물건인지 모릅니다.
+    그 세번이 속한 호(4자리)·소호(6자리)의 영문 이름을 돌려줍니다. 못 받으면 빈 값입니다."""
+
+    digits = _digits(code)
+    names = _un_names("HS2022")
+    return {"heading": names.get(digits[:4], ""), "subheading": names.get(digits[:6], "")}
 
 
 def search_un(query: str, limit: int = 20, edition: str = "HS2022") -> dict:

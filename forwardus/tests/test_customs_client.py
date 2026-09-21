@@ -99,12 +99,14 @@ def test_api_error_message_is_surfaced(with_key, monkeypatch):
     assert "koenTp" in result["message"]
 
 
-def test_without_key_uses_examples(app, monkeypatch):
-    """키가 없으면 예시 목록으로 동작합니다."""
+def test_without_key_uses_internal_table(app, monkeypatch):
+    """키가 없으면 관세청 공개 품목표(기준일 표시)로 동작합니다."""
 
     app.config["UNIPASS_API_KEYS"] = {}
-    result = customs_client.search_hs_codes("화장품")
-    assert result["source"] == "mock"
+    result = customs_client.search_hs_codes("샴푸")
+    assert result["source"] == "internal"
+    assert result["base_date"] and "기준" in result["offline_note"]
+    assert any(row["code"] == "3305.10-0000" for row in result["data"])
 
 
 def test_format_hs_code():

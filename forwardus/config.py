@@ -76,6 +76,8 @@ class Config:
 
     DATA_DIR = BASE_DIR / "data"
     MOCK_DATA_DIR = DATA_DIR / "mock"
+    # 바깥에서 받은 참고자료(HS 품목분류표·도착국 세율)를 두는 곳. git에 올리지 않습니다.
+    CACHE_DIR = DATA_DIR / "cache"
 
     EXCHANGE_RATE_USD_KRW = float(os.getenv("EXCHANGE_RATE_USD_KRW", "1380"))
     API_TIMEOUT_SECONDS = float(os.getenv("API_TIMEOUT_SECONDS", "8"))
@@ -90,7 +92,11 @@ class Config:
     TRACKING_API_KEY = os.getenv("TRACKING_API_KEY", "")
     CUSTOMS_API_KEY = os.getenv("CUSTOMS_API_KEY", "")
     EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY", "")
-    AI_API_KEY = os.getenv("AI_API_KEY", "")
+    # OPENAI_API_KEY로 적어 두신 경우에도 받습니다. 둘 중 하나만 있으면 됩니다.
+    AI_API_KEY = os.getenv("AI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
+    # HS 품목분류는 틀리면 관세포탈이 되는 자리라 더 나은 모형을 씁니다.
+    # 상담·서류 읽기는 gpt-4o-mini로 충분하지만 여기만 따로 둡니다.
+    AI_HS_MODEL = os.getenv("AI_HS_MODEL", "gpt-4o")
 
     UNIPASS_API_KEYS = {name: os.getenv(f"UNIPASS_KEY_{name}", "") for name in UNIPASS_SERVICES}
 

@@ -170,12 +170,20 @@ def _hs_name_hints(query: str) -> list[str]:
     return [str(name).strip()[:40] for name in names[:3] if str(name).strip()]
 
 
-def search_hs_codes(query: str) -> dict:
+def search_hs_codes(query: str, *, compare_navigation: bool = False,
+                    country: str = "", order: str = "frequency") -> dict:
     """관세청 HS부호검색. 못 찾으면 품명을 바꿔 한 번 더 찾습니다.
 
     관세청이 멈추면 무료 국제 출처(UN·미국·영국)로 6자리라도 찾아 줍니다.
     6자리는 신고에 그대로 쓸 수 없으므로 그렇다고 밝힙니다.
+
+    compare_navigation=True(화면 검색)이면 AI 품명 해석 → 후보 적합도 →
+    품목란 건수·도착국 관세 비교까지 한 뒤 우선순위로 정렬해 돌려줍니다.
     """
+
+    if compare_navigation:
+        from app.services import hs_suggestion_service
+        return hs_suggestion_service.search(query, country, order)
 
     text = (query or "").strip()
     found = customs_client.search_hs_codes(text)

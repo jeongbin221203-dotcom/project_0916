@@ -15,3 +15,6 @@ instance/
 data/raw/*
 !data/raw/.gitkeep
 instance/requirement_uploads/
+
+# 바깥에서 받아 둔 참고자료 캐시 (app/collectors/file_cache.py)
+data/cache/

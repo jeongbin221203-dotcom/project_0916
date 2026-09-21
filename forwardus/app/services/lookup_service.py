@@ -214,6 +214,7 @@ def run(kind: str, query: str) -> dict:
         "success": result["success"],
         "source": result["source"],
         "message": result.get("message", ""),
+        "offline_note": result.get("offline_note", ""),
         "columns": [{"key": key, "label": label} for key, label in COLUMNS[kind]],
         "rows": rows if isinstance(rows, list) else [rows],
     }
@@ -345,12 +346,33 @@ def data_sources() -> dict:
                  "signup": "https://www.data.go.kr/tcs/dss/selectDataSetList.do?keyword=선박입출항실적"},
                 {"label": "세계은행 WITS · 미국 HTS · 영국 관세율표 (키 없이 씁니다)",
                  "env": "", "ready": True, "used": True},
+                {"label": "UN Comtrade HS 품목분류표 (키 없이 씁니다 · 파일로 받아 둠)",
+                 "env": "", "ready": True, "used": True},
+                _hsk_catalog_row(),
             ],
         },
     ]
     total = sum(len(group["rows"]) for group in groups)
     ready = sum(1 for group in groups for item in group["rows"] if item["ready"])
     return {"groups": groups, "total": total, "ready": ready}
+
+
+def _hsk_catalog_row() -> dict:
+    """내부 HSK 품목표. 공공누리 제1유형이라 출처를 밝히고, 기준일이 지나면 갱신을 알립니다."""
+
+    from app.collectors import hsk_catalog
+
+    info = hsk_catalog.info()
+    if not hsk_catalog.available():
+        state = "없음 · python data/build_hsk.py 로 만드세요"
+    elif info["stale"]:
+        state = f"{info['base_date']} 기준 · 올해 개정 이전 자료라 python data/build_hsk.py 로 갱신하세요"
+    else:
+        state = f"{info['base_date']} 기준"
+    return {"label": f"관세청 HS부호 단위별 품목명 (공공데이터포털 · 공공누리 제1유형 출처표시) · "
+                     f"관세청 API가 멈췄을 때 쓰는 내부 품목표 · {state}",
+            "env": "", "ready": hsk_catalog.available() and not info["stale"], "used": True,
+            "signup": info["url"] or "https://www.data.go.kr/data/15130660/fileData.do"}
 
 
 def _unipass_services() -> dict:
@@ -498,7 +520,8 @@ def _probe(label: str, env: str, call) -> dict:
     return {
         "label": label, "env": env,
         "ok": ok_now and source == "api",
-        "state": ("응답함" if source == "api" else "예시 데이터로 대체") if ok_now else "안 됨",
+        "state": ({"api": "응답함", "internal": "내부 품목표로 대체"}.get(source, "예시 데이터로 대체")
+                  if ok_now else "안 됨"),
         "detail": result.get("message", "") or
                   (f"{len(result['data'])}건" if isinstance(result.get("data"), list) else ""),
     }

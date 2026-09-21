@@ -59,7 +59,8 @@
     {% else %}
       <p class="muted small">{{ result.label }} · {{ result.rows|length }}건
         <span class="badge source_{{ result.source }}">Data Source:
-          {{ 'API' if result.source == 'api' else result.source }}</span></p>
+          {{ {'api': 'API', 'internal': '관세청 품목표'}.get(result.source, result.source) }}</span></p>
+      {% if result.offline_note %}<p class="alert warn small">{{ result.offline_note }}</p>{% endif %}
       <div class="table_scroll">
         <table class="table">
           <thead><tr>{% for col in result.columns %}<th>{{ col.label }}</th>{% endfor %}</tr></thead>

@@ -1,7 +1,8 @@
 """HS CODE 조회와 도착국 규제 정보.
 
 HS CODE는 관세청 UNI-PASS "HS부호검색" API에서 찾고, 키가 없거나 호출이
-실패하면 data/mock/hs_codes.json의 예시 목록을 씁니다.
+실패하면 내부 품목표(data/mock/hsk_codes.json, 관세청 공개 자료)로 찾습니다.
+그것마저 없으면 data/mock/hs_codes.json의 예시 목록을 씁니다.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from copy import deepcopy
 
+from app.collectors import hsk_catalog
 from app.collectors.base_client import fail, get_config, load_mock, ok, request_text
 
 REQUIREMENT_STATUSES = ["confirmed", "check_required", "not_applicable", "unknown"]
@@ -50,17 +52,36 @@ def search_hs_codes_mock(query: str) -> dict:
     return ok(results[:MAX_HS_RESULTS], "mock")
 
 
+def search_hs_codes_offline(query: str, reason: str) -> dict:
+    """관세청을 쓸 수 없을 때. 내부 품목표(관세청 공개 자료)로 찾고, 없으면 예시 목록.
+
+    내부 품목표는 실제 HSK지만 기준일이 지났을 수 있어 source="internal"로 구분하고
+    기준일을 함께 알립니다.
+    """
+
+    rows = hsk_catalog.search(query)
+    if rows is None:
+        return search_hs_codes_mock(query)
+    info = hsk_catalog.info()
+    base_date = info["base_date"]
+    stale = (" 품목표가 올해 HSK 개정 이전 자료라 바뀐 세번이 빠져 있을 수 있습니다."
+             if info["stale"] else "")
+    return {**ok(rows, "internal"), "base_date": base_date, "stale": info["stale"],
+            "offline_note": f"{reason} 관세청 공개 품목표({base_date} 기준, 출처: 관세청·공공데이터포털)"
+                            f"에서 찾았습니다.{stale} 신고 전 관세청 최신 품목분류를 확인하세요."}
+
+
 def search_hs_codes(query: str) -> dict:
     """관세청 HS부호검색(API018)으로 품목을 찾습니다.
 
     품명은 한글·영문 모두 부분일치로 찾고, HS부호는 10자리 완전일치만 됩니다.
-    API 키가 없거나 호출이 실패할 때만 예시 목록으로 되돌아갑니다.
+    API 키가 없거나 호출이 실패하면 내부 품목표로 찾습니다.
     """
 
     keyword = (query or "").strip()
     key = _hs_key()
     if not key:
-        return search_hs_codes_mock(keyword)
+        return search_hs_codes_offline(keyword, "관세청 API 키가 없어")
     if not keyword:
         return ok([], "api")
 
@@ -78,11 +99,11 @@ def search_hs_codes(query: str) -> dict:
 
     result = request_text("GET", UNIPASS_HS_URL, params={"crkyCn": key, **params})
     if not result["success"]:
-        return search_hs_codes_mock(keyword)
+        return search_hs_codes_offline(keyword, "관세청이 응답하지 않아")
     try:
         root = ET.fromstring(result["data"])
     except ET.ParseError:
-        return search_hs_codes_mock(keyword)
+        return search_hs_codes_offline(keyword, "관세청 응답을 읽지 못해")
 
     notice = (root.findtext("ntceInfo") or "").strip()
     if notice:

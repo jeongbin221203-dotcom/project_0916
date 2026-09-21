@@ -49,6 +49,33 @@ def available() -> bool:
     return bool(get_config("AI_API_KEY", ""))
 
 
+def structured_chat(messages: list[dict], schema: dict, *, name: str,
+                    max_tokens: int = 1800) -> dict:
+    """Schema-constrained output for product interpretation, with explicit failure."""
+    key = get_config("AI_API_KEY", "")
+    if not key:
+        return fail("API_AUTH_FAILED", "api", "OpenAI 키가 없어 일반 검색을 사용합니다.")
+    result = request_text("POST", OPENAI_URL, timeout=25,
+                          headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                          json={"model": get_config("AI_HS_MODEL", MODEL), "temperature": 0,
+                                "max_tokens": max_tokens, "messages": messages,
+                                "response_format": {"type": "json_schema", "json_schema": {
+                                    "name": name, "strict": True, "schema": schema}}})
+    if not result["success"]:
+        return result
+    try:
+        choice = json.loads(result["data"])["choices"][0]
+        message = choice["message"]
+        if message.get("refusal") or choice.get("finish_reason") != "stop":
+            return fail("API_INVALID_RESPONSE", "api", "AI 분석을 완료하지 못해 일반 검색을 사용합니다.")
+        payload = json.loads(message["content"])
+        if not isinstance(payload, dict):
+            raise ValueError("Expected object")
+        return ok(payload, "api")
+    except (ValueError, KeyError, IndexError, TypeError):
+        return fail("API_INVALID_RESPONSE", "api", "AI 응답을 해석하지 못해 일반 검색을 사용합니다.")
+
+
 def chat(messages: list[dict], *, max_tokens: int = 700) -> dict:
     """대화 한 번. 답은 글자 그대로 돌려줍니다. (고객상담 창에서 씁니다)"""
 
