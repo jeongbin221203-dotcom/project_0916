@@ -209,7 +209,32 @@ def sweep_repeat(app, s: Sweep) -> None:
                 s.run("서류 반복 검증", ds.validate_shipment_documents, shipment)
 
 
+def block_outbound() -> None:
+    """스윕이 실제 기관을 부르지 못하게 막습니다.
+
+    예전에 이 스윕을 돌리다 관세청이 우리 IP를 방화벽에서 차단했습니다.
+    호출 제한이 아니라 TCP 연결 자체가 막혀 브라우저로도 못 들어갔습니다.
+    스윕은 우리 코드가 버티는지 보는 것이지 남의 서버를 시험하는 것이 아닙니다.
+
+    여기 [1]번은 httpx.request를 직접 갈아 끼우므로 원래 나가지 않지만,
+    [2]번 대량 처리와 [3]번 반복은 진짜로 바깥을 부릅니다.
+
+    실제 호출로 확인하려면 FORWARDUS_FUZZ_LIVE=1 을 주고 돌리세요.
+    """
+
+    import os
+
+    if os.environ.get("FORWARDUS_FUZZ_LIVE") == "1":
+        return
+
+    def offline(*args, **kwargs):
+        raise httpx.ConnectError("스윕에서는 바깥으로 나가지 않습니다.")
+
+    httpx.request = offline
+
+
 def main() -> int:
+    block_outbound()
     app = create_app()
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"

@@ -169,9 +169,16 @@ def test_lookup_page_lists_every_service_and_its_key(app, client):
 
     assert {row["key"] for row in catalog} == set(lookup_service.LOOKUPS)
     for row in catalog:
-        # 관세청 서비스는 서비스마다 키가 따로이고, 공공데이터포털은 키 하나입니다.
-        assert row["env"].startswith("UNIPASS_KEY_") or row["env"] == "DATA_GO_KR_SERVICE_KEY"
+        # 관세청은 서비스마다 키가 따로, 공공데이터포털은 키 하나,
+        # 국제 출처(UN·미국·영국)는 키가 아예 없습니다.
+        assert (row["env"].startswith("UNIPASS_KEY_")
+                or row["env"] == "DATA_GO_KR_SERVICE_KEY"
+                or (row["env"] == "" and row["ready"] is True)), row
         assert row["about"] and row["hint"] and row["example"]
+
+    # 키 없이 되는 조회는 늘 쓸 수 있어야 합니다. 관세청이 멈춰도 마찬가지입니다.
+    no_key = [row for row in catalog if not row["env"]]
+    assert no_key and all(row["ready"] for row in no_key)
 
     html = client.get("/lookup/").get_data(as_text=True)
     for row in catalog:
