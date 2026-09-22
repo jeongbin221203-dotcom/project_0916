@@ -14,7 +14,7 @@ import pytest
 from app.processors import bank_redaction
 
 pytestmark = pytest.mark.skipif(not bank_redaction.ocr_available(),
-                                reason="OCR(rapidocr)이 설치되지 않았습니다")
+                                reason="Tesseract OCR이 설치되지 않았습니다")
 
 LINES = [
     "OFFER SHEET",
@@ -77,7 +77,7 @@ def test_오퍼_번호와_날짜와_금액은_남는다(masked):
 
 
 def test_OCR이_잘못_읽은_숫자_줄은_통째로_지운다():
-    """칸을 넓게 띄운 줄을 이 OCR은 "H 00 00 0 0 00"으로 읽습니다(자신감 0.69).
+    """칸을 넓게 띄운 줄은 OCR이 숫자를 잘못 읽기 쉽습니다("H 00 00 0 0 00" 같은 식).
     그 줄에 계좌번호가 있어도 우리 규칙은 못 찾습니다. 그래서 줄째 지웁니다."""
 
     garbled = "Hair Shampoo 500ml   2,100 PCS   A/C 100-200-300400   US$ 3,780.00"
