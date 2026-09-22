@@ -72,16 +72,8 @@ def _safe_next(target: str | None) -> str:
     return url_for("dashboard.index")
 
 
-# 로그인할 때 세션을 비워도 남겨 둘 것. 올려 둔 오퍼시트를 이어 쓰는 표입니다.
-# 오퍼시트를 올린 뒤 로그인하는 사람이 처음부터 다시 올리지 않게 합니다.
-# (로그아웃할 때는 남기지 않습니다. 같은 브라우저를 다음 사람이 쓸 수 있습니다)
-KEEP_ON_LOGIN = ("offer_draft",)
-
-
 def _log_in(user: User) -> None:
-    kept = {key: session[key] for key in KEEP_ON_LOGIN if key in session}
     session.clear()
-    session.update(kept)
     session["user_id"] = user.id
     g.current_user_cache = (user.id, user)
 

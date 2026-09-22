@@ -82,6 +82,18 @@ def api_exchange_rate():
     return jsonify(planning_service.exchange_rates())
 
 
+@planning_bp.get("/api/fx-board")
+def api_fx_board():
+    """실시간 환율 시세표. 모든 통화의 매매기준율·전일 대비·송금 환율(TTB·TTS).
+
+    사이드바 [💱 환율] 창의 시세표와 다국가 계산기가 씁니다. (fx_board_client)
+    """
+
+    from app.collectors import fx_board_client
+
+    return jsonify(fx_board_client.board())
+
+
 @planning_bp.get("/api/tariff-summary")
 def api_tariff_summary():
     """HS 후보별로 도착국에 쓸 수 있는 협정을 한 줄로 요약합니다."""

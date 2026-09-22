@@ -14,6 +14,12 @@
     </div>
   </div>
 
+  {# 받아 둔 B/L·Offer Sheet가 있으면 올려서 칸을 채웁니다. 채운 뒤 확인은 아래 칸에서 합니다. #}
+  <div class="doc_upload_wrap">
+    <div data-doc-upload></div>
+    <div class="doc_upload_result" data-doc-upload-result hidden></div>
+  </div>
+
   {% include "document/_form.html" %}
 {% endblock %}
 {% block scripts %}
@@ -22,8 +28,10 @@
       locationsUrl: "{{ url_for('planning.api_locations') }}",
       schedulesUrl: "{{ url_for('planning.api_schedules') }}",
       startUrl: "{{ url_for('document.start') }}",
+      extractUrl: "{{ url_for('document.extract') }}",
       originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}"
     };
   </script>
+  <script src="{{ static_url('js/doc_upload.js') }}"></script>
   <script src="{{ static_url('js/doc_form.js') }}"></script>
 {% endblock %}

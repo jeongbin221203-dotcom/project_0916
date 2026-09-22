@@ -97,36 +97,6 @@ def test_login_logout(client):
     assert client.get("/dashboard").status_code == 302
 
 
-def test_login_keeps_uploaded_offer_sheet(client):
-    """오퍼시트를 올린 뒤 로그인해도 이어 씁니다. 다시 올리게 하지 않습니다."""
-
-    _signup(client)
-    client.post("/auth/logout")
-    with client.session_transaction() as session:
-        session["offer_draft"] = "a" * 32
-        session["something_else"] = "x"
-
-    client.post("/auth/login", data={"email": "kim@example.com", "password": "secret123"})
-
-    with client.session_transaction() as session:
-        assert session["offer_draft"] == "a" * 32
-        assert "something_else" not in session       # 나머지는 예전처럼 비웁니다
-        assert session["user_id"]
-
-
-def test_logout_forgets_uploaded_offer_sheet(client):
-    """같은 브라우저를 다음 사람이 쓸 수 있습니다. 로그아웃하면 남기지 않습니다."""
-
-    _signup(client)
-    with client.session_transaction() as session:
-        session["offer_draft"] = "a" * 32
-
-    client.post("/auth/logout")
-
-    with client.session_transaction() as session:
-        assert "offer_draft" not in session
-
-
 @pytest.mark.parametrize("target", ["https://evil.example", "//evil.example", "/\\evil.example"])
 def test_login_ignores_external_next(client, target):
     _signup(client)

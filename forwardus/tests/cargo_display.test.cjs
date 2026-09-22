@@ -5,14 +5,16 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../app/static/js/planning.js'), 'utf8');
-function section(start, end) { return source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start))); }
+// HS 후보 그리기와 ⓘ 설명은 간편 검색 창과 같이 쓰려고 hs_search.js로 옮겼습니다.
+const hsSource = fs.readFileSync(path.join(__dirname, '../app/static/js/hs_search.js'), 'utf8');
+function section(start, end, text = source) { return text.slice(text.indexOf(start), text.indexOf(end, text.indexOf(start))); }
 function context(data = {}) {
   const ctx = vm.createContext({URLSearchParams, urls: {destinationTariff: '/tariff'},
     getJson: async () => ({success: true, data}),
     escapeHtml: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;')});
-  vm.runInContext(section('  function infoTip(', '  const tipPopup'), ctx);
+  vm.runInContext(section('  function infoTip(', '  const tipPopup', hsSource), ctx);
   vm.runInContext(section('  const destinationTokens', '  /* ----- HS부호'), ctx);
-  vm.runInContext(section('  function renderHsItem(', '  function hsEmptyMessage('), ctx);
+  vm.runInContext(section('  function renderHsItem(', '  function hsEmptyMessage(', hsSource), ctx);
   return ctx;
 }
 test('relevance uses categorical colors, escapes API text and keeps evidence in details', () => {

@@ -24,6 +24,7 @@ import json
 from datetime import date
 
 from app.collectors import ai_client, location_client
+from app.processors import bank_redaction
 from app.processors.cost_calculator import INCOTERMS_INFO
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
@@ -264,8 +265,10 @@ def read(text: str) -> dict:
                            "칸을 직접 채워 주세요.")
 
     prompt = EXTRACT_PROMPT.format(today=date.today().isoformat())
+    # 계좌번호·SWIFT는 AI로 보내지 않습니다. (붙여 넣은 오퍼 글에 섞여 오는 일이 흔합니다)
+    sent = bank_redaction.strip_bank_numbers(written)[0]
     answer = ai_client.chat([{"role": "system", "content": prompt},
-                             {"role": "user", "content": written}], max_tokens=900)
+                             {"role": "user", "content": sent}], max_tokens=900)
     if not answer["success"]:
         raise ServiceError(answer["message"])
 
