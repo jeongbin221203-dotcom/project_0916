@@ -1,4 +1,4 @@
-"""Shipment planning: locations, cargo, schedules, reverse planner, shipment creation."""
+"""Shipment planning: locations, cargo, schedules, shipment creation."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from app.collectors import (customs_client, exchange_client, location_client, sc
 from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
 from app.processors.cargo_calculator import calculate_cargo_lines, calculate_cargo_metrics
-from app.processors.cost_calculator import INCOTERMS_INFO, calculate_logistics_cost
+from app.processors.cost_calculator import INCOTERMS_FLOW_STEPS, INCOTERMS_INFO, calculate_logistics_cost
 from app.processors import dangerous_goods, fta_guide, korean
 from app.processors import transit_calculator
 from app.processors.transit_calculator import great_circle_km
@@ -18,7 +18,6 @@ from app.processors.schedule_calculator import (
     DEFAULT_TRANSIT_DAYS,
     calculate_eta,
     calculate_cargo_ready_date,
-    calculate_reverse_schedule,
     check_buyer_deadline,
     check_departure_margin,
 )
@@ -54,6 +53,7 @@ def get_form_options() -> dict:
 
     return {
         "incoterms": INCOTERMS_INFO,
+        "incoterm_flow": INCOTERMS_FLOW_STEPS,
         "package_types": PACKAGE_TYPE_INFO,
         "sort_options": SORT_OPTIONS,
         # 고르는 칸이라 바깥을 부르지 않습니다. 환율은 exchange_rates()로 따로 받습니다.
@@ -1110,30 +1110,6 @@ def check_departure_date(payload: dict) -> dict:
         "label": margin["label"],
     })
     return result
-
-
-def reverse_schedule(payload: dict) -> dict:
-    buyer_required_date = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", field="buyer_required_date")
-    transport_mode = str(payload.get("transport_mode") or "SEA").upper()
-    transit_days = payload.get("transit_days")
-    try:
-        transit_days = int(transit_days) if transit_days not in (None, "") else None
-    except (TypeError, ValueError) as exc:
-        raise ValidationError("운송 기간은 정수로 입력해주세요.", "transit_days") from exc
-    if transit_days is not None and not 0 < transit_days <= 90:
-        raise ValidationError("운송 기간은 1~90일 사이로 입력해주세요.", "transit_days")
-
-    plan = calculate_reverse_schedule(buyer_required_date, transport_mode, transit_days)
-    warnings = []
-    if plan["cargo_ready_date"] < date.today():
-        warnings.append("출고 준비일이 이미 지났습니다. 항공 운송 또는 Buyer와 납기 조정을 검토하세요.")
-    return {
-        **{key: (value.isoformat() if isinstance(value, date) else value) for key, value in plan.items() if key != "steps"},
-        "steps": [
-            {**step, "date": step["date"].isoformat()} if "date" in step else step for step in plan["steps"]
-        ],
-        "warnings": warnings,
-    }
 
 
 def cargo_items(payload: dict) -> list[dict]:
