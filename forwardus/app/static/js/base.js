@@ -124,6 +124,27 @@
     });
   }
 
+  // 로그인한 사람의 이름을 누르면 '내 Dashboard' · 로그아웃 메뉴가 열립니다.
+  const userMenu = document.querySelector("[data-user-menu]");
+  if (userMenu) {
+    const userToggle = userMenu.querySelector("[data-user-menu-toggle]");
+    const userPanel = userMenu.querySelector("[data-user-menu-panel]");
+    const setUserMenu = (open) => {
+      userPanel.hidden = !open;
+      userToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    userToggle.addEventListener("click", () => setUserMenu(userPanel.hidden));
+    document.addEventListener("click", (event) => {
+      if (!userMenu.contains(event.target)) setUserMenu(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !userPanel.hidden) {
+        setUserMenu(false);
+        userToggle.focus();
+      }
+    });
+  }
+
   // 날짜 칸은 어디를 눌러도 달력이 열리게 합니다. (기본 동작은 달력 아이콘만)
   document.querySelectorAll('input[type="date"]').forEach((input) => {
     const open = () => {

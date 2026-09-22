@@ -148,7 +148,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         # 고객상담 창은 모든 화면에 붙으므로 여기서 한 번만 준비합니다.
         from app.services import support_chat_service
 
+        from app.routes.auth import current_user
+
         return {"nav_active": request.blueprint or "", "static_url": static_url,
+                "current_user": current_user(),
                 "support_chat_intro": support_chat_service.intro(),
                 "support_icon": support_icon(),
                 "brand_logo": _pick_image("logo"),

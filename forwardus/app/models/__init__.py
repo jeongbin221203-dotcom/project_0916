@@ -7,6 +7,7 @@ from app.models.requirement_document import RequirementDocument
 from app.models.shipment import Shipment
 from app.models.shipment_cost import Payment, ShipmentCost
 from app.models.tracking_event import TrackingEvent
+from app.models.user import User
 
 __all__ = ["Buyer", "Cargo", "Payment", "RequirementDocument", "Shipment", "ShipmentCost",
-           "TradeDocument", "TrackingEvent"]
+           "TradeDocument", "TrackingEvent", "User"]

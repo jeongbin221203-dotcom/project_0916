@@ -72,6 +72,25 @@ p { margin: 0 0 10px; }
 .main_nav { display: flex; gap: 4px; }
 .main_nav a { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; }
 .main_nav a:hover, .main_nav a.active { background: var(--blue_soft); color: var(--blue_dark); text-decoration: none; }
+.user_menu { position: relative; }
+.main_nav .nav_user { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 8px 12px; border-radius: 10px; color: var(--ink); font-weight: 800; font-size: 14px; white-space: nowrap; cursor: pointer; }
+.main_nav .nav_user:hover, .main_nav .nav_user.active, .main_nav .nav_user[aria-expanded="true"] { background: var(--blue_soft); color: var(--blue_dark); }
+.main_nav .nav_user .caret { font-size: 11px; }
+.user_menu_panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 160px; display: grid; gap: 2px; padding: 6px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.user_menu_panel[hidden] { display: none; }
+.main_nav .user_menu_panel a { display: block; white-space: nowrap; }
+.main_nav .nav_auth_sep { width: 1px; margin: 6px 6px; background: var(--line); }
+.main_nav a.nav_signup { background: var(--blue); color: #fff; }
+.main_nav a.nav_signup:hover, .main_nav a.nav_signup.active { background: var(--blue_dark); color: #fff; }
+.main_nav .nav_logout { display: block; margin: 0; }
+.main_nav .nav_logout button { width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; cursor: pointer; }
+.main_nav .nav_logout button:hover { background: var(--blue_soft); color: var(--blue_dark); }
+
+/* 로그인 · 회원가입 */
+.auth_wrap { max-width: 420px; margin: 24px auto; }
+.auth_wrap h1 { margin-top: 0; }
+.auth_switch { margin: 16px 0 0; text-align: center; font-size: 14px; }
+
 .nav_toggle { display: none; border: 0; background: transparent; font-size: 22px; padding: 6px 10px; }
 
 .site_footer { border-top: 1px solid var(--line); background: #fff; padding: 22px 0; font-size: 13px; }
@@ -143,7 +162,7 @@ p { margin: 0 0 10px; }
 .field_label { font-size: 13px; font-weight: 800; color: #334155; }
 /* 입력칸 모양. 타입 선택자에만 기대면 타입을 바꿀 때 스타일이 빠지므로
    .text_input 클래스도 함께 받습니다. */
-input[type=text], input[type=number], input[type=date], input[type=email],
+input[type=text], input[type=number], input[type=date], input[type=email], input[type=password],
 input.text_input, select {
   width: 100%; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; outline: none; transition: border-color .15s, box-shadow .15s;
 }
@@ -232,6 +251,9 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   .nav_toggle { display: block; }
   .main_nav { display: none; position: absolute; top: 62px; left: 0; right: 0; flex-direction: column; background: #fff; padding: 10px 16px 16px; border-bottom: 1px solid var(--line); }
   .main_nav.open { display: flex; }
+  .main_nav .nav_auth_sep { width: auto; height: 1px; margin: 6px 0; }
+  .main_nav .nav_user { width: 100%; }
+  .user_menu_panel { position: static; box-shadow: none; border: 0; padding: 0 0 0 12px; }
 }
 @media (max-width: 640px) {
   .card { padding: 18px; border-radius: 16px; }
