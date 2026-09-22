@@ -7,9 +7,23 @@
     {# 탭 아이콘도 로고 마크를 씁니다. 파일을 바꾸면 여기도 같이 바뀝니다. #}
     <link rel="icon" type="image/svg+xml" href="{{ brand_mark }}">
     <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
+    {% if not standalone %}
+      {# 사이드바·환율 창은 모든 화면이 같이 씁니다. (shell.css) #}
+      <link rel="stylesheet" href="{{ static_url('css/shell.css') }}">
+      {# 사이드바를 열어 둔 사람에게 접힌 모양이 한 번 번쩍이지 않게, 그리기 전에 상태를 먼저 붙입니다.
+         기본은 접힘(아이콘 레일)입니다. isSidebarExpanded가 "true"일 때만 펼칩니다. (sidebar.js)
+         화면을 옮겨도 같은 값을 읽으므로 접힘/펼침이 그대로 이어집니다. #}
+      <script>
+        try {
+          if (window.localStorage.getItem("isSidebarExpanded") === "true") {
+            document.documentElement.classList.add("rail_expanded");
+          }
+        } catch (error) { /* 저장 공간을 못 쓰면 기본(접힘)으로 둡니다. */ }
+      </script>
+    {% endif %}
     {% block head %}{% endblock %}
   </head>
-  <body class="{{ 'standalone' if standalone }}">
+  <body class="{{ 'standalone' if standalone }} {% block body_class %}{% endblock %}">
     {# 화면 하나에만 집중해야 하는 자리는 머리말·푸터·상담 단추를 뺍니다.
        그 화면 템플릿에서 {% set standalone = true %} 를 적으면 됩니다.
        대신 그 화면이 스스로 돌아갈 길을 내 줘야 합니다. 안 그러면 갇힙니다. #}
@@ -28,21 +42,23 @@
         <button class="nav_toggle" type="button" aria-label="메뉴 열기" aria-expanded="false" data-nav-toggle>☰</button>
         <nav class="main_nav" data-nav>
           <a href="{{ url_for('planning.new') }}" class="{{ 'active' if nav_active == 'planning' }}">운송 계획</a>
-          <a href="{{ url_for('shipment.index') }}" class="{{ 'active' if nav_active in ('shipment', 'document', 'tracking', 'assistant') }}">Shipments</a>
+          {# 예전 Shipments 메뉴는 Dashboard로 합쳤습니다. 마스터는 전체, 회원은 내 것만 봅니다. #}
+          {% if current_user %}
+            <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active in ('dashboard', 'shipment', 'assistant') or (nav_active == 'tracking' and request.endpoint != 'tracking.container_lookup') }}">Dashboard</a>
+          {% endif %}
           <a href="{{ url_for('tracking.container_lookup') }}" class="{{ 'active' if request.endpoint == 'tracking.container_lookup' }}">컨테이너 조회</a>
           <a href="{{ url_for('lookup.index') }}" class="{{ 'active' if nav_active == 'lookup' }}">관세청 조회</a>
           <span class="nav_auth_sep" aria-hidden="true"></span>
           {% if current_user %}
-            {# Dashboard는 로그인한 사람의 이름 메뉴 안으로 옮겼습니다. #}
+            {# 이름 메뉴에는 로그아웃만 둡니다. Dashboard는 위쪽 메뉴와 사이드바에 있습니다. #}
             <div class="user_menu" data-user-menu>
-              <button type="button" class="nav_user {{ 'active' if nav_active == 'dashboard' }}"
+              <button type="button" class="nav_user"
                       aria-haspopup="true" aria-expanded="false" data-user-menu-toggle>
                 {{ current_user.name or current_user.email }}님
                 {% if current_user.is_master %}<span class="badge master_badge">마스터</span>{% endif %}
                 <span class="caret" aria-hidden="true">▾</span>
               </button>
               <div class="user_menu_panel" data-user-menu-panel hidden>
-                <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active == 'dashboard' }}">{{ '전체 Dashboard' if current_user.is_master else '내 Dashboard' }}</a>
                 <form class="nav_logout" method="post" action="{{ url_for('auth.logout') }}">
                   <button type="submit">로그아웃</button>
                 </form>
@@ -57,6 +73,13 @@
     </header>
     {% endif %}
 
+    {# 루트 레이아웃: 왼쪽 사이드바는 모든 화면에 고정되고, 오른쪽 .app_stage 안의 내용만 화면마다 바뀝니다.
+       (React의 Layout + <Outlet/> 자리. 여기서는 {% block content %}가 그 자리입니다) #}
+    {% if not standalone %}
+    <div class="app_shell">
+      {% include "_sidebar.html" %}
+      <div class="app_stage">
+    {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="flash_stack" role="status">
@@ -70,6 +93,10 @@
     <main class="{% block main_class %}content_width page{% endblock %}">
       {% block content %}{% endblock %}
     </main>
+    {% if not standalone %}
+      </div>
+    </div>
+    {% endif %}
 
     {% if not standalone %}
     <footer class="site_footer">
@@ -125,6 +152,8 @@
 
     {# HS CODE 간편 검색. 어느 화면에서나 [data-hs-open]을 누르면 이 창이 뜹니다.
        검색은 운송 계획 [3. Cargo]의 HS 칸과 같은 창구·같은 코드(hs_search.js)를 씁니다. #}
+    {% include "_fx_center.html" %}
+
     <div class="hs_modal" data-hs-modal hidden>
       <div class="hs_modal_backdrop" data-hs-close></div>
       <div class="hs_modal_box" role="dialog" aria-modal="true" aria-labelledby="hs_modal_title">
@@ -165,6 +194,7 @@
         url: "{{ url_for('home.api_support_chat') }}",
         intro: {{ support_chat_intro|tojson }}
       };
+      window.FORWARDUS_FX = { fxBoardUrl: "{{ url_for('planning.api_fx_board') }}" };
       window.FORWARDUS_HS_MODAL = {
         hsCodesUrl: "{{ url_for('planning.api_hs_codes') }}",
         countriesUrl: "{{ url_for('planning.api_countries') }}"
@@ -175,6 +205,11 @@
     <script>
       {# 대화는 회원마다 따로 둡니다. 한 탭에서 계정을 바꿔도 섞이지 않게. #}
       window.FORWARDUS_CHAT = { scope: {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }} };
+      {# 서류 작성에서 적은 값을 운송 계획이 이어 씁니다. 로그인한 회원만. (work_draft.js) #}
+      {% if current_user %}
+      window.FORWARDUS_WORK_DRAFT = { url: "{{ url_for('work_draft.show') }}",
+                                      planningUrl: "{{ url_for('work_draft.planning') }}" };
+      {% endif %}
     </script>
     {% endif %}
     <script src="{{ static_url('js/base.js') }}"></script>
@@ -183,7 +218,10 @@
     {% if not standalone %}
       {# 시작 화면의 탭과 고래 상담창이 나눠 쓰는 대화. 둘보다 먼저 읽습니다. #}
       <script src="{{ static_url('js/chat_store.js') }}"></script>
+      <script src="{{ static_url('js/work_draft.js') }}"></script>
       <script src="{{ static_url('js/hs_modal.js') }}"></script>
+      <script src="{{ static_url('js/sidebar.js') }}"></script>
+      <script src="{{ static_url('js/fx_center.js') }}"></script>
     {% endif %}
     {% if show_whale %}<script src="{{ static_url('js/support_chat.js') }}"></script>{% endif %}
     {% block scripts %}{% endblock %}

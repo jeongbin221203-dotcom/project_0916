@@ -8,6 +8,7 @@ from app.models.shipment import Shipment
 from app.models.shipment_cost import Payment, ShipmentCost
 from app.models.tracking_event import TrackingEvent
 from app.models.user import User
+from app.models.work_draft import WorkDraft
 
 __all__ = ["Buyer", "Cargo", "Payment", "RequirementDocument", "Shipment", "ShipmentCost",
-           "TradeDocument", "TrackingEvent", "User"]
+           "TradeDocument", "TrackingEvent", "User", "WorkDraft"]

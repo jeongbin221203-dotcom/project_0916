@@ -14,7 +14,7 @@ def test_widget_appears_on_every_page(client):
     시작 화면에서 대화가 시작되면 그동안만 숨기는데, 그건 브라우저가 합니다.
     """
 
-    for path in ("/", "/planning/new", "/shipments", "/lookup/"):
+    for path in ("/", "/planning/new", "/dashboard", "/lookup/"):
         html = client.get(path).get_data(as_text=True)
         assert "data-support-open" in html, path
         assert "<b>OpenAI</b>" in html, path

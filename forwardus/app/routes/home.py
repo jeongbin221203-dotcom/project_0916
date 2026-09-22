@@ -7,18 +7,18 @@ import json
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
-from app.routes.auth import current_user
 from app.services import (ServiceError, agent_service, attachment_service,
                           document_extract_service, document_pipeline_service,
-                          intake_service,
-                          shipment_service, support_chat_service)
+                          intake_service, support_chat_service)
 from app.validators import ValidationError
 
 home_bp = Blueprint("home", __name__)
 
 
 def quick_actions() -> list[dict]:
-    """적는 칸 바로 위의 세 단추.
+    """적는 칸 바로 위의 세 단추. 순서: 무역 상담 → 서류 작성 → 운송 계획 (그 뒤에 HS CODE 조회)
+
+    서류 작성이 운송 계획보다 앞입니다. 서류에 적은 값이 운송 계획 칸을 미리 채웁니다.
 
     누르면 그 모드로 대화가 시작됩니다. 칸을 펼치지 않습니다 — 칸은
     사이드바의 화면에 있고, 여기는 말로 하는 자리입니다.
@@ -38,13 +38,6 @@ def quick_actions() -> list[dict]:
                       "인코텀즈는 어떻게 고르나요?",
                       "적재의무기한이 뭔가요?",
                       "원산지증명서는 어디서 받나요?"]},
-        {"key": "planning", "icon": "📦", "label": "운송 계획",
-         "placeholder": "어디서 어디로, 무엇을 언제 보내시나요",
-         "hint": "출발·도착지와 화물을 알려 주시면 스케줄과 물류비를 찾아 드립니다.",
-         "opener": "어디서 어디로 보내시나요? 출발지와 도착지를 알려 주세요.",
-         "examples": ["부산에서 로스앤젤레스로 11월 초에 보냅니다",
-                      "치약 500박스, 한 박스 40x30x25cm에 12kg입니다",
-                      "항공으로 보내면 얼마나 걸리나요?"]},
         {"key": "documents", "icon": "📄", "label": "서류 작성",
          "placeholder": "어떤 서류가 필요하신가요",
          "hint": "필요한 서류만 골라 그 서류에 들어가는 것만 여쭤봅니다.",
@@ -59,32 +52,24 @@ def quick_actions() -> list[dict]:
          "fill_label": "📄 적은 내용으로 칸 채우기",
          "examples": ["패킹리스트만 만들어줘", "상업송장만 작성해줘"],
          # 빈 서식 PDF를 그대로 내려받는 자리. 대화를 시작하는 칩과 성격이
-         # 달라 따로 둡니다. (파일은 아직 안 붙였습니다)
+         # 달라 따로 둡니다. (/documents/blank/<kind>.pdf)
          "downloads": [{"label": "패킹리스트(PDF)", "kind": "packing_list_std"},
                        {"label": "상업송장(PDF)", "kind": "commercial_invoice"}]},
+        {"key": "planning", "icon": "📦", "label": "운송 계획",
+         "placeholder": "어디서 어디로, 무엇을 언제 보내시나요",
+         "hint": "출발·도착지와 화물을 알려 주시면 스케줄과 물류비를 찾아 드립니다.",
+         "opener": "어디서 어디로 보내시나요? 출발지와 도착지를 알려 주세요.",
+         "examples": ["부산에서 로스앤젤레스로 11월 초에 보냅니다",
+                      "치약 500박스, 한 박스 40x30x25cm에 12kg입니다",
+                      "항공으로 보내면 얼마나 걸리나요?"]},
     ]
-
-
-# 왼쪽 세로 줄. 가운데는 적는 칸 하나만 남기고 나머지는 전부 이리로 옮겼습니다.
-RAIL = [
-    {"key": "planning", "icon": "📦", "tone": "blue", "label": "운송 계획",
-     "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다"},
-    {"key": "shipment", "icon": "📄", "tone": "green", "label": "서류 작성",
-     "note": "상업송장·포장명세서를 Shipment 데이터로 자동 작성합니다"},
-]
-
-RAIL_URLS = {"planning": "planning.new", "shipment": "document.new"}
 
 
 @home_bp.get("/")
 def index():
-    rail = [{**item, "url": url_for(RAIL_URLS[item["key"]])} for item in RAIL]
-    # 서식 칸은 더 이상 여기서 만들지 않습니다. 사이드바의 "서류 작성"
-    # 화면(/documents/new)으로 옮겼습니다. 홈은 대화하는 자리입니다.
-    # 최근 Shipment는 보는 사람 것만. 로그인 전이면 비어 있습니다.
-    return render_template("home/index.html",
-                           recent=shipment_service.list_shipments(viewer=current_user())[:3],
-                           actions=quick_actions(), rail=rail)
+    # 서식 칸은 사이드바의 "서류 작성" 화면(/documents/new)에 있습니다. 홈은 대화하는 자리입니다.
+    # 사이드바(최근 Shipment 포함)는 모든 화면에 붙어 base.html이 그립니다. (routes/sidebar.py)
+    return render_template("home/index.html", actions=quick_actions())
 
 
 @home_bp.post("/api/intake")

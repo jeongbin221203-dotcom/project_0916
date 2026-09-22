@@ -1,0 +1,44 @@
+"""왼쪽 사이드바에 들어갈 것. 모든 화면이 같이 씁니다. (base.html → _sidebar.html)
+
+원래 시작 화면(home.py)에만 있던 목록을 옮겼습니다. 어느 화면에 있든 같은 자리에
+같은 항목이 있고, 지금 있는 곳만 표시가 바뀝니다.
+"""
+
+from __future__ import annotations
+
+from flask import request, url_for
+
+# key는 "지금 어디에 있나"를 가릴 때 씁니다. blueprints가 그 항목에 속한 화면들입니다.
+RAIL = [
+    {"key": "home", "icon": "🏠", "tone": "", "label": "홈", "endpoint": "home.index",
+     "note": "대화로 묻고 서류를 만듭니다", "blueprints": ("home",)},
+    {"key": "planning", "icon": "📦", "tone": "blue", "label": "운송 계획", "endpoint": "planning.new",
+     "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다", "blueprints": ("planning",)},
+    {"key": "documents", "icon": "📄", "tone": "green", "label": "서류 작성", "endpoint": "document.new",
+     "note": "상업송장·포장명세서를 Shipment 데이터로 자동 작성합니다", "blueprints": ("document",)},
+    # Shipment 상세·추적·AI 도우미 화면은 Dashboard 아래에 있습니다.
+    {"key": "dashboard", "icon": "📊", "tone": "violet", "label": "Dashboard", "endpoint": "dashboard.index",
+     "note": "내 Shipment 현황 (마스터는 전체)",
+     "blueprints": ("dashboard", "shipment", "tracking", "assistant")},
+]
+RECENT_COUNT = 3
+
+
+def active_key() -> str:
+    blueprint = request.blueprint or ""
+    # 컨테이너 조회는 tracking 안에 있지만 Shipment 화면이 아닙니다. 위쪽 메뉴에서 다룹니다.
+    if request.endpoint == "tracking.container_lookup":
+        return ""
+    return next((item["key"] for item in RAIL if blueprint in item["blueprints"]), "")
+
+
+def context(viewer) -> dict:
+    """사이드바 조각이 쓰는 값. 최근 Shipment는 보는 사람 것만(로그인 전이면 없음)."""
+
+    from app.services import shipment_service
+
+    current = active_key()
+    items = [{**item, "url": url_for(item["endpoint"]), "active": item["key"] == current}
+             for item in RAIL]
+    recent = shipment_service.list_shipments(viewer=viewer)[:RECENT_COUNT] if viewer else []
+    return {"links": items, "recent": recent}

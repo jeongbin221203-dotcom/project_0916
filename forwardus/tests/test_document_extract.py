@@ -400,7 +400,7 @@ def test_서류_작성_화면에_올리기_칸과_Notify_Party_칸이_있다(cli
 
 
 def test_HS_간편_검색_창은_어느_화면에나_있고_Cargo와_같은_창구를_쓴다(client):
-    for path in ("/", "/documents/new", "/planning/new", "/shipments"):
+    for path in ("/", "/documents/new", "/planning/new", "/dashboard"):
         html = client.get(path).get_data(as_text=True)
         assert "data-hs-modal" in html, path
         assert "hs_search.js" in html, path

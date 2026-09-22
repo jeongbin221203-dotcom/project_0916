@@ -147,13 +147,15 @@
     const file = event.target.closest("[data-home-file]");
     if (file) {
       flash(file);
-      // 빈 서식 파일은 아직 안 붙였습니다. 없는 것을 있는 척하지 않습니다.
-      say("bot", "빈 서식 PDF는 아직 준비 중입니다.\n\n"
-        + `지금은 **${file.textContent.replace("(PDF)", "")}**를 대화로 만들어 `
-        + "PDF로 받으실 수 있습니다. 아래에 적어 보내 주세요.");
-      input.value = file.textContent.replace("(PDF)", "").trim() + " 만들어줘";
-      resize();
-      input.focus();
+      // 값이 비어 있는 표준 서식 PDF를 바로 내려받습니다.
+      const link = document.createElement("a");
+      link.href = config.blankUrl.replace("__KIND__", encodeURIComponent(file.dataset.homeFile));
+      link.download = "";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      say("note", `**${file.textContent.replace("(PDF)", "").trim()}** 빈 서식을 내려받았습니다. `
+        + "값을 채운 서류가 필요하시면 아래에 적어 보내 주세요.");
       return;
     }
 
@@ -552,8 +554,14 @@
     // 새 서류를 올리면 앞의 고르기 칸은 치웁니다. 두 개가 남으면 어느 것이 지금 것인지 헷갈립니다.
     if (pipe && pipe.card) pipe.card.remove();
     pipe = { ...state, card: null, label };
+    syncWorkDraft("upload");
     say("bot", pipe.reply);
     renderPickCard();
+  }
+
+  // 대화로 모은 초안도 "작성 중인 수출 건"에 저장해 운송 계획이 이어 씁니다. (work_draft.js)
+  function syncWorkDraft(source) {
+    if (pipe && pipe.draft && window.ForwardusWorkDraft) window.ForwardusWorkDraft.save(pipe.draft, source);
   }
 
   async function startPipeline(extracted, kinds) {
@@ -599,6 +607,7 @@
     waiting.remove();
     if (!response.success) { say("bad", response.message); return; }
     Object.assign(pipe, response.data);
+    syncWorkDraft("chat");
     say("bot", pipe.reply);
     (pipe.notes || []).forEach((note) => say("bad", note));
     renderPickCard();
@@ -969,80 +978,7 @@
     else askSupport(text);
   });
 
-  /* ----- 왼쪽 사이드바: 아이콘 레일 ↔ 펼침 드로어 -----
-     기본은 접힘(아이콘만 있는 60px 레일)입니다. 맨 위 ☰를 누르면 드로어가 164px로
-     미끄러져 나오며 가운데를 밀지 않고 덮습니다. 상태는 isSidebarExpanded(boolean)로 두고
-     localStorage에 기억해 새로고침·화면 이동 뒤에도 그대로입니다.
-     (그리기 전에 index.html 머리의 짧은 스크립트가 같은 값을 먼저 붙입니다) */
-  const RAIL_KEY = "isSidebarExpanded";
-  const railToggle = document.querySelector("[data-rail-toggle]");
-  const railInner = document.querySelector(".rail_inner");
-  let isSidebarExpanded = document.documentElement.classList.contains("rail_expanded");
-
-  function setSidebarExpanded(expanded, { save = true } = {}) {
-    isSidebarExpanded = expanded;
-    document.documentElement.classList.toggle("rail_expanded", expanded);
-    if (railToggle) {
-      const label = expanded ? "사이드바 닫기" : "사이드바 열기";
-      railToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-      railToggle.setAttribute("aria-label", label);
-      railToggle.dataset.tip = label;
-    }
-    if (save) {
-      try {
-        window.localStorage.setItem(RAIL_KEY, expanded ? "true" : "false");
-      } catch (error) { /* 저장 공간을 못 쓰면 이 화면에서만 바뀝니다. */ }
-    }
-  }
-
-  // 드로어가 가운데 내용을 실제로 덮고 있는지. (넓은 화면에서는 가운데가 멀어 덮지 않습니다)
-  function drawerCovers(target) {
-    if (!railInner || !target) return false;
-    return railInner.getBoundingClientRect().right > target.getBoundingClientRect().left;
-  }
-
-  if (railToggle) {
-    setSidebarExpanded(isSidebarExpanded, { save: false });
-    railToggle.addEventListener("click", () => setSidebarExpanded(!isSidebarExpanded));
-    // 드로어가 내용을 덮고 있을 때만, 바깥을 누르면 닫습니다. 덮지 않으면 열어 둔 채 씁니다.
-    document.addEventListener("click", (event) => {
-      if (!isSidebarExpanded || railInner.contains(event.target)) return;
-      if (event.target.closest("[data-fx-modal], [data-hs-modal], [data-dp-modal]")) return;
-      if (drawerCovers(centerEl)) setSidebarExpanded(false);
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && isSidebarExpanded && drawerCovers(centerEl)
-          && !document.querySelector(".fx_modal:not([hidden]), .hs_modal:not([hidden]), .dp_modal:not([hidden])")) {
-        setSidebarExpanded(false);
-        railToggle.focus();
-      }
-    });
-  }
-
-  /* ----- 왼쪽 줄에서 옆으로 펼치는 것들 ----- */
-  // 내용이 있는 항목(최근 Shipment)은 좁은 줄에 넣을 수 없어 옆으로 펼칩니다.
-  // (환율은 옆으로 펼치지 않고 환율 센터 창을 엽니다. fx_center.js)
-  const flyouts = Array.from(document.querySelectorAll("[data-rail-flyout]"));
-
-  function setFlyout(box, open) {
-    box.querySelector(".rail_flyout").hidden = !open;
-    box.querySelector("button").setAttribute("aria-expanded", open ? "true" : "false");
-  }
-
-  flyouts.forEach((box) => {
-    box.querySelector("button").addEventListener("click", (event) => {
-      event.stopPropagation();
-      const opening = box.querySelector(".rail_flyout").hidden;
-      flyouts.forEach((other) => setFlyout(other, other === box && opening));
-    });
-  });
-  // 바깥을 누르거나 Esc를 누르면 닫습니다.
-  document.addEventListener("click", (event) => {
-    flyouts.forEach((box) => { if (!box.contains(event.target)) setFlyout(box, false); });
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") flyouts.forEach((box) => setFlyout(box, false));
-  });
+  // 왼쪽 사이드바(접힘·펼침, 최근 Shipment)는 모든 화면이 같이 씁니다. → sidebar.js
 
   /* ----- 나눈 대화 다시 그리기 -----
      다른 화면에 갔다 오거나 고래 상담창에서 말을 걸었어도 여기서 이어집니다. */
