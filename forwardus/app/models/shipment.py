@@ -63,6 +63,18 @@ class Shipment(db.Model):
     exporter_address = db.Column(db.String(500), nullable=False, default="")
     notify_party = db.Column(db.String(300), nullable=False, default="SAME AS CONSIGNEE")
 
+    # 관세사에게 넘기는 수출신고 자료에만 쓰는 칸입니다.
+    # 사업자등록번호는 신고서에 반드시 들어가는데 운송에는 쓰이지 않아 따로 둡니다.
+    exporter_business_no = db.Column(db.String(20), nullable=False, default="")
+    customs_trade_kind = db.Column(db.String(4), nullable=False, default="11")
+    customs_payment_method = db.Column(db.String(4), nullable=False, default="TT")
+    country_of_origin = db.Column(db.String(60), nullable=False, default="KR · 대한민국")
+
+    # 부킹이 끝나면 받는 번호들. 컨테이너·통관 조회의 열쇠가 됩니다.
+    bl_no = db.Column(db.String(30), nullable=False, default="")
+    export_declaration_no = db.Column(db.String(20), nullable=False, default="")
+    cargo_no = db.Column(db.String(20), nullable=False, default="")
+
     carrier = db.Column(db.String(100), nullable=True)
     vessel_or_flight = db.Column(db.String(100), nullable=True)
     transit_days = db.Column(db.Integer, nullable=True)
@@ -75,8 +87,18 @@ class Shipment(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     buyer = db.relationship("Buyer", back_populates="shipments")
-    cargo = db.relationship("Cargo", back_populates="shipment", uselist=False, cascade="all, delete-orphan")
+    cargos = db.relationship("Cargo", back_populates="shipment", cascade="all, delete-orphan",
+                             order_by="Cargo.line_no")
+
+    @property
+    def cargo(self):
+        """대표 화물(첫 품목). 서류·요약처럼 한 건만 쓰는 곳에서 씁니다."""
+
+        return self.cargos[0] if self.cargos else None
     documents = db.relationship("TradeDocument", back_populates="shipment", cascade="all, delete-orphan")
+    requirement_documents = db.relationship(
+        "RequirementDocument", back_populates="shipment", cascade="all, delete-orphan",
+        order_by="RequirementDocument.uploaded_at")
     tracking_events = db.relationship(
         "TrackingEvent",
         back_populates="shipment",
@@ -139,5 +161,6 @@ class Shipment(db.Model):
             "schedule_source": self.schedule_source,
             "status": self.status,
             "cargo": self.cargo.to_dict() if self.cargo else None,
+            "cargos": [item.to_dict() for item in self.cargos],
             "total_cost_krw": self.total_cost_krw,
         }

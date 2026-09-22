@@ -1,10 +1,16 @@
 {% extends "base.html" %}
 {% block title %}새 운송 계획{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/planning.css') }}">{% endblock %}
 {% block content %}
   <div class="page_head">
     <div>
-      <p class="eyebrow">Shipment Planning</p>
+      {# 단독으로 열면 위쪽 메뉴가 없습니다. 돌아갈 길을 여기서 냅니다.
+         길 없는 화면에 가두면 새로고침밖에 할 것이 없습니다. #}
+      {% if standalone %}
+        <a class="back_home" href="{{ url_for('home.index') }}">← ForwardUs 홈</a>
+      {% else %}
+        <p class="eyebrow">Shipment Planning</p>
+      {% endif %}
       <h1>새 운송 계획</h1>
       <p class="muted">단계는 순서와 관계없이 자유롭게 이동할 수 있습니다. 필수 항목은 Shipment 생성 시 한 번에 확인합니다.</p>
     </div>
@@ -25,14 +31,15 @@
     <section class="card step" data-step="1">
       <div class="route_layout">
         <div class="calendar_panel">
-          <label class="field_label">출발 희망일</label>
+          <label class="field_label">예상 일정</label>
           <div class="calendar" data-calendar></div>
-          <p class="selected_date">선택: <b data-selected-date>-</b></p>
+          <p class="selected_date" data-selected-date></p>
+          <div class="outlook" data-outlook hidden></div>
         </div>
         <div class="route_fields">
           <label class="field">
             <span class="field_label">견적명</span>
-            <input type="text" name="project_name" maxlength="200" placeholder="예: 10월 LA 화장품 출하" required>
+            <input class="text_input" type="text" name="project_name" maxlength="200" placeholder="예: 10월 LA 화장품 출하" required>
           </label>
 
           <div class="field">
@@ -52,15 +59,67 @@
           </div>
 
           <div class="field autocomplete" data-autocomplete="origin">
-            <span class="field_label">출발지 (국내 <span data-kind-label>항구</span>)</span>
+            <span class="field_label">출발지 (국내 <span data-kind-label>항구</span>)
+              <button type="button" class="link_button inline" data-custom-toggle>직접 입력</button>
+            </span>
             <input type="text" autocomplete="off" placeholder="부산, KRPUS, 인천…" data-ac-input>
             <ul class="ac_list" data-ac-list hidden></ul>
+            <small class="field_hint" data-sea-only>목록에는 국가관리 무역항만 보여줍니다.
+              지방관리 무역항(제주·통영·고현 등)은 이름을 입력하면 나옵니다.</small>
+            <div class="custom_box" data-custom hidden>
+              <input type="text" data-custom-code maxlength="10" placeholder="코드 (선택)" data-code-input>
+              <div class="custom_search">
+                <input type="text" data-custom-name maxlength="200" placeholder="이름으로 검색" data-name-input>
+                <ul class="ac_list" data-custom-list hidden></ul>
+              </div>
+              <span class="custom_country">대한민국</span>
+              <button type="button" class="button small primary" data-custom-apply>적용</button>
+            </div>
           </div>
 
           <div class="field autocomplete" data-autocomplete="destination">
-            <span class="field_label">도착지 (해외 <span data-kind-label>항구</span>)</span>
+            <span class="field_label">도착지 (해외 <span data-kind-label>항구</span>)
+              <button type="button" class="link_button inline" data-custom-toggle>직접 입력</button>
+            </span>
+            <select data-country-filter>
+              <option value="">국가 전체</option>
+            </select>
             <input type="text" autocomplete="off" placeholder="Los Angeles, USLAX, 상하이…" data-ac-input>
             <ul class="ac_list" data-ac-list hidden></ul>
+            <div class="custom_box" data-custom hidden>
+              <input type="text" data-custom-code maxlength="10" placeholder="코드 (선택)" data-code-input>
+              <div class="custom_search">
+                <input type="text" data-custom-name maxlength="200" placeholder="이름으로 검색" data-name-input>
+                <ul class="ac_list" data-custom-list hidden></ul>
+              </div>
+              <select data-custom-country><option value="">국가 선택</option></select>
+              <button type="button" class="button small primary" data-custom-apply>적용</button>
+            </div>
+          </div>
+
+          <div class="badge_guide" data-air-only hidden>
+            <p><em class="ac_note cargo">KE 화물</em>
+              대한항공 화물이 취항하는 공항입니다. 인천에서 화물기 또는 여객기 화물칸으로 바로 보낼 수 있습니다.
+              (예: 암스테르담·프랑크푸르트·로스앤젤레스·뉴욕·시카고·싱가포르·정저우)</p>
+            <p><em class="ac_note cargo">화물 거점</em>
+              대한항공 취항지는 아니지만 화물 처리 규모가 크고 화물 전용 시설이 갖춰진 공항입니다.
+              다른 항공사나 콘솔 업체를 통해 보낼 수 있습니다.
+              (예: 멤피스·루이빌 특송 허브, 앵커리지 환적 거점, 홍콩·두바이·방콕)</p>
+            <p><em class="ac_note direct">직항</em>
+              고른 국내 출발 공항에서 <b>갈아타지 않고 한 번에 가는 편</b>이 있는 공항입니다.
+              출발 공항을 바꾸면 표시도 바뀝니다. 직항이 없으면 "환승 필요"로 내려가고,
+              다른 국내 공항에서 직항이 있으면 어디인지(예: "ICN 출발은 직항") 알려줍니다.</p>
+          </div>
+
+          <div class="badge_guide" data-sea-only hidden>
+            <p><em class="ac_note direct">직기항</em>
+              한국 항구에서 <b>배를 갈아타지 않고 곧바로 들어가는 정기 항로</b>가 있는 항구입니다.
+              실제 운항 기록에서 한국과 이어진 항로가 확인된 곳만 표시합니다.
+              직기항이면 컨테이너를 한 번 실으면 목적항까지 그대로 갑니다.</p>
+            <p><em class="ac_note">환적 필요</em>
+              직기항 선박이 없어 중간 거점 항구에서 <b>다른 배로 옮겨 실어야</b> 하는 항구입니다.
+              옮겨 싣는 동안 배를 기다리므로 나흘 안팎이 더 걸리고, 어디서 갈아타는지
+              (예: "환적: 함부르크항 · 브레머하펜항") 함께 적어 둡니다.</p>
           </div>
 
           <label class="field">
@@ -75,15 +134,28 @@
     {# Step 2 — Incoterms #}
     <section class="card step" data-step="2" hidden>
       <h2>Incoterms 선택</h2>
-      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. 항공 운송에서는 FOB·CFR·CIF 대신 FCA·CPT·CIP를 사용합니다.</p>
+      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. Incoterms 2020 기준 11개 조건입니다.
+        <b>🚢</b>는 해상·내수로 전용, <b>🚢✈️</b>는 모든 운송수단에 쓸 수 있는 조건입니다.
+        항공에서는 FAS·FOB·CFR·CIF 대신 FCA·CPT·CIP를 쓰는 것이 맞습니다.
+        <b>카드에 마우스를 올리면 자세한 설명이 나옵니다.</b></p>
+      <p class="incoterm_warn" data-air-only hidden>
+        항공을 고르셨습니다. <b>🚢</b> 표시 조건은 해상 전용이라 항공 운송에는 맞지 않습니다.</p>
       <div class="incoterm_grid">
         {% for term in options.incoterms %}
-          <label class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}>
+          <label class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}
+                 tabindex="0" aria-describedby="incoterm_help_{{ term.code }}">
             <input type="radio" name="incoterms" value="{{ term.code }}">
-            <b>{{ term.code }}</b>
+            <b>{{ term.code }}
+              <i class="incoterm_tag" title="{% if term.sea_only %}해상·내수로 운송에만 쓰는 조건입니다{% else %}해상·항공 모두 쓸 수 있는 조건입니다{% endif %}">
+                {% if term.sea_only %}🚢{% else %}🚢✈️{% endif %}</i></b>
             <span>{{ term.label }}</span>
             <small>위험 이전: {{ term.risk }}</small>
             <small>수출자 부담: {{ term.seller_cost }}</small>
+            <div class="incoterm_help" id="incoterm_help_{{ term.code }}" role="tooltip">
+              <b>{{ term.code }} · {{ term.name }}</b>
+              <p>{{ term.detail }}</p>
+              <p class="incoterm_caution"><i>짚고 갈 점</i> {{ term.caution }}</p>
+            </div>
           </label>
         {% endfor %}
       </div>
@@ -100,53 +172,101 @@
         <div class="form_grid">
           <label class="field span2">
             <span class="field_label">품명 (Product Description)</span>
-            <input type="text" name="product_description" maxlength="300" placeholder="예: Skin care cream 50ml">
+            <input class="text_input" type="text" name="product_description" maxlength="300" placeholder="예: Skin care cream 50ml">
           </label>
           <div class="field autocomplete span2" data-autocomplete="hs_code">
             <span class="field_label">HS CODE <small class="muted">(선택)</small></span>
-            <input type="text" name="hs_code" autocomplete="off" placeholder="3304.99 또는 화장품" data-ac-input>
+            <div class="hs_input_row">
+              <input class="text_input" type="text" name="hs_code" autocomplete="off" placeholder="립스틱, 샴푸 또는 HS부호 10자리" data-ac-input>
+              {# 적합도가 늘 먼저이고, 그다음 기준만 고릅니다. #}
+              <select class="hs_order" data-hs-order aria-label="HS 후보 정렬 기준 (적합도 다음)"
+                      title="적합도가 같은 후보끼리의 정렬 기준">
+                <option value="frequency">건수 많은 순</option>
+                <option value="tariff">관세 낮은 순</option>
+              </select>
+            </div>
             <ul class="ac_list" data-ac-list hidden></ul>
+            <small class="field_hint">AI가 품명을 해석하고 관세청에서 확인한 후보의 적합도·품목란 건수·도착국 관세를 비교합니다.
+              AI 적합도는 확정 분류가 아닙니다. 필요한 재질·성분·용도를 함께 적어주세요.</small>
           </div>
+
+          <div class="tariff span2" data-tariff hidden></div>
           <label class="field">
             <span class="field_label">포장 유형</span>
             <select name="package_type">
-              {% for key, label in options.package_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+              {% for key, info in options.package_types.items() %}
+                <option value="{{ key }}" data-modes="{{ info.modes|join(',') }}"
+                        data-note="{{ info.note }}">{{ info.label }}</option>
+              {% endfor %}
             </select>
+            <small class="field_hint" data-package-note></small>
           </label>
           <label class="field">
             <span class="field_label">수량 (Quantity)</span>
-            <input type="number" name="quantity" min="1" step="1" inputmode="numeric" data-calc>
+            <input class="text_input" type="text" name="quantity" inputmode="numeric" autocomplete="off" data-number data-step="1" data-min="1" data-calc>
           </label>
           <label class="field">
             <span class="field_label">가로 Length (cm)</span>
-            <input type="number" name="length_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+            <input class="text_input" type="text" name="length_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">세로 Width (cm)</span>
-            <input type="number" name="width_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+            <input class="text_input" type="text" name="width_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">높이 Height (cm)</span>
-            <input type="number" name="height_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+            <input class="text_input" type="text" name="height_cm" inputmode="decimal" autocomplete="off" data-number data-step="1" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">포장당 총중량 (kg)</span>
-            <input type="number" name="weight_per_package_kg" min="0" step="0.01" inputmode="decimal" data-calc>
+            <input class="text_input" type="text" name="weight_per_package_kg" inputmode="decimal" autocomplete="off" data-number data-step="10" data-min="0" data-calc>
           </label>
           <label class="field">
             <span class="field_label">총 순중량 Net Weight (kg) <small class="muted">(선택)</small></span>
-            <input type="number" name="net_weight_kg" min="0" step="0.01" inputmode="decimal">
+            <input class="text_input" type="text" name="net_weight_kg" inputmode="decimal" autocomplete="off" data-number data-step="10" data-min="0">
           </label>
+          <label class="field">
+            <span class="field_label">품목 1 금액 Amount <small class="muted">(선택)</small></span>
+            <input class="text_input" type="text" name="amount" inputmode="decimal" autocomplete="off" data-number data-step="100" data-min="0" data-calc>
+            <small class="muted small">품목별로 적으면 아래 Invoice Value가 자동으로 더해집니다.</small>
+          </label>
+
           <div class="field">
-            <span class="field_label">Invoice Value</span>
+            <span class="field_label">Invoice Value <small class="muted" data-invoice-auto hidden>품목 금액 합계</small></span>
             <div class="input_group">
-              <select name="currency">{% for c in options.currencies %}<option>{{ c }}</option>{% endfor %}</select>
-              <input type="number" name="invoice_value" min="0" step="0.01" inputmode="decimal">
+              <select name="currency">
+                <optgroup label="주요 결제 통화">
+                  {% for c in options.currencies if c.major %}
+                    <option value="{{ c.code }}">{{ c.code }} · {{ c.name }}</option>
+                  {% endfor %}
+                </optgroup>
+                <optgroup label="그 밖의 관세청 고시 통화">
+                  {% for c in options.currencies if not c.major %}
+                    <option value="{{ c.code }}">{{ c.code }} · {{ c.name }}</option>
+                  {% endfor %}
+                </optgroup>
+              </select>
+              <input class="text_input" type="text" name="invoice_value" inputmode="decimal" autocomplete="off" data-number data-step="100" data-min="0">
             </div>
+          </div>
+
+          <div class="field span2" data-dg-main></div>
+
+          <div class="field span2 cargo_lines">
+            <div class="row_between">
+              <span class="field_label">추가 품목 <small class="muted">(선택)</small></span>
+              <button type="button" class="link_button" data-add-cargo>+ 품목 추가</button>
+            </div>
+            <small class="field_hint">한 건에 여러 품목을 실을 때 아래에 더합니다. 위 품목과 같은 항목을 입력합니다.
+              CBM·중량·컨테이너 수량은 모든 품목을 더해서 계산합니다.</small>
+            <div data-cargo-lines></div>
           </div>
         </div>
         <aside class="calc_panel" data-calc-panel>
           <p class="eyebrow">자동 계산 <span class="badge source_calculated">Calculated</span></p>
+          {# 품목이 둘 이상이면 품목별 계산을 먼저 보여주고 아래에 합계를 둡니다. #}
+          <div class="calc_lines" data-calc-lines hidden></div>
+          <p class="calc_total_title" data-calc-total-title hidden>합계 (Total)</p>
           <dl>
             <div><dt>Total CBM</dt><dd data-metric="total_cbm">-</dd></div>
             <div><dt>Total Weight</dt><dd data-metric="total_weight_kg">-</dd></div>
@@ -175,6 +295,8 @@
         </div>
       </div>
       <p class="muted" data-schedule-meta></p>
+      <div class="alert warn" data-schedule-note hidden></div>
+      <p class="muted small">카드를 한 번 누르면 선택, 두 번 누르면 바로 다음 단계로 넘어갑니다.</p>
       <div class="schedule_list" data-schedule-list></div>
       <div class="step_actions">
         <button type="button" class="button ghost" data-prev>이전</button>
@@ -185,15 +307,53 @@
     {# Step 5 — Parties & Confirm #}
     <section class="card step" data-step="5" hidden>
       <h2>수출자·Buyer 정보</h2>
-      <div class="form_grid">
-        <label class="field"><span class="field_label">수출자(Exporter)명</span><input type="text" name="exporter_name" maxlength="200"></label>
-        <label class="field"><span class="field_label">수출자 주소</span><input type="text" name="exporter_address" maxlength="500"></label>
-        <label class="field"><span class="field_label">Buyer(Consignee)명</span><input type="text" name="buyer_name" maxlength="200"></label>
-        <label class="field"><span class="field_label">Buyer 국가</span><input type="text" name="buyer_country" maxlength="100" placeholder="비워두면 도착지 국가"></label>
-        <label class="field"><span class="field_label">Buyer 주소</span><input type="text" name="buyer_address" maxlength="500"></label>
-        <label class="field"><span class="field_label">Buyer 이메일</span><input type="email" name="buyer_email" maxlength="200"></label>
-        <label class="field span2"><span class="field_label">Notify Party</span><input type="text" name="notify_party" maxlength="300" placeholder="SAME AS CONSIGNEE"></label>
-      </div>
+
+      {# 세 가지는 서류에서 각각 다른 칸에 들어갑니다. 블록을 나눠 헷갈리지 않게 합니다. #}
+      <section class="party_block">
+        <h3 class="party_title">수출자 정보</h3>
+        <p class="party_note">상업송장의 Seller, 선적서류의 Shipper 칸에 들어갑니다.</p>
+        <div class="form_grid">
+          <label class="field"><span class="field_label">수출자(Exporter)명</span>
+            <input class="text_input" type="text" name="exporter_name" maxlength="200"></label>
+          <label class="field"><span class="field_label">수출자 주소</span>
+            <input class="text_input" type="text" name="exporter_address" maxlength="500"></label>
+        </div>
+      </section>
+
+      <section class="party_block">
+        <h3 class="party_title">Buyer 정보</h3>
+        <p class="party_note">상업송장의 Consignee 칸에 들어갑니다. 물건을 받는 쪽입니다.</p>
+        <div class="form_grid">
+          <label class="field"><span class="field_label">Buyer(Consignee)명</span>
+            <input class="text_input" type="text" name="buyer_name" maxlength="200"></label>
+          <div class="field autocomplete" data-buyer-country>
+            <span class="field_label">Buyer 국가</span>
+            <input class="text_input" type="text" name="buyer_country" maxlength="100"
+                   autocomplete="off" data-ac-input placeholder="비워두면 도착지 국가">
+            <ul class="ac_list" data-ac-list hidden></ul>
+          </div>
+          <label class="field"><span class="field_label">Buyer 주소</span>
+            <input class="text_input" type="text" name="buyer_address" maxlength="500"></label>
+          <label class="field"><span class="field_label">Buyer 이메일</span>
+            <input class="text_input" type="email" name="buyer_email" maxlength="200"></label>
+        </div>
+      </section>
+
+      <section class="party_block">
+        <h3 class="party_title">Notify Party <small class="muted">착하통지처</small></h3>
+        <p class="party_note">화물이 도착하면 연락받는 곳입니다. 대개 Buyer와 같습니다.</p>
+        <label class="party_same">
+          <input type="checkbox" data-notify-same checked>
+          <span>Buyer와 동일</span>
+        </label>
+        <div class="form_grid">
+          <label class="field span2"><span class="field_label">Notify Party 명</span>
+            <input class="text_input" type="text" name="notify_party" maxlength="300"
+                   placeholder="SAME AS CONSIGNEE">
+          </label>
+        </div>
+      </section>
+
       <h3>요약</h3>
       <dl class="summary_list" data-summary></dl>
       <div class="step_actions">
@@ -206,12 +366,27 @@
 {% block scripts %}
   <script>
     window.FORWARDUS_URLS = {
+      home: "{{ url_for('home.index') }}",
       locations: "{{ url_for('planning.api_locations') }}",
+      countries: "{{ url_for('planning.api_countries') }}",
+      unlocode: "{{ url_for('planning.api_unlocode') }}",
+      departureCheck: "{{ url_for('planning.api_departure_check') }}",
+      transitEstimate: "{{ url_for('planning.api_transit_estimate') }}",
+      scheduleOutlook: "{{ url_for('planning.api_schedule_outlook') }}",
       hsCodes: "{{ url_for('planning.api_hs_codes') }}",
+      tariff: "{{ url_for('planning.api_tariff') }}",
+      destinationTariff: "{{ url_for('planning.api_destination_tariff') }}",
+      tariffSummary: "{{ url_for('planning.api_tariff_summary') }}",
+      exchangeRate: "{{ url_for('planning.api_exchange_rate') }}",
       cargo: "{{ url_for('planning.api_cargo') }}",
+      dangerousGoods: "{{ url_for('planning.api_dangerous_goods') }}",
+      unNumbers: "{{ url_for('planning.api_un_numbers') }}",
       schedules: "{{ url_for('planning.api_schedules') }}",
       create: "{{ url_for('planning.api_create_shipment') }}"
     };
+    // UN 위험물 등급 목록. 첫 품목과 추가 품목이 같은 목록을 씁니다.
+    window.FORWARDUS_DG_CLASSES = {{ options.dg_classes|tojson }};
+    window.FORWARDUS_PACKING_GROUPS = {{ options.packing_groups|tojson }};
   </script>
-  <script src="{{ url_for('static', filename='js/planning.js') }}"></script>
+  <script src="{{ static_url('js/planning.js') }}"></script>
 {% endblock %}

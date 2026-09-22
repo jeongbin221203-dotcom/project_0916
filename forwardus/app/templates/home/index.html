@@ -1,77 +1,145 @@
 {% extends "base.html" %}
 {% from "_macros.html" import status_badge %}
 {% block title %}홈{% endblock %}
-{% block main_class %}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/home.css') }}">{% endblock %}
+{% block main_class %}home_main{% endblock %}
 {% block content %}
-  <section class="hero">
-    <div class="content_width hero_inner">
-      <div>
-        <span class="pill">중소기업·1인사업자를 위한 수출 운영 플랫폼</span>
-        <h1>언제·어떻게 보낼지부터<br><span>화물이 어디 있는지</span>까지</h1>
-        <p class="lead">물류 전담 조직이 없어도 운송 계획, 무역서류, 운송 추적을 한 흐름으로 처리합니다. 한 번 입력한 데이터는 견적·서류·추적 단계에서 다시 입력하지 않습니다.</p>
-        <div class="button_row">
-          <a class="button primary large" href="{{ url_for('planning.new') }}">새 운송 계획 시작</a>
-          <a class="button ghost large" href="{{ url_for('planning.index') }}">납기일로 일정 역산하기</a>
+  <div class="home_shell {{ 'is_locked' if home_locked }}">
+    {# 왼쪽 줄. 칸을 채우는 화면들은 전부 이리로 모았습니다. #}
+    <aside class="home_rail" aria-label="바로가기"
+           {% if home_locked %}aria-disabled="true" inert{% endif %}>
+     {# 흰 바탕은 바깥(aside)이 끝까지 채우고, 붙어 있는 것은 안쪽입니다.
+        한 덩어리로 두면 body의 zoom 때문에 100vh 계산이 어긋나 밀려 올라갑니다. #}
+     <div class="rail_inner">
+      <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page">
+        <span class="rail_icon" aria-hidden="true">🏠</span>
+        <small>홈</small>
+      </a>
+      {% for item in rail %}
+        <a class="rail_item" href="{{ item.url }}" title="{{ item.note }}">
+          <span class="rail_icon {{ item.tone }}" aria-hidden="true">{{ item.icon }}</span>
+          <small>{{ item.label }}</small>
+        </a>
+      {% endfor %}
+      {# 환율은 어느 화면에서나 자주 찾습니다. 송장 금액을 원화로 볼 때 씁니다. #}
+      <div class="rail_item has_flyout" data-rail-flyout data-rail-fx>
+        <button type="button" aria-expanded="false" aria-controls="rail_fx">
+          <span class="rail_icon amber" aria-hidden="true">💱</span>
+          <small>환율</small>
+        </button>
+        <div class="rail_flyout" id="rail_fx" hidden>
+          <b>환율 계산기</b>
+          <div class="fx_row">
+            <input class="fx_amount" type="text" inputmode="decimal" value="1000"
+                   data-fx-amount aria-label="금액">
+            {# 통화 목록은 환율을 받을 때 함께 채웁니다. #}
+            <select data-fx-from aria-label="바꿀 통화"><option value="USD">USD</option></select>
+          </div>
+          <button type="button" class="fx_swap" data-fx-swap aria-label="위아래 바꾸기">⇅</button>
+          <div class="fx_row">
+            <output class="fx_result" data-fx-result>—</output>
+            <select data-fx-to aria-label="바뀔 통화"><option value="KRW">KRW</option></select>
+          </div>
+          {# 무슨 환율로 계산했는지 반드시 같이 보여 줍니다. #}
+          <p class="fx_basis" data-fx-basis>환율을 받아오는 중입니다…</p>
         </div>
       </div>
-      <ol class="flow_card" aria-label="전체 흐름">
-        <li>Route / Cargo 입력</li>
-        <li>운송 계획 · Schedule 선택</li>
-        <li>Shipment 생성</li>
-        <li>무역서류 생성 · 검증</li>
-        <li>Booking / 출항</li>
-        <li>Tracking · ETA Monitoring</li>
-        <li>Shipment History · Analytics</li>
-      </ol>
+
+      {% if recent %}
+        <div class="rail_item has_flyout" data-rail-flyout data-rail-recent>
+          <button type="button" aria-expanded="false" aria-controls="rail_recent">
+            <span class="rail_icon" aria-hidden="true">🧾</span>
+            <small>최근</small>
+          </button>
+          <div class="rail_flyout" id="rail_recent" hidden>
+            <div class="row_between">
+              <b>최근 Shipment</b>
+              <a href="{{ url_for('shipment.index') }}">전체 보기 →</a>
+            </div>
+            {% for s in recent %}
+              <a class="rail_ship" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">
+                <div class="row_between"><span class="mono">{{ s.shipment_id }}</span>{{ status_badge(s.status, s.status_label) }}</div>
+                <b>{{ s.project_name }}</b>
+                <span class="muted">{{ s.origin_code }} → {{ s.destination_code }} · {{ s.mode_label }}</span>
+                <span class="muted">ETD {{ s.etd|d }} · ETA {{ s.eta|d }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+     </div>
+    </aside>
+
+    <div class="home_stage">
+     <div class="home_center" data-home-center>
+      {# 대화가 시작되면 이 인사는 접히고 적는 칸이 아래로 내려갑니다. #}
+      <div class="home_hello">
+        {% if brand_logo %}
+          <img class="home_logo" src="{{ brand_logo }}" alt="ForwardUs">
+        {% else %}
+          <div class="home_brand">
+            <img class="home_mark" src="{{ brand_mark }}" alt="">
+            <b>ForwardUs</b>
+          </div>
+        {% endif %}
+        <p class="home_tagline">수출, 처음이어도 됩니다</p>
+      </div>
+
+      {# 대화가 쌓이는 자리 #}
+      <div class="home_log" data-home-log hidden></div>
+
+      {# 적는 칸 덩어리. 대화를 시작하면 화면 아래에 붙습니다. #}
+      <div class="home_composer" data-home-composer>
+        {# 빠른 시작 셋. 적는 칸 바로 위에 둡니다. #}
+        <div class="home_actions" role="tablist" aria-label="무엇을 도와드릴까요">
+          {% for action in actions %}
+            <button type="button" role="tab" data-home-action="{{ action.key }}"
+                    class="{{ 'active' if loop.first }}"
+                    aria-selected="{{ 'true' if loop.first else 'false' }}"
+                    {{ 'disabled' if home_locked }}>
+              <span aria-hidden="true">{{ action.icon }}</span> {{ action.label }}
+            </button>
+          {% endfor %}
+        </div>
+
+        <form class="home_box" data-home-form>
+          <textarea data-home-input rows="3" maxlength="2000"
+                    {{ 'disabled' if home_locked }}
+                    placeholder="{{ actions[0].placeholder }}"
+                    aria-label="물어볼 내용"></textarea>
+          <div class="home_box_foot">
+            <div class="home_chips" data-home-chips></div>
+            <button class="home_send" type="submit" aria-label="보내기"
+                    {{ 'disabled' if home_locked }}>↑</button>
+          </div>
+        </form>
+        {% if home_locked %}
+          <p class="home_hint locked_note">이 화면은 지금 보기 전용입니다.
+            <b>위쪽 메뉴</b>로 이용해 주세요.</p>
+        {% else %}
+          <p class="home_hint" data-home-hint>{{ actions[0].hint }}</p>
+        {% endif %}
+      </div>
+     </div>
     </div>
-  </section>
-
-  <section class="content_width page">
-    <h2 class="section_title">핵심 기능</h2>
-    <div class="grid three">
-      <article class="card feature">
-        <span class="feature_no">01</span>
-        <h3>운송 계획</h3>
-        <p>SEA(FCL/LCL)·AIR 선택, CBM·Revenue Ton·Chargeable Weight 계산, 스케줄 비교와 Buyer 납기 역산.</p>
-        <a href="{{ url_for('planning.new') }}">운송 계획 →</a>
-      </article>
-      <article class="card feature">
-        <span class="feature_no">02</span>
-        <h3>서류·통관</h3>
-        <p>Shipment 데이터로 Commercial Invoice, Packing List, SI 등을 자동 작성하고 서류 간 수량·중량·금액 불일치를 검사.</p>
-        <a href="{{ url_for('shipment.index') }}">Shipment 선택 →</a>
-      </article>
-      <article class="card feature">
-        <span class="feature_no">03</span>
-        <h3>실제 운송 추적</h3>
-        <p>이벤트 기반 Shipment Timeline과 ETA 변경 감지. 지연이 납기에 미치는 영향까지 확인.</p>
-        <a href="{{ url_for('shipment.index') }}">Tracking →</a>
-      </article>
-    </div>
-
-    <article class="card assistant_banner">
-      <div>
-        <p class="eyebrow">AI Export Assistant</p>
-        <h3>숫자를 계산하는 것은 코드, 숫자를 설명하는 것은 AI</h3>
-        <p class="muted">수출 요건 확인, 물류비 해석, 지연 대응, 자금 흐름을 Shipment 데이터 기반으로 설명합니다. 수출 가능 여부를 단정하지 않습니다.</p>
-      </div>
-    </article>
-
-    {% if recent %}
-      <div class="section_head">
-        <h2 class="section_title">최근 Shipment</h2>
-        <a href="{{ url_for('shipment.index') }}">전체 보기 →</a>
-      </div>
-      <div class="grid three">
-        {% for s in recent %}
-          <a class="card shipment_card" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">
-            <div class="row_between"><span class="mono">{{ s.shipment_id }}</span>{{ status_badge(s.status, s.status_label) }}</div>
-            <b>{{ s.project_name }}</b>
-            <span class="muted">{{ s.origin_code }} → {{ s.destination_code }} · {{ s.mode_label }}</span>
-            <span class="muted">ETD {{ s.etd|d }} · ETA {{ s.eta|d }}</span>
-          </a>
-        {% endfor %}
-      </div>
-    {% endif %}
-  </section>
+  </div>
+{% endblock %}
+{% block scripts %}
+  <script>
+    window.FORWARDUS_HOME = {
+      actions: {{ actions|tojson }},
+      chatUrl: "{{ url_for('home.api_support_chat') }}",
+      ratesUrl: "{{ url_for('planning.api_exchange_rate') }}",
+      intakeUrl: "{{ url_for('home.api_intake') }}",
+      agentUrl: "{{ url_for('home.api_agent') }}",
+      planningUrl: "{{ url_for('planning.new') }}",
+      docFormUrl: "{{ url_for('document.new') }}",
+      locked: {{ 'true' if home_locked else 'false' }}
+    };
+  </script>
+  {# 잠겼으면 스크립트를 아예 붙이지 않습니다. 눌리지 않는 것이
+     보이기만 그런 것이 아니라 실제로 아무 일도 하지 않아야 합니다. #}
+  {% if not home_locked %}
+    <script src="{{ static_url('js/home.js') }}"></script>
+  {% endif %}
 {% endblock %}

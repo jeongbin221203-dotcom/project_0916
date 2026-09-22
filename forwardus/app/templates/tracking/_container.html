@@ -1,0 +1,111 @@
+{# 컨테이너·B/L 조회 결과. Shipment 화면과 단독 조회 화면이 함께 씁니다. #}
+{% macro container_result(result) -%}
+  {% if not result %}
+    <p class="muted">번호를 넣으면 관세청에 조회합니다.</p>
+  {% else %}
+    {% if result.kind_label %}
+      <p class="muted small">입력한 번호를 <b>{{ result.kind_label }}</b>로 보고 조회했습니다.</p>
+    {% endif %}
+
+    {% if result.message %}
+      <div class="alert warn">{{ result.message }}</div>
+    {% endif %}
+    {% for note in result.notes %}
+      <p class="muted small">{{ note }}</p>
+    {% endfor %}
+
+    {% if result.export %}
+      <h3 class="ctr_title">수출 선적 확인 <small class="muted">관세청 수출이행내역</small></h3>
+      {% for row in result.export %}
+        <article class="ctr_card {{ 'shipped' if row.shipped }}">
+          <div class="row_between wrap">
+            <b>{{ row.exporter or '수출자 미상' }}</b>
+            <span class="badge {{ 'ok' if row.shipped else 'warn' }}">{{ row.shipped_label }}</span>
+          </div>
+          {% if row.deadline %}
+            <p class="ctr_deadline {{ row.deadline.kind }}">{{ row.deadline.text }}</p>
+          {% endif %}
+          <dl class="ctr_rows">
+            {% if row.declaration_no %}<div><dt>수출신고번호</dt><dd class="mono">{{ row.declaration_no }}</dd></div>{% endif %}
+            {% if row.bl_no %}<div><dt>B/L번호</dt><dd class="mono">{{ row.bl_no }}</dd></div>{% endif %}
+            {% if row.accepted_date %}<div><dt>신고 수리일</dt><dd>{{ row.accepted_date }}</dd></div>{% endif %}
+            {% if row.departure_date %}<div><dt>출항일</dt><dd>{{ row.departure_date }}</dd></div>{% endif %}
+            {% if row.vessel_or_flight %}<div><dt>선박·편명</dt><dd>{{ row.vessel_or_flight }}</dd></div>{% endif %}
+            {% if row.loading_place %}<div><dt>선적지</dt><dd>{{ row.loading_place }}</dd></div>{% endif %}
+            {% if row.shipped_packages %}<div><dt>선적 수량</dt><dd>{{ row.shipped_packages }} {{ row.package_unit }}</dd></div>{% endif %}
+            {% if row.shipped_weight %}<div><dt>선적 중량</dt><dd>{{ row.shipped_weight }}</dd></div>{% endif %}
+          </dl>
+        </article>
+      {% endfor %}
+    {% endif %}
+
+    {% if result.cargo and result.cargo.kind == 'list' %}
+      <h3 class="ctr_title">같은 번호로 여러 건이 있습니다</h3>
+      <p class="muted small">아래에서 화물관리번호를 눌러 한 건씩 보세요.</p>
+      <div class="ctr_list">
+        {% for row in result.cargo.rows %}
+          <a class="ctr_pick" href="?q={{ row.cargo_no }}">
+            <b class="mono">{{ row.cargo_no }}</b>
+            <span class="muted small">{{ row.carrier }} · {{ row.discharge_port }}
+              {% if row.arrival_date %}· 입항 {{ row.arrival_date }}{% endif %}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% elif result.cargo %}
+      <h3 class="ctr_title">통관 진행 <small class="muted">관세청 화물통관 진행정보</small></h3>
+      <article class="ctr_card">
+        <div class="row_between wrap">
+          <b>{{ result.cargo.progress or '진행상태 없음' }}</b>
+          {% if result.cargo.clearance %}<span class="badge">{{ result.cargo.clearance }}</span>{% endif %}
+        </div>
+        <dl class="ctr_rows">
+          {% if result.cargo.cargo_no %}<div><dt>화물관리번호</dt><dd class="mono">{{ result.cargo.cargo_no }}</dd></div>{% endif %}
+          {% if result.cargo.mbl_no %}<div><dt>MBL</dt><dd class="mono">{{ result.cargo.mbl_no }}</dd></div>{% endif %}
+          {% if result.cargo.hbl_no %}<div><dt>HBL</dt><dd class="mono">{{ result.cargo.hbl_no }}</dd></div>{% endif %}
+          {% if result.cargo.vessel %}<div><dt>선박</dt><dd>{{ result.cargo.vessel }} {{ result.cargo.voyage }}</dd></div>{% endif %}
+          {% if result.cargo.carrier %}<div><dt>선사·항공사</dt><dd>{{ result.cargo.carrier }}</dd></div>{% endif %}
+          {% if result.cargo.forwarder %}<div><dt>포워더</dt><dd>{{ result.cargo.forwarder }}</dd></div>{% endif %}
+          {% if result.cargo.load_port %}<div><dt>적재항</dt><dd>{{ result.cargo.load_port }}</dd></div>{% endif %}
+          {% if result.cargo.discharge_port %}<div><dt>양륙항</dt><dd>{{ result.cargo.discharge_port }}</dd></div>{% endif %}
+          {% if result.cargo.arrival_date %}<div><dt>입항일</dt><dd>{{ result.cargo.arrival_date }}</dd></div>{% endif %}
+          {% if result.cargo.product %}<div><dt>품명</dt><dd>{{ result.cargo.product }}</dd></div>{% endif %}
+          {% if result.cargo.packages %}<div><dt>포장</dt><dd>{{ result.cargo.packages }} {{ result.cargo.package_unit }}</dd></div>{% endif %}
+          {% if result.cargo.weight %}<div><dt>총중량</dt><dd>{{ result.cargo.weight }} {{ result.cargo.weight_unit }}</dd></div>{% endif %}
+          {% if result.cargo.container_count %}<div><dt>컨테이너 수</dt><dd>{{ result.cargo.container_count }}개</dd></div>{% endif %}
+        </dl>
+      </article>
+
+      {% if result.cargo.events %}
+        <h3 class="ctr_title">반출입 기록</h3>
+        <ol class="ctr_events">
+          {% for event in result.cargo.events %}
+            <li>
+              <span class="ctr_at">{{ event.at or '-' }}</span>
+              <span class="ctr_what"><b>{{ event.kind }}</b>
+                {% if event.detail %}<span>{{ event.detail }}</span>{% endif %}
+                {% if event.place %}<small class="muted">{{ event.place }}</small>{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ol>
+      {% endif %}
+    {% endif %}
+
+    {% if result.containers %}
+      <h3 class="ctr_title">컨테이너 <small class="muted">번호 · 규격 · 봉인번호</small></h3>
+      <div class="ctr_boxes">
+        {% for box in result.containers %}
+          <div class="ctr_box">
+            <b class="mono">{{ box.container_no }}</b>
+            <span class="muted small">{{ box.size_code }}{% if box.size_note %} · {{ box.size_note }}{% endif %}</span>
+            {% if box.seals %}<span class="ctr_seal">봉인 {{ box.seals|join(' / ') }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if result.available %}
+      <p class="muted small">관세청 UNI-PASS에서 받아온 실제 값입니다.
+        해외 구간의 컨테이너 위치는 관세청이 주지 않습니다. 선사에 문의하세요.</p>
+    {% endif %}
+  {% endif %}
+{%- endmacro %}

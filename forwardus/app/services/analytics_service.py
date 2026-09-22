@@ -25,8 +25,8 @@ def build_dashboard() -> dict:
     tracked = [s for s in shipments if s.status in ARRIVED_STATUSES or s.delay_days > 0]
     delayed = [s for s in tracked if s.delay_days > 0]
     total_cost = sum(s.total_cost_krw for s in shipments)
-    total_cbm = sum(s.cargo.total_cbm for s in shipments if s.cargo)
-    total_kg = sum(s.cargo.total_weight_kg for s in shipments if s.cargo)
+    total_cbm = sum(c.total_cbm for s in shipments for c in s.cargos)
+    total_kg = sum(c.total_weight_kg for s in shipments for c in s.cargos)
 
     kpi = {
         "total_shipments": len(shipments),
