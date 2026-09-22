@@ -53,14 +53,20 @@ def money_text(value) -> str:
 
 # 한글이 나오는 글꼴을 찾습니다. 없으면 기본 글꼴로 내려갑니다.
 # (배포 환경에는 맑은 고딕이 없을 수 있습니다)
+# 우리가 함께 싣는 글꼴(나눔스퀘어 네오). 맑은 고딕이 없는 곳(배포 서버 등)에서도
+# 한글과 원문자(①~⑯)가 나오게 맨 뒤에 둡니다. 맑은 고딕이 있으면 그쪽을 먼저 씁니다.
+_BUNDLED = Path(__file__).resolve().parents[1] / "static" / "fonts" / "nanum-square-neo"
+
 FONT_CANDIDATES = (
     "C:/Windows/Fonts/malgun.ttf",
     "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+    str(_BUNDLED / "NanumSquareNeo-Rg.otf"),
 )
 BOLD_CANDIDATES = ("C:/Windows/Fonts/malgunbd.ttf",
-                   "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf")
+                   "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+                   str(_BUNDLED / "NanumSquareNeo-Eb.otf"))
 
 
 def _font(size: int, bold: bool = False):

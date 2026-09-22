@@ -28,13 +28,35 @@ html { scroll-behavior: smooth; }
 @media (max-width: 1280px) { :root { --ui_scale: 1.08; } }
 @media (max-width: 900px) { :root { --ui_scale: 1; } }
 
+/* 글꼴: 나눔스퀘어 네오 (네이버). app/static/fonts/nanum-square-neo/
+   웹에서는 woff2(약 350KB)를 쓰고, 못 읽는 브라우저만 원본 otf(약 1.6MB)를 받습니다.
+   브라우저는 화면에 실제로 쓰인 굵기만 내려받습니다.
+   화면에서 쓰는 굵기: 400 본문 · 600·700 → Bold · 800 → ExtraBold · 900 → Heavy
+   font-display: swap — 글꼴을 받는 동안에도 글자를 먼저 보여 줍니다. */
+@font-face { font-family: "NanumSquare Neo"; font-weight: 300; font-style: normal; font-display: swap;
+  src: url("../fonts/nanum-square-neo/NanumSquareNeo-Lt.woff2") format("woff2"),
+       url("../fonts/nanum-square-neo/NanumSquareNeo-Lt.otf") format("opentype"); }
+@font-face { font-family: "NanumSquare Neo"; font-weight: 400; font-style: normal; font-display: swap;
+  src: url("../fonts/nanum-square-neo/NanumSquareNeo-Rg.woff2") format("woff2"),
+       url("../fonts/nanum-square-neo/NanumSquareNeo-Rg.otf") format("opentype"); }
+@font-face { font-family: "NanumSquare Neo"; font-weight: 700; font-style: normal; font-display: swap;
+  src: url("../fonts/nanum-square-neo/NanumSquareNeo-Bd.woff2") format("woff2"),
+       url("../fonts/nanum-square-neo/NanumSquareNeo-Bd.otf") format("opentype"); }
+@font-face { font-family: "NanumSquare Neo"; font-weight: 800; font-style: normal; font-display: swap;
+  src: url("../fonts/nanum-square-neo/NanumSquareNeo-Eb.woff2") format("woff2"),
+       url("../fonts/nanum-square-neo/NanumSquareNeo-Eb.otf") format("opentype"); }
+@font-face { font-family: "NanumSquare Neo"; font-weight: 900; font-style: normal; font-display: swap;
+  src: url("../fonts/nanum-square-neo/NanumSquareNeo-Hv.woff2") format("woff2"),
+       url("../fonts/nanum-square-neo/NanumSquareNeo-Hv.otf") format("opentype"); }
+
 body {
   margin: 0; min-width: 320px; background: var(--surface); color: var(--ink);
-  font-family: Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* 나눔스퀘어 네오에 없는 글자(✓ ✗ 등)는 뒤의 글꼴로 그립니다. */
+  font-family: "NanumSquare Neo", Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased;
   zoom: var(--ui_scale);
 }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
