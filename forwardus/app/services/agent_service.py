@@ -34,6 +34,9 @@ DOC_WORDS = {
                            "commercial invoice", "c/i", "ci", "invoice"),
     "proforma_invoice": ("견적송장", "견적 송장", "프로포마", "프로파마",
                          "proforma", "p/i", "pi"),
+    # "sr"·"si"처럼 짧은 것은 다른 낱말 속에 끼어 있어 넣지 않습니다.
+    "shipping_instruction": ("선적의뢰서", "선적 의뢰서", "쉬핑리퀘스트", "shipping request",
+                             "shipping instruction", "s/r", "s/i"),
 }
 
 # "그냥 만들어줘", "없어", "빈칸으로" — 더 안 적고 지금 것으로 그리라는 뜻입니다.
@@ -64,6 +67,9 @@ FIELDS = {
     "buyer": {
         "group": "기본 정보", "ko": "Buyer (받는 곳과 다를 때)", "en": "Buyer",
         "note": "받는 곳과 실제 구매자가 다를 때만 적습니다"},
+    "notify_party": {
+        "group": "기본 정보", "ko": "통지처", "en": "Notify Party",
+        "note": "화물 도착을 통지받을 곳. 받는 곳과 같으면 SAME AS CONSIGNEE"},
 
     "invoice_no": {
         "group": "문서 정보", "ko": "송장 번호", "en": "Invoice No. & Date",
@@ -146,6 +152,13 @@ ASK_FOR = {
         ("validity_date", False), ("po_no", False),
         ("payment_terms", False), ("bank_info", False),
         ("remarks", False), ("signed_by", False), ("accepted_by", False),
+    ],
+    "shipping_instruction": [
+        ("exporter_name", True), ("exporter_address", False),
+        ("buyer_name", True), ("buyer_address", True), ("notify_party", False),
+        ("origin_code", True), ("destination_code", True),
+        ("incoterms", False), ("shipping_marks", False), ("remarks", False),
+        ("signed_by", False),
     ],
 }
 
@@ -372,6 +385,7 @@ TOGETHER = {
     "packing_list_std": ["packing_list_std", "commercial_invoice"],
     "commercial_invoice": ["commercial_invoice", "packing_list_std"],
     "proforma_invoice": ["proforma_invoice"],
+    "shipping_instruction": ["shipping_instruction"],
 }
 
 

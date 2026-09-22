@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import json
+
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
-from app.services import (ServiceError, agent_service, draft_document_service,
-                          intake_service, shipment_service, support_chat_service)
+from app.routes.auth import current_user
+from app.services import (ServiceError, agent_service, attachment_service,
+                          document_extract_service, document_pipeline_service,
+                          intake_service,
+                          shipment_service, support_chat_service)
 from app.validators import ValidationError
 
 home_bp = Blueprint("home", __name__)
@@ -46,8 +51,11 @@ def quick_actions() -> list[dict]:
          "opener": "어떤 서류가 필요하신가요? 상업송장·포장명세서 중에 고르셔도 되고, "
                    "둘 다 필요하시면 그렇게 말씀해 주세요.\n\n"
                    "보내실 화물을 한 번에 적어 주시면 서류 칸을 채워 드립니다. "
-                   "적으신 뒤 **적은 내용으로 칸 채우기**를 눌러 주세요.",
+                   "적으신 뒤 **적은 내용으로 칸 채우기**를 눌러 주세요.\n\n"
+                   "받아 두신 B/L·Offer Sheet·견적서가 있으면 적는 칸 왼쪽 아래 **+**로 "
+                   "올려 주세요. 읽은 값으로 서류를 만들고, 빠진 것만 여쭤봅니다.",
          # 적은 글에서 값을 뽑아 서류 작성 화면의 칸을 채웁니다.
+         # (서류 올리기는 칩이 아니라 세 탭이 같이 쓰는 적는 칸의 + 단추입니다)
          "fill_label": "📄 적은 내용으로 칸 채우기",
          "examples": ["패킹리스트만 만들어줘", "상업송장만 작성해줘"],
          # 빈 서식 PDF를 그대로 내려받는 자리. 대화를 시작하는 칩과 성격이
@@ -73,7 +81,9 @@ def index():
     rail = [{**item, "url": url_for(RAIL_URLS[item["key"]])} for item in RAIL]
     # 서식 칸은 더 이상 여기서 만들지 않습니다. 사이드바의 "서류 작성"
     # 화면(/documents/new)으로 옮겼습니다. 홈은 대화하는 자리입니다.
-    return render_template("home/index.html", recent=shipment_service.list_shipments()[:3],
+    # 최근 Shipment는 보는 사람 것만. 로그인 전이면 비어 있습니다.
+    return render_template("home/index.html",
+                           recent=shipment_service.list_shipments(viewer=current_user())[:3],
                            actions=quick_actions(), rail=rail)
 
 
@@ -107,10 +117,60 @@ def api_agent():
 
     # 다 그렸으면 그림까지 함께 보냅니다. 대화창에 바로 붙습니다.
     # 서류가 둘이면 둘 다 그립니다. 수출에는 함께 내는 것이라 따로 볼 이유가 없습니다.
+    # 검토 창(미리보기·고치기)이 쓰는 칸 값도 함께 넣습니다.
     if result.get("stage") == "made":
         for row in result.get("documents", []):
-            row["preview"] = draft_document_service.preview(row["kind"], result["draft"])
+            row.update(document_pipeline_service.review_document(row["kind"], result["draft"]))
             row["file_url"] = url_for("document.draft_file", kind=row["kind"])
+    return jsonify({"success": True, "data": result})
+
+
+@home_bp.post("/api/doc-pipeline/<step>")
+def api_doc_pipeline(step: str):
+    """올린 서류 → 빠진 정보 묻기 → 채팅으로 합치기 → 고른 서류 만들기.
+
+    서버는 상태를 갖지 않습니다. 초안(draft)은 브라우저가 들고 다닙니다.
+    """
+
+    handlers = {"start": document_pipeline_service.start,
+                "merge": document_pipeline_service.merge,
+                "generate": document_pipeline_service.generate,
+                # 앞서 올린 서류가 있을 때, 상담 탭에서 적은 말이 서류를 만들어 달라는 것인지.
+                "intent": lambda payload: document_pipeline_service.intent(
+                    payload.get("message", ""))}
+    if step not in handlers:
+        return error_response(ServiceError("없는 단계입니다.", "NOT_FOUND", 404))
+    try:
+        result = handlers[step](request.get_json(silent=True) or {})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return jsonify({"success": True, "data": result})
+
+
+@home_bp.post("/api/attach")
+def api_attach():
+    """적는 칸의 `+`로 붙인 파일과 같이 적은 말. 세 탭이 같이 씁니다.
+
+    서류 종류를 알아보고, 서류를 만들어 달라는 말이면 서류 작성 흐름으로 보냅니다.
+    올린 파일은 남기지 않습니다.
+    """
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return error_response(ServiceError("올릴 파일을 골라 주세요.", "VALIDATION_ERROR"))
+    data = upload.stream.read(document_extract_service.MAX_UPLOAD_BYTES + 1)
+    try:
+        history = json.loads(request.form.get("history") or "[]")
+    except ValueError:
+        history = []
+    history = [turn for turn in history if isinstance(turn, dict)] if isinstance(history, list) else []
+    try:
+        result = attachment_service.handle(upload.filename, data,
+                                           message=request.form.get("message", ""),
+                                           mode=request.form.get("mode", "consult"),
+                                           history=history)
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
     return jsonify({"success": True, "data": result})
 
 
@@ -121,7 +181,8 @@ def api_support_chat():
     payload = request.get_json(silent=True) or {}
     try:
         result = support_chat_service.ask(payload.get("question", ""),
-                                          payload.get("history") or [])
+                                          payload.get("history") or [],
+                                          brief=payload.get("style") == "brief")
     except ServiceError as error:
         return jsonify({"success": False, "message": str(error),
                         "error_code": error.error_code, "source": "api"}), error.status

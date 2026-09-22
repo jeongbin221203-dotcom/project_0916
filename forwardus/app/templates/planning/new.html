@@ -7,7 +7,7 @@
       {# 단독으로 열면 위쪽 메뉴가 없습니다. 돌아갈 길을 여기서 냅니다.
          길 없는 화면에 가두면 새로고침밖에 할 것이 없습니다. #}
       {% if standalone %}
-        <a class="back_home" href="{{ url_for('home.index') }}">← ForwardUs 홈</a>
+        <a class="back_home" href="{{ url_for('home.index') }}" data-home-reset>← ForwardUs 홈</a>
       {% else %}
         <p class="eyebrow">Shipment Planning</p>
       {% endif %}
@@ -221,8 +221,7 @@
               </select>
             </div>
             <ul class="ac_list" data-ac-list hidden></ul>
-            <small class="field_hint">AI가 품명을 해석하고 관세청에서 확인한 후보의 적합도·품목란 건수·도착국 관세를 비교합니다.
-              AI 적합도는 확정 분류가 아닙니다. 필요한 재질·성분·용도를 함께 적어주세요.</small>
+            <small class="field_hint">색상은 AI 적합도이며 확정 분류가 아닙니다. 근거는 ⓘ에서 확인하세요.</small>
           </div>
 
           <div class="tariff span2" data-tariff hidden></div>

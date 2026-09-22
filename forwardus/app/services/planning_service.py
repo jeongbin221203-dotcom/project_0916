@@ -1141,8 +1141,10 @@ def cargo_metrics(payload: dict, *, strict: bool = False) -> dict:
     return calculate_cargo_lines(cargo_items(payload), strict=strict)
 
 
-def create_shipment(payload: dict) -> Shipment:
+def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
     """Create a quoted Shipment from the planning wizard.
+
+    user_id is the member who owns it; only they and the master can see it.
 
     Every value is re-validated and recalculated on the server; the selected
     schedule is looked up again rather than trusting client-side freight.
@@ -1202,6 +1204,7 @@ def create_shipment(payload: dict) -> Shipment:
     shipment = Shipment(
         shipment_id=shipment_repository.next_shipment_id(date.today().year),
         project_name=route["project_name"],
+        user_id=user_id,
         buyer=buyer,
         trade_type="export",
         transport_mode=route["transport_mode"],
@@ -1240,6 +1243,8 @@ def create_shipment(payload: dict) -> Shipment:
             hs_code=optional_text(item.get("hs_code"), max_length=20) or hs_code,
             package_type=line["package_type"],
             is_dangerous=line["is_dangerous"],
+            temperature_requirement=line["temperature_requirement"],
+            special_container_type=line["special_container_type"],
             un_number=line["un_number"],
             dg_class=line["dg_class"],
             packing_group=line["packing_group"],
@@ -1254,6 +1259,10 @@ def create_shipment(payload: dict) -> Shipment:
             # 품목마다 단가·금액을 따로 적습니다. (송장의 Unit price / Amount 칸)
             unit_price=line["unit_price"],
             amount=line["amount"],
+            # 단가를 낱개로 매겼으면 그 기준을 같이 남깁니다. 없으면 포장 개수가 기준입니다.
+            unit_quantity=line["unit_quantity"],
+            price_unit=line["price_unit"],
+            units_per_package=line["units_per_package"],
             total_cbm=line["total_cbm"],
             total_weight_kg=line["total_weight_kg"],
             revenue_ton=line["revenue_ton"],

@@ -94,6 +94,9 @@ def checklist() -> dict:
               "placeholder": "Los Angeles, CA 90001"},
              {"name": "buyer_email", "label": "Buyer 이메일", "placeholder": "a@b.com"},
              {"name": "attention", "label": "담당자 (ATTENTION)", "placeholder": "Mr. Kim"},
+             {"name": "notify_party", "label": "Notify Party", "wide": True,
+              "placeholder": "SAME AS CONSIGNEE",
+              "hint": "도착 통지를 받을 곳. B/L을 올리면 그대로 옮겨 옵니다"},
          ]},
         {"key": "terms", "tab": "doc", "label": "거래 · 결제 조건", "icon": "📝",
          "note": "비워 두면 상업송장의 TERMS OF PAYMENT와 L/C 칸이 —로 남습니다.",
@@ -121,8 +124,11 @@ def checklist() -> dict:
              {"name": "comments", "label": "비고 (포장명세서)", "wide": True},
          ]},
     ]
-    return {"groups": groups, "item_fields": _item_fields(options),
-            "required_count": _required_count(groups)}
+    item_fields = _item_fields(options)
+    # 화면의 "채운 칸 / 전체"는 첫 품목의 필수 칸도 셉니다. 전체에서 빠뜨리면 9/8이 됩니다.
+    return {"groups": groups, "item_fields": item_fields,
+            "required_count": _required_count(groups)
+                              + sum(1 for field in item_fields if field.get("required"))}
 
 
 def _item_fields(options: dict) -> list[dict]:
@@ -184,7 +190,7 @@ def _invoice_value(items: list[dict]) -> float:
     return round(sum(amounts), 2)
 
 
-def create(payload: dict) -> dict:
+def create(payload: dict, user_id: int | None = None) -> dict:
     """채운 내용으로 Shipment를 만들고 서류까지 냅니다."""
 
     if not isinstance(payload, dict):
@@ -223,7 +229,7 @@ def create(payload: dict) -> dict:
         "schedule_id": _text(payload, "schedule_id", 80),
     }
 
-    shipment = planning_service.create_shipment(plan)
+    shipment = planning_service.create_shipment(plan, user_id=user_id)
     document_service.generate_documents(shipment)
     _apply_extras(shipment, payload)
 

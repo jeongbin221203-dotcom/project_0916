@@ -72,6 +72,26 @@ p { margin: 0 0 10px; }
 .main_nav { display: flex; gap: 4px; }
 .main_nav a { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; }
 .main_nav a:hover, .main_nav a.active { background: var(--blue_soft); color: var(--blue_dark); text-decoration: none; }
+.user_menu { position: relative; }
+.main_nav .nav_user { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 8px 12px; border-radius: 10px; color: var(--ink); font-weight: 800; font-size: 14px; white-space: nowrap; cursor: pointer; }
+.main_nav .nav_user:hover, .main_nav .nav_user.active, .main_nav .nav_user[aria-expanded="true"] { background: var(--blue_soft); color: var(--blue_dark); }
+.main_nav .nav_user .caret { font-size: 11px; }
+.master_badge { background: #fef3c7; color: #92400e; font-size: 11px; padding: 2px 7px; }
+.user_menu_panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 160px; display: grid; gap: 2px; padding: 6px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.user_menu_panel[hidden] { display: none; }
+.main_nav .user_menu_panel a { display: block; white-space: nowrap; }
+.main_nav .nav_auth_sep { width: 1px; margin: 6px 6px; background: var(--line); }
+.main_nav a.nav_signup { background: var(--blue); color: #fff; }
+.main_nav a.nav_signup:hover, .main_nav a.nav_signup.active { background: var(--blue_dark); color: #fff; }
+.main_nav .nav_logout { display: block; margin: 0; }
+.main_nav .nav_logout button { width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; cursor: pointer; }
+.main_nav .nav_logout button:hover { background: var(--blue_soft); color: var(--blue_dark); }
+
+/* 로그인 · 회원가입 */
+.auth_wrap { max-width: 420px; margin: 24px auto; }
+.auth_wrap h1 { margin-top: 0; }
+.auth_switch { margin: 16px 0 0; text-align: center; font-size: 14px; }
+
 .nav_toggle { display: none; border: 0; background: transparent; font-size: 22px; padding: 6px 10px; }
 
 .site_footer { border-top: 1px solid var(--line); background: #fff; padding: 22px 0; font-size: 13px; }
@@ -143,7 +163,7 @@ p { margin: 0 0 10px; }
 .field_label { font-size: 13px; font-weight: 800; color: #334155; }
 /* 입력칸 모양. 타입 선택자에만 기대면 타입을 바꿀 때 스타일이 빠지므로
    .text_input 클래스도 함께 받습니다. */
-input[type=text], input[type=number], input[type=date], input[type=email],
+input[type=text], input[type=number], input[type=date], input[type=email], input[type=password],
 input.text_input, select {
   width: 100%; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; outline: none; transition: border-color .15s, box-shadow .15s;
 }
@@ -232,6 +252,9 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   .nav_toggle { display: block; }
   .main_nav { display: none; position: absolute; top: 62px; left: 0; right: 0; flex-direction: column; background: #fff; padding: 10px 16px 16px; border-bottom: 1px solid var(--line); }
   .main_nav.open { display: flex; }
+  .main_nav .nav_auth_sep { width: auto; height: 1px; margin: 6px 0; }
+  .main_nav .nav_user { width: 100%; }
+  .user_menu_panel { position: static; box-shadow: none; border: 0; padding: 0 0 0 12px; }
 }
 @media (max-width: 640px) {
   .card { padding: 18px; border-radius: 16px; }
@@ -277,6 +300,21 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .support_close { border: 0; background: rgba(255,255,255,.18); color: #fff;
   width: 30px; height: 30px; border-radius: 9px; font-size: 20px; line-height: 1; cursor: pointer; }
 .support_close:hover { background: rgba(255,255,255,.3); }
+.support_head_actions { display: flex; align-items: center; gap: 6px; }
+.support_reset { border: 0; background: rgba(255,255,255,.18); color: #fff; border-radius: 8px;
+  padding: 5px 9px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.support_reset:hover { background: rgba(255,255,255,.3); }
+/* 어느 탭에서 나눈 말인지 바뀌는 자리 */
+.support_divider { align-self: center; font-size: 11px; font-weight: 800; color: var(--muted);
+  padding: 2px 10px; border-radius: 999px; background: #eef2f7; }
+/* 시작 화면 탭에서 온 답은 서식(굵게·목록)을 살려 그립니다. */
+.support_rich p { margin: 0 0 8px; }
+.support_rich > :last-child { margin-bottom: 0; }
+.support_rich ul, .support_rich ol { margin: 0 0 8px; padding-left: 18px; }
+.support_rich h4 { margin: 0 0 6px; font-size: 14px; }
+.support_rich em.need { color: var(--red); font-style: normal; font-weight: 700; }
+.support_note { background: #f8fafc; color: #475569; font-size: 13px; }
+.support_note p { margin: 0; }
 
 .support_log { flex: 1; overflow-y: auto; padding: 16px; display: flex;
   flex-direction: column; gap: 10px; background: #f8fafc; }
@@ -307,3 +345,103 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .back_home { display: inline-block; margin-bottom: 6px; font-size: 13.5px; font-weight: 700; }
 /* 단독 화면은 머리말이 없으므로 위쪽 여백을 스스로 만듭니다. */
 body.standalone .page { padding-top: 28px; }
+
+/* Autocomplete — 운송 계획(planning.css)에서 옮겼습니다.
+   HS CODE 간편 검색 창이 어느 화면에서나 같은 모양으로 뜨게 하려는 것입니다. */
+/* Autocomplete */
+.autocomplete { position: relative; }
+.ac_list { position: absolute; z-index: 20; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(15,23,42,.12); max-height: 300px; overflow-y: auto; }
+.ac_list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 11px; border-radius: 10px; cursor: pointer; align-items: baseline; }
+.ac_list .ac_title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ac_list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.ac_list li:hover { background: var(--blue_soft); }
+.ac_list li.empty { color: var(--muted); cursor: default; }
+/* HS 입력칸 오른쪽에 후보 정렬을 나란히 둡니다. 좁은 화면에서는 아래로 내려갑니다. */
+.hs_input_row { display: flex; gap: 8px; align-items: stretch; }
+.hs_input_row .text_input { flex: 1 1 auto; min-width: 0; }
+.hs_input_row .hs_order { flex: 0 0 auto; width: auto; min-width: 132px; font-size: 13px; }
+@media (max-width: 520px) {
+  .hs_input_row { flex-wrap: wrap; }
+  .hs_input_row .hs_order { flex: 1 1 100%; }
+}
+[data-autocomplete="hs_code"] .ac_list, [data-line-hs] .ac_list, .hs_modal .ac_list {
+  position: static; max-height: 580px; width: 100%; box-shadow: none; margin: 8px 0;
+}
+[data-autocomplete="hs_code"] .ac_list li, [data-line-hs] .ac_list li, .hs_modal .ac_list li { display: block; }
+[data-autocomplete="hs_code"] .ac_list small, [data-line-hs] .ac_list small, .hs_modal .ac_list small { display: block; margin-top: 4px; }
+.ac_list .hs_stats { color: var(--blue_dark); }
+.ac_list details summary { cursor: pointer; }
+.ac_list .ac_group { display: block; padding: 8px 11px 3px; color: var(--muted); font-size: 12px; font-weight: 800; cursor: default; background: none; }
+.ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #94a3b8; }
+.ac_list .ac_group_other small { font-weight: 600; margin-left: 6px; }
+
+/* HS CODE 간편 검색 창. 어느 화면에서나 [data-hs-open]으로 뜹니다. (hs_modal.js) */
+body.hs_modal_open { overflow: hidden; }
+.hs_modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center;
+  padding: 6vh 16px 16px; }
+.hs_modal[hidden] { display: none; }
+.hs_modal_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.45); }
+.hs_modal_box { position: relative; display: flex; flex-direction: column; gap: 12px;
+  width: min(760px, 100%); max-height: 88vh; padding: 20px 22px; overflow: hidden;
+  border-radius: 20px; background: #fff; box-shadow: 0 30px 80px rgba(15,23,42,.35); }
+.hs_modal_head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.hs_modal_head h2 { margin: 0; font-size: 18px; }
+.hs_modal_head small { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
+.hs_modal_close { flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 10px;
+  background: var(--surface); font-size: 22px; line-height: 1; cursor: pointer; }
+.hs_modal_close:hover { background: var(--line); }
+.hs_modal_target { margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--blue_soft);
+  color: var(--blue_dark); font-size: 13px; font-weight: 700; }
+.hs_modal_body { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; }
+.hs_modal_body .ac_list { max-height: none; margin: 0; }
+.hs_modal_row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hs_modal_row .hs_country { width: auto; min-width: 190px; font-size: 13px; }
+.hs_modal_chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hs_chip { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  color: var(--blue_dark); font-size: 12px; font-weight: 700; cursor: pointer; }
+.hs_chip:hover { border-color: var(--blue); background: var(--blue_soft); }
+.hs_modal_status { margin: 0; padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; }
+.hs_modal_status.ok { background: var(--green_soft); color: #07694f; }
+.hs_modal_status.warn { background: var(--amber_soft); color: #8a4f00; }
+@media (max-width: 520px) {
+  .hs_modal { padding: 12px 8px; }
+  .hs_modal_box { padding: 16px; max-height: 94vh; }
+  .hs_modal_row .hs_country { flex: 1 1 100%; }
+}
+
+/* ⓘ 설명과 HS 후보 카드. 운송 계획 Cargo와 HS CODE 간편 검색 창이 같이 씁니다. */
+/* ? 아이콘: 마우스를 올리거나 키보드·탭으로 고르면 자세한 설명을 띄웁니다. */
+.info_tip { position: relative; display: inline-flex; flex: 0 0 auto; }
+.info_tip > i { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(43,102,246,.12); color: var(--blue_dark); font-style: normal; font-size: 11px; font-weight: 900; cursor: help; }
+.info_tip:focus-visible { outline: none; }
+.info_tip:focus-visible > i { box-shadow: 0 0 0 2px var(--blue); }
+.info_tip_body { position: absolute; top: calc(100% + 8px); right: -8px; z-index: 30; width: 340px; max-width: 80vw;
+  padding: 12px 14px; border-radius: 12px; background: var(--ink); color: #e2e8f0; text-align: left;
+  font-size: 12px; font-weight: 600; line-height: 1.6; box-shadow: 0 18px 40px rgba(15,23,42,.28);
+  opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .15s, transform .15s; }
+.info_tip.start .info_tip_body { right: auto; left: -8px; }
+.info_tip_body b { display: block; margin-bottom: 4px; color: #fff; font-size: 12.5px; }
+.info_tip_body p { margin: 0 0 6px; }
+.info_tip_body p:last-child { margin-bottom: 0; }
+.info_tip:hover .info_tip_body, .info_tip:focus-within .info_tip_body { opacity: 1; visibility: visible; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .info_tip_body { transition: none; } }
+/* Compact cargo lookup: color and text convey the same relevance grade. */
+.hs_candidate { --match: #64748b; --tint: #f1f5f9; padding: 10px 12px; border-left: 4px solid var(--match); border-radius: 9px; background: var(--tint); color: var(--ink); }
+.hs_candidate.match_high { --match: #15803d; --tint: #effaf2; }
+.hs_candidate.match_medium { --match: #a16207; --tint: #fffbeb; }
+.hs_candidate.match_low { --match: #b91c1c; --tint: #fff1f2; }
+.hs_candidate_head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.hs_candidate_head .info_tip { margin-left: auto; }
+.hs_match { padding: 2px 7px; border-radius: 6px; color: var(--match); background: #fff; font-size: 11px; font-weight: 800; }
+.hs_name { display: block; margin-top: 5px; font-size: 14px; }
+.hs_path { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.hs_metrics { margin-top: 5px; font-size: 11px; color: var(--muted); }
+.hs_summary > .info_tip { margin-left: 8px; }
+.hs_candidate:hover { box-shadow: inset 0 0 0 1px var(--match); }
+.info_tip .info_tip_body { display: none; }
+.cargo_tip_popup { position: fixed; z-index: 1000; width: min(360px, calc(100vw - 16px)); max-height: min(420px, calc(100dvh - 16px)); overflow-y: auto; box-sizing: border-box; padding: 14px 16px; border-radius: 12px; background: #17283f; color: #edf2fa; box-shadow: 0 12px 35px #0f172a40; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.cargo_tip_popup[hidden] { display: none; }
+.cargo_tip_popup b { color: #fff; }
+.cargo_tip_popup p { margin: 7px 0 0; }
+.hs_modal .ac_list li[data-index] { padding: 3px; }

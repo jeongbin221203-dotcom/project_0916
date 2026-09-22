@@ -11,6 +11,78 @@ from app.services import container_tracking_service as tracking
 from app.validators import ValidationError
 
 
+def test_cargo_api_removes_display_separators(app, monkeypatch):
+    from app.collectors.base_client import ok
+
+    calls = []
+    def request(method, url, **kwargs):
+        calls.append(kwargs["params"])
+        return ok("<response><tCnt>0</tCnt></response>", "api")
+
+    app.config["UNIPASS_API_KEYS"] = {
+        "CARGO_CLEARANCE_PROGRESS": "test-key", "CONTAINER_DETAIL": "test-key"}
+    monkeypatch.setattr(container_client, "request_text", request)
+    with app.app_context():
+        container_client.cargo_progress(cargo_no=" 26QiFR1069i-2008 ")
+        container_client.container_detail(" 26QiFR1069i-2008 ")
+    assert len(calls) == 2
+    assert all(params["cargMtNo"] == "26QIFR1069I2008" for params in calls)
+
+
+def test_bl_lookups_use_the_same_normalization_as_saved_numbers(app, monkeypatch):
+    from app.collectors.base_client import ok
+
+    calls = []
+    def request(method, url, **kwargs):
+        calls.append(kwargs["params"])
+        return ok("<response><tCnt>0</tCnt></response>", "api")
+
+    app.config["UNIPASS_API_KEYS"] = {
+        "CARGO_CLEARANCE_PROGRESS": "test-key", "EXPORT_PERFORMANCE_BY_DECLARATION": "test-key"}
+    monkeypatch.setattr(container_client, "request_text", request)
+    with app.app_context():
+        container_client.cargo_progress(mbl_no=" hdmu-123 456 ", hbl_no=" house-123 ", bl_year="2026")
+        container_client.export_performance(bl_no=" hdmu-123 456 ")
+    assert calls[0]["mblNo"] == calls[1]["blNo"] == "HDMU123456"
+    assert calls[0]["hblNo"] == "HOUSE123"
+    assert calls[0]["blYy"] == "2026"
+
+
+def test_container_service_error_is_not_hidden(app, monkeypatch):
+    from app.collectors.base_client import fail, ok
+
+    monkeypatch.setattr(container_client, "cargo_progress", lambda **kw: ok(None, "api"))
+    monkeypatch.setattr(container_client, "container_detail", lambda number: fail("API_TIMEOUT", "api"))
+    result = tracking.track("26QiFR1069i-2008")
+    assert not result["available"]
+    assert "기록 유무를 확인할 수 없습니다" in result["message"]
+    assert any(note.startswith("컨테이너내역:") for note in result["notes"])
+
+
+@pytest.mark.parametrize("error_code", ["API_AUTH_FAILED", "API_TIMEOUT", "API_CONNECTION_ERROR"])
+def test_failed_lookup_does_not_claim_customs_has_no_records(app, monkeypatch, error_code):
+    from app.collectors.base_client import fail, ok
+
+    monkeypatch.setattr(container_client, "cargo_progress",
+                        lambda **kw: fail(error_code, "api"))
+    monkeypatch.setattr(container_client, "container_detail", lambda number: ok([], "api"))
+    result = tracking.track("00ANLU083N59007001")
+    assert not result["available"]
+    assert "기록 유무를 확인할 수 없습니다" in result["message"]
+    assert "관세청에 기록이 없습니다" not in result["message"]
+    assert result["notes"]
+
+
+def test_completed_empty_lookup_reports_no_records(app, monkeypatch):
+    from app.collectors.base_client import ok
+
+    monkeypatch.setattr(container_client, "cargo_progress", lambda **kw: ok(None, "api"))
+    monkeypatch.setattr(container_client, "container_detail", lambda number: ok([], "api"))
+    result = tracking.track("00ANLU083N59007001")
+    assert "관세청에 기록이 없습니다" in result["message"]
+    assert not result["notes"]
+
+
 def test_number_shape_decides_where_we_ask():
     """번호 모양만 보고 어디에 물어볼지 정합니다."""
 

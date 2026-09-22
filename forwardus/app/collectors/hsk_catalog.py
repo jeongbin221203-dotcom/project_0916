@@ -96,6 +96,24 @@ def path(code: str) -> list[str]:
             if n < len(digits) and digits[:n] in levels and levels[digits[:n]][0]]
 
 
+def level_name(code: str) -> str | None:
+    """류(2)·호(4)·소호(6) 부호의 한글 이름. 품목표에 없는 부호면 None.
+
+    품목표가 없으면 ""입니다. (있는지 없는지 확인할 수 없으니 막지 않습니다)
+    """
+
+    catalog = _catalog()
+    digits = _digits(code)
+    if not catalog:
+        return ""
+    levels = catalog.get("levels") or {}
+    if digits in levels:
+        return levels[digits][0] or ""
+    if digits in catalog["codes"]:
+        return catalog["codes"][digits][0]
+    return None
+
+
 def context(code: str) -> dict:
     """AI 적합도 검토에 넘길 상위 분류 이름. (호 4자리, 그 아래 단계들)"""
 

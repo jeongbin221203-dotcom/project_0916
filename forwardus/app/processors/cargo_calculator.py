@@ -134,8 +134,9 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         # 입력이 덜 되었거나 앞뒤가 맞지 않는 항목. 계산은 막지 않고 품목 번호와 함께 알려 줍니다.
         "dg_warnings": [{"line_no": index, "message": line["dg_warning"]}
                         for index, line in enumerate(lines, start=1) if line.get("dg_warning")],
-        "warnings": [{"line_no": index, "message": line["net_weight_warning"]}
-                     for index, line in enumerate(lines, start=1) if line.get("net_weight_warning")],
+        "warnings": [{"line_no": index, "message": line[key]}
+                     for index, line in enumerate(lines, start=1)
+                     for key in ("net_weight_warning", "units_warning") if line.get(key)],
         "quantity": sum(line["quantity"] for line in lines),
         # 품목별 금액을 모두 적었으면 그 합이 송장 금액입니다.
         # 하나라도 비어 있으면 지어내지 않고 None을 돌려줍니다.

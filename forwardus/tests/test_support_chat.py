@@ -9,12 +9,16 @@ from app.collectors import ai_client
 
 
 def test_widget_appears_on_every_page(client):
-    """상담 버튼은 화면을 가리지 않고 어디서나 떠 있어야 합니다."""
+    """상담 버튼은 시작 화면을 포함해 어디서나 떠 있어야 합니다.
 
-    for path in ("/", "/planning/new", "/shipments"):
+    시작 화면에서 대화가 시작되면 그동안만 숨기는데, 그건 브라우저가 합니다.
+    """
+
+    for path in ("/", "/planning/new", "/shipments", "/lookup/"):
         html = client.get(path).get_data(as_text=True)
         assert "data-support-open" in html, path
         assert "<b>OpenAI</b>" in html, path
+        assert "js/support_chat.js" in html and "js/chat_store.js" in html, path
 
 
 def test_empty_and_overlong_questions_are_refused(app):
@@ -46,6 +50,26 @@ def test_incoterms_are_quoted_from_our_own_data_not_the_model(app, monkeypatch):
     assert "EXW" in reference and "DDP" in reference
     # 숫자를 지어내지 말라는 지시도 함께 갑니다.
     assert "관세율" in reference
+
+
+def test_widget_gets_brief_prompt_and_home_gets_template(client, monkeypatch):
+    """오른쪽 아래 상담 창은 짧은 프롬프트, 메인 화면 무역 상담은 템플릿 프롬프트."""
+
+    sent = []
+
+    def fake_chat(messages, **kwargs):
+        sent.append((messages[0]["content"], kwargs.get("max_tokens")))
+        return {"success": True, "source": "api", "data": "답변"}
+
+    monkeypatch.setattr(support_chat_service.ai_client, "chat", fake_chat)
+    client.post("/api/support-chat", json={"question": "FOB가 뭔가요?", "style": "brief"})
+    client.post("/api/support-chat", json={"question": "FOB가 뭔가요?"})
+
+    (widget_prompt, widget_tokens), (home_prompt, home_tokens) = sent
+    assert widget_prompt == support_chat_service.BRIEF_SYSTEM_PROMPT
+    assert widget_tokens == support_chat_service.BRIEF_ANSWER_TOKENS
+    assert home_prompt == support_chat_service.SYSTEM_PROMPT
+    assert home_tokens == support_chat_service.MAX_ANSWER_TOKENS
 
 
 def test_history_is_trimmed_and_roles_are_filtered(app, monkeypatch):

@@ -45,6 +45,17 @@ def _isolated_file_cache(tmp_path, monkeypatch):
     hs_open_client.clear_cache()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_outages():
+    """닿지 않은 기관을 건너뛴 기록이 테스트 사이에 넘어가지 않게 합니다."""
+
+    from app.collectors import base_client
+
+    base_client.clear_outages()
+    yield
+    base_client.clear_outages()
+
+
 @pytest.fixture()
 def app():
     flask_app = create_app(TestConfig)
@@ -56,6 +67,25 @@ def app():
 
 @pytest.fixture()
 def client(app):
+    """마스터로 로그인한 브라우저.
+
+    Shipment 화면은 로그인해야 열리고, 서비스로 바로 만든 Shipment는
+    작성자가 없어 마스터만 봅니다. 권한 자체는 tests/test_permissions.py에서 봅니다.
+    """
+
+    from app.models import User
+
+    test_client = app.test_client()
+    master = User.query.filter_by(email=app.config["MASTER_EMAIL"]).one()
+    with test_client.session_transaction() as session:
+        session["user_id"] = master.id
+    return test_client
+
+
+@pytest.fixture()
+def anon_client(app):
+    """로그인하지 않은 브라우저."""
+
     return app.test_client()
 
 

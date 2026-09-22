@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.mark.parametrize("path", ["/", "/planning/new", "/shipments", "/dashboard", "/health"])
+@pytest.mark.parametrize("path", ["/", "/planning/new", "/shipments", "/health"])
 def test_static_pages_render(client, path):
     assert client.get(path).status_code == 200
 
@@ -67,5 +67,8 @@ def test_full_flow(client, shipment_payload):
     }).status_code == 302
     assert "운전자금".encode() in client.get(f"/assistant/{shipment_id}").data
 
+    # 내 Dashboard는 로그인해야 열립니다.
+    client.post("/auth/signup", data={"email": "flow@example.com", "password": "secret123",
+                                      "password_confirm": "secret123"})
     dashboard = client.get("/dashboard")
     assert dashboard.status_code == 200 and shipment_id.encode() in dashboard.data

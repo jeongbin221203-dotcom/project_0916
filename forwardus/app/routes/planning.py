@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
+from app.routes.auth import current_user, login_required
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
 
@@ -12,11 +13,13 @@ planning_bp = Blueprint("planning", __name__, url_prefix="/planning")
 
 
 @planning_bp.get("/new")
+@login_required
 def new():
     return _wizard(standalone=False)
 
 
 @planning_bp.get("/new/solo")
+@login_required
 def new_solo():
     """같은 위저드를 단독으로. 머리말·푸터·상담 단추 없이 입력만 보입니다.
 
@@ -77,6 +80,18 @@ def api_exchange_rate():
     """통화별 원화 환율. 운임을 원화로 환산해 보여주는 데 씁니다."""
 
     return jsonify(planning_service.exchange_rates())
+
+
+@planning_bp.get("/api/fx-board")
+def api_fx_board():
+    """실시간 환율 시세표. 모든 통화의 매매기준율·전일 대비·송금 환율(TTB·TTS).
+
+    사이드바 [💱 환율] 창의 시세표와 다국가 계산기가 씁니다. (fx_board_client)
+    """
+
+    from app.collectors import fx_board_client
+
+    return jsonify(fx_board_client.board())
 
 
 @planning_bp.get("/api/tariff-summary")
@@ -166,9 +181,11 @@ def api_departure_check():
 
 
 @planning_bp.post("/api/shipments")
+@login_required
 def api_create_shipment():
     try:
-        shipment = planning_service.create_shipment(request.get_json(silent=True) or {})
+        shipment = planning_service.create_shipment(request.get_json(silent=True) or {},
+                                                    user_id=current_user().id)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     return jsonify({
