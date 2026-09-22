@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.collectors import ai_client
+from app.collectors import ai_client, ocr_client
 from app.models.requirement_document import RequirementDocument
 from app.processors import export_requirements
 from app.repositories import shipment_repository
@@ -19,6 +19,11 @@ from app.validators.cargo_validator import PACKAGE_UNITS
 ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".txt", ".docx"}
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 UPLOAD_DIR = Path("instance") / "requirement_uploads"
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
+# 증명서는 보통 한두 장입니다. 앞 5장이면 충분합니다.
+MAX_PDF_PAGES = 5
+# 한 페이지에서 뽑은 글자가 이보다 적으면 스캔 페이지로 보고 OCR로 다시 읽습니다.
+MIN_PAGE_TEXT = 20
 
 
 def official_requirements(hs_code: str) -> dict:
@@ -157,17 +162,28 @@ def requirement_key_of(shipment, document_id: int) -> str:
 
 
 def extract_text(path: Path, suffix: str) -> str:
-    """서류에서 글자를 뽑습니다. 못 뽑으면 빈 글자를 돌려줍니다."""
+    """서류에서 글자를 뽑습니다. 못 뽑으면 빈 글자를 돌려줍니다.
+
+    글자가 든 PDF는 pdfplumber로 그대로 뽑고(OCR보다 정확합니다), 사진과
+    글자 없는 스캔 페이지는 Tesseract OCR로 읽습니다.
+    """
 
     try:
         if suffix == ".txt":
             return path.read_text(encoding="utf-8", errors="replace")
+        if suffix in IMAGE_SUFFIXES:
+            return ocr_client.read_image(path) if ocr_client.available() else ""
         if suffix == ".pdf":
             import pdfplumber
 
+            pages = []
             with pdfplumber.open(path) as pdf:
-                # 증명서는 보통 한두 장입니다. 앞 5장이면 충분합니다.
-                return "\n".join((page.extract_text() or "") for page in pdf.pages[:5])
+                for index, page in enumerate(pdf.pages[:MAX_PDF_PAGES]):
+                    text = page.extract_text() or ""
+                    if len(text.strip()) < MIN_PAGE_TEXT:
+                        text = _ocr_pdf_page(path, index) or text
+                    pages.append(text)
+            return "\n".join(pages)
         if suffix == ".docx":
             import docx
 
@@ -176,6 +192,17 @@ def extract_text(path: Path, suffix: str) -> str:
         # 어떤 형식이든 읽기에 실패하면 "못 읽었다"로 넘깁니다. 화면에서 이유를 알려 줍니다.
         return ""
     return ""
+
+
+def _ocr_pdf_page(path: Path, index: int) -> str:
+    """스캔 페이지 하나를 OCR로 읽습니다. 한 장이 실패해도 나머지는 살립니다."""
+
+    if not ocr_client.available():
+        return ""
+    try:
+        return ocr_client.read_pdf_page(path, index)
+    except Exception:
+        return ""
 
 
 def shipment_context(shipment) -> dict:
@@ -218,11 +245,7 @@ def analyze(shipment, document_id: int) -> RequirementDocument:
     text = extract_text(path, suffix)
     if not text.strip():
         document.review_status = "failed"
-        document.review_summary = (
-            "서류에서 글자를 읽지 못했습니다. 사진으로만 된 서류는 아직 읽지 못합니다. "
-            "PDF로 다시 내려받아 올리거나, 내용을 직접 확인해 주세요."
-            if suffix in (".png", ".jpg", ".jpeg") else
-            "서류에서 글자를 읽지 못했습니다. 스캔 이미지만 들어 있는 PDF일 수 있습니다.")
+        document.review_summary = _unreadable_reason(suffix)
         document.review_findings = []
         document.reviewed_at = datetime.now(timezone.utc)
         shipment_repository.commit()
@@ -247,6 +270,19 @@ def analyze(shipment, document_id: int) -> RequirementDocument:
     document.reviewed_at = datetime.now(timezone.utc)
     shipment_repository.commit()
     return document
+
+
+def _unreadable_reason(suffix: str) -> str:
+    """글자를 못 읽었을 때 이유를 사람 말로 돌려줍니다."""
+
+    if suffix in IMAGE_SUFFIXES | {".pdf"} and not ocr_client.available():
+        kind = "사진" if suffix in IMAGE_SUFFIXES else "스캔 이미지만 든 PDF"
+        return (f"{kind}를 읽는 OCR 프로그램(Tesseract)이 이 서버에 설치돼 있지 않아 글자를 읽지 못했습니다. "
+                "Tesseract를 설치하고 .env의 TESSERACT_CMD에 위치를 적은 뒤 서버를 다시 켜 주세요.")
+    if suffix in IMAGE_SUFFIXES:
+        return ("사진에서 글자를 읽지 못했습니다. 글자가 잘 보이도록 밝고 반듯하게 다시 찍거나, "
+                "PDF로 내려받아 올려 주세요.")
+    return "서류에서 글자를 읽지 못했습니다. 스캔 상태가 흐리거나 글자가 없는 파일일 수 있습니다."
 
 
 def _clean(text: str) -> str:

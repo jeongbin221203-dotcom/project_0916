@@ -10,4 +10,5 @@ pytest>=8
 hypothesis>=6.100
 # 업로드한 증빙 서류에서 글자를 읽는 데 씁니다.
 pdfplumber>=0.11
+pytesseract>=0.3.10
 python-docx>=1.1

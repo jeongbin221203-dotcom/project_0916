@@ -97,6 +97,11 @@ class Config:
     # HS 품목분류는 틀리면 관세포탈이 되는 자리라 더 나은 모형을 씁니다.
     # 상담·서류 읽기는 gpt-4o-mini로 충분하지만 여기만 따로 둡니다.
     AI_HS_MODEL = os.getenv("AI_HS_MODEL", "gpt-4o")
+    # 사진·스캔 서류를 읽는 Tesseract OCR. 비우면 PATH와 Windows 기본 설치
+    # 위치(C:\Program Files\Tesseract-OCR\tesseract.exe)에서 찾습니다.
+    TESSERACT_CMD = os.getenv("TESSERACT_CMD", "")
+    # 읽을 언어. 한글 서류를 읽으려면 kor 언어 자료가 설치돼 있어야 합니다.
+    TESSERACT_LANG = os.getenv("TESSERACT_LANG", "kor+eng")
 
     UNIPASS_API_KEYS = {name: os.getenv(f"UNIPASS_KEY_{name}", "") for name in UNIPASS_SERVICES}
 
