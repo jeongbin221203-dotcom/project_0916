@@ -7,7 +7,10 @@
   const stage = document.querySelector("[data-home-form]");
   if (!config || !stage) return;
 
-  const { escapeHtml, postJson } = window.Forwardus;
+  const { escapeHtml, getJson, postJson } = window.Forwardus;
+  // 고래 상담창과 같은 대화를 나눠 씁니다. 다른 화면에 갔다 와도 이어집니다.
+  const chat = window.ForwardusChat;
+  const SOURCE = "home";
 
   const input = stage.querySelector("[data-home-input]");
   const chipsBox = stage.querySelector("[data-home-chips]");
@@ -17,15 +20,19 @@
   const centerEl = document.querySelector("[data-home-center]");
 
   let current = config.actions[0];
-  // 대화는 이어서 봅니다. 서버가 뒤쪽 몇 개만 씁니다.
-  const history = [];
-  // 어느 모드에서 처음 인사를 건넸는지. 같은 말을 두 번 하지 않으려고 둡니다.
-  const greeted = new Set();
+
+  // 나눈 말을 대화 한 줄기에 적습니다. 고래 상담창에도 같이 보입니다.
+  function record(role, text, kind = "", extra = null) {
+    return chat.append({ role, text, kind, extra, mode: current.key }, SOURCE);
+  }
 
   // 한 번 묻고 나면 인사를 접고 적는 칸을 화면 아래에 붙입니다.
   // 답이 쌓이는 동안에도 다시 묻는 자리가 늘 같은 곳에 있어야 합니다.
+  // 대화하는 동안에는 고래 상담창을 숨깁니다. 같은 대화가 가운데에 크게
+  // 떠 있어 두 벌로 보일 이유가 없습니다. 첫 화면으로 돌아오면 다시 보입니다.
   function startTalking() {
     centerEl.classList.add("talking");
+    document.body.classList.add("home_talking");
   }
 
   /* ----- 무엇에 대해 이야기할지 ----- */
@@ -49,11 +56,19 @@
 
     // 사람이 무엇부터 적어야 할지 모르는 것이 가장 흔한 막힘입니다.
     // 단추를 누르면 우리가 먼저 말을 겁니다.
-    if (greet && action.opener && !greeted.has(action.key)) {
-      greeted.add(action.key);
-      say("bot", action.opener);
-    }
+    if (greet && action.opener) greetFor(action);
     resize();
+  }
+
+  // 인사는 지금 고른 탭의 것 하나만 보입니다. 다른 탭으로 넘어가면 앞 탭의
+  // 인사를 지우고 새 인사를 맨 아래에 둡니다. 적은 말이 있든 없든 같습니다.
+  function greetFor(action) {
+    const last = logEl.lastElementChild;
+    // 같은 탭을 다시 눌렀고 그 인사가 아직 맨 아래에 있으면 그대로 둡니다.
+    if (last && last.dataset.greeting === action.key) return;
+    logEl.querySelectorAll("[data-greeting]").forEach((row) => row.remove());
+    say("bot", action.opener).dataset.greeting = action.key;
+    chat.replaceGreeting({ text: action.opener, mode: action.key }, SOURCE);
   }
 
   document.querySelectorAll("[data-home-action]").forEach((button) => {
@@ -141,6 +156,7 @@
     // 화면을 대신 넘기지 않습니다. 넘기면 이 안내가 가려져서, 무엇이 확인이
     // 필요한 값인지 모른 채 그대로 서류가 만들어집니다.
     say("bot", `칸 ${filled}개를 채웠습니다.` + notes);
+    record("assistant", `칸 ${filled}개를 채웠습니다.` + notes, "note");
     const link = say("bot", "");
     link.innerHTML = `<a class="button primary" href="${escapeHtml(config.docFormUrl)}">`
       + "서류 작성 화면에서 확인하기 →</a>";
@@ -164,45 +180,10 @@
   });
 
   /* ----- 답변 그리기 -----
-     AI는 **굵게**나 "- 목록" 같은 표시를 섞어 씁니다. 글자 그대로 두면
-     별표가 그대로 보입니다. 서식만 살려 주되, 넣기 전에 반드시 escape합니다.
-     AI가 하는 말에 <script>가 섞여 들어올 수 있습니다. */
+     서식을 살리는 방법은 고래 상담창과 같아야 해서 chat_store.js에 둡니다. */
+  const renderAnswer = (text) => chat.render(text);
 
-  function inline(escaped) {
-    return escaped
-      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-      // {{ }}로 감싼 것은 빨갛게. 꼭 있어야 하는 칸과 운송 계획에서
-      // 정해지는 칸을 눈에 띄게 하려는 표시입니다.
-      .replace(/\{\{(.+?)\}\}/g, '<em class="need">$1</em>')
-      // [글](주소). 주소는 http(s)만 받습니다. javascript: 같은 것이
-      // 들어오면 링크로 만들지 않고 글자 그대로 둡니다.
-      .replace(/\[([^\]]+)\]\((https?:&#x2F;&#x2F;[^)\s]+|https?:\/\/[^)\s]+)\)/g,
-        (whole, label, url) => {
-          const clean = url.replace(/&#x2F;/g, "/");
-          return `<a href="${clean}" target="_blank" rel="noopener">${label}</a>`;
-        })
-      .replace(/`([^`]+)`/g, "<code>$1</code>");
-  }
-
-  function renderAnswer(text) {
-    // escapeHtml을 먼저 한 번만 겁니다. 이후로는 우리가 넣는 태그만 살아 있습니다.
-    return escapeHtml(text).split(/\n{2,}/).map((block) => {
-      const lines = block.split("\n").filter((line) => line.trim());
-      if (!lines.length) return "";
-      // 한 덩어리가 전부 목록이면 목록으로, 아니면 문단으로 그립니다.
-      if (lines.every((line) => /^\s*(?:[-*•]|\d+\.)\s+/.test(line))) {
-        const items = lines.map((line) =>
-          `<li>${inline(line.replace(/^\s*(?:[-*•]|\d+\.)\s+/, ""))}</li>`).join("");
-        return /^\s*\d+\./.test(lines[0]) ? `<ol>${items}</ol>` : `<ul>${items}</ul>`;
-      }
-      if (lines.length === 1 && /^#{1,4}\s+/.test(lines[0])) {
-        return `<h4>${inline(lines[0].replace(/^#{1,4}\s+/, ""))}</h4>`;
-      }
-      return `<p>${lines.map(inline).join("<br>")}</p>`;
-    }).join("");
-  }
-
-  function say(kind, text) {
+  function say(kind, text, { restoring = false } = {}) {
     const row = document.createElement("div");
     row.className = `home_msg ${kind}`;
     if (kind === "bot") {
@@ -217,14 +198,17 @@
     // 물어본 말은 위로 올려 붙입니다. 답이 그 아래로 이어서 나오니
     // 눈이 한 자리에 머뭅니다. 매번 맨 아래로 끌어내리면 글이 길 때
     // 답의 끝부터 보이게 되어 읽을 자리를 찾느라 화면이 튑니다.
-    if (kind === "me") {
+    if (kind === "me" && !restoring) {
       row.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     return row;
   }
 
   async function askSupport(question) {
+    // 앞 대화에는 고래 상담창에서 나눈 말도 들어 있습니다.
+    const history = chat.history();
     say("me", question);
+    record("user", question);
     const waiting = say("bot wait", "답을 찾고 있습니다…");
     sendButton.disabled = true;
 
@@ -238,16 +222,18 @@
     }
     const answer = response.data.answer;
     say("bot", answer);
-    history.push({ role: "user", content: question }, { role: "assistant", content: answer });
+    record("assistant", answer);
   }
 
   /* ----- 서류 만들기 -----
      "패킹리스트만 만들어줘" 같은 말을 받으면, 그 서식이 요구하는 칸만
      되묻고 채워지는 대로 초안을 그려 보여 줍니다. */
-  let docDraft = {};
+  // 모은 값은 대화와 함께 기억합니다. 다른 화면에 갔다 와도 이어서 채웁니다.
+  let docDraft = chat.get("docDraft") || {};
 
   async function askAgent(message) {
     say("me", message);
+    record("user", message);
     const waiting = say("bot wait", "보고 있습니다…");
     sendButton.disabled = true;
     sendButton.classList.add("working");
@@ -263,12 +249,22 @@
     }
     const data = response.data;
     docDraft = data.draft || docDraft;
+    chat.set("docDraft", docDraft);
     say("bot", data.reply);
-    if (data.fields) showFields(data.fields);
+    record("assistant", data.reply);
+    if (data.fields) {
+      showFields(data.fields);
+      record("assistant", "서류에 들어갈 칸 목록을 보여 드렸습니다. "
+        + "시작 화면의 **서류 작성** 탭에서 칸을 눌러 채울 수 있습니다.", "note",
+        { fields: data.fields });
+    }
 
     // AI가 확인 못 한 값이 있으면 같이 알려 줍니다. 조용히 넘어가면
     // 틀린 값이 그대로 서류가 됩니다.
-    (data.notes || []).forEach((note) => say("bad", note));
+    (data.notes || []).forEach((note) => {
+      say("bad", note);
+      record("assistant", note, "warn");
+    });
 
     if (data.documents) {
       // 적으신 내용을 임시로 둡니다. 운송 일정을 넣는 화면이 이걸 집어 가
@@ -285,6 +281,10 @@
       }
       data.documents.forEach(showDraft);
       showNextStep();
+      // 초안 그림은 커서 대화에 담지 않습니다. 무엇을 만들었는지만 적어 둡니다.
+      record("assistant", data.documents.map((doc) => `📄 **${doc.title}** 초안을 만들었습니다.`)
+        .join("\n") + "\n\n운송 일정을 넣으면 정식 서류로 만들 수 있습니다.", "note",
+        { nextStep: true });
     }
   }
 
@@ -521,5 +521,54 @@
     if (event.key === "Escape") flyouts.forEach((box) => setFlyout(box, false));
   });
 
+  /* ----- 나눈 대화 다시 그리기 -----
+     다른 화면에 갔다 오거나 고래 상담창에서 말을 걸었어도 여기서 이어집니다. */
+  function showStored(message, { restoring = false } = {}) {
+    if (message.role === "user") {
+      say("me", message.text, { restoring });
+      return;
+    }
+    if (message.kind === "warn") { say("bad", message.text); return; }
+    if (message.kind === "greeting") { say("bot", message.text).dataset.greeting = message.mode; return; }
+    if (message.extra && message.extra.fields) { showFields(message.extra.fields); return; }
+    say("bot", message.text);
+    if (message.extra && message.extra.nextStep) showNextStep();
+  }
+
+  function restore() {
+    const messages = chat.messages();
+    if (!messages.length) return;
+    // 마지막으로 이야기하던 탭을 다시 골라 둡니다.
+    const lastMode = [...messages].reverse().map((m) => m.mode)
+      .find((mode) => config.actions.some((a) => a.key === mode));
+    if (lastMode) {
+      current = config.actions.find((a) => a.key === lastMode);
+      document.querySelectorAll("[data-home-action]").forEach((button) => {
+        const on = button.dataset.homeAction === lastMode;
+        button.classList.toggle("active", on);
+        button.setAttribute("aria-selected", on ? "true" : "false");
+      });
+    }
+    messages.forEach((message) => showStored(message, { restoring: true }));
+    // 마지막 말이 보이게 내려 둡니다.
+    logEl.lastElementChild.scrollIntoView({ block: "end" });
+  }
+
+  chat.subscribe((event) => {
+    if (event.source === SOURCE) return;
+    if (event.type === "clear") {
+      // 고래 상담창에서 새 대화를 시작했습니다. 여기도 처음으로 돌립니다.
+      logEl.innerHTML = "";
+      logEl.hidden = true;
+      centerEl.classList.remove("talking");
+      document.body.classList.remove("home_talking");
+      docDraft = {};
+      return;
+    }
+    if (event.type !== "append") return;
+    showStored(event.message);
+  });
+
+  restore();
   showAction(current);
 })();

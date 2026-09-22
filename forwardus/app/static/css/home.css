@@ -526,3 +526,7 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 }
 .home_chips .chip_file::before { content: "📄 "; }
 .home_chips .chip_file:hover { border-color: var(--navy); background: #f1f5f9; }
+
+/* 시작 화면에서 대화가 시작되면 고래 상담창을 숨깁니다. 같은 대화가 가운데에 떠 있습니다. */
+body.home_talking .support_fab,
+body.home_talking .support_panel { display: none !important; }

@@ -11,7 +11,7 @@
      {# 흰 바탕은 바깥(aside)이 끝까지 채우고, 붙어 있는 것은 안쪽입니다.
         한 덩어리로 두면 body의 zoom 때문에 100vh 계산이 어긋나 밀려 올라갑니다. #}
      <div class="rail_inner">
-      <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page">
+      <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page" data-home-reset>
         <span class="rail_icon" aria-hidden="true">🏠</span>
         <small>홈</small>
       </a>
