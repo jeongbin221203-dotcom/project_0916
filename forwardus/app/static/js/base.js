@@ -10,9 +10,11 @@
 
   const REQUEST_TIMEOUT_MS = 20000;
 
-  async function requestJson(url, options) {
+  // timeoutMs를 주면 그만큼 기다립니다. AI가 끼는 조회(HS 후보 비교, 서류 읽기)는
+  // 20초를 넘기는 일이 흔합니다. 예전에는 부르는 쪽이 넘긴 값을 버리고 늘 20초에 끊었습니다.
+  async function requestJson(url, options, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs || REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       try {
@@ -36,12 +38,17 @@
     }
   }
 
-  const getJson = (url) => requestJson(url, { headers: { Accept: "application/json" } });
-  const postJson = (url, body) => requestJson(url, {
+  const getJson = (url, timeoutMs) => requestJson(url, { headers: { Accept: "application/json" } },
+    timeoutMs);
+  const postJson = (url, body, timeoutMs) => requestJson(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
-  });
+  }, timeoutMs);
+  // 파일 올리기. Content-Type은 브라우저가 경계값까지 붙여 정하게 둡니다.
+  const postForm = (url, formData, timeoutMs) => requestJson(url, {
+    method: "POST", headers: { Accept: "application/json" }, body: formData,
+  }, timeoutMs);
 
   function formatNumber(value, digits = 0) {
     if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
@@ -112,8 +119,120 @@
   });
   unhide.observe(document.body, { attributes: true, attributeFilter: ["hidden"], subtree: true });
 
-  window.Forwardus = { escapeHtml, getJson, postJson, formatNumber, toIsoDate,
-                       plainNumber, groupDigits, setupNumberInput };
+  /* ----- Autocomplete -----
+     운송 계획(planning.js)에만 있던 것을 그대로 옮겼습니다. HS CODE 간편 검색 창도
+     같은 것을 써야 Cargo 화면과 똑같이 동작합니다. 한쪽만 고치면 둘이 갈라집니다. */
+  function debounce(fn, wait) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); };
+  }
+
+  function setupAutocomplete(container, fetchItems, renderItem, onSelect, options = {}) {
+    const input = container.querySelector("[data-ac-input]");
+    const list = container.querySelector("[data-ac-list]");
+    let items = [];
+    let searchVersion = 0;
+
+    let overrideQuery = null;
+
+    const search = debounce(async () => {
+      const version = ++searchVersion;
+      list.innerHTML = `<li class="empty">${escapeHtml(options.loadingMessage || "검색 중…")}</li>`;
+      list.hidden = false;
+      const query = overrideQuery === null ? input.value.trim() : overrideQuery;
+      overrideQuery = null;
+      const fetched = await fetchItems(query);
+      if (version !== searchVersion) return;
+      items = fetched;
+      if (!items.length) {
+        const message = options.emptyMessage
+          ? options.emptyMessage(items)
+          : `검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.`;
+        list.innerHTML = `<li class="empty">${escapeHtml(message)}</li>`;
+        return;
+      }
+      let html = "";
+      if (options.groupBy) {
+        // 같은 그룹을 한 번만 표시합니다. 서버가 보내는 순서가 섞여 있어도
+        // 머리글이 중복되지 않도록 그룹별로 모아서 그립니다.
+        const groups = new Map();
+        items.forEach((item, index) => {
+          const value = options.groupBy(item);
+          if (!groups.has(value)) groups.set(value, []);
+          groups.get(value).push({ item, index });
+        });
+        groups.forEach((entries, value) => {
+          const other = value === "환승 필요" || value === "환적 필요"
+            || value === "정기 항로 확인 필요";
+          const GROUP_NOTES = {
+            "환승 필요": "고른 출발 공항에서 직항편이 없어 환승이 필요합니다",
+            "환적 필요": "한국에서 직기항 선박이 없어 환적항을 거칩니다",
+            "정기 항로 확인 필요": "정기 항로 기록이 없어 선사에 확인이 필요합니다",
+          };
+          const note = GROUP_NOTES[value];
+          html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
+            + (note ? `<small>${escapeHtml(note)}</small>` : "")
+            + `</li>`;
+          entries.forEach(({ item, index }) => {
+            html += `<li role="option" tabindex="0" data-index="${index}">${renderItem(item)}</li>`;
+          });
+        });
+      } else {
+        items.forEach((item, index) => {
+          html += `<li role="option" tabindex="0" data-index="${index}">${renderItem(item)}</li>`;
+        });
+      }
+      // 목록 맨 위에 덧붙일 안내가 있으면 함께 그립니다. (예: 영문을 한글로 바꿔 찾음)
+      if (options.leadRow) html = options.leadRow(items) + html;
+      list.innerHTML = html;
+      // 목록을 그린 뒤 덧붙일 것이 있으면 (예: HS 후보별 협정) 이어서 채웁니다.
+      if (options.afterRender) options.afterRender(items, list);
+    }, options.delayMs || 200);
+
+    input.addEventListener("input", () => { ++searchVersion; onSelect(null, input); search(); });
+    // 이미 고른 항구가 있어도 다시 누르면 전체 목록을 보여줍니다.
+    // (간편 검색 창처럼 적힌 말 그대로 다시 찾아야 하는 자리는 focusShowsAll: false)
+    input.addEventListener("focus", () => {
+      if (options.focusShowsAll === false) return;
+      input.select();
+      overrideQuery = "";
+      search();
+    });
+    input.addEventListener("blur", () => { if (!options.keepOpen) setTimeout(() => { list.hidden = true; }, 150); });
+    list.addEventListener("mousedown", (event) => {
+      // 후보 안의 ⓘ(근거 보기)를 눌렀을 때는 그 후보를 고르지 않습니다.
+      if (event.target.closest(".info_tip")) return;
+      const li = event.target.closest("li[data-index]");
+      if (!li) return;
+      onSelect(items[Number(li.dataset.index)], input);
+      list.hidden = true;
+    });
+    // 키보드로도 고릅니다. Tab으로 후보에 가서 Enter·스페이스.
+    list.addEventListener("keydown", (event) => {
+      if (event.target.closest(".info_tip") || !["Enter", " "].includes(event.key)) return;
+      const li = event.target.closest("li[data-index]");
+      if (!li) return;
+      event.preventDefault();
+      onSelect(items[Number(li.dataset.index)], input);
+      list.hidden = true;
+    });
+    return {
+      search,
+      showAll() {
+        ++searchVersion;
+        overrideQuery = "";
+        search();
+      },
+      // 목록이 열려 있을 때만 다시 그립니다. 닫혀 있는데 다시 검색하면
+      // 이미 고른 값("로테르담항 (NLRTM)")으로 검색해 빈 목록이 떠 버립니다.
+      refresh() {
+        if (!list.hidden) { ++searchVersion; search(); }
+      },
+    };
+  }
+
+  window.Forwardus = { escapeHtml, getJson, postJson, postForm, formatNumber, toIsoDate,
+                       plainNumber, groupDigits, setupNumberInput, debounce, setupAutocomplete };
 
   const toggle = document.querySelector("[data-nav-toggle]");
   const nav = document.querySelector("[data-nav]");

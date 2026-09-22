@@ -98,12 +98,19 @@ class Config:
     SCHEDULE_API_KEY = os.getenv("SCHEDULE_API_KEY", "")
     TRACKING_API_KEY = os.getenv("TRACKING_API_KEY", "")
     CUSTOMS_API_KEY = os.getenv("CUSTOMS_API_KEY", "")
+    # 환율 시세표(사이드바 💱). 앞의 것이 있으면 앞의 것을 씁니다. (fx_board_client)
+    # EXCHANGE_API_KEY: 한국수출입은행 현재환율 API authkey (은행 고시 TTB·TTS·매매기준율)
+    # OPEN_EXCHANGE_RATES_APP_ID: openexchangerates.org (시장 환율, 무료 월 1,000회)
     EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY", "")
+    OPEN_EXCHANGE_RATES_APP_ID = os.getenv("OPEN_EXCHANGE_RATES_APP_ID", "")
     # OPENAI_API_KEY로 적어 두신 경우에도 받습니다. 둘 중 하나만 있으면 됩니다.
     AI_API_KEY = os.getenv("AI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
     # HS 품목분류는 틀리면 관세포탈이 되는 자리라 더 나은 모형을 씁니다.
     # 상담·서류 읽기는 gpt-4o-mini로 충분하지만 여기만 따로 둡니다.
     AI_HS_MODEL = os.getenv("AI_HS_MODEL", "gpt-4o")
+    # 올린 서류(오퍼시트)를 읽는 모형. 스캔 사진도 읽어야 해서 그림을 보는 모형이어야 합니다.
+    # 단가·금액이 서류에 그대로 찍히는 자리라 상담용(mini)보다 나은 모형을 씁니다.
+    AI_DOC_MODEL = os.getenv("AI_DOC_MODEL", "gpt-4o")
 
     UNIPASS_API_KEYS = {name: os.getenv(f"UNIPASS_KEY_{name}", "") for name in UNIPASS_SERVICES}
 
@@ -111,8 +118,8 @@ class Config:
     # 시작 화면을 잠급니다.
     #
     # 왼쪽 줄, 탭, 적는 칸, 고객 상담 단추가 모두 눌리지 않습니다.
-    # 위쪽 메뉴(운송 계획 · Shipments · 일정 역산 · 컨테이너 조회 ·
-    # 관세청 조회 · 로그인)만 그대로 씁니다.
+    # 위쪽 메뉴(운송 계획 · Shipments · 컨테이너 조회 · 관세청 조회 · 로그인)만
+    # 그대로 씁니다.
     #
     # 보여 주기용으로 시작 화면만 막아 둘 때 씁니다.
     #
@@ -123,6 +130,7 @@ class Config:
 
     # 모든 사용자의 Shipment를 보는 마스터 계정. 앱이 뜰 때 없으면 만듭니다.
     # 비밀번호는 처음 만들 때만 씁니다. 운영에서는 .env에서 꼭 바꾸세요.
+    # TODO(보안): 브랜치를 모두 합친 뒤 기본 비밀번호 "1234"를 없앱니다.
     MASTER_EMAIL = os.getenv("MASTER_EMAIL", "forwardus@gmail.com").strip().lower()
     MASTER_PASSWORD = os.getenv("MASTER_PASSWORD", "1234")
 

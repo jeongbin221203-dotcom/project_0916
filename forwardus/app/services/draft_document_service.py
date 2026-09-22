@@ -22,6 +22,7 @@ from app.collectors import location_client
 from app.processors.cargo_calculator import calculate_cargo_lines
 from app.services import ServiceError, document_service
 from app.validators import ValidationError
+from app.validators.cargo_validator import has_box, validate_commercial_line
 
 # 스케줄이 있어야 채워지는 칸. 빈칸으로 두면 "안 적었나" 싶고,
 # 지어내면 거짓말이 됩니다. 그래서 미정이라고 적습니다.
@@ -32,6 +33,7 @@ SCHEDULE_FIELDS = {
     "packing_list": ("date_shipped", "shipped_via"),
     "packing_list_std": ("etd", "vessel_or_flight"),
     "proforma_invoice": ("shipment_time",),
+    "shipping_instruction": ("etd", "vessel_or_flight", "carrier"),
 }
 
 # 초안으로 그릴 수 있는 서식.
@@ -44,7 +46,13 @@ FORMS = {
     "packing_list": "포장명세서 (ORDER # 양식)",
     "packing_list_std": "포장명세서 (표준 ①~⑯ 양식)",
     "proforma_invoice": "견적송장 (Proforma Invoice)",
+    "shipping_instruction": "선적의뢰서 (Shipping Request)",
 }
+
+# 미리보기에서 고친 값을 다시 그릴 때의 한도. 화면이 보낸 값은 믿지 않고 자릅니다.
+MAX_FIELD_CHARS = 500
+MAX_CELL_CHARS = 300
+MAX_ITEM_ROWS = 20
 
 # 표준 포장명세서는 상업송장과 같은 칸을 쓰되 순서와 이름이 서식대로입니다.
 STD_PACKING_FIELDS = [
@@ -115,17 +123,20 @@ def _as_shipment(draft: dict) -> SimpleNamespace:
         raise ValidationError("품목을 하나 이상 적어 주세요.", "items")
 
     # 부피·중량·컨테이너 수는 우리 계산기가 냅니다. 화면이 보낸 값을 믿지 않습니다.
-    metrics = calculate_cargo_lines(items, strict=False)
+    # 상자 크기가 없는 품목(오퍼시트로 만든 초안)은 송장에 필요한 것만 확인하고
+    # 부피·중량은 비워 둡니다. 크기를 지어내 넣지 않습니다.
+    lines = [_line(raw) for raw in items]
 
     cargos = []
-    for raw, line in zip(items, metrics["lines"]):
+    for raw, line in zip(items, lines):
         cargos.append(SimpleNamespace(
             # 계산기가 hs_code는 돌려주지 않아 입력에서 그대로 가져옵니다.
             hs_code=str(raw.get("hs_code") or "").strip(),
-            **{key: line[key] for key in (
+            **{key: line.get(key) for key in (
                 "product_description", "package_type", "quantity",
                 "length_cm", "width_cm", "height_cm", "weight_per_package_kg",
                 "net_weight_kg", "unit_price", "amount",
+                "unit_quantity", "price_unit", "units_per_package",
                 "total_cbm", "total_weight_kg", "container_type", "container_quantity",
                 "is_dangerous", "un_number", "dg_class", "packing_group",
                 "proper_shipping_name")}))
@@ -134,7 +145,9 @@ def _as_shipment(draft: dict) -> SimpleNamespace:
     dest_code, dest_name = _place(draft.get("destination_code"))
 
     # 품목 금액을 모두 적었으면 그 합이 송장 금액입니다.
-    invoice_value = metrics["amount"]
+    amounts = [line.get("amount") for line in lines]
+    invoice_value = (round(sum(amounts), 2) if amounts and all(a is not None for a in amounts)
+                     else None)
     if invoice_value is None:
         invoice_value = _number(draft.get("invoice_value"))
 
@@ -166,6 +179,19 @@ def _as_shipment(draft: dict) -> SimpleNamespace:
     # Shipment.cargo는 cargos[0]을 주는 속성입니다. 임시 객체에는 그냥 붙입니다.
     stand_in.cargo = cargos[0]
     return stand_in
+
+
+def _line(item: dict) -> dict:
+    """품목 한 줄. 상자 크기가 있으면 부피·중량까지, 없으면 송장 칸만."""
+
+    if has_box(item):
+        return calculate_cargo_lines([item], strict=False)["lines"][0]
+    line = validate_commercial_line(item)
+    line["product_description"] = str(item.get("product_description") or "").strip()[:300]
+    for key in ("length_cm", "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg",
+                "total_cbm", "total_weight_kg", "container_type", "container_quantity"):
+        line.setdefault(key, None)
+    return line
 
 
 def _number(value):
@@ -233,12 +259,24 @@ def _draft_numbers(draft: dict) -> dict:
 def _extras(draft: dict) -> dict:
     """서식에만 있고 Shipment에는 자리가 없는 칸. 적어 주신 대로 씁니다."""
 
+    # shipment_time은 견적송장 ⑬입니다. 오퍼시트의 "Within 30 days after L/C"는
+    # 스케줄이 아니라 계약 조건이라, 적혀 있으면 "미정" 대신 그 문구를 씁니다.
     names = ("buyer", "lc_no", "other_references", "payment_terms", "shipping_marks",
-             "remarks", "bank_info", "po_no", "validity_date", "signed_by",
+             "remarks", "bank_info", "po_no", "validity_date", "signed_by", "shipment_time",
              "accepted_by", "consignee_city_zip", "attention", "customer_order_no",
-             "date_ordered", "container_no", "comments", "packed_by", "invoice_no")
-    return {name: str(draft.get(name) or "").strip()
-            for name in names if str(draft.get(name) or "").strip()}
+             "date_ordered", "container_no", "comments", "packed_by", "invoice_no",
+             "booking_no", "container_seal_no")
+    extras = {name: str(draft.get(name) or "").strip()
+              for name in names if str(draft.get(name) or "").strip()}
+    # 가격 조건은 장소와 함께 적는 것이 맞습니다. "FOB" 대신 "FOB BUSAN".
+    code = str(draft.get("incoterms") or "").strip().upper()
+    place = str(draft.get("incoterms_place") or "").strip()
+    if code and place:
+        extras["incoterms"] = f"{code} {place}"
+    # 선적의뢰서의 컨테이너 칸. 올린 B/L에서 읽은 컨테이너 번호가 있으면 씁니다.
+    if "container_seal_no" not in extras and extras.get("container_no"):
+        extras["container_seal_no"] = extras["container_no"]
+    return extras
 
 
 def _items(kind: str, stand_in) -> list[dict]:
@@ -247,14 +285,24 @@ def _items(kind: str, stand_in) -> list[dict]:
     if kind != "packing_list_std":
         return document_service.build_items(stand_in, kind)
 
+    from app.validators.cargo_validator import PACKAGE_UNITS
+
     rows = []
     for cargo in stand_in.cargos:
-        packages = f"{cargo.quantity or 0:,} {cargo.package_type or ''}".strip()
+        # 상업송장과 같은 단위 약어(CTN·PLT…)로 찍습니다. 두 서류의 포장 표기가 달라 보이면
+        # 세관이 같은 화물인지 다시 묻습니다. 포장 개수를 모르면 "0 CTN"이 아니라 비웁니다.
+        packages = document_service.packages_text(cargo)
+        # ⑬은 "수량 또는 순중량"입니다. 낱개로 값을 매겼으면 그 수량을 먼저 적어
+        # 송장의 수량(2,000 PCS)과 포장명세서가 같은 숫자를 말하게 합니다.
+        amount_line = _kg(cargo.net_weight_kg)
+        if document_service.priced_by_units(cargo):
+            counted = f"{document_service.count_text(cargo.unit_quantity)} {cargo.price_unit}"
+            amount_line = " / ".join(part for part in (counted, amount_line) if part)
         rows.append({
             "shipping_marks": "",
             "packages": packages,
             "description": cargo.product_description or "",
-            "net_weight": _kg(cargo.net_weight_kg),
+            "net_weight": amount_line,
             "total_weight": _kg(cargo.total_weight_kg),
             "measurement": f"{cargo.total_cbm:,.3f} CBM" if cargo.total_cbm else "",
         })
@@ -265,11 +313,82 @@ def _kg(value) -> str:
     return f"{value:,.2f} KG" if value else ""
 
 
-def preview(kind: str, draft: dict) -> str:
+def with_private(draft: dict, private: dict | None) -> dict:
+    """은행 정보·바이어 주소·연락처를 그림을 그리는 순간에만 합칩니다. 저장하지 않습니다.
+
+    이 값들은 이용자 브라우저에만 있다가, 미리보기(가려서)나 PDF(그대로)를
+    만들 때만 서버를 지나갑니다. 미리보기와 PDF가 같은 방식으로 합치도록
+    한 곳에 둡니다.
+
+    연락처는 바이어 주소 아랫줄에 붙입니다. 견적송장·상업송장·포장명세서에는
+    연락처 칸이 따로 없어, 그렇게 하지 않으면 PDF 어디에도 찍히지 않습니다.
+    """
+
+    merged = dict(draft or {})
+    private = private if isinstance(private, dict) else {}
+    bank = str(private.get("bank_info") or "").strip()[:500]
+    address = str(private.get("buyer_address") or "").strip()[:500]
+    contact = str(private.get("buyer_contact") or "").strip()[:200]
+    if bank:
+        merged["bank_info"] = bank
+    if address or contact:
+        merged["buyer_address"] = "\n".join(part for part in (
+            address or str(merged.get("buyer_address") or "").strip(), contact) if part)
+    if contact:
+        merged["buyer_email"] = contact
+    return merged
+
+
+# 미리보기에서 가리는 칸. 은행 정보와 바이어(이름·주소·연락처)입니다.
+# 끝자리만 보이는 식이 아니라 전부 덮습니다. PDF에는 원래 값이 들어갑니다.
+MASKED_FIELDS = ("bank_info", "consignee", "consignee_address", "attention", "buyer",
+                 "notify_party", "consignee_city_zip")
+
+# 빈 칸을 어디서 채우는지. 여기 없는 칸은 서류 작성 화면에서 채웁니다.
+FROM_PLANNING = {"etd", "eta", "vessel_or_flight", "carrier", "pol", "pod", "final_destination",
+                 "incoterms", "currency", "gross_weight_kg", "net_weight_kg", "total_cbm",
+                 "date_shipped", "shipped_via", "equipment", "freight_term", "shipment_time",
+                 "carriage_by", "invoice_value"}
+ITEM_FROM_PLANNING = {"packages", "total_weight", "measurement", "net_weight", "unit_weight",
+                      "shipped", "quantity"}
+PLANNING_HINT = "운송 계획에서 입력하면 채워집니다"
+DOCUMENT_HINT = "서류 작성에서 입력하면 채워집니다"
+
+
+def _mark_for_preview(data: dict, *, masked: bool, hints: bool) -> dict:
+    """미리보기용 사본. 가릴 칸은 가리고, 빈 칸에는 어디서 채우는지 적습니다."""
+
+    from app.processors import document_form
+
+    shown = dict(data)
+    for name, value in data.items():
+        if name == "items":
+            continue
+        text = str(value or "").strip()
+        if masked and name in MASKED_FIELDS and text:
+            shown[name] = document_form.MASKED
+        elif hints and text == UNDECIDED:
+            shown[name] = document_form.HINT + PLANNING_HINT
+        elif hints and not text:
+            where = PLANNING_HINT if name in FROM_PLANNING else DOCUMENT_HINT
+            shown[name] = document_form.HINT + where
+    if hints:
+        shown["items"] = [
+            {key: (value if str(value or "").strip() else document_form.HINT + (
+                "운송 계획에서" if key in ITEM_FROM_PLANNING else "서류 작성에서"))
+             for key, value in row.items()}
+            for row in data.get("items") or []]
+    return shown
+
+
+def preview(kind: str, draft: dict, *, masked: bool = False, hints: bool = False) -> str:
     """대화창에 바로 붙일 수 있는 그림 한 장. data URI로 돌려줍니다.
 
     파일로 저장하지 않습니다. 초안은 아직 확정이 아니라 서버에 남길
     이유가 없고, 남기면 누가 언제 지울지가 또 일이 됩니다.
+
+    masked=True면 은행·바이어 정보를 덮고, hints=True면 빈 칸에 어디서
+    채우는지 빨간 글씨로 적습니다. 둘 다 그림에만 있고 PDF에는 없습니다.
     """
 
     import base64
@@ -277,7 +396,8 @@ def preview(kind: str, draft: dict) -> str:
     from app.processors import document_form
 
     rendered = render(kind, draft)
-    page = document_form.draw_form(kind, rendered["data"], rendered["columns"])
+    data = _mark_for_preview(rendered["data"], masked=masked, hints=hints)
+    page = document_form.draw_form(kind, data, rendered["columns"])
     png = document_form.as_png(document_form.crop_to_content(page))
     return "data:image/png;base64," + base64.b64encode(png).decode()
 
@@ -298,7 +418,79 @@ def file_name(kind: str) -> str:
     return {"commercial_invoice": "commercial_invoice",
             "packing_list": "packing_list",
             "packing_list_std": "packing_list",
-            "proforma_invoice": "proforma_invoice"}.get(kind, kind) + "_draft.pdf"
+            "proforma_invoice": "proforma_invoice",
+            "shipping_instruction": "shipping_request"}.get(kind, kind) + "_draft.pdf"
+
+
+# --- 미리보기에서 고친 값으로 다시 그리기 -----------------------------------------------
+# 검토 창에서 사람이 칸을 고치면, draft가 아니라 **고친 서류 값 그대로** 그립니다.
+# 고친 값을 draft로 되돌려 다시 계산하면 사람이 고친 글자가 계산 값으로 덮입니다.
+
+def as_text(data: dict) -> dict:
+    """그려질 모양 그대로의 글자로. 검토 창의 칸에 넣는 값입니다.
+
+    draw_form은 칸 값을 str()로, 품목 표 숫자를 천 단위 쉼표로 찍습니다.
+    검토 창이 같은 글자를 보여 줘야 고치지 않은 칸이 다시 그려도 똑같습니다.
+    """
+
+    text = {key: ("" if value is None else str(value))
+            for key, value in data.items() if key != "items"}
+    text["items"] = [
+        {key: (f"{value:,}" if isinstance(value, (int, float)) and not isinstance(value, bool)
+               else ("" if value is None else str(value)))
+         for key, value in row.items()}
+        for row in data.get("items") or []]
+    return text
+
+
+def clean_data(kind: str, data) -> dict:
+    """화면이 보낸 서류 값. 이 서식의 칸과 품목 표 열만 받고, 길이를 자릅니다."""
+
+    _require_form(kind)
+    if not isinstance(data, dict):
+        raise ValidationError("서류 내용을 읽지 못했습니다.", "data")
+    cleaned = {name: str(data.get(name) if data.get(name) is not None else "")[:MAX_FIELD_CHARS]
+               for name in fields_for(kind)}
+    keys = [column["key"] for column in item_columns(kind)]
+    rows = data.get("items") if isinstance(data.get("items"), list) else []
+    cleaned["items"] = [
+        {key: str(row.get(key) if row.get(key) is not None else "")[:MAX_CELL_CHARS] for key in keys}
+        for row in rows[:MAX_ITEM_ROWS] if isinstance(row, dict)]
+    return cleaned
+
+
+def _page(kind: str, data) -> "object":
+    from app.processors import document_form
+
+    return document_form.draw_form(kind, clean_data(kind, data), item_columns(kind))
+
+
+def preview_data(kind: str, data) -> str:
+    """고친 값으로 그린 미리보기 그림 (data URI)."""
+
+    import base64
+
+    from app.processors import document_form
+
+    png = document_form.as_png(document_form.crop_to_content(_page(kind, data)))
+    return "data:image/png;base64," + base64.b64encode(png).decode()
+
+
+def pdf_documents(documents) -> bytes:
+    """검토를 마친 서류들을 한 PDF로. 서류마다 A4 한 쪽입니다."""
+
+    from app.processors import document_form
+
+    if not isinstance(documents, list) or not documents:
+        raise ValidationError("내려받을 서류를 골라 주세요.", "documents")
+    if len(documents) > len(FORMS):
+        raise ValidationError("서류가 너무 많습니다.", "documents")
+    pages = []
+    for row in documents:
+        if not isinstance(row, dict):
+            raise ValidationError("서류 내용을 읽지 못했습니다.", "documents")
+        pages.append(_page(str(row.get("kind") or ""), row.get("data")))
+    return document_form.as_pdf_pages(pages)
 
 
 def _missing(kind: str, data: dict) -> list[dict]:

@@ -18,6 +18,10 @@
   const hintEl = document.querySelector("[data-home-hint]");
   const logEl = document.querySelector("[data-home-log]");
   const centerEl = document.querySelector("[data-home-center]");
+  const uploadInput = window.ForwardusDocUpload && config.attachUrl
+    ? stage.querySelector("[data-home-upload]") : null;
+  const plusButton = stage.querySelector("[data-home-plus]");
+  const attachTray = stage.querySelector("[data-home-attach]");
 
   let current = config.actions[0];
 
@@ -31,16 +35,47 @@
   // 대화하는 동안에는 고래 상담창을 숨깁니다. 같은 대화가 가운데에 크게
   // 떠 있어 두 벌로 보일 이유가 없습니다. 첫 화면으로 돌아오면 다시 보입니다.
   function startTalking() {
+    if (centerEl.classList.contains("talking")) return;
     centerEl.classList.add("talking");
     document.body.classList.add("home_talking");
+    syncComposerSpace();
   }
+
+  /* ----- 아래에 붙은 적는 칸만큼 대화 아래를 비워 두기 -----
+     적는 칸 덩어리(탭 줄 + 적는 칸)는 화면 아래에 고정됩니다. 높이가 늘 같지 않아서
+     (파일 칩, 여러 줄 입력) 실제 높이를 재어 CSS 변수로 넘깁니다. 고정값을 두면
+     덩어리가 커질 때 마지막 답의 출처·각주가 그 뒤로 가려집니다. (home.css의 --composer_h) */
+  const composerEl = document.querySelector("[data-home-composer]");
+  let composerHeight = 0;
+
+  function atBottom() {
+    const doc = document.documentElement;
+    return window.innerHeight + window.scrollY >= doc.scrollHeight - 48;
+  }
+
+  function syncComposerSpace() {
+    if (!composerEl || !centerEl.classList.contains("talking")) return;
+    const height = Math.ceil(composerEl.getBoundingClientRect().height);
+    if (height === composerHeight) return;
+    // 맨 아래를 보고 있었으면 덩어리가 커져도 계속 맨 아래가 보이게 따라 내립니다.
+    const follow = composerHeight && atBottom();
+    composerHeight = height;
+    document.documentElement.style.setProperty("--composer_h", `${height}px`);
+    if (follow) window.scrollTo(0, document.documentElement.scrollHeight);
+  }
+
+  if (composerEl && "ResizeObserver" in window) {
+    new ResizeObserver(syncComposerSpace).observe(composerEl);
+  }
+  window.addEventListener("resize", syncComposerSpace);
 
   /* ----- 무엇에 대해 이야기할지 ----- */
   function showAction(action, { greet = false } = {}) {
     current = action;
-    input.placeholder = action.placeholder;
+    setPlaceholder();
     hintEl.innerHTML = action.hint;
     // 칸을 채우는 단추는 성격이 달라 맨 앞에 따로 둡니다.
+    // (서류 올리기는 칩이 아니라 적는 칸 왼쪽 아래 + 단추, HS CODE 조회는 탭 줄 오른쪽 끝입니다)
     const fill = action.fill_label
       ? `<button type="button" class="chip_fill" data-home-fill>${escapeHtml(action.fill_label)}</button>`
       : "";
@@ -71,18 +106,32 @@
     chat.replaceGreeting({ text: action.opener, mode: action.key }, SOURCE);
   }
 
+  // 탭을 고릅니다. 서류를 올리면 사람이 누르지 않아도 서류 작성으로 넘어갑니다(greet 없이).
+  function selectMode(key, { greet = true } = {}) {
+    document.querySelectorAll("[data-home-action]").forEach((other) => {
+      const on = other.dataset.homeAction === key;
+      other.classList.toggle("active", on);
+      other.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    const picked = config.actions.find((a) => a.key === key);
+    showAction(picked || config.actions[0], { greet });
+  }
+
   document.querySelectorAll("[data-home-action]").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll("[data-home-action]").forEach((other) => {
-        const on = other === button;
-        other.classList.toggle("active", on);
-        other.setAttribute("aria-selected", on ? "true" : "false");
-      });
-      const picked = config.actions.find((a) => a.key === button.dataset.homeAction);
-      showAction(picked || config.actions[0], { greet: true });
+      selectMode(button.dataset.homeAction);
       input.focus();
     });
   });
+
+  // 탭 줄 오른쪽 끝의 HS CODE 조회. 모드를 바꾸지 않고 간편 검색 창만 띄웁니다.
+  // 상담이나 올린 서류에서 알게 된 품명이 있으면 그걸로 바로 찾습니다. (hs_modal.js가 기억)
+  const hsOpen = document.querySelector("[data-home-hs-open]");
+  if (hsOpen && window.ForwardusHsModal) {
+    hsOpen.addEventListener("click", () => window.ForwardusHsModal.open({ query: guessHsQuery() }));
+  } else if (hsOpen) {
+    hsOpen.hidden = true;
+  }
 
   // 눌렀다는 것이 보여야 합니다. 값은 적는 칸으로 들어가는데 단추 쪽에
   // 아무 변화가 없으면, 눌린 건지 아닌지 몰라 또 누르게 됩니다.
@@ -181,7 +230,99 @@
 
   /* ----- 답변 그리기 -----
      서식을 살리는 방법은 고래 상담창과 같아야 해서 chat_store.js에 둡니다. */
-  const renderAnswer = (text) => chat.render(text);
+
+  // 📄·🔎로 시작하는 링크는 "ForwardUs 액션 버튼"입니다. 글 속 링크가 아니라 단추로 보이게 합니다.
+  function actionClass(label) {
+    return /^\s*(📄|🔎|📑|📦)/u.test(label) ? ' class="answer_action"' : "";
+  }
+
+  function inline(escaped) {
+    return escaped
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      // {{ }}로 감싼 것은 빨갛게. 꼭 있어야 하는 칸과 운송 계획에서
+      // 정해지는 칸을 눈에 띄게 하려는 표시입니다.
+      .replace(/\{\{(.+?)\}\}/g, '<em class="need">$1</em>')
+      // [글](주소). 주소는 http(s)만 받습니다. javascript: 같은 것이
+      // 들어오면 링크로 만들지 않고 글자 그대로 둡니다.
+      .replace(/\[([^\]]+)\]\((https?:&#x2F;&#x2F;[^)\s]+|https?:\/\/[^)\s]+)\)/g,
+        (whole, label, url) => {
+          const clean = url.replace(/&#x2F;/g, "/");
+          return `<a href="${clean}" target="_blank" rel="noopener">${label}</a>`;
+        })
+      // [글](/documents/new) 같은 우리 화면 주소. "/"로 시작하는 것만 받고
+      // "//"(다른 사이트로 가는 주소)는 막습니다. 같은 탭에서 엽니다.
+      .replace(/\[([^\]]+)\]\(((?:&#x2F;|\/)(?!&#x2F;|\/)[^)\s]*)\)/g,
+        (whole, label, url) => `<a href="${url.replace(/&#x2F;/g, "/")}"${actionClass(label)}>${label}</a>`)
+      // [HS CODE 조회](#hs:립스틱). 화면을 옮기지 않고 간편 검색 창을 띄웁니다. (hs_modal.js)
+      // 품명은 이미 escape된 글자라 속성에 그대로 넣어도 됩니다.
+      .replace(/\[([^\]]+)\]\(#hs(?::([^)]*))?\)/g, (whole, label, query = "") =>
+        `<a href="#hs" class="hs_link${actionClass(label) ? " answer_action" : ""}" data-hs-open`
+        + ` data-hs-query="${query.trim()}">${label}</a>`)
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+
+  function renderAnswer(text) {
+    // escapeHtml을 먼저 한 번만 겁니다. 이후로는 우리가 넣는 태그만 살아 있습니다.
+    return escapeHtml(text).split(/\n{2,}/).map((block) => {
+      const lines = block.split("\n").filter((line) => line.trim());
+      if (!lines.length) return "";
+      // | 표 | — 데이터 브리핑의 국가별 수출액 비교. 제목 줄 앞에 설명 줄이 붙어 와도 표로 그립니다.
+      const tableAt = lines.findIndex((line, i) => /^\s*\|/.test(line)
+        && lines[i + 1] && /^\s*\|?\s*:?-{3,}/.test(lines[i + 1]));
+      if (tableAt >= 0) {
+        const before = lines.slice(0, tableAt);
+        const rows = [];
+        let end = tableAt;
+        while (end < lines.length && /^\s*\|/.test(lines[end])) rows.push(lines[end++]);
+        const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "")
+          .split("|").map((cell) => cell.trim());
+        const head = cells(rows[0]);
+        // 둘째 줄(|:---:|---:|)이 칸 정렬입니다. K-stat 표처럼 순위·코드는 가운데, 금액은 오른쪽.
+        const aligns = cells(rows[1]).map((cell) => (/^:-+:$/.test(cell) ? "center"
+          : /^-+:$/.test(cell) ? "right" : /^:-+$/.test(cell) ? "left" : ""));
+        // 정렬을 안 적었으면 금액·증감률 칸은 오른쪽으로 맞춥니다. 자릿수를 눈으로 견주기 쉽습니다.
+        const numeric = (text) => /^[+\-−]?\d[\d,]*(\.\d+)?\s*(%|달러|억|만|천불)?$/.test(text)
+          || (/^[+\-−]?[\d,.]+/.test(text) && /(달러|%|억|만)/.test(text));
+        const cellClass = (text, i) => {
+          const names = [];
+          if (aligns[i]) names.push(`al_${aligns[i]}`);
+          else if (numeric(text)) names.push("num");
+          // 증감률은 오르면 파랑, 내리면 빨강. 표를 훑을 때 방향이 먼저 보이게 합니다.
+          if (/^\+\d[\d,.]*%$/.test(text)) names.push("up");
+          else if (/^[-−]\d[\d,.]*%$/.test(text)) names.push("down");
+          return names.length ? ` class="${names.join(" ")}"` : "";
+        };
+        const body = rows.slice(2).map((line) => {
+          const row = cells(line);
+          // 합계 줄은 굵게. (**합계**처럼 적어 옵니다)
+          const total = row.some((cell) => /^\*\*(합계|총계|계)\*\*$/.test(cell));
+          return `<tr${total ? ' class="total"' : ""}>${row.map((cell, i) =>
+            `<td${cellClass(cell, i)}>${inline(cell)}</td>`).join("")}</tr>`;
+        }).join("");
+        const table = `<div class="answer_table_wrap"><table class="answer_table"><thead><tr>${
+          head.map((cell, i) => `<th${aligns[i] ? ` class="al_${aligns[i]}"` : ""}>${inline(cell)}</th>`)
+            .join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
+        const after = lines.slice(end);
+        return (before.length ? `<p>${before.map(inline).join("<br>")}</p>` : "")
+          + table + (after.length ? `<p>${after.map(inline).join("<br>")}</p>` : "");
+      }
+      // 한 덩어리가 전부 목록이면 목록으로, 아니면 문단으로 그립니다.
+      if (lines.every((line) => /^\s*(?:[-*•]|\d+\.)\s+/.test(line))) {
+        const items = lines.map((line) =>
+          `<li>${inline(line.replace(/^\s*(?:[-*•]|\d+\.)\s+/, ""))}</li>`).join("");
+        return /^\s*\d+\./.test(lines[0]) ? `<ol>${items}</ol>` : `<ul>${items}</ul>`;
+      }
+      // "> " 인용. escape 뒤라 ">"는 "&gt;"로 들어옵니다.
+      if (lines.every((line) => /^\s*&gt;\s?/.test(line))) {
+        return `<blockquote>${lines.map((line) =>
+          inline(line.replace(/^\s*&gt;\s?/, ""))).join("<br>")}</blockquote>`;
+      }
+      if (lines.length === 1 && /^#{1,4}\s+/.test(lines[0])) {
+        return `<h4>${inline(lines[0].replace(/^#{1,4}\s+/, ""))}</h4>`;
+      }
+      return `<p>${lines.map(inline).join("<br>")}</p>`;
+    }).join("");
+  }
 
   function say(kind, text, { restoring = false } = {}) {
     const row = document.createElement("div");
@@ -212,7 +353,13 @@
     const waiting = say("bot wait", "답을 찾고 있습니다…");
     sendButton.disabled = true;
 
-    const response = await postJson(config.chatUrl, { question, history });
+    // 수출 실적·결제 통계를 물으면 서버가 관세청·무역보험공사 API를 부른 뒤 답합니다.
+    // 몇 번 왕복하므로 기본 20초로는 모자랍니다.
+    const slow = setTimeout(() => {
+      waiting.textContent = "관세청·무역보험공사 데이터를 조회해 분석하고 있습니다…";
+    }, 4000);
+    const response = await postJson(config.chatUrl, { question, history }, 120000);
+    clearTimeout(slow);
     sendButton.disabled = false;
     waiting.remove();
 
@@ -221,8 +368,389 @@
       return;
     }
     const answer = response.data.answer;
-    say("bot", answer);
+    const row = say("bot", answer);
     record("assistant", answer);
+    // 어떤 공공데이터로 답했는지 답 아래에 남깁니다. 숫자의 근거를 사람이 볼 수 있어야 합니다.
+    if ((response.data.sources || []).length) {
+      const note = document.createElement("p");
+      note.className = "answer_sources";
+      note.textContent = `📊 실데이터 조회: ${response.data.sources.join(" · ")} (공공데이터포털)`;
+      // 조회 기간·HS 범위·등급의 성격. AI가 본문에서 빠뜨려도 여기엔 늘 남습니다.
+      (response.data.basis || []).forEach((line) => {
+        const item = document.createElement("small");
+        item.textContent = line;
+        note.appendChild(item);
+      });
+      row.appendChild(note);
+    }
+    rememberHsQueries(answer);
+  }
+
+  /* ----- HS CODE 간편 검색 -----
+     상담 답변에 [HS CODE 조회](#hs:품명)이 있으면 그 품명을 기억해 둡니다.
+     "HS CODE 조회" 단추를 누르면 그 품명으로 바로 찾습니다. */
+  function rememberHsQueries(answer) {
+    if (!window.ForwardusHsModal) return;
+    const found = Array.from(String(answer).matchAll(/\]\(#hs:([^)]+)\)/g), (m) => m[1].trim());
+    // 마지막에 나온 것이 지금 이야기하는 품목일 가능성이 큽니다.
+    window.ForwardusHsModal.remember(found.reverse());
+  }
+
+  // 적는 칸에 뭔가 적혀 있으면 그것부터, 없으면 기억해 둔 품명(hs_modal.js가 고릅니다).
+  function guessHsQuery() {
+    const text = input.value.trim();
+    return text.length >= 2 && text.length <= 60 && !text.includes("\n") ? text : "";
+  }
+
+  /* ----- 파일 붙이기 (세 탭 공통) -----
+     + 로 고르거나 끌어다 놓으면 바로 보내지 않고 적는 칸 위에 칩으로 보여 줍니다.
+     "이거 기반으로 인보이스 써줘"처럼 할 말을 함께 적어 보내면 서버(/api/attach)가
+     1) 어떤 서류인지 알아보고 2) 서류를 만들어 달라는 말이면 서류 작성 흐름을 시작합니다.
+     그 말을 무역 상담 탭에서 했으면 탭을 서류 작성으로 옮깁니다. */
+  let attached = null;       // { file, url } — 칩에 보이는 파일
+  let lastDoc = null;        // 마지막으로 읽은 서류. 나중에 "이걸로 서류 만들어줘"라고 해도 씁니다.
+
+  function setPlaceholder() {
+    input.placeholder = attached
+      ? "이 서류로 무엇을 할까요? (예: 이거 기반으로 인보이스 써줘 / 이 B/L에서 확인할 것은?)"
+      : current.placeholder;
+  }
+
+  function formatSize(bytes) {
+    return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
+      : `${Math.max(1, Math.round(bytes / 1024))}KB`;
+  }
+
+  function isImage(file) {
+    return /^image\//.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name);
+  }
+
+  // 파일 칩. 그림이면 썸네일, PDF면 문서 표시. 보낸 말에도 같은 모양으로 남깁니다.
+  function fileChipHtml(file, url, { removable = false } = {}) {
+    const thumb = url
+      ? `<img class="attach_thumb" src="${url}" alt="">`
+      : `<span class="attach_thumb is_pdf" aria-hidden="true">PDF</span>`;
+    const remove = removable
+      ? `<button type="button" class="attach_remove" data-attach-remove aria-label="첨부 삭제">×</button>` : "";
+    return `<span class="attach_chip">${thumb}<span class="attach_meta">`
+      + `<b title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</b>`
+      + `<small>${escapeHtml(formatSize(file.size))}</small></span>${remove}</span>`;
+  }
+
+  function attach(file) {
+    const reason = window.ForwardusDocUpload.problem(file);
+    if (reason) { say("bad", reason); return; }
+    clearAttachment();
+    attached = { file, url: isImage(file) ? URL.createObjectURL(file) : "" };
+    attachTray.innerHTML = fileChipHtml(file, attached.url, { removable: true });
+    attachTray.hidden = false;
+    setPlaceholder();
+    resize();
+    input.focus();
+  }
+
+  // keepUrl: 보낸 말의 칩이 같은 썸네일을 쓰므로 그때는 풀지 않습니다.
+  function clearAttachment({ keepUrl = false } = {}) {
+    if (attached && attached.url && !keepUrl) URL.revokeObjectURL(attached.url);
+    attached = null;
+    attachTray.innerHTML = "";
+    attachTray.hidden = true;
+    if (uploadInput) uploadInput.value = "";
+    setPlaceholder();
+  }
+
+  function sayMine(text, file, url) {
+    const row = say("me", "");
+    row.innerHTML = fileChipHtml(file, url)
+      + (text ? `<span class="me_text">${escapeHtml(text)}</span>` : "");
+    return row;
+  }
+
+  function busy(on) {
+    sendButton.disabled = on;
+    if (plusButton) plusButton.disabled = on;
+    sendButton.classList.toggle("working", on);
+  }
+
+  // 탭을 사람이 누르지 않아도 옮깁니다. 옮겼다는 것을 반드시 말합니다. 조용히 바뀌면 헷갈립니다.
+  function goDocuments(reason) {
+    if (current.key === "documents") return;
+    const from = current.label;
+    selectMode("documents", { greet: false });
+    const tab = document.querySelector('[data-home-action="documents"]');
+    if (tab) flash(tab);
+    say("note", `${reason ? reason + " " : ""}[${from}] → [서류 작성] 탭으로 옮겨 이어서 진행합니다.`);
+  }
+
+  async function sendAttachment(text) {
+    const { file, url } = attached;
+    clearAttachment({ keepUrl: true });
+    sayMine(text, file, url);
+    const waiting = say("bot wait", "첨부하신 서류가 어떤 서류인지 살펴보고 있습니다… "
+      + "그림으로 된 서류는 30초쯤 걸립니다.");
+    busy(true);
+
+    const body = new FormData();
+    body.append("file", file, file.name);
+    body.append("message", text);
+    body.append("mode", current.key);
+    body.append("history", JSON.stringify(chat.history().slice(-8)));
+    const response = await window.Forwardus.postForm(config.attachUrl, body, 180000);
+    busy(false);
+    waiting.remove();
+
+    if (!response.success) {
+      say("bad", response.message || "서류를 읽지 못했습니다.");
+      return;
+    }
+    const data = response.data;
+    lastDoc = data.document;
+    // 서류 작성 화면으로 넘어가도 이어 쓸 수 있게 놓아 둡니다. (HS 간편 검색 품명도)
+    window.ForwardusDocUpload.stash(data.document);
+    say("bot", data.recognized);
+    const card = say("bot", "");
+    card.innerHTML = window.ForwardusDocUpload.resultHtml(data.document);
+
+    if (data.route === "documents") {
+      goDocuments(text ? "서류 작성을 요청하셔서" : "");
+      beginPipeline(data.pipeline, data.document.document_label);
+      return;
+    }
+    if (data.answer) {
+      say("bot", data.answer);
+      record("user", data.question || text || file.name);
+      record("assistant", data.answer);
+      rememberHsQueries(data.answer);
+    } else if (data.answer_error) {
+      say("bad", data.answer_error);
+    }
+    offerMake(data.document);
+  }
+
+  // 상담 탭에서 올렸으면 서류로 만들지 묻는 단추를 둡니다. 말로 "서류 만들어줘"라고 해도 됩니다.
+  function offerMake(documentData) {
+    const row = say("bot", "");
+    row.innerHTML = `<div class="draft_actions">
+        <button type="button" class="button primary" data-offer-make>📄 이 서류로 서류 만들기</button>
+        <span class="muted small">"이거 기반으로 인보이스 써줘"처럼 말씀하셔도 됩니다.</span></div>`;
+    row.querySelector("[data-offer-make]").addEventListener("click", (event) => {
+      event.currentTarget.disabled = true;
+      goDocuments("");
+      startPipeline(documentData, []);
+    });
+  }
+
+  /* ----- 올린 서류로 서류 만들기 -----
+     읽은 값 → 빠진 필수 정보 묻기 → 채팅으로 받아 합치기 → 고른 서류만 만들기 → 검토 창.
+     무엇이 필수이고 무엇이 빠졌는지는 서버(document_pipeline_service)가 정합니다.
+     초안은 브라우저가 들고 다닙니다. 서버는 상태를 갖지 않습니다. */
+  let pipe = null;
+
+  const pipelineUrl = (step) => config.pipelineUrl.replace("__STEP__", step);
+
+  function beginPipeline(state, label) {
+    // 새 서류를 올리면 앞의 고르기 칸은 치웁니다. 두 개가 남으면 어느 것이 지금 것인지 헷갈립니다.
+    if (pipe && pipe.card) pipe.card.remove();
+    pipe = { ...state, card: null, label };
+    say("bot", pipe.reply);
+    renderPickCard();
+  }
+
+  async function startPipeline(extracted, kinds) {
+    const response = await postJson(pipelineUrl("start"), {
+      form: extracted.form, document_label: extracted.document_label, kinds }, 30000);
+    if (!response.success) { say("bad", response.message); return; }
+    beginPipeline(response.data, extracted.document_label);
+  }
+
+  // 앞서 올린 서류가 있을 때 상담·운송 탭에서 적은 말. 서류를 만들어 달라는 말이면
+  // 서류 작성 탭으로 옮겨 그 서류로 시작합니다. 아니면 평소처럼 상담으로 답합니다.
+  async function routeWithLastDoc(text) {
+    const response = await postJson(pipelineUrl("intent"), { message: text }, 10000);
+    if (!response.success || !response.data.make) {
+      if (current.key === "documents") askAgent(text); else askSupport(text);
+      return;
+    }
+    const kinds = response.data.kinds;
+    say("me", text);
+    goDocuments("서류 작성을 요청하셔서");
+    if (pipe) {
+      // 이미 진행 중이면 처음부터 다시 읽지 않습니다. 채팅으로 채운 값이 남아야 합니다.
+      // 짚어 말한 서류가 있으면 고르기만 그 서류로 바꿉니다.
+      if (kinds.length) pipe.kinds = kinds;
+      if (pipe.card) { pipe.card.remove(); pipe.card = null; }
+      say("bot", "진행 중이던 서류 작성을 이어 갑니다. 아래에서 만들 서류를 확인해 주세요.");
+      renderPickCard();
+      return;
+    }
+    say("bot", `앞서 올려 주신 **${lastDoc.document_label}**을(를) 바탕으로 진행합니다.`);
+    startPipeline(lastDoc, kinds);
+  }
+
+  async function mergePipe(message) {
+    say("me", message);
+    const waiting = say("bot wait", "적어 주신 내용을 기존 서류 값과 합치는 중입니다…");
+    sendButton.disabled = true;
+    const response = await postJson(pipelineUrl("merge"),
+      // asked: 방금 물어본 목록. 사람이 번호로 답하면 서버가 이 순서로 읽습니다.
+      { draft: pipe.draft, kinds: pickedKinds(), message,
+        asked: (pipe.missing || []).map((row) => row.key) }, 60000);
+    sendButton.disabled = false;
+    waiting.remove();
+    if (!response.success) { say("bad", response.message); return; }
+    Object.assign(pipe, response.data);
+    say("bot", pipe.reply);
+    (pipe.notes || []).forEach((note) => say("bad", note));
+    renderPickCard();
+  }
+
+  function pickedKinds() {
+    if (!pipe || !pipe.card) return pipe ? pipe.kinds : [];
+    return Array.from(pipe.card.querySelectorAll("input[data-pick-kind]:checked"),
+      (box) => box.value);
+  }
+
+  // 고른 서류에 필요한데 아직 빠진 것. 체크를 바꿀 때마다 서버에 묻지 않고 거릅니다.
+  // (만들 때 서버가 다시 봅니다)
+  function missingFor(kinds) {
+    return (pipe.missing_all || []).filter((row) => row.kinds.some((kind) => kinds.includes(kind)));
+  }
+
+  // 만들 서류 고르기. 하나만 두고 대화가 이어질 때마다 맨 아래로 옮겨 다시 그립니다.
+  function renderPickCard() {
+    const kinds = pipe.card ? pickedKinds() : pipe.kinds;
+    const card = pipe.card || say("bot", "");
+    card.classList.add("pick_card_row");
+    card.innerHTML = `
+      <div class="pick_card">
+        <p class="pick_title"><b>만들 서류를 고르세요</b>
+          <small>기본은 가장 자주 쓰는 상업송장·포장명세서입니다</small></p>
+        <div class="pick_list">${pipe.options.map((option) => `
+          <label class="pick_opt">
+            <input type="checkbox" data-pick-kind value="${escapeHtml(option.kind)}"
+                   ${kinds.includes(option.kind) ? "checked" : ""}>
+            <span><b>${escapeHtml(option.label)}</b><small>${escapeHtml(option.about)}</small></span>
+          </label>`).join("")}</div>
+        <p class="pick_need" data-pick-need></p>
+        <div class="draft_actions">
+          <button type="button" class="button primary" data-pick-make>선택한 서류 생성하기</button>
+          <a class="button" href="${escapeHtml(config.docFormUrl)}">서류 작성 화면에서 직접 편집</a>
+          <button type="button" class="link_button" data-pick-reset>올린 서류 없이 대화로 새로 만들기</button>
+        </div>
+      </div>`;
+    logEl.appendChild(card);
+    pipe.card = card;
+    updatePickNeed();
+    card.querySelectorAll("input[data-pick-kind]").forEach((box) =>
+      box.addEventListener("change", updatePickNeed));
+    card.querySelector("[data-pick-make]").addEventListener("click", generatePipe);
+    // 이 흐름을 끝냅니다. 이후 서류 작성 모드의 말은 예전처럼 대화로 서류를 만드는 창구로 갑니다.
+    card.querySelector("[data-pick-reset]").addEventListener("click", () => {
+      card.remove();
+      pipe = null;
+      lastDoc = null;
+      say("bot", "올린 서류 흐름을 닫았습니다. 어떤 서류가 필요하신지 말씀해 주세요. "
+        + '(예: "패킹리스트만 만들어줘")');
+      input.focus();
+    });
+    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function updatePickNeed() {
+    const kinds = pickedKinds();
+    const need = pipe.card.querySelector("[data-pick-need]");
+    const make = pipe.card.querySelector("[data-pick-make]");
+    const rows = missingFor(kinds);
+    if (!kinds.length) {
+      need.className = "pick_need bad";
+      need.textContent = "만들 서류를 하나 이상 골라 주세요.";
+    } else if (rows.length) {
+      need.className = "pick_need warn";
+      need.innerHTML = `고르신 서류에 아직 필요한 정보 <b>${rows.length}개</b> · `
+        + rows.map((row) => escapeHtml(row.label)).join(", ")
+        + "<br><small>채팅창에 적어 주시면 기존 값과 합쳐 이어서 진행합니다.</small>";
+    } else {
+      need.className = "pick_need ok";
+      need.textContent = "필요한 정보가 모두 있습니다. 바로 만들 수 있습니다.";
+    }
+    // 빠진 채로 강행하지 않습니다. 빈 칸이 찍힌 송장은 세관·은행에서 되돌아옵니다.
+    make.disabled = !kinds.length || rows.length > 0;
+  }
+
+  async function generatePipe() {
+    const kinds = pickedKinds();
+    const make = pipe.card.querySelector("[data-pick-make]");
+    make.disabled = true;
+    make.textContent = "만드는 중…";
+    const waiting = say("bot wait", "고르신 서류를 서식에 맞춰 그리는 중입니다…");
+    const response = await postJson(pipelineUrl("generate"), { draft: pipe.draft, kinds }, 90000);
+    waiting.remove();
+    make.textContent = "선택한 서류 생성하기";
+    if (!response.success) { say("bad", response.message); updatePickNeed(); return; }
+    const data = response.data;
+    if (data.stage !== "made") {
+      // 서버가 보기에 아직 빠진 것이 있습니다. 다시 묻고 고르기를 이어 갑니다.
+      Object.assign(pipe, data);
+      say("bot", data.reply);
+      renderPickCard();
+      return;
+    }
+    pipe.kinds = kinds;
+    say("bot", data.reply);
+    showMade(data.documents);
+    updatePickNeed();
+  }
+
+  // 만든 서류. 썸네일과 검토 창 여는 단추를 대화에 남깁니다. 닫아도 다시 열 수 있습니다.
+  function showMade(documents) {
+    const row = say("bot", "");
+    row.innerHTML = `
+      <div class="made_docs">${documents.map((doc) => `
+        <figure class="made_doc"><img src="${doc.preview}" alt="${escapeHtml(doc.title)} 초안">
+          <figcaption>${escapeHtml(doc.title.split(" (")[0])}</figcaption></figure>`).join("")}</div>
+      <div class="draft_actions">
+        <button type="button" class="button primary" data-open-review>📑 미리보기 &amp; 검토 · PDF 다운로드</button>
+      </div>`;
+    const openReview = () => openPreview(documents);
+    row.querySelector("[data-open-review]").addEventListener("click", openReview);
+    row.querySelectorAll(".made_doc").forEach((figure) => figure.addEventListener("click", openReview));
+    openReview();
+  }
+
+  function openPreview(documents) {
+    if (!window.ForwardusDocPreview) return;
+    window.ForwardusDocPreview.open(documents,
+      { previewUrl: config.previewUrl, pdfUrl: config.reviewPdfUrl });
+  }
+
+  if (uploadInput && plusButton && attachTray) {
+    plusButton.addEventListener("click", () => uploadInput.click());
+    uploadInput.addEventListener("change", () => {
+      if (uploadInput.files.length) attach(uploadInput.files[0]);
+    });
+    attachTray.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-attach-remove]")) return;
+      clearAttachment();
+      input.focus();
+    });
+    // 적는 칸 덩어리에 끌어다 놓아도 됩니다. 어느 모드에서든 받습니다. (붙이기만 하고 보내지 않습니다)
+    ["dragenter", "dragover"].forEach((type) => stage.addEventListener(type, (event) => {
+      if (!event.dataTransfer || !Array.from(event.dataTransfer.types).includes("Files")) return;
+      event.preventDefault();
+      stage.classList.add("is_over");
+    }));
+    ["dragleave", "dragend"].forEach((type) => stage.addEventListener(type, (event) => {
+      if (!stage.contains(event.relatedTarget)) stage.classList.remove("is_over");
+    }));
+    stage.addEventListener("drop", (event) => {
+      if (!event.dataTransfer || !event.dataTransfer.files.length) return;
+      event.preventDefault();
+      stage.classList.remove("is_over");
+      attach(event.dataTransfer.files[0]);
+    });
+  } else if (plusButton) {
+    // 서류를 읽을 수 없는 화면(잠김 등)에서는 + 를 보이지 않습니다. 눌러도 아무 일이 없으면 안 됩니다.
+    plusButton.hidden = true;
   }
 
   /* ----- 서류 만들기 -----
@@ -280,7 +808,7 @@
         /* 저장 공간이 없으면 링크만 드립니다. */
       }
       data.documents.forEach(showDraft);
-      showNextStep();
+      showNextStep(data.documents);
       // 초안 그림은 커서 대화에 담지 않습니다. 무엇을 만들었는지만 적어 둡니다.
       record("assistant", data.documents.map((doc) => `📄 **${doc.title}** 초안을 만들었습니다.`)
         .join("\n") + "\n\n운송 일정을 넣으면 정식 서류로 만들 수 있습니다.", "note",
@@ -377,13 +905,18 @@
   }
 
   // 다음에 할 일을 한 번만 보여 줍니다. 서류마다 붙이면 같은 단추가 겹칩니다.
-  function showNextStep() {
+  function showNextStep(documents) {
     const row = say("bot", "");
+    // 대화로 만든 초안도 같은 검토 창에서 고치고 PDF로 받습니다.
+    const review = documents && documents.length && documents[0].fields
+      ? `<button type="button" class="button" data-open-review>📑 미리보기 &amp; 검토</button>` : "";
     row.innerHTML = `
       <div class="draft_actions">
+        ${review}
         <a class="button primary" href="${escapeHtml(config.docFormUrl)}">
           운송 일정 넣고 정식 서류 만들기 →</a>
       </div>`;
+    row.querySelector("[data-open-review]")?.addEventListener("click", () => openPreview(documents));
   }
 
   async function downloadPdf(button, data) {
@@ -412,92 +945,83 @@
     button.textContent = label;
   }
 
+  // 다른 스크립트가 같은 대화창에 말을 붙일 수 있게 엽니다.
+  window.ForwardusHome = { say, renderAnswer, startTalking };
+
   /* ----- 보내기 ----- */
   stage.addEventListener("submit", (event) => {
     event.preventDefault();
     const text = input.value.trim();
-    if (!text) {
+    if (sendButton.disabled) return;
+    // 파일을 붙였으면 말이 없어도 보냅니다. 어떤 서류인지부터 알려 드립니다.
+    if (!text && !attached) {
       input.focus();
       return;
     }
     input.value = "";
     resize();
+    if (attached) { sendAttachment(text); return; }
     // 서류 작성에서는 서류를 만드는 창구로, 나머지는 상담으로 보냅니다.
-    if (current.key === "documents") askAgent(text);
+    // 올린 서류로 만들고 있는 중이면, 적은 말은 빠진 정보로 보고 기존 값과 합칩니다.
+    if (current.key === "documents" && pipe) mergePipe(text);
+    else if (lastDoc) routeWithLastDoc(text);
+    else if (current.key === "documents") askAgent(text);
     else askSupport(text);
   });
 
-  /* ----- 환율 계산기 -----
-     송장 금액이 달러인데 원화로 얼마인지는 늘 궁금합니다.
-     환율은 펼칠 때 한 번만 받아 둡니다. */
-  function setupExchange() {
-    const box = document.querySelector("[data-rail-fx]");
-    if (!box) return () => {};
+  /* ----- 왼쪽 사이드바: 아이콘 레일 ↔ 펼침 드로어 -----
+     기본은 접힘(아이콘만 있는 60px 레일)입니다. 맨 위 ☰를 누르면 드로어가 164px로
+     미끄러져 나오며 가운데를 밀지 않고 덮습니다. 상태는 isSidebarExpanded(boolean)로 두고
+     localStorage에 기억해 새로고침·화면 이동 뒤에도 그대로입니다.
+     (그리기 전에 index.html 머리의 짧은 스크립트가 같은 값을 먼저 붙입니다) */
+  const RAIL_KEY = "isSidebarExpanded";
+  const railToggle = document.querySelector("[data-rail-toggle]");
+  const railInner = document.querySelector(".rail_inner");
+  let isSidebarExpanded = document.documentElement.classList.contains("rail_expanded");
 
-    const amountEl = box.querySelector("[data-fx-amount]");
-    const fromEl = box.querySelector("[data-fx-from]");
-    const toEl = box.querySelector("[data-fx-to]");
-    const resultEl = box.querySelector("[data-fx-result]");
-    const basisEl = box.querySelector("[data-fx-basis]");
-    let rates = null;
-
-    function calculate() {
-      const amount = Number(String(amountEl.value).replace(/,/g, ""));
-      const from = rates && rates[fromEl.value];
-      const to = rates && rates[toEl.value];
-      if (!from || !to || !Number.isFinite(amount)) { resultEl.textContent = "—"; return; }
-      // rates는 "그 통화 1단위가 몇 원인지"입니다. 원을 거쳐 환산합니다.
-      resultEl.textContent = ((amount * from) / to).toLocaleString("ko-KR", {
-        maximumFractionDigits: toEl.value === "KRW" ? 0 : 2,
-      });
+  function setSidebarExpanded(expanded, { save = true } = {}) {
+    isSidebarExpanded = expanded;
+    document.documentElement.classList.toggle("rail_expanded", expanded);
+    if (railToggle) {
+      const label = expanded ? "사이드바 닫기" : "사이드바 열기";
+      railToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+      railToggle.setAttribute("aria-label", label);
+      railToggle.dataset.tip = label;
     }
-
-    [amountEl, fromEl, toEl].forEach((el) => {
-      el.addEventListener("input", calculate);
-      el.addEventListener("change", calculate);
-    });
-    box.querySelector("[data-fx-swap]").addEventListener("click", () => {
-      [fromEl.value, toEl.value] = [toEl.value, fromEl.value];
-      calculate();
-    });
-
-    return async function load() {
-      if (rates) return;
-      const response = await getJson(config.ratesUrl);
-      if (!response.success) {
-        basisEl.textContent = "환율을 받지 못했습니다. 잠시 뒤에 다시 열어 주세요.";
-        basisEl.classList.add("is_mock");
-        return;
-      }
-      rates = response.data;
-      fillCurrencies();
-      // 무슨 환율로 계산했는지 함께 보여 줍니다. 관세청이 멈추면 임시 환율로
-      // 떨어지는데, 그걸 모르고 쓰면 금액이 틀립니다.
-      basisEl.textContent = response.basis;
-      basisEl.classList.toggle("is_mock", response.source !== "api");
-      calculate();
-    };
-
-    // 고를 수 있는 통화는 실제로 환율을 받은 것뿐입니다. 없는 통화를
-    // 목록에 두면 골랐을 때 계산이 안 됩니다.
-    function fillCurrencies() {
-      const major = ["USD", "KRW", "EUR", "JPY", "CNY"];
-      const codes = Object.keys(rates).sort((a, b) => {
-        const rank = (code) => (major.indexOf(code) + 1 || 99);
-        return rank(a) - rank(b) || a.localeCompare(b);
-      });
-      [fromEl, toEl].forEach((select) => {
-        const keep = select.value;
-        select.innerHTML = codes.map((code) => `<option value="${code}">${code}</option>`).join("");
-        select.value = codes.includes(keep) ? keep : codes[0];
-      });
+    if (save) {
+      try {
+        window.localStorage.setItem(RAIL_KEY, expanded ? "true" : "false");
+      } catch (error) { /* 저장 공간을 못 쓰면 이 화면에서만 바뀝니다. */ }
     }
   }
 
-  const loadRates = setupExchange();
+  // 드로어가 가운데 내용을 실제로 덮고 있는지. (넓은 화면에서는 가운데가 멀어 덮지 않습니다)
+  function drawerCovers(target) {
+    if (!railInner || !target) return false;
+    return railInner.getBoundingClientRect().right > target.getBoundingClientRect().left;
+  }
+
+  if (railToggle) {
+    setSidebarExpanded(isSidebarExpanded, { save: false });
+    railToggle.addEventListener("click", () => setSidebarExpanded(!isSidebarExpanded));
+    // 드로어가 내용을 덮고 있을 때만, 바깥을 누르면 닫습니다. 덮지 않으면 열어 둔 채 씁니다.
+    document.addEventListener("click", (event) => {
+      if (!isSidebarExpanded || railInner.contains(event.target)) return;
+      if (event.target.closest("[data-fx-modal], [data-hs-modal], [data-dp-modal]")) return;
+      if (drawerCovers(centerEl)) setSidebarExpanded(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && isSidebarExpanded && drawerCovers(centerEl)
+          && !document.querySelector(".fx_modal:not([hidden]), .hs_modal:not([hidden]), .dp_modal:not([hidden])")) {
+        setSidebarExpanded(false);
+        railToggle.focus();
+      }
+    });
+  }
 
   /* ----- 왼쪽 줄에서 옆으로 펼치는 것들 ----- */
-  // 내용이 있는 항목(최근 Shipment, 환율)은 좁은 줄에 넣을 수 없어 옆으로 펼칩니다.
+  // 내용이 있는 항목(최근 Shipment)은 좁은 줄에 넣을 수 없어 옆으로 펼칩니다.
+  // (환율은 옆으로 펼치지 않고 환율 센터 창을 엽니다. fx_center.js)
   const flyouts = Array.from(document.querySelectorAll("[data-rail-flyout]"));
 
   function setFlyout(box, open) {
@@ -510,7 +1034,6 @@
       event.stopPropagation();
       const opening = box.querySelector(".rail_flyout").hidden;
       flyouts.forEach((other) => setFlyout(other, other === box && opening));
-      if (opening && box.dataset.railFx !== undefined) loadRates();
     });
   });
   // 바깥을 누르거나 Esc를 누르면 닫습니다.

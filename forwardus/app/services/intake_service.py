@@ -24,6 +24,7 @@ import json
 from datetime import date
 
 from app.collectors import ai_client, location_client
+from app.processors import bank_redaction
 from app.processors.cost_calculator import INCOTERMS_INFO
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
@@ -203,6 +204,25 @@ def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
 
     result = planning_service.search_locations(text, transport_mode, role)
     rows = result["data"] if result["success"] else []
+    # 서류에는 "Busan, Korea"처럼 나라가 붙어 옵니다. 그대로는 목록에 없으니
+    # 쉼표 앞("Busan")만 다시 찾습니다.
+    if not rows and "," in text:
+        head = text.split(",")[0].strip()
+        if head:
+            again = planning_service.search_locations(head, transport_mode, role)
+            rows = again["data"] if again["success"] else []
+    # "미국 로스앤젤레스", "Los Angeles USA"처럼 나라가 앞뒤에 붙은 경우.
+    # 앞 낱말이나 뒤 낱말을 떼고 한 번씩 더 찾습니다. 짐작이 섞이므로 그렇다고 적어 둡니다.
+    if not rows:
+        words = text.replace(",", " ").split()
+        for shorter in (" ".join(words[1:]), " ".join(words[:-1])):
+            if len(words) < 2 or len(shorter) < 2:
+                continue
+            again = planning_service.search_locations(shorter, transport_mode, role)
+            rows = again["data"] if again["success"] else []
+            if rows:
+                notes.append(f"{label} '{text}'을(를) '{shorter}'(으)로 찾았습니다. 맞는지 봐 주세요.")
+                break
     if not rows:
         notes.append(f"{label} '{text}'을(를) 목록에서 찾지 못했습니다. 직접 골라 주세요.")
         return None
@@ -245,8 +265,10 @@ def read(text: str) -> dict:
                            "칸을 직접 채워 주세요.")
 
     prompt = EXTRACT_PROMPT.format(today=date.today().isoformat())
+    # 계좌번호·SWIFT는 AI로 보내지 않습니다. (붙여 넣은 오퍼 글에 섞여 오는 일이 흔합니다)
+    sent = bank_redaction.strip_bank_numbers(written)[0]
     answer = ai_client.chat([{"role": "system", "content": prompt},
-                             {"role": "user", "content": written}], max_tokens=900)
+                             {"role": "user", "content": sent}], max_tokens=900)
     if not answer["success"]:
         raise ServiceError(answer["message"])
 

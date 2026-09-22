@@ -12,11 +12,6 @@ from app.validators import ValidationError
 planning_bp = Blueprint("planning", __name__, url_prefix="/planning")
 
 
-@planning_bp.get("")
-def index():
-    return render_template("planning/index.html")
-
-
 @planning_bp.get("/new")
 @login_required
 def new():
@@ -85,6 +80,18 @@ def api_exchange_rate():
     """통화별 원화 환율. 운임을 원화로 환산해 보여주는 데 씁니다."""
 
     return jsonify(planning_service.exchange_rates())
+
+
+@planning_bp.get("/api/fx-board")
+def api_fx_board():
+    """실시간 환율 시세표. 모든 통화의 매매기준율·전일 대비·송금 환율(TTB·TTS).
+
+    사이드바 [💱 환율] 창의 시세표와 다국가 계산기가 씁니다. (fx_board_client)
+    """
+
+    from app.collectors import fx_board_client
+
+    return jsonify(fx_board_client.board())
 
 
 @planning_bp.get("/api/tariff-summary")
@@ -169,14 +176,6 @@ def api_departure_check():
 
     try:
         return jsonify({"success": True, "data": planning_service.check_departure_date(request.get_json(silent=True) or {})})
-    except (ValidationError, ServiceError) as exc:
-        return error_response(exc)
-
-
-@planning_bp.post("/api/reverse-schedule")
-def api_reverse_schedule():
-    try:
-        return jsonify({"success": True, "data": planning_service.reverse_schedule(request.get_json(silent=True) or {})})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
 

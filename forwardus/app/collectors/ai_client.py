@@ -50,14 +50,20 @@ def available() -> bool:
 
 
 def structured_chat(messages: list[dict], schema: dict, *, name: str,
-                    max_tokens: int = 1800) -> dict:
-    """Schema-constrained output for product interpretation, with explicit failure."""
+                    max_tokens: int = 1800, model: str | None = None,
+                    timeout: float = 25) -> dict:
+    """Schema-constrained output for product interpretation, with explicit failure.
+
+    messages의 content에 이미지 조각({"type": "image_url", ...})을 넣으면
+    Vision으로 읽습니다. 그림을 읽는 호출은 느려서 timeout을 늘려 부릅니다.
+    model을 비우면(None 또는 "") AI_HS_MODEL을 씁니다.
+    """
     key = get_config("AI_API_KEY", "")
     if not key:
         return fail("API_AUTH_FAILED", "api", "OpenAI 키가 없어 일반 검색을 사용합니다.")
-    result = request_text("POST", OPENAI_URL, timeout=25,
+    result = request_text("POST", OPENAI_URL, timeout=timeout,
                           headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                          json={"model": get_config("AI_HS_MODEL", MODEL), "temperature": 0,
+                          json={"model": model or get_config("AI_HS_MODEL", MODEL), "temperature": 0,
                                 "max_tokens": max_tokens, "messages": messages,
                                 "response_format": {"type": "json_schema", "json_schema": {
                                     "name": name, "strict": True, "schema": schema}}})
@@ -76,29 +82,74 @@ def structured_chat(messages: list[dict], schema: dict, *, name: str,
         return fail("API_INVALID_RESPONSE", "api", "AI 응답을 해석하지 못해 일반 검색을 사용합니다.")
 
 
-def chat(messages: list[dict], *, max_tokens: int = 700) -> dict:
-    """대화 한 번. 답은 글자 그대로 돌려줍니다. (고객상담 창에서 씁니다)"""
+# 도구를 부르고 결과를 받아 다시 묻는 왕복의 최대 횟수. 비교 질문은 나라 여럿을 부르므로
+# 한 번에 여러 도구를 부르게 두고(parallel tool calls), 왕복은 몇 번으로 막습니다.
+MAX_TOOL_ROUNDS = 3
+# 도구 결과 하나를 AI에게 넘길 때의 최대 글자 수. 넘으면 뒤를 자릅니다.
+MAX_TOOL_OUTPUT_CHARS = 12_000
+
+
+def chat(messages: list[dict], *, max_tokens: int = 700, tools: list[dict] | None = None,
+         run_tool=None, force_tool: bool = False) -> dict:
+    """대화 한 번. 답은 글자 그대로 돌려줍니다. (고객상담 창에서 씁니다)
+
+    tools(OpenAI function 정의)와 run_tool(name, arguments) -> dict 를 주면 Function Calling을
+    씁니다. AI가 도구를 부르면 우리 코드가 실제 API를 불러 결과를 돌려주고, AI는 그 결과로 답을
+    씁니다. 어떤 도구를 불렀는지는 결과의 "tools_used"에 남깁니다. (화면이 근거를 표시합니다)
+    force_tool이면 첫 왕복에서 도구를 반드시 부르게 합니다. (수치를 물었는데 기억으로 답하는 것을 막습니다)
+    """
 
     key = get_config("AI_API_KEY", "")
     if not key:
         return fail("API_AUTH_FAILED", "api",
                     "AI 상담 키(AI_API_KEY)가 없습니다. .env에 키를 넣으면 바로 동작합니다.")
 
-    result = request_text("POST", OPENAI_URL, timeout=60,
-                          headers={"Authorization": f"Bearer {key}",
-                                   "Content-Type": "application/json"},
-                          json={"model": MODEL, "temperature": 0.2,
-                                "max_tokens": max_tokens, "messages": messages})
-    if not result["success"]:
-        return result
-    try:
-        body = json.loads(result["data"])
-        answer = body["choices"][0]["message"]["content"].strip()
-    except (ValueError, KeyError, IndexError):
-        return fail("API_INVALID_RESPONSE", "api", "AI 응답을 해석하지 못했습니다.")
-    if not answer:
-        return fail("API_NO_DATA", "api", "답변이 비어 있습니다. 다시 물어봐 주세요.")
-    return ok(answer, "api")
+    messages = list(messages)
+    used: list[dict] = []
+    for round_no in range(MAX_TOOL_ROUNDS + 1):
+        payload = {"model": MODEL, "temperature": 0.2, "max_tokens": max_tokens,
+                   "messages": messages}
+        # 마지막 왕복에서는 도구를 빼서 반드시 글로 답하게 합니다.
+        if tools and run_tool and round_no < MAX_TOOL_ROUNDS:
+            payload["tools"] = tools
+            payload["tool_choice"] = "required" if force_tool and round_no == 0 else "auto"
+        result = request_text("POST", OPENAI_URL, timeout=60,
+                              headers={"Authorization": f"Bearer {key}",
+                                       "Content-Type": "application/json"},
+                              json=payload)
+        if not result["success"]:
+            return result
+        try:
+            message = json.loads(result["data"])["choices"][0]["message"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            return fail("API_INVALID_RESPONSE", "api", "AI 응답을 해석하지 못했습니다.")
+
+        calls = message.get("tool_calls") or []
+        if calls and run_tool:
+            messages.append({"role": "assistant", "content": message.get("content"),
+                             "tool_calls": calls})
+            for call in calls:
+                name = (call.get("function") or {}).get("name", "")
+                try:
+                    arguments = json.loads((call.get("function") or {}).get("arguments") or "{}")
+                except ValueError:
+                    arguments = {}
+                output = run_tool(name, arguments if isinstance(arguments, dict) else {})
+                used.append({"name": name, "arguments": arguments,
+                             "success": bool(output.get("success")),
+                             "source": output.get("source", ""), "output": output})
+                messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
+                                 "content": json.dumps(output, ensure_ascii=False)[:MAX_TOOL_OUTPUT_CHARS]})
+            continue
+
+        answer = (message.get("content") or "").strip()
+        if not answer:
+            return fail("API_NO_DATA", "api", "답변이 비어 있습니다. 다시 물어봐 주세요.")
+        response = ok(answer, "api")
+        if used:
+            response["tools_used"] = used
+        return response
+    return fail("API_NO_DATA", "api", "답변을 마치지 못했습니다. 다시 물어봐 주세요.")
 
 
 def review_document(document_text: str, context: dict) -> dict:

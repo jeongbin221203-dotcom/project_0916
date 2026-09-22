@@ -146,15 +146,15 @@ COLUMNS = {
                 ("from", "출처"), ("codes", "각 나라 부호")],
     "hs_code": [("code", "HS부호"), ("name", "품명"),
                 ("quantity_unit", "수량단위"), ("weight_unit", "중량단위")],
-    "trade_view": [("name", "구분"), ("export_usd_thousand", "수출액(천달러)"),
+    "trade_view": [("name", "구분"), ("export_usd_thousand", "수출액(달러)"),
                    ("export_weight_kg", "수출중량(kg)"), ("export_count", "수출 건수"),
-                   ("import_usd_thousand", "수입액(천달러)")],
+                   ("import_usd_thousand", "수입액(달러)")],
     "busiest_ports": [("port", "항구"), ("total_teu", "총 처리량(TEU)"),
                       ("full_teu", "적컨테이너(TEU)"), ("empty_teu", "공컨테이너(TEU)")],
     "trade_stats": [("country", "나라"), ("product", "품목"),
-                    ("export_usd_thousand", "수출액(천달러)"),
+                    ("export_usd_thousand", "수출액(달러)"),
                     ("export_weight_kg", "수출중량(kg)"),
-                    ("import_usd_thousand", "수입액(천달러)")],
+                    ("import_usd_thousand", "수입액(달러)")],
 }
 
 

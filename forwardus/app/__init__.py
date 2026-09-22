@@ -42,9 +42,16 @@ def migrate_cargo_lines(database) -> None:
              "dg_class": "VARCHAR(5) NOT NULL DEFAULT ''",
              "packing_group": "VARCHAR(5) NOT NULL DEFAULT ''",
              "proper_shipping_name": "VARCHAR(200) NOT NULL DEFAULT ''",
+             # 보관 온도(냉장·냉동)와 특수 컨테이너(오픈탑·플랫랙·탱크) 요청
+             "temperature_requirement": "VARCHAR(20) NOT NULL DEFAULT ''",
+             "special_container_type": "VARCHAR(20) NOT NULL DEFAULT ''",
              # 품목별 금액도 나중에 더해졌습니다.
              "unit_price": "FLOAT",
-             "amount": "FLOAT"}
+             "amount": "FLOAT",
+             # 단가의 기준(낱개 수량 · 가격 단위 · 포장당 낱개 수)도 나중에 더해졌습니다.
+             "unit_quantity": "FLOAT",
+             "price_unit": "VARCHAR(10) NOT NULL DEFAULT ''",
+             "units_per_package": "FLOAT"}
     missing = {name: spec for name, spec in added.items() if name not in columns}
     if missing:
         with database.engine.begin() as connection:

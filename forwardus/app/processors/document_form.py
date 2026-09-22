@@ -29,6 +29,28 @@ LABEL = (90, 102, 122)
 MUTED = (150, 160, 175)
 WHITE = (255, 255, 255)
 
+# 미리보기에서만 쓰는 표시. 값 앞에 붙이면 그 칸을 다르게 그립니다.
+# PDF를 만들 때는 붙이지 않으므로 내려받은 서류에는 나오지 않습니다.
+#   MASKED  은행·바이어 정보. 글자를 하나도 보이지 않게 덮습니다.
+#   HINT    빈 칸. 어디서 채우면 되는지 빨간 글씨로 적습니다.
+MASKED = "\x00mask"
+HINT = "\x00hint:"
+HINT_COLOR = (200, 45, 45)
+MASK_FILL = (214, 220, 229)
+
+# 돈 칸. 64.0이 아니라 64.00으로 적습니다. 단가는 넷째 자리까지 있을 수 있습니다.
+MONEY_KEYS = {"invoice_value", "unit_price", "amount"}
+
+
+def money_text(value) -> str:
+    """6400.0 → '6,400.00', 0.8525 → '0.8525'. 숫자가 아니면 그대로."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return str(value or "")
+    text = f"{value:,.4f}".rstrip("0")
+    whole, _, cents = text.partition(".")
+    return f"{whole}.{cents.ljust(2, '0')}"
+
 # 한글이 나오는 글꼴을 찾습니다. 없으면 기본 글꼴로 내려갑니다.
 # (배포 환경에는 맑은 고딕이 없을 수 있습니다)
 FONT_CANDIDATES = (
@@ -135,6 +157,30 @@ LAYOUTS = {
             [("comments", "COMMENTS", 0.5), ("packed_by", "PACKED BY", 0.5)],
         ],
     },
+    # 선적의뢰서 (Shipping Request / S·I). 포워더·선사에 B/L 내용을 알려 주는 서식입니다.
+    # 칸 구성은 document_service.DOCUMENT_SECTIONS["shipping_instruction"]과 같습니다.
+    "shipping_instruction": {
+        "title": "SHIPPING REQUEST",
+        "rows": [
+            [("exporter+exporter_address", "Shipper", 0.5),
+             ("booking_no+doc_no+doc_date", "Booking No. · S/R No. · Date", 0.5)],
+            [("consignee+consignee_address", "Consignee", 0.5),
+             ("notify_party", "Notify Party", 0.5)],
+            [("pol", "Port of Loading", 0.25), ("pod", "Port of Discharge", 0.25),
+             ("vessel_or_flight", "Vessel / Voyage", 0.25), ("etd", "ETD", 0.25)],
+            [("carrier", "Carrier", 0.34), ("freight_term", "Freight", 0.33),
+             ("incoterms", "Terms of delivery", 0.33)],
+        ],
+        "table": True,
+        "footer": [
+            [("gross_weight_kg", "Total gross weight (kg)", 0.34),
+             ("total_cbm", "Total measurement (CBM)", 0.33),
+             ("container_seal_no", "Container No. / Seal No.", 0.33)],
+            [("shipping_marks", "Shipping marks", 0.5),
+             ("dangerous_goods", "Dangerous goods", 0.5)],
+            [("remarks", "Remarks", 0.5), ("signed_by", "Signed by", 0.5)],
+        ],
+    },
     "proforma_invoice": {
         "title": "PROFORMA INVOICE",
         "rows": [
@@ -205,14 +251,23 @@ def _cell(draw, box, label: str, value: str, fonts) -> None:
     if not text:
         draw.text((x + 9, y + 28), "—", font=fonts["body"], fill=MUTED)
         return
-    # 아직 안 정해진 칸은 눈에 띄게 둡니다. 비워 두면 안 적은 것과 구별이 안 됩니다.
-    color = MUTED if text.startswith("미정") else INK
+    # 가린 칸은 글자를 하나도 그리지 않습니다. 끝자리만 보이는 식도 아닙니다.
+    if MASKED in text:
+        draw.rectangle([x + 9, y + 27, x + w - 9, y + min(h - 8, 27 + 40)], fill=MASK_FILL)
+        draw.text((x + 15, y + 33), "화면에서 가림 · PDF에는 들어갑니다",
+                  font=fonts["label"], fill=LABEL)
+        return
     top = y + 26
-    for line in _wrap(draw, text, fonts["body"], w - 18):
-        if top + 18 > y + h - 4:
-            break
-        draw.text((x + 9, top), line, font=fonts["body"], fill=color)
-        top += 19
+    for part in text.split("\n"):
+        # 아직 안 정해진 칸은 눈에 띄게 둡니다. 비워 두면 안 적은 것과 구별이 안 됩니다.
+        color = MUTED if part.startswith("미정") else INK
+        if part.startswith(HINT):
+            part, color = part[len(HINT):], HINT_COLOR
+        for line in _wrap(draw, part, fonts["body"], w - 18):
+            if top + 18 > y + h - 4:
+                break
+            draw.text((x + 9, top), line, font=fonts["body"], fill=color)
+            top += 19
 
 
 def _rows(draw, rows, top: int, width: int, data: dict, fonts, height: int) -> int:
@@ -220,9 +275,13 @@ def _rows(draw, rows, top: int, width: int, data: dict, fonts, height: int) -> i
         left = MARGIN
         for names, label, share in row:
             cell_w = int(width * share)
-            value = "\n".join(
-                str(data.get(name, "") or "").strip()
-                for name in names.split("+") if str(data.get(name, "") or "").strip())
+            parts = [(money_text(data.get(name)) if name in MONEY_KEYS
+                      else str(data.get(name, "") or "")).strip()
+                     for name in names.split("+") if str(data.get(name, "") or "").strip()]
+            # 칸이 넘치면 아랫줄이 잘립니다. 적힌 값이 안내에 밀려 잘리지 않게
+            # 실제 값을 먼저, "어디서 채우세요" 안내를 뒤로 보냅니다.
+            parts.sort(key=lambda part: part.startswith(HINT))
+            value = "\n".join(parts)
             _cell(draw, (left, top, cell_w, height), label, value, fonts)
             left += cell_w
         top += height
@@ -249,9 +308,15 @@ def _table(draw, columns, items, top: int, width: int, fonts) -> int:
         for column in columns:
             draw.rectangle([left, top, left + share, top + row_h], outline=LINE, width=1)
             value = item.get(column["key"], "")
-            text = f"{value:,}" if isinstance(value, (int, float)) else str(value or "")
+            if column["key"] in MONEY_KEYS:
+                text = money_text(value)
+            else:
+                text = f"{value:,}" if isinstance(value, (int, float)) else str(value or "")
+            color = INK
+            if text.startswith(HINT):
+                text, color = text[len(HINT):], HINT_COLOR
             for index, line in enumerate(_wrap(draw, text, fonts["body"], share - 16)[:2]):
-                draw.text((left + 8, top + 8 + index * 17), line, font=fonts["body"], fill=INK)
+                draw.text((left + 8, top + 8 + index * 17), line, font=fonts["body"], fill=color)
             left += share
         top += row_h
     return top
@@ -307,4 +372,13 @@ def as_png(image: Image.Image) -> bytes:
 def as_pdf(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, "PDF", resolution=150.0)
+    return buffer.getvalue()
+
+
+def as_pdf_pages(images: list[Image.Image]) -> bytes:
+    """여러 서류를 한 파일로. 서류 한 장이 A4 한 쪽입니다."""
+
+    buffer = io.BytesIO()
+    first, rest = images[0], images[1:]
+    first.save(buffer, "PDF", resolution=150.0, save_all=True, append_images=rest)
     return buffer.getvalue()

@@ -257,9 +257,11 @@ def test_잠가도_위쪽_메뉴는_그대로_쓴다(app, client):
     nav = re.search(r'<nav class="main_nav".*?</nav>', html, re.S).group(0)
 
     assert "disabled" not in nav
-    for label in ("운송 계획", "Shipments", "일정 역산", "컨테이너 조회",
+    for label in ("운송 계획", "Shipments", "컨테이너 조회",
                   "관세청 조회"):
         assert label in nav
+    # 일정 역산은 없앤 기능입니다. 메뉴에도 남기지 않습니다.
+    assert "일정 역산" not in nav
     # 메뉴가 가리키는 화면도 실제로 열려야 합니다.
     for url in re.findall(r'href="([^"]+)"', nav):
         assert client.get(url).status_code == 200, url

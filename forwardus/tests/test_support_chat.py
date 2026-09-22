@@ -52,6 +52,26 @@ def test_incoterms_are_quoted_from_our_own_data_not_the_model(app, monkeypatch):
     assert "관세율" in reference
 
 
+def test_widget_gets_brief_prompt_and_home_gets_template(client, monkeypatch):
+    """오른쪽 아래 상담 창은 짧은 프롬프트, 메인 화면 무역 상담은 템플릿 프롬프트."""
+
+    sent = []
+
+    def fake_chat(messages, **kwargs):
+        sent.append((messages[0]["content"], kwargs.get("max_tokens")))
+        return {"success": True, "source": "api", "data": "답변"}
+
+    monkeypatch.setattr(support_chat_service.ai_client, "chat", fake_chat)
+    client.post("/api/support-chat", json={"question": "FOB가 뭔가요?", "style": "brief"})
+    client.post("/api/support-chat", json={"question": "FOB가 뭔가요?"})
+
+    (widget_prompt, widget_tokens), (home_prompt, home_tokens) = sent
+    assert widget_prompt == support_chat_service.BRIEF_SYSTEM_PROMPT
+    assert widget_tokens == support_chat_service.BRIEF_ANSWER_TOKENS
+    assert home_prompt == support_chat_service.SYSTEM_PROMPT
+    assert home_tokens == support_chat_service.MAX_ANSWER_TOKENS
+
+
 def test_history_is_trimmed_and_roles_are_filtered(app, monkeypatch):
     """대화가 길어져도 보내는 양을 제한하고, 이상한 role은 버립니다."""
 

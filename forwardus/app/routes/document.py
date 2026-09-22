@@ -9,8 +9,8 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
 
 from app.routes import error_response, load_shipment
 from app.routes.auth import current_user, login_required
-from app.services import (ServiceError, customs_filing_service, document_service,
-                          document_start_service, draft_document_service,
+from app.services import (ServiceError, customs_filing_service, document_extract_service,
+                          document_service, document_start_service, draft_document_service,
                           requirement_service, shipment_service)
 from app.validators import ValidationError
 
@@ -26,8 +26,10 @@ def draft_file(kind: str):
     """
 
     payload = request.get_json(silent=True) or {}
+    # 은행 정보·바이어 주소는 브라우저가 따로(private) 보냅니다. 여기서만 합치고 버립니다.
+    draft = draft_document_service.with_private(payload.get("draft") or {}, payload.get("private"))
     try:
-        data = draft_document_service.pdf_bytes(kind, payload.get("draft") or {})
+        data = draft_document_service.pdf_bytes(kind, draft)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     return send_file(io.BytesIO(data), mimetype="application/pdf",
@@ -47,6 +49,59 @@ def new():
     return render_template("document/new.html",
                            checklist=document_start_service.checklist(),
                            recent=shipment_service.list_shipments(viewer=current_user())[:3])
+
+
+@document_bp.post("/draft/preview")
+def draft_preview():
+    """검토 창에서 고친 값으로 미리보기를 다시 그립니다. 저장하지 않습니다."""
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        image = draft_document_service.preview_data(str(payload.get("kind") or ""),
+                                                    payload.get("data"))
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return jsonify({"success": True, "data": {"preview": image}})
+
+
+@document_bp.post("/draft/review.pdf")
+def draft_review_pdf():
+    """검토를 마친 서류들을 인쇄 규격(A4) PDF 한 파일로 내려받습니다.
+
+    그리는 코드는 "PDF로 받기"와 같습니다(document_form). 서식이 한 곳에서 나와야
+    화면의 미리보기와 인쇄물이 같은 모양이 됩니다.
+    """
+
+    payload = request.get_json(silent=True) or {}
+    documents = payload.get("documents")
+    try:
+        data = draft_document_service.pdf_documents(documents)
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    kinds = [str(row.get("kind")) for row in documents if isinstance(row, dict)]
+    name = (draft_document_service.file_name(kinds[0]) if len(kinds) == 1
+            else "trade_documents_draft.pdf")
+    return send_file(io.BytesIO(data), mimetype="application/pdf", as_attachment=True,
+                     download_name=name)
+
+
+@document_bp.post("/extract")
+def extract():
+    """올린 B/L·Offer Sheet·견적서 등을 읽어 서류 작성 칸을 채울 초안을 돌려줍니다.
+
+    Shipment를 만들지 않고, 파일도 남기지 않습니다. 확인과 만들기는 사람이 합니다.
+    """
+
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return error_response(ServiceError("올릴 파일을 골라 주세요.", "VALIDATION_ERROR"))
+    # 한도보다 한 바이트 더 읽어 보면, 큰 파일을 끝까지 읽지 않고도 넘친 것을 압니다.
+    data = upload.stream.read(document_extract_service.MAX_UPLOAD_BYTES + 1)
+    try:
+        result = document_extract_service.extract(upload.filename, data)
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return jsonify({"success": True, "data": result})
 
 
 @document_bp.post("/start")

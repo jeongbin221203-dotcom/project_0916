@@ -203,9 +203,53 @@
     const row = itemTemplate.content.cloneNode(true).querySelector(".doc_item");
     itemsBox.appendChild(row);
     renumber();
+    addHsButton(row);
     row.addEventListener("input", () => { invalidateSchedule(); score(); });
     row.addEventListener("change", score);
     return row;
+  }
+
+  /* ----- 품목의 HS부호를 간편 검색 창으로 찾기 -----
+     이 줄의 품명으로 바로 찾고, 고르면 이 줄의 HS부호 칸에 넣습니다.
+     도착지를 골라 두었으면 그 나라 관세로 비교합니다. */
+  function destinationCountry() {
+    const port = (form.elements.destination_code?.value || "").trim();
+    return port.slice(0, 2) || (form.elements.buyer_country?.value || "").trim();
+  }
+
+  function addHsButton(row) {
+    const field = row.querySelector('[data-doc-field="hs_code"]');
+    if (!field || !window.ForwardusHsModal) return;
+    const hsInput = field.querySelector("[data-doc-input]");
+    const hint = document.createElement("small");
+    hint.className = "doc_hint";
+    hint.hidden = true;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "link_button doc_hs_find";
+    button.textContent = "🔎 HS CODE 간편 검색";
+    field.append(button, hint);
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();   // label 안에 있어 칸으로 초점이 튀지 않게 합니다.
+      const name = row.querySelector('[name="item_product_description"]')?.value.trim() || "";
+      const no = row.querySelector("[data-item-no]").textContent;
+      window.ForwardusHsModal.open({
+        query: hsInput.value.trim().length === 10 ? hsInput.value.trim() : name,
+        country: destinationCountry(),
+        target: {
+          label: `품목 ${no} HS부호 칸`,
+          apply(code, item, { warning }) {
+            hsInput.value = code;
+            hsInput.dispatchEvent(new Event("input", { bubbles: true }));
+            hsInput.classList.add("is_prefilled");
+            hint.textContent = warning || `${item.name || item.name_en || ""} · 간편 검색에서 골랐습니다.`;
+            hint.hidden = false;
+            hsInput.focus();
+          },
+        },
+      });
+    });
   }
 
   function renumber() {
@@ -432,6 +476,13 @@
     resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  // 읽어 온 값으로 채운 칸은 표시해 둡니다. 사람이 고치면 표시를 지웁니다.
+  // 조용히 채우면 맞는지 보지 않고 넘어갑니다.
+  function markPrefilled(input) {
+    input.classList.add("is_prefilled");
+    input.addEventListener("input", () => input.classList.remove("is_prefilled"), { once: true });
+  }
+
   /* ----- 대화창에서 읽어 준 값으로 칸 채우기 ----- */
   // 사람이 적은 글을 AI가 읽어 준 것입니다. 칸에 넣기만 하고 만들지는
   // 않습니다. 맞는지 보고 누르는 것은 사람이 합니다.
@@ -443,6 +494,8 @@
       const input = form.elements[name];
       if (!input || !value) return;
       if (input.type === "hidden" && input.closest("[data-doc-choice]")) {
+        // 이미 그 값이면 누르지 않습니다. 운송 모드를 다시 누르면 적어 둔 출발·도착지가 지워집니다.
+        if (input.value === value) return;
         // 고르는 칸은 단추를 눌러 줘야 표시도 같이 바뀝니다.
         const button = input.closest("[data-doc-choice]")
           .querySelector(`button[data-value="${value}"]`);
@@ -450,13 +503,16 @@
         return;
       }
       input.value = value;
+      markPrefilled(input);
     });
 
     // 항구는 코드가 값이고 보이는 칸은 따로입니다.
     ["origin", "destination"].forEach((role) => {
       const shown = fields[`${role}_name`];
       if (shown) {
-        panel.querySelector(`[data-doc-place="${role}"] [data-place-search]`).value = shown;
+        const search = panel.querySelector(`[data-doc-place="${role}"] [data-place-search]`);
+        search.value = shown;
+        markPrefilled(search);
       }
     });
 
@@ -468,7 +524,7 @@
         const row = addItem();
         row.querySelectorAll("[data-doc-input]").forEach((input) => {
           const key = input.name.replace(/^item_/, "");
-          if (item[key]) input.value = item[key];
+          if (item[key]) { input.value = item[key]; markPrefilled(input); }
         });
       });
     }
@@ -483,6 +539,27 @@
   drawCalendar();
   showDocTab("doc");
   score();
+
+  /* ----- B/L·Offer Sheet 올려서 칸 채우기 ----- */
+  const uploadZone = document.querySelector("[data-doc-upload]");
+  const uploadResult = document.querySelector("[data-doc-upload-result]");
+  if (uploadZone && window.ForwardusDocUpload && config.extractUrl) {
+    window.ForwardusDocUpload.mount(uploadZone, {
+      url: config.extractUrl,
+      onStart() { uploadResult.hidden = true; },
+      onResult(data) {
+        // 이 화면에서 바로 채웁니다. 만들기는 여전히 사람이 누릅니다.
+        window.FORWARDUS_DOC_FILL(data.form);
+        if (window.ForwardusHsModal) window.ForwardusHsModal.remember(data.hs_queries || []);
+        uploadResult.innerHTML = window.ForwardusDocUpload.resultHtml(data)
+          + `<p class="muted small">노란 칸이 서류에서 읽어 온 값입니다. 맞는지 보고 고친 뒤
+             <b>서류 만들기</b>를 눌러 주세요.</p>`;
+        uploadResult.hidden = false;
+        showDocTab("doc");
+        uploadResult.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    });
+  }
 
   // 시작 화면에서 "적은 내용으로 칸 채우기"를 누르고 넘어온 경우.
   // 한 번만 집어 가고 지웁니다. 새로고침 때마다 되살아나면 방금 고친 값을 덮습니다.

@@ -17,6 +17,7 @@ import json
 import xml.etree.ElementTree as ET
 from datetime import date
 
+from app.collectors import file_cache
 from app.collectors.base_client import fail, get_config, ok, request_text
 
 BASE = "https://apis.data.go.kr/1220000"
@@ -128,7 +129,12 @@ def _number(value) -> int:
 
 
 def _row(raw: dict) -> dict:
-    """관세청 응답 한 줄을 우리 모양으로. (금액 단위는 천 달러입니다)"""
+    """관세청 응답 한 줄을 우리 모양으로.
+
+    금액(expDlr·impDlr)은 **달러** 단위입니다. (2025년 HS 6109 총계가 271,743,781 —
+    천 달러로 읽으면 티셔츠 수출이 2,700억 달러가 됩니다) 칸 이름의 _thousand는
+    예전 이름이 남은 것이고 값은 달러입니다.
+    """
 
     # 두 API가 칸 이름을 다르게 씁니다.
     #   품목별 국가별(Itemtrade): hsCode + statKor(품명)   ※ 나라는 요청에서 고정
@@ -182,7 +188,7 @@ def item_trade(hs_code: str, country_code: str = "", year: int | None = None) ->
         "from": start, "to": end,
         "rows": rows,
         "total": totals[0] if totals else None,
-        "unit_note": "금액 단위는 천 달러, 중량 단위는 kg입니다.",
+        "unit_note": "금액 단위는 달러(USD), 중량 단위는 kg입니다.",
     }, "api")
 
 
@@ -215,6 +221,76 @@ def top_destinations(hs_code: str, limit: int = 10, year: int | None = None) -> 
                   key=lambda row: -row["export_usd_thousand"])[:max(1, limit)]
     return ok({**result["data"], "rows": rows,
                "note": f"{result['data']['from'][:4]}년에 실제로 신고된 수출 실적입니다."}, "api")
+
+
+# 기간별 나라별 합계는 달이 끝나야 바뀝니다. 하루 동안은 받아 둔 것을 씁니다.
+EXPORTS_CACHE_DAYS = 1
+
+
+def exports_by_country(hs_code: str, start: str, end: str) -> dict:
+    """정한 기간(YYYYMM~YYYYMM) 동안 이 품목의 나라별 수출액 합계. (금액은 달러)
+
+    관세청 국가별 품목 통계(nitemtrade)는 달·나라·세부 부호마다 한 줄씩 옵니다.
+    나라별로 더하고, 자료가 들어 있는 마지막 달(last_month, "2026.08")을 함께 돌려줍니다.
+    올해처럼 아직 끝나지 않은 해를 지난해 같은 달까지와 견주려면 그 달이 필요합니다.
+    HS부호는 2·4·6·10자리 모두 받습니다.
+
+    같은 응답을 세부 부호(hsCd)별로도 더해 codes에 둡니다. 한 단계 아래 부호로 옵니다
+    (2→4, 4→6, 6→10자리). K-stat의 품목별 수출입실적 표가 이것입니다.
+    """
+
+    digits = "".join(ch for ch in (hs_code or "") if ch.isdigit())[:10]
+    if len(digits) < 2:
+        return fail("VALIDATION_ERROR", "api", "HS부호를 2자리 이상 넣어 주세요.")
+    # v2: codes·수입·무역수지를 함께 담습니다. 예전 모양의 파일은 쓰지 않습니다.
+    cache_name = f"trade_exports_v2_{digits}_{start}_{end}"
+    cached = file_cache.read(cache_name)
+    if cached and cached[1] < EXPORTS_CACHE_DAYS:
+        return ok(cached[0], "api")
+
+    result = _call(COUNTRY_URL, {"strtYymm": start, "endYymm": end, "hsSgn": digits},
+                   "수출입무역통계")
+    if not result["success"]:
+        return ok(cached[0], "cache") if cached else result
+
+    countries: dict[str, dict] = {}
+    codes: dict[str, dict] = {}
+    total = None
+    months: set[str] = set()
+    for raw in result["data"]:
+        if not isinstance(raw, dict):
+            continue
+        row = _row(raw)
+        if row["period"] in ("총계", "합계") or row["country_code"] in ("-", ""):
+            if row["period"] in ("총계", "합계"):
+                total = row
+            continue
+        months.add(row["period"])
+        found = countries.setdefault(row["country_code"], {
+            "country": row["country"], "country_code": row["country_code"],
+            "export_usd": 0, "export_weight_kg": 0})
+        found["export_usd"] += row["export_usd_thousand"]
+        found["export_weight_kg"] += row["export_weight_kg"]
+        if row["hs_code"] and row["hs_code"] != "-":
+            line = codes.setdefault(row["hs_code"], {
+                "hs_code": row["hs_code"], "name": row["product"],
+                "export_usd": 0, "import_usd": 0})
+            line["export_usd"] += row["export_usd_thousand"]
+            line["import_usd"] += row["import_usd_thousand"]
+
+    export_sum = sum(row["export_usd"] for row in countries.values())
+    import_sum = sum(row["import_usd"] for row in codes.values())
+    data = {
+        "hs_code": digits, "from": start, "to": end,
+        "last_month": max(months) if months else "",
+        "total_export_usd": total["export_usd_thousand"] if total else export_sum,
+        "total_import_usd": total["import_usd_thousand"] if total else import_sum,
+        "countries": countries,
+        "codes": codes,
+    }
+    if countries:
+        file_cache.write(cache_name, data)
+    return ok(data, "api")
 
 
 def sources() -> dict:
@@ -284,5 +360,5 @@ def trade_view(view: str, year: int | None = None) -> dict:
     ordered = sorted(merged.values(), key=lambda row: -row["export_usd_thousand"])
     return ok({
         "view": view, "label": label, "from": start, "to": end, "rows": ordered,
-        "note": f"{start[:4]}년 {label} 실적입니다. 금액 단위는 천 달러입니다.",
+        "note": f"{start[:4]}년 {label} 실적입니다. 금액 단위는 달러(USD)입니다.",
     }, "api")

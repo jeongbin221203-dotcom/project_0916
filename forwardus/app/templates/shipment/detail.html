@@ -22,6 +22,9 @@
         <div><dt>Invoice Value</dt><dd>{{ shipment.currency }} {{ shipment.invoice_value|num(2) }}</dd></div>
         {% if shipment.cargo %}
           <div><dt>Cargo</dt><dd>{{ shipment.cargo.product_description }}{% if shipment.cargo.hs_code %} · HS {{ shipment.cargo.hs_code }}{% endif %}</dd></div>
+          {% for item in shipment.cargos if item.handling_summary %}
+            <div><dt>품목 {{ item.line_no }} 운송 조건</dt><dd>{{ item.handling_summary }}</dd></div>
+          {% endfor %}
           <div><dt>Quantity</dt><dd>{{ shipment.cargo.quantity|num }} pkg</dd></div>
           <div><dt>Total CBM</dt><dd>{{ shipment.cargo.total_cbm|num(3) }} CBM</dd></div>
           <div><dt>Gross Weight</dt><dd>{{ shipment.cargo.total_weight_kg|num(1) }} kg</dd></div>

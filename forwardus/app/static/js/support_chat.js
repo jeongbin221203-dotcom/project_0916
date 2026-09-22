@@ -100,7 +100,9 @@
     showMessage(chat.append({ role: "user", text, mode: SOURCE }, SOURCE));
 
     const waiting = bubble("bot", "답변을 준비하고 있습니다…", "support_waiting");
-    const response = await postJson(config.url, { question: text, history });
+    // 이 창은 서식을 그리지 않으니 짧은 답을 받습니다. (메인 화면은 긴 템플릿 답)
+    // history는 이번 질문을 적기 전에 꺼냈으므로 잘라 낼 것이 없습니다.
+    const response = await postJson(config.url, { question: text, history, style: "brief" });
     waiting.remove();
 
     if (response.success) {

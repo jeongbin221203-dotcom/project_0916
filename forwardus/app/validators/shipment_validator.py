@@ -5,14 +5,17 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from app.processors.cost_calculator import INCOTERMS_INFO
 from app.validators import ValidationError
 from app.validators.cargo_validator import MAX_INVOICE_VALUE, parse_number, parse_optional_number
 
 TRANSPORT_MODES = {"SEA", "AIR"}
 SEA_MODES = {"FCL", "LCL"}
 CURRENCIES = {"USD", "EUR", "JPY", "CNY", "KRW"}
-AIR_INVALID_INCOTERMS = {"FOB", "CFR", "CIF"}
-INCOTERMS = {"EXW", "FCA", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"}
+# 조건 목록은 화면과 같은 표(INCOTERMS_INFO)에서 가져옵니다. 따로 적어 두면
+# 한쪽만 고쳐져 화면에서 고른 조건(예: FAS)이 저장 단계에서 거절됩니다.
+INCOTERMS = {row["code"] for row in INCOTERMS_INFO}
+AIR_INVALID_INCOTERMS = {row["code"] for row in INCOTERMS_INFO if row.get("sea_only")}
 
 
 # 수출 일정에 쓸 수 있는 날짜 범위. 이 밖은 잘못 입력한 것으로 봅니다.
@@ -88,9 +91,9 @@ def validate_route(payload: dict) -> dict:
 
 # 항공에 해상 전용 조건을 쓰는 것은 틀린 일이지만, 바이어가 계약서에 그렇게
 # 적어 오는 일이 실제로 있습니다. 막지 않고 한 번 더 확인만 받습니다.
-AIR_INCOTERMS_MESSAGE = ("항공 운송에는 FOB, CFR, CIF 대신 FCA, CPT, CIP를 씁니다. "
-                         "FOB·CFR·CIF는 '본선에 적재된 때' 위험이 넘어간다고 정한 "
-                         "해상 전용 조건이라 항공에는 넘어가는 시점이 없습니다.")
+AIR_INCOTERMS_MESSAGE = ("항공 운송에는 FAS, FOB, CFR, CIF 대신 FCA, CPT, CIP를 씁니다. "
+                         "FAS·FOB·CFR·CIF는 '본선 옆에 둔 때'·'본선에 적재된 때' 위험이 "
+                         "넘어간다고 정한 해상·내수로 전용 조건이라 항공에는 넘어가는 시점이 없습니다.")
 AIR_INCOTERMS_CONFIRM = "그래도 이 조건으로 진행하시려면 [다음]을 한 번 더 눌러주세요."
 
 
