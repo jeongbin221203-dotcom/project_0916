@@ -6,22 +6,38 @@
 글자  은행 이야기를 하는 줄(은행·계좌·A/C·SWIFT…)과 그 아래 두 줄에서
       번호를 [ACCOUNT_1] 같은 표시로 바꿉니다. 돌아온 뒤 은행 칸에만 되돌립니다.
 
-그림  우리 컴퓨터에서 먼저 글자를 읽고(OCR, 인터넷 안 씀) 번호 자리를 칠합니다.
+그림  우리 컴퓨터에서 먼저 글자를 읽고(Tesseract OCR, 인터넷 안 씀) 번호 자리를 칠합니다.
       칠한 그림을 한 번 더 읽어 번호가 아직 보이면 그 줄 전체를 칠합니다.
       칠한 그림만 AI에게 보내고, 이용자에게도 그 그림을 보여 줍니다.
 
-      이 OCR은 한글을 읽지 못합니다("입금계좌" 같은 이름표를 못 봄). 그래서
-      그림에서는 은행이라는 말이 없어도 9자리 이상의 번호는 모두 지웁니다.
+      Tesseract는 단어마다 자리를 알려 줍니다. 번호가 들어 있는 단어의 자리를
+      그대로 칠하므로 글자 폭을 어림하지 않습니다.
+
+      한글 학습 자료(kor)가 깔려 있으면 한글도 읽지만, 없으면 "입금계좌" 같은
+      이름표를 못 봅니다. 그래서 그림에서는 은행이라는 말이 없어도 9자리 이상의
+      번호는 모두 지웁니다. (한글을 읽을 때도 같습니다. 이름표를 잘못 읽을 수 있습니다)
       OCR이 설치되어 있지 않으면 그림을 받지 않습니다. 가리지 못한 그림을
       보내는 것보다 받지 않는 것이 낫습니다.
+
+설치  Tesseract 프로그램 + pytesseract 패키지가 둘 다 있어야 합니다.
+      Windows: https://github.com/UB-Mannheim/tesseract/wiki 설치 파일
+               (기본 자리 C:/Program Files/Tesseract-OCR 은 저절로 찾습니다)
+      Linux:   apt-get install tesseract-ocr tesseract-ocr-kor
+      다른 자리에 깔았으면 .env에 TESSERACT_CMD=실행 파일 경로 를 적습니다.
+
+한글  학습 자료(kor.traineddata)는 설치 폴더에 넣으려면 관리자 권한이 필요합니다.
+      그래서 data/tessdata/ 에 eng·kor 자료를 두면 그것을 먼저 씁니다.
+      (TESSDATA_DIR로 다른 폴더를 가리킬 수도 있습니다. git에는 올리지 않습니다)
 """
 
 from __future__ import annotations
 
 import io
-import logging
+import os
 import re
+import shutil
 import threading
+from pathlib import Path
 
 # 은행 정보가 나오는 줄을 알아보는 말. 이 줄과 그 아래 BANK_WINDOW 줄 안의 번호를 가립니다.
 #
@@ -124,45 +140,152 @@ def restore(value: str, secrets: dict) -> str:
 
 # --- 그림 --------------------------------------------------------------------------
 
-_engine = None
-_engine_lock = threading.Lock()
-# 칠한 자리 둘레로 이만큼 더 칠합니다. 글자 폭을 어림해 칠하므로 넉넉하게 둡니다.
+_ocr_lock = threading.Lock()
+_ocr_state: dict = {}
+# 칠한 자리 둘레로 이만큼 더 칠합니다.
 PAD_CHARS = 2
 PAD_PIXELS = 4
 # OCR이 이보다 자신 없게 읽은 줄에 숫자가 이만큼 있으면 줄 전체를 지웁니다.
-# 잘못 읽은 줄("H 00 00 0 0 00", 자신감 0.69)에 계좌번호가 있어도 우리 규칙은
-# 번호를 못 찾습니다. 품목 줄이 지워질 수 있지만, 번호가 새는 것보다 낫습니다.
-LOW_CONFIDENCE = 0.85
+# 잘못 읽은 줄에 계좌번호가 있어도 우리 규칙은 번호를 못 찾습니다.
+# 품목 줄이 지워질 수 있지만, 번호가 새는 것보다 낫습니다.
+# 줄의 자신감은 그 줄에서 가장 자신 없는 단어의 것입니다(Tesseract 0~100 → 0~1).
+# 바르게 읽은 줄도 단어 하나가 0.84쯤 나옵니다("DS01227"). 잘못 읽은 줄은 0.5 안팎입니다.
+LOW_CONFIDENCE = 0.70
 UNSURE_DIGITS = 6
+# Tesseract는 글자 높이가 30px 안팎일 때 가장 잘 읽습니다. 작은 그림은 키워서 읽습니다.
+MIN_READ_WIDTH = 1600
+# Windows 설치 파일이 기본으로 까는 자리. PATH에 없어도 여기서 찾습니다.
+_WINDOWS_PATHS = (r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                  r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe")
+# 프로젝트에 둔 학습 자료. 설치 폴더에 한글 자료를 넣을 권한이 없을 때 씁니다.
+_PROJECT_TESSDATA = Path(__file__).resolve().parents[2] / "data" / "tessdata"
+
+
+def _tessdata_folder() -> str:
+    """쓸 학습 자료 폴더. 없으면 빈 글자(설치 폴더를 씁니다).
+
+    Tesseract에는 TESSDATA_PREFIX로 알립니다. --tessdata-dir로 넘기면 Windows에서
+    따옴표가 그대로 붙어 폴더를 못 찾습니다.
+    """
+
+    configured = os.getenv("TESSDATA_DIR", "").strip()
+    folder = Path(configured) if configured else _PROJECT_TESSDATA
+    return str(folder) if (folder / "eng.traineddata").exists() else ""
+
+
+def _tesseract_cmd() -> str:
+    """Tesseract 실행 파일. .env의 TESSERACT_CMD → PATH → Windows 기본 자리 순서로 찾습니다."""
+
+    configured = os.getenv("TESSERACT_CMD", "").strip()
+    if configured:
+        return configured if Path(configured).exists() else ""
+    found = shutil.which("tesseract")
+    if found:
+        return found
+    for candidate in _WINDOWS_PATHS:
+        if Path(candidate).exists():
+            return candidate
+    return ""
+
+
+def _setup() -> dict:
+    """한 번만 확인합니다. (쓸 수 있는지, 읽을 언어)"""
+
+    with _ocr_lock:
+        if _ocr_state:
+            return _ocr_state
+        _ocr_state.update(ready=False, lang="eng")
+        try:
+            import pytesseract
+        except ImportError:
+            return _ocr_state
+        command = _tesseract_cmd()
+        if not command:
+            return _ocr_state
+        pytesseract.pytesseract.tesseract_cmd = command
+        folder = _tessdata_folder()
+        if folder:
+            os.environ["TESSDATA_PREFIX"] = folder
+        try:
+            pytesseract.get_tesseract_version()
+            languages = set(pytesseract.get_languages(config=""))
+        except Exception:                    # noqa: BLE001 - 깨진 설치도 "없음"으로 봅니다
+            return _ocr_state
+        if "eng" not in languages:
+            return _ocr_state
+        _ocr_state.update(ready=True, lang="kor+eng" if "kor" in languages else "eng")
+        return _ocr_state
 
 
 def ocr_available() -> bool:
-    try:
-        import rapidocr  # noqa: F401
-    except ImportError:
-        return False
-    return True
+    return _setup()["ready"]
+
+
+def _read_lines(image) -> list[dict]:
+    """줄마다 {quad, text, score, words}. words는 [(시작, 끝, 상자)] — text 안의 글자 자리입니다.
+
+    위에서 아래, 왼쪽에서 오른쪽 순서입니다. score는 0~1 (줄에서 가장 자신 없는 단어).
+    """
+
+    import pytesseract
+
+    state = _setup()
+    image = image.convert("RGB")
+    scale = 1.0
+    if image.width < MIN_READ_WIDTH:
+        scale = MIN_READ_WIDTH / image.width
+        image = image.resize((round(image.width * scale), round(image.height * scale)))
+    # psm 6: 한 덩어리의 글로 보고 줄 단위로 읽습니다. 서류처럼 줄이 가지런한 글에 맞습니다.
+    data = pytesseract.image_to_data(image, lang=state["lang"],
+                                     config="--oem 1 --psm 6",
+                                     output_type=pytesseract.Output.DICT)
+
+    lines: dict[tuple, list] = {}
+    for i, word in enumerate(data["text"]):
+        word = str(word or "").strip()
+        confidence = float(data["conf"][i])
+        if not word or confidence < 0:
+            continue
+        key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
+        box = (data["left"][i] / scale, data["top"][i] / scale,
+               (data["left"][i] + data["width"][i]) / scale,
+               (data["top"][i] + data["height"][i]) / scale)
+        lines.setdefault(key, []).append((word, confidence / 100, box))
+
+    rows = []
+    for words in lines.values():
+        words.sort(key=lambda row: row[2][0])
+        text, spans = "", []
+        for word, _, box in words:
+            if text:
+                text += " "
+            spans.append((len(text), len(text) + len(word), box))
+            text += word
+        left = min(box[0] for _, _, box in words)
+        top = min(box[1] for _, _, box in words)
+        right = max(box[2] for _, _, box in words)
+        bottom = max(box[3] for _, _, box in words)
+        rows.append({"quad": [[left, top], [right, top], [right, bottom], [left, bottom]],
+                     "text": text, "score": min(score for _, score, _ in words),
+                     "words": spans})
+    rows.sort(key=lambda row: (round(row["quad"][0][1] / 12), row["quad"][0][0]))
+    return rows
 
 
 def _read(image) -> list[tuple[list, str, float]]:
     """(네 꼭짓점, 글자, 자신감) 목록. 위에서 아래, 왼쪽에서 오른쪽 순서입니다."""
 
-    global _engine
-    import numpy
+    return [(row["quad"], row["text"], row["score"]) for row in _read_lines(image)]
 
-    with _engine_lock:
-        if _engine is None:
-            from rapidocr import RapidOCR
 
-            logging.getLogger("RapidOCR").setLevel(logging.WARNING)
-            _engine = RapidOCR()
-        result = _engine(numpy.array(image.convert("RGB")))
-    if result.boxes is None:
-        return []
-    rows = [([list(map(float, point)) for point in box], str(text), float(score))
-            for box, text, score in zip(result.boxes, result.txts, result.scores)]
-    rows.sort(key=lambda row: (round(min(p[1] for p in row[0]) / 12), min(p[0] for p in row[0])))
-    return rows
+def _word_box(row: dict, start: int, end: int) -> tuple[int, int, int, int] | None:
+    """text의 start~end 글자가 걸친 단어들을 모두 덮는 상자."""
+
+    boxes = [box for s, e, box in row["words"] if s < end and e > start]
+    if not boxes:
+        return None
+    return (int(min(b[0] for b in boxes)) - PAD_PIXELS, int(min(b[1] for b in boxes)) - PAD_PIXELS,
+            int(max(b[2] for b in boxes)) + PAD_PIXELS, int(max(b[3] for b in boxes)) + PAD_PIXELS)
 
 
 def _span_box(quad: list, text: str, start: int, end: int) -> tuple[int, int, int, int]:
@@ -202,23 +325,27 @@ def redact_image(png: bytes) -> dict:
     from PIL import Image, ImageDraw
 
     image = Image.open(io.BytesIO(png)).convert("RGB")
-    rows = _read(image)
-    joined = "\n".join(text for _, text, _ in rows)
+    rows = _read_lines(image)
+    joined = "\n".join(row["text"] for row in rows)
     _, secrets = redact(joined, everywhere=True)
     originals = sorted(set(secrets.values()), key=len, reverse=True)
 
     draw = ImageDraw.Draw(image)
     unsure = 0
-    for quad, text, score in rows:
-        if score < LOW_CONFIDENCE and len(_digits_of(text)) >= UNSURE_DIGITS:
+    for row in rows:
+        quad, text = row["quad"], row["text"]
+        if row["score"] < LOW_CONFIDENCE and len(_digits_of(text)) >= UNSURE_DIGITS:
             draw.rectangle(_whole_box(quad), fill="black")
             unsure += 1
             continue
         for original in originals:
             start = text.find(original)
             while start >= 0:
-                draw.rectangle(_span_box(quad, text, start, start + len(original)), fill="black")
-                start = text.find(original, start + len(original))
+                end = start + len(original)
+                # 번호가 걸친 단어의 자리를 그대로 칠합니다. 못 찾으면 글자 폭으로 어림합니다.
+                box = _word_box(row, start, end) or _span_box(quad, text, start, end)
+                draw.rectangle(box, fill="black")
+                start = text.find(original, end)
 
     # 칠한 뒤 다시 읽어 봅니다. 어림한 자리가 빗나가 번호 일부가 남았으면 줄 전체를 칠합니다.
     if originals:
