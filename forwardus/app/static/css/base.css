@@ -375,14 +375,16 @@ body.standalone .page { padding-top: 28px; }
 .ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #94a3b8; }
 .ac_list .ac_group_other small { font-weight: 600; margin-left: 6px; }
 
-/* HS CODE 간편 검색 창. 어느 화면에서나 [data-hs-open]으로 뜹니다. (hs_modal.js) */
+/* HS CODE 간편 검색 창. 어느 화면에서나 [data-hs-open]으로 뜹니다. (hs_modal.js)
+   body에 zoom(--ui_scale)이 걸려 있어 vh를 그대로 쓰면 배율만큼 길어져 창 아래가
+   화면 밖으로 잘립니다. 화면 단위는 배율로 나눕니다. (planning.css 설명 팝업과 같은 방식) */
 body.hs_modal_open { overflow: hidden; }
 .hs_modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center;
-  padding: 6vh 16px 16px; }
+  padding: calc(6dvh / var(--ui_scale, 1)) 16px 16px; }
 .hs_modal[hidden] { display: none; }
 .hs_modal_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.45); }
 .hs_modal_box { position: relative; display: flex; flex-direction: column; gap: 12px;
-  width: min(760px, 100%); max-height: 88vh; padding: 20px 22px; overflow: hidden;
+  width: min(760px, 100%); max-height: calc(88dvh / var(--ui_scale, 1)); padding: 20px 22px; overflow: hidden;
   border-radius: 20px; background: #fff; box-shadow: 0 30px 80px rgba(15,23,42,.35); }
 .hs_modal_head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .hs_modal_head h2 { margin: 0; font-size: 18px; }
@@ -405,7 +407,7 @@ body.hs_modal_open { overflow: hidden; }
 .hs_modal_status.warn { background: var(--amber_soft); color: #8a4f00; }
 @media (max-width: 520px) {
   .hs_modal { padding: 12px 8px; }
-  .hs_modal_box { padding: 16px; max-height: 94vh; }
+  .hs_modal_box { padding: 16px; max-height: calc(94dvh / var(--ui_scale, 1)); }
   .hs_modal_row .hs_country { flex: 1 1 100%; }
 }
 
