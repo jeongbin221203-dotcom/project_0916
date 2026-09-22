@@ -1,55 +1,60 @@
 {% extends "base.html" %}
 {% from "_macros.html" import status_badge %}
 {% block title %}홈{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ static_url('css/home.css') }}">{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ static_url('css/home.css') }}">
+  {# 사이드바를 열어 둔 사람에게 접힌 모양이 한 번 번쩍이지 않게, 그리기 전에 상태를 먼저 붙입니다.
+     기본은 접힘(아이콘 레일)입니다. isSidebarExpanded가 "true"일 때만 펼칩니다. (home.js) #}
+  <script>
+    try {
+      if (window.localStorage.getItem("isSidebarExpanded") === "true") {
+        document.documentElement.classList.add("rail_expanded");
+      }
+    } catch (error) { /* 저장 공간을 못 쓰면 기본(접힘)으로 둡니다. */ }
+  </script>
+{% endblock %}
 {% block main_class %}home_main{% endblock %}
 {% block content %}
   <div class="home_shell {{ 'is_locked' if home_locked }}">
     {# 왼쪽 줄. 칸을 채우는 화면들은 전부 이리로 모았습니다. #}
-    <aside class="home_rail" aria-label="바로가기"
+    <aside class="home_rail" id="home_rail" aria-label="바로가기"
            {% if home_locked %}aria-disabled="true" inert{% endif %}>
      {# 흰 바탕은 바깥(aside)이 끝까지 채우고, 붙어 있는 것은 안쪽입니다.
         한 덩어리로 두면 body의 zoom 때문에 100vh 계산이 어긋나 밀려 올라갑니다. #}
+     {# 접힘: 아이콘만 있는 얇은 레일(60px). 펼침: 그 위로 드로어(164px)가 미끄러져 나와
+        가운데를 밀지 않고 덮습니다. 이름은 접혔을 때 말풍선(data-tip)으로 보입니다. #}
      <div class="rail_inner">
-      <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page">
+      <button type="button" class="rail_toggle" data-rail-toggle data-tip="사이드바 열기"
+              aria-expanded="false" aria-controls="home_rail" aria-label="사이드바 열기">
+        <svg class="rail_toggle_icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+        </svg>
+      </button>
+      <a class="rail_item active" href="{{ url_for('home.index') }}" aria-current="page" data-tip="홈">
         <span class="rail_icon" aria-hidden="true">🏠</span>
-        <small>홈</small>
+        <span class="rail_label">홈</span>
       </a>
       {% for item in rail %}
-        <a class="rail_item" href="{{ item.url }}" title="{{ item.note }}">
+        <a class="rail_item" href="{{ item.url }}" data-tip="{{ item.label }}" aria-description="{{ item.note }}">
           <span class="rail_icon {{ item.tone }}" aria-hidden="true">{{ item.icon }}</span>
-          <small>{{ item.label }}</small>
+          <span class="rail_label">{{ item.label }}</span>
         </a>
       {% endfor %}
-      {# 환율은 어느 화면에서나 자주 찾습니다. 송장 금액을 원화로 볼 때 씁니다. #}
-      <div class="rail_item has_flyout" data-rail-flyout data-rail-fx>
-        <button type="button" aria-expanded="false" aria-controls="rail_fx">
+      {# 환율은 어느 화면에서나 자주 찾습니다. 화면을 옮기지 않고 환율 센터 창을 엽니다. (fx_center.js) #}
+      <div class="rail_item">
+        <button type="button" data-fx-open aria-haspopup="dialog" data-tip="환율"
+                aria-description="실시간 환율 · 환율 계산기">
           <span class="rail_icon amber" aria-hidden="true">💱</span>
-          <small>환율</small>
+          <span class="rail_label">환율</span>
         </button>
-        <div class="rail_flyout" id="rail_fx" hidden>
-          <b>환율 계산기</b>
-          <div class="fx_row">
-            <input class="fx_amount" type="text" inputmode="decimal" value="1000"
-                   data-fx-amount aria-label="금액">
-            {# 통화 목록은 환율을 받을 때 함께 채웁니다. #}
-            <select data-fx-from aria-label="바꿀 통화"><option value="USD">USD</option></select>
-          </div>
-          <button type="button" class="fx_swap" data-fx-swap aria-label="위아래 바꾸기">⇅</button>
-          <div class="fx_row">
-            <output class="fx_result" data-fx-result>—</output>
-            <select data-fx-to aria-label="바뀔 통화"><option value="KRW">KRW</option></select>
-          </div>
-          {# 무슨 환율로 계산했는지 반드시 같이 보여 줍니다. #}
-          <p class="fx_basis" data-fx-basis>환율을 받아오는 중입니다…</p>
-        </div>
       </div>
 
       {% if recent %}
         <div class="rail_item has_flyout" data-rail-flyout data-rail-recent>
-          <button type="button" aria-expanded="false" aria-controls="rail_recent">
+          <button type="button" aria-expanded="false" aria-controls="rail_recent" data-tip="최근"
+                  aria-description="최근 Shipment">
             <span class="rail_icon" aria-hidden="true">🧾</span>
-            <small>최근</small>
+            <span class="rail_label">최근</span>
           </button>
           <div class="rail_flyout" id="rail_recent" hidden>
             <div class="row_between">
@@ -116,7 +121,7 @@
           <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
                  hidden data-home-upload>
           <div class="home_attach" data-home-attach hidden></div>
-          <textarea data-home-input rows="3" maxlength="2000"
+          <textarea data-home-input rows="2" maxlength="2000"
                     {{ 'disabled' if home_locked }}
                     placeholder="{{ actions[0].placeholder }}"
                     aria-label="물어볼 내용"></textarea>
@@ -141,6 +146,74 @@
       </div>
      </div>
     </div>
+  </div>
+
+  {# 실시간 환율 센터. 사이드바 [💱 환율]로 엽니다. 시세표와 다국가 계산기 두 탭. (fx_center.js) #}
+  <div class="fx_modal" data-fx-modal hidden>
+    <div class="fx_backdrop" data-fx-close></div>
+    <section class="fx_box" role="dialog" aria-modal="true" aria-labelledby="fx_title">
+      <header class="fx_head">
+        <div>
+          <h2 id="fx_title">💱 실시간 환율 센터</h2>
+          <p class="fx_meta" data-fx-meta>환율을 받아오는 중입니다…</p>
+        </div>
+        <button type="button" class="fx_close" data-fx-close aria-label="닫기">×</button>
+      </header>
+      <div class="fx_tabs" role="tablist" aria-label="환율 센터">
+        <button role="tab" type="button" class="active" aria-selected="true" data-fx-tab="board"
+                aria-controls="fx_panel_board">📋 환율 시세표</button>
+        <button role="tab" type="button" aria-selected="false" data-fx-tab="calc"
+                aria-controls="fx_panel_calc">🧮 다국가 환율 계산기</button>
+      </div>
+
+      <div class="fx_panel" id="fx_panel_board" role="tabpanel" data-fx-panel="board">
+        <label class="fx_search">
+          <span aria-hidden="true">🔎</span>
+          <input type="search" data-fx-search placeholder="국가·통화 검색 (예: 멕시코, MXN, 유로)"
+                 aria-label="국가·통화 검색" autocomplete="off">
+        </label>
+        <div class="fx_table_wrap">
+          <table class="fx_table">
+            <thead><tr>
+              <th>통화</th><th>통화명</th><th class="num">매매기준율</th><th class="num">전일 대비</th>
+              <th class="num">받을 때<small>TTB</small></th><th class="num">보낼 때<small>TTS</small></th>
+            </tr></thead>
+            <tbody data-fx-rows></tbody>
+          </table>
+        </div>
+        <p class="fx_note" data-fx-note></p>
+      </div>
+
+      <div class="fx_panel" id="fx_panel_calc" role="tabpanel" data-fx-panel="calc" hidden>
+        <div class="fx_calc">
+          <label class="fx_field fx_amount_field">
+            <span>금액</span>
+            <input type="text" inputmode="decimal" data-fx-amount value="1,000" aria-label="금액">
+          </label>
+          <div class="fx_pair">
+            <label class="fx_field"><span>기준 통화 (From)</span><select data-fx-from></select></label>
+            <button type="button" class="fx_swap_btn" data-fx-swap aria-label="기준·대상 통화 바꾸기"
+                    title="바꾸기">⇄</button>
+            <label class="fx_field"><span>대상 통화 (To)</span><select data-fx-to></select></label>
+          </div>
+          <fieldset class="fx_mode">
+            <legend>적용 환율</legend>
+            <label><input type="radio" name="fx_mode" value="deal" data-fx-mode checked>
+              <b>매매기준율</b><small>계약·견적 기준</small></label>
+            <label><input type="radio" name="fx_mode" value="ttb" data-fx-mode>
+              <b>수출 대금을 원화로 받을 때</b><small>전신환 매입률 TTB</small></label>
+            <label><input type="radio" name="fx_mode" value="tts" data-fx-mode>
+              <b>외화로 송금 보낼 때</b><small>전신환 매도율 TTS</small></label>
+          </fieldset>
+          <label class="fx_field fx_spread" data-fx-spread-box hidden>
+            <span>추정 스프레드 (매매기준율 ±%)</span>
+            <input type="number" min="0" max="10" step="0.05" data-fx-spread value="1" aria-label="추정 스프레드">
+          </label>
+          <output class="fx_result" data-fx-result aria-live="polite">—</output>
+          <p class="fx_applied" data-fx-applied></p>
+        </div>
+      </div>
+    </section>
   </div>
 
   {# 서류 미리보기 & 검토. 만든 서류를 탭별로 보고 그 자리에서 고친 뒤 PDF로 받습니다. (doc_preview.js) #}
@@ -181,6 +254,7 @@
       actions: {{ actions|tojson }},
       chatUrl: "{{ url_for('home.api_support_chat') }}",
       ratesUrl: "{{ url_for('planning.api_exchange_rate') }}",
+      fxBoardUrl: "{{ url_for('planning.api_fx_board') }}",
       intakeUrl: "{{ url_for('home.api_intake') }}",
       extractUrl: "{{ url_for('document.extract') }}",
       attachUrl: "{{ url_for('home.api_attach') }}",
@@ -199,5 +273,6 @@
     <script src="{{ static_url('js/doc_upload.js') }}"></script>
     <script src="{{ static_url('js/doc_preview.js') }}"></script>
     <script src="{{ static_url('js/home.js') }}"></script>
+    <script src="{{ static_url('js/fx_center.js') }}"></script>
   {% endif %}
 {% endblock %}

@@ -29,8 +29,38 @@
   // 한 번 묻고 나면 인사를 접고 적는 칸을 화면 아래에 붙입니다.
   // 답이 쌓이는 동안에도 다시 묻는 자리가 늘 같은 곳에 있어야 합니다.
   function startTalking() {
+    if (centerEl.classList.contains("talking")) return;
     centerEl.classList.add("talking");
+    syncComposerSpace();
   }
+
+  /* ----- 아래에 붙은 적는 칸만큼 대화 아래를 비워 두기 -----
+     적는 칸 덩어리(탭 줄 + 적는 칸)는 화면 아래에 고정됩니다. 높이가 늘 같지 않아서
+     (파일 칩, 여러 줄 입력) 실제 높이를 재어 CSS 변수로 넘깁니다. 고정값을 두면
+     덩어리가 커질 때 마지막 답의 출처·각주가 그 뒤로 가려집니다. (home.css의 --composer_h) */
+  const composerEl = document.querySelector("[data-home-composer]");
+  let composerHeight = 0;
+
+  function atBottom() {
+    const doc = document.documentElement;
+    return window.innerHeight + window.scrollY >= doc.scrollHeight - 48;
+  }
+
+  function syncComposerSpace() {
+    if (!composerEl || !centerEl.classList.contains("talking")) return;
+    const height = Math.ceil(composerEl.getBoundingClientRect().height);
+    if (height === composerHeight) return;
+    // 맨 아래를 보고 있었으면 덩어리가 커져도 계속 맨 아래가 보이게 따라 내립니다.
+    const follow = composerHeight && atBottom();
+    composerHeight = height;
+    document.documentElement.style.setProperty("--composer_h", `${height}px`);
+    if (follow) window.scrollTo(0, document.documentElement.scrollHeight);
+  }
+
+  if (composerEl && "ResizeObserver" in window) {
+    new ResizeObserver(syncComposerSpace).observe(composerEl);
+  }
+  window.addEventListener("resize", syncComposerSpace);
 
   /* ----- 무엇에 대해 이야기할지 ----- */
   function showAction(action, { greet = false } = {}) {
@@ -903,77 +933,59 @@
     else askSupport(text);
   });
 
-  /* ----- 환율 계산기 -----
-     송장 금액이 달러인데 원화로 얼마인지는 늘 궁금합니다.
-     환율은 펼칠 때 한 번만 받아 둡니다. */
-  function setupExchange() {
-    const box = document.querySelector("[data-rail-fx]");
-    if (!box) return () => {};
+  /* ----- 왼쪽 사이드바: 아이콘 레일 ↔ 펼침 드로어 -----
+     기본은 접힘(아이콘만 있는 60px 레일)입니다. 맨 위 ☰를 누르면 드로어가 164px로
+     미끄러져 나오며 가운데를 밀지 않고 덮습니다. 상태는 isSidebarExpanded(boolean)로 두고
+     localStorage에 기억해 새로고침·화면 이동 뒤에도 그대로입니다.
+     (그리기 전에 index.html 머리의 짧은 스크립트가 같은 값을 먼저 붙입니다) */
+  const RAIL_KEY = "isSidebarExpanded";
+  const railToggle = document.querySelector("[data-rail-toggle]");
+  const railInner = document.querySelector(".rail_inner");
+  let isSidebarExpanded = document.documentElement.classList.contains("rail_expanded");
 
-    const amountEl = box.querySelector("[data-fx-amount]");
-    const fromEl = box.querySelector("[data-fx-from]");
-    const toEl = box.querySelector("[data-fx-to]");
-    const resultEl = box.querySelector("[data-fx-result]");
-    const basisEl = box.querySelector("[data-fx-basis]");
-    let rates = null;
-
-    function calculate() {
-      const amount = Number(String(amountEl.value).replace(/,/g, ""));
-      const from = rates && rates[fromEl.value];
-      const to = rates && rates[toEl.value];
-      if (!from || !to || !Number.isFinite(amount)) { resultEl.textContent = "—"; return; }
-      // rates는 "그 통화 1단위가 몇 원인지"입니다. 원을 거쳐 환산합니다.
-      resultEl.textContent = ((amount * from) / to).toLocaleString("ko-KR", {
-        maximumFractionDigits: toEl.value === "KRW" ? 0 : 2,
-      });
+  function setSidebarExpanded(expanded, { save = true } = {}) {
+    isSidebarExpanded = expanded;
+    document.documentElement.classList.toggle("rail_expanded", expanded);
+    if (railToggle) {
+      const label = expanded ? "사이드바 닫기" : "사이드바 열기";
+      railToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+      railToggle.setAttribute("aria-label", label);
+      railToggle.dataset.tip = label;
     }
-
-    [amountEl, fromEl, toEl].forEach((el) => {
-      el.addEventListener("input", calculate);
-      el.addEventListener("change", calculate);
-    });
-    box.querySelector("[data-fx-swap]").addEventListener("click", () => {
-      [fromEl.value, toEl.value] = [toEl.value, fromEl.value];
-      calculate();
-    });
-
-    return async function load() {
-      if (rates) return;
-      const response = await getJson(config.ratesUrl);
-      if (!response.success) {
-        basisEl.textContent = "환율을 받지 못했습니다. 잠시 뒤에 다시 열어 주세요.";
-        basisEl.classList.add("is_mock");
-        return;
-      }
-      rates = response.data;
-      fillCurrencies();
-      // 무슨 환율로 계산했는지 함께 보여 줍니다. 관세청이 멈추면 임시 환율로
-      // 떨어지는데, 그걸 모르고 쓰면 금액이 틀립니다.
-      basisEl.textContent = response.basis;
-      basisEl.classList.toggle("is_mock", response.source !== "api");
-      calculate();
-    };
-
-    // 고를 수 있는 통화는 실제로 환율을 받은 것뿐입니다. 없는 통화를
-    // 목록에 두면 골랐을 때 계산이 안 됩니다.
-    function fillCurrencies() {
-      const major = ["USD", "KRW", "EUR", "JPY", "CNY"];
-      const codes = Object.keys(rates).sort((a, b) => {
-        const rank = (code) => (major.indexOf(code) + 1 || 99);
-        return rank(a) - rank(b) || a.localeCompare(b);
-      });
-      [fromEl, toEl].forEach((select) => {
-        const keep = select.value;
-        select.innerHTML = codes.map((code) => `<option value="${code}">${code}</option>`).join("");
-        select.value = codes.includes(keep) ? keep : codes[0];
-      });
+    if (save) {
+      try {
+        window.localStorage.setItem(RAIL_KEY, expanded ? "true" : "false");
+      } catch (error) { /* 저장 공간을 못 쓰면 이 화면에서만 바뀝니다. */ }
     }
   }
 
-  const loadRates = setupExchange();
+  // 드로어가 가운데 내용을 실제로 덮고 있는지. (넓은 화면에서는 가운데가 멀어 덮지 않습니다)
+  function drawerCovers(target) {
+    if (!railInner || !target) return false;
+    return railInner.getBoundingClientRect().right > target.getBoundingClientRect().left;
+  }
+
+  if (railToggle) {
+    setSidebarExpanded(isSidebarExpanded, { save: false });
+    railToggle.addEventListener("click", () => setSidebarExpanded(!isSidebarExpanded));
+    // 드로어가 내용을 덮고 있을 때만, 바깥을 누르면 닫습니다. 덮지 않으면 열어 둔 채 씁니다.
+    document.addEventListener("click", (event) => {
+      if (!isSidebarExpanded || railInner.contains(event.target)) return;
+      if (event.target.closest("[data-fx-modal], [data-hs-modal], [data-dp-modal]")) return;
+      if (drawerCovers(centerEl)) setSidebarExpanded(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && isSidebarExpanded && drawerCovers(centerEl)
+          && !document.querySelector(".fx_modal:not([hidden]), .hs_modal:not([hidden]), .dp_modal:not([hidden])")) {
+        setSidebarExpanded(false);
+        railToggle.focus();
+      }
+    });
+  }
 
   /* ----- 왼쪽 줄에서 옆으로 펼치는 것들 ----- */
-  // 내용이 있는 항목(최근 Shipment, 환율)은 좁은 줄에 넣을 수 없어 옆으로 펼칩니다.
+  // 내용이 있는 항목(최근 Shipment)은 좁은 줄에 넣을 수 없어 옆으로 펼칩니다.
+  // (환율은 옆으로 펼치지 않고 환율 센터 창을 엽니다. fx_center.js)
   const flyouts = Array.from(document.querySelectorAll("[data-rail-flyout]"));
 
   function setFlyout(box, open) {
@@ -986,7 +998,6 @@
       event.stopPropagation();
       const opening = box.querySelector(".rail_flyout").hidden;
       flyouts.forEach((other) => setFlyout(other, other === box && opening));
-      if (opening && box.dataset.railFx !== undefined) loadRates();
     });
   });
   // 바깥을 누르거나 Esc를 누르면 닫습니다.
