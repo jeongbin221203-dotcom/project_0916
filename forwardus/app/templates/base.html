@@ -6,13 +6,6 @@
     <title>{% block title %}ForwardUs{% endblock %} | 수출 운영 플랫폼</title>
     {# 탭 아이콘도 로고 마크를 씁니다. 파일을 바꾸면 여기도 같이 바뀝니다. #}
     <link rel="icon" type="image/svg+xml" href="{{ brand_mark }}">
-    {# 본문(Regular)과 가장 많이 쓰는 굵기(ExtraBold)는 미리 받습니다. 글꼴이 늦게 와
-       글자 모양이 바뀌며 깜빡이는 것을 줄입니다. 주소는 base.css가 부르는 것과 같아야
-       두 번 받지 않습니다(그래서 static_url이 아니라 url_for를 씁니다). #}
-    <link rel="preload" as="font" type="font/woff2" crossorigin
-          href="{{ url_for('static', filename='fonts/nanum-square-neo/NanumSquareNeo-Rg.woff2') }}">
-    <link rel="preload" as="font" type="font/woff2" crossorigin
-          href="{{ url_for('static', filename='fonts/nanum-square-neo/NanumSquareNeo-Eb.woff2') }}">
     <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
     {% block head %}{% endblock %}
   </head>
