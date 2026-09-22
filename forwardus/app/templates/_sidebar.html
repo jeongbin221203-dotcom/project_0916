@@ -1,0 +1,60 @@
+{% from "_macros.html" import status_badge %}
+{# 왼쪽 사이드바. base.html이 모든 화면(standalone 제외)에 붙입니다. 화면을 옮겨도 같은 자리에 있고
+   오른쪽 내용({% block content %})만 바뀝니다. 항목과 최근 Shipment는 routes/sidebar.py가 정합니다.
+   접힘: 아이콘만 있는 얇은 레일(60px). 펼침: 그 위로 드로어(164px)가 미끄러져 나와
+   가운데를 밀지 않고 덮습니다. 이름은 접혔을 때 말풍선(data-tip)으로 보입니다. (sidebar.js)
+   시작 화면을 잠갔으면(HOME_LOCKED) 시작 화면에서만 막습니다. #}
+{% set rail_locked = home_locked and request.endpoint == 'home.index' %}
+<aside class="home_rail{{ ' is_locked' if rail_locked }}" id="home_rail" aria-label="바로가기"
+       {% if rail_locked %}aria-disabled="true" inert{% endif %}>
+ {# 흰 바탕은 바깥(.app_shell 배경)이 끝까지 채우고, 붙어 있는 것은 안쪽입니다.
+    한 덩어리로 두면 body의 zoom 때문에 100vh 계산이 어긋나 밀려 올라갑니다. #}
+ <div class="rail_inner">
+  <button type="button" class="rail_toggle" data-rail-toggle data-tip="사이드바 열기"
+          aria-expanded="false" aria-controls="home_rail" aria-label="사이드바 열기">
+    <svg class="rail_toggle_icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </svg>
+  </button>
+  {% for item in sidebar.links %}
+    <a class="rail_item {{ 'active' if item.active }}" href="{{ item.url }}" data-tip="{{ item.label }}"
+       aria-description="{{ item.note }}" {% if item.active %}aria-current="page"{% endif %}
+       {% if item.key == 'home' %}data-home-reset{% endif %}>
+      <span class="rail_icon {{ item.tone }}" aria-hidden="true">{{ item.icon }}</span>
+      <span class="rail_label">{{ item.label }}</span>
+    </a>
+  {% endfor %}
+  {# 환율은 어느 화면에서나 자주 찾습니다. 화면을 옮기지 않고 환율 센터 창을 엽니다. (fx_center.js) #}
+  <div class="rail_item">
+    <button type="button" data-fx-open aria-haspopup="dialog" data-tip="환율"
+            aria-description="실시간 환율 · 환율 계산기">
+      <span class="rail_icon amber" aria-hidden="true">💱</span>
+      <span class="rail_label">환율</span>
+    </button>
+  </div>
+
+  {% if sidebar.recent %}
+    <div class="rail_item has_flyout" data-rail-flyout data-rail-recent>
+      <button type="button" aria-expanded="false" aria-controls="rail_recent" data-tip="최근"
+              aria-description="최근 Shipment">
+        <span class="rail_icon" aria-hidden="true">🧾</span>
+        <span class="rail_label">최근</span>
+      </button>
+      <div class="rail_flyout" id="rail_recent" hidden>
+        <div class="row_between">
+          <b>최근 Shipment</b>
+          <a href="{{ url_for('dashboard.index') }}">Dashboard →</a>
+        </div>
+        {% for s in sidebar.recent %}
+          <a class="rail_ship" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">
+            <div class="row_between"><span class="mono">{{ s.shipment_id }}</span>{{ status_badge(s.status, s.status_label) }}</div>
+            <b>{{ s.project_name }}</b>
+            <span class="muted">{{ s.origin_code }} → {{ s.destination_code }} · {{ s.mode_label }}</span>
+            <span class="muted">ETD {{ s.etd|d }} · ETA {{ s.eta|d }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+ </div>
+</aside>

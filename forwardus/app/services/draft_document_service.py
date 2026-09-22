@@ -412,6 +412,33 @@ def pdf_bytes(kind: str, draft: dict) -> bytes:
     return document_form.as_pdf(page)
 
 
+# 빈 서식으로 내려받을 수 있는 서류. (칸만 있고 값은 비어 있습니다)
+BLANK_FORMS = ("commercial_invoice", "packing_list_std")
+BLANK_ROWS = 10
+
+
+def blank_pdf(kind: str) -> bytes:
+    """값을 채우지 않은 표준 서식 PDF. 머리글·칸·품목 표 틀만 그립니다.
+
+    손으로 적거나 거래처에 양식으로 보내는 데 씁니다. 초안 그림과 같은 코드로 그려서
+    화면의 미리보기·PDF와 모양이 같습니다.
+    """
+
+    from app.processors import document_form
+
+    if kind not in BLANK_FORMS:
+        raise ServiceError(f"빈 서식이 없는 서류입니다: {kind}", "UNKNOWN_FORM", 404)
+    data = {name: document_form.BLANK for name in fields_for(kind)}
+    data["items"] = [{} for _ in range(BLANK_ROWS)]
+    page = document_form.draw_form(kind, data, item_columns(kind),
+                                   note="ForwardUs 빈 서식 · 값을 채워 쓰세요")
+    return document_form.as_pdf(page)
+
+
+def blank_file_name(kind: str) -> str:
+    return file_name(kind).removesuffix(".pdf").removesuffix("_draft") + "_blank.pdf"
+
+
 def file_name(kind: str) -> str:
     """내려받을 때 붙일 이름."""
 

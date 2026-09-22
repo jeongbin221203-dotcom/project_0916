@@ -9,6 +9,7 @@
   <label class="doc_field {{ 'wide' if field.wide }}" data-doc-field="{{ field.name }}"
          {% if field.sea_only %}data-sea-only{% endif %}>
     <span class="doc_label">{{ field.label }}
+      {%- if field.money %}<span class="doc_money_unit" data-money-unit> (USD)</span>{% endif %}
       {%- if field.required %}<i class="doc_must" title="서류에 반드시 필요합니다">*</i>{% endif %}
     </span>
     {% if field.kind == 'select' %}
@@ -30,7 +31,8 @@
       <input type="date" name="{{ name }}" data-doc-input>
     {% elif field.kind == 'number' %}
       <input type="text" inputmode="decimal" autocomplete="off" name="{{ name }}" data-doc-input
-             placeholder="{{ field.placeholder or '' }}">
+             placeholder="{{ ('USD ' if field.money else '') ~ (field.placeholder or '') }}"
+             {% if field.money %}data-money-input data-money-example="{{ field.placeholder or '' }}"{% endif %}>
     {% elif field.kind == 'place' %}
       <div class="doc_place" data-doc-place="{{ field.role }}">
         <input type="text" autocomplete="off" data-place-search
@@ -111,6 +113,9 @@
         <p class="doc_note">송장과 포장명세서의 품목 줄이 됩니다. 금액은 <b>모든 품목에 적거나 모두 비우거나</b> 둘 중 하나여야 합니다.
           일부만 적으면 줄의 합과 총액이 어긋난 송장이 나옵니다.</p>
         <div data-doc-items></div>
+        {# 품목 금액의 합. 고른 통화가 함께 붙습니다. #}
+        <p class="doc_total" data-doc-total hidden>총액<span data-money-unit> (USD)</span>
+          <b data-doc-total-value>0.00</b></p>
         <button type="button" class="link_button" data-doc-add-item>+ 품목 추가</button>
       </section>
 

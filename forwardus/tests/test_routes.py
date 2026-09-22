@@ -5,9 +5,13 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.mark.parametrize("path", ["/", "/planning/new", "/shipments", "/health"])
+@pytest.mark.parametrize("path", ["/", "/planning/new", "/dashboard", "/health"])
 def test_static_pages_render(client, path):
     assert client.get(path).status_code == 200
+
+
+def test_old_shipments_list_moves_to_dashboard(client):
+    assert client.get("/shipments?status=booked").headers["Location"] == "/dashboard?status=booked"
 
 
 def test_unknown_shipment_returns_404(client):

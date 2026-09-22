@@ -12,6 +12,13 @@
         말로 적어 만들고 싶으시면 <a href="{{ url_for('home.index') }}">시작 화면</a>에서
         <b>서류 작성</b>을 눌러 대화로 하셔도 됩니다.</p>
     </div>
+    {# 값이 비어 있는 표준 서식. 손으로 적거나 거래처에 양식으로 보낼 때 씁니다. #}
+    <div class="blank_forms" aria-label="빈 서식 PDF 내려받기">
+      <a class="button ghost" href="{{ url_for('document.blank_file', kind='commercial_invoice') }}"
+         download data-blank-form="commercial_invoice">⬇ 상업송장 빈 서식(PDF)</a>
+      <a class="button ghost" href="{{ url_for('document.blank_file', kind='packing_list_std') }}"
+         download data-blank-form="packing_list_std">⬇ 패킹리스트 빈 서식(PDF)</a>
+    </div>
   </div>
 
   {# 받아 둔 B/L·Offer Sheet가 있으면 올려서 칸을 채웁니다. 채운 뒤 확인은 아래 칸에서 합니다. #}

@@ -37,6 +37,18 @@ def draft_file(kind: str):
                      download_name=draft_document_service.file_name(kind))
 
 
+@document_bp.get("/blank/<kind>.pdf")
+def blank_file(kind: str):
+    """빈 서식(상업송장·패킹리스트) PDF를 바로 내려받습니다. 로그인하지 않아도 됩니다."""
+
+    try:
+        data = draft_document_service.blank_pdf(kind)
+    except ServiceError as exc:
+        return error_response(exc)
+    return send_file(io.BytesIO(data), mimetype="application/pdf", as_attachment=True,
+                     download_name=draft_document_service.blank_file_name(kind))
+
+
 @document_bp.get("/new")
 @login_required
 def new():
