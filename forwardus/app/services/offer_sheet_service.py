@@ -4,7 +4,10 @@
   1. 파일은 메모리에서만 읽습니다. 디스크에 쓰지 않습니다. (원본을 남기지 않습니다)
   2. 글자가 있으면 글자로, 없으면(스캔·사진) 그림으로 AI에게 보냅니다.
      글자로 보낼 때는 계좌번호·SWIFT를 먼저 가립니다. OpenAI는 그 번호를 보지 않고,
-     돌아온 뒤 우리가 제자리에 되돌립니다. 그림은 가릴 수 없어 그대로 갑니다.
+     돌아온 뒤 우리가 제자리에 되돌립니다.
+     그림은 우리 컴퓨터에서 OCR로 번호 자리를 찾아 검게 칠한 뒤에 보냅니다.
+     (app/processors/bank_redaction.py) 칠한 번호는 되살리지 않으니 은행 정보는
+     이용자가 직접 적습니다. OCR이 없으면 그림을 받지 않습니다.
   3. AI는 정해진 틀로 옮겨 적기만 합니다. 판단은 우리 코드가 합니다.
   4. **확실한 것만 초안에 넣습니다.** 나머지는 "확인 필요"나 "직접 입력"으로 돌려
      사람이 정하게 합니다. 무엇을 확실하다고 보는지는 아래와 같습니다.
@@ -34,6 +37,7 @@ from pathlib import Path
 
 from app.collectors import ai_client
 from app.collectors.base_client import get_config
+from app.processors import bank_redaction
 from app.services import ServiceError, draft_store, intake_service
 from app.validators import ValidationError
 from app.validators.cargo_validator import (PACKAGE_TYPE_INFO, price_unit_of,
@@ -62,6 +66,7 @@ FIELDS = [
     ("buyer_address", "buyer_address", "바이어 주소"),
     ("buyer_contact", "buyer_contact", "바이어 연락처"),
     ("incoterms", "incoterms", "가격 조건 (Incoterms)"),
+    ("incoterms_place", "incoterms_place", "가격 조건 장소 (Named place)"),
     ("origin_code", "origin_place", "출발항 (Port of Loading)"),
     ("destination_code", "destination_place", "도착항 (Port of Discharge)"),
     ("currency", "currency", "통화"),
@@ -78,7 +83,8 @@ LABELS = {ours: label for ours, _, label in FIELDS}
 _S = {"type": "string"}
 _ITEM = {"type": "object", "additionalProperties": False, "properties": {
     "description": _S, "hs_code": _S, "quantity": _S, "quantity_unit": _S,
-    "unit_price": _S, "amount": _S, "pieces_per_package": _S, "package_type": _S}}
+    "unit_price": _S, "amount": _S, "pieces_per_package": _S, "package_content_unit": _S,
+    "package_type": _S}}
 _ITEM["required"] = list(_ITEM["properties"])
 SCHEMA = {"type": "object", "additionalProperties": False, "properties": {
     "document_type": _S, "offer_no": _S, "offer_date": _S, "validity_date": _S,
@@ -100,12 +106,15 @@ PROMPT = """무역 서류(오퍼시트·견적서·Proforma)를 읽어 값을 �
 - 숫자는 쉼표·통화 기호를 떼고 숫자만. 날짜는 YYYY-MM-DD.
 - [ACCOUNT_1], [SWIFT_1] 같은 표시는 가린 번호다. 보이는 그대로 옮긴다.
 - incoterms는 세 글자 코드만(FOB). 그 뒤의 장소는 incoterms_place에.
+  회사마다 적는 자리가 다르다. "Price Term", "Terms of Price", "REMARK: FOB",
+  단가 칸 머리("CIF YOKOHAMA, JAPAN/PC"), 총액 옆("FOB BUSAN") 어디든 찾아 옮긴다.
 - origin_place는 **선적항·출발항**(Port of Loading, From)이다. "Origin"·"Country of Origin"은
   원산지(물건을 만든 나라)라서 origin_place가 아니라 country_of_origin에 적는다.
 - destination_place는 도착항·목적지(Port of Discharge, Destination, To).
 - quantity_unit은 수량 옆에 적힌 단위 그대로(PCS, KG, SET).
 - unit_price는 적힌 단가 그대로. 금액을 수량으로 나눠 만들지 않는다.
 - pieces_per_package는 "20 PCS/CTN"처럼 그 품목의 포장당 개수가 적혀 있을 때만.
+  그 개수의 단위(20 PCS/CTN이면 PCS)는 package_content_unit에.
 - package_type은 포장 종류(carton, pallet, drum, bag 등).
 - packing은 포장에 관한 문장을 그대로. document_type은 서류 종류를 영어로."""
 
@@ -235,40 +244,11 @@ def _png(image) -> bytes:
 
 
 # --- 3. 번호 가리기 ----------------------------------------------------------------
+# 글자와 그림 모두 app/processors/bank_redaction.py에서 가립니다.
 
-_ACCOUNT = re.compile(
-    r"(?i)\b(A/?C(?:\s*No\.?)?|Account(?:\s*(?:No\.?|Number))?|Acct\.?(?:\s*No\.?)?|IBAN|계좌(?:번호)?)"
-    r"(\s*[:.#]?\s*)([A-Z]{0,2}\d[\d \-]{5,}\d)")
-_SWIFT = re.compile(
-    r"(?i)\b(SWIFT(?:\s*Code)?|BIC(?:\s*Code)?)(\s*[:.]?\s*)([A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b")
-
-
-def redact(text: str) -> tuple[str, dict]:
-    """계좌번호·SWIFT를 [ACCOUNT_1] 같은 표시로 바꿉니다. (가린 글, 표시 → 원래 값)
-
-    이름표(A/C, SWIFT) 바로 뒤의 번호만 가립니다. 이름표 없이 숫자만 적힌
-    계좌는 알아볼 수 없습니다. 그래서 화면에 "글자 파일은 이름표가 붙은 번호만
-    가립니다"라고 알립니다.
-    """
-
-    secrets: dict[str, str] = {}
-
-    def swap(kind):
-        def replace(match):
-            token = f"[{kind}_{sum(1 for key in secrets if key.startswith(f'[{kind}')) + 1}]"
-            secrets[token] = match.group(3)
-            return f"{match.group(1)}{match.group(2)}{token}"
-        return replace
-
-    text = _SWIFT.sub(swap("SWIFT"), text)
-    text = _ACCOUNT.sub(swap("ACCOUNT"), text)
-    return text, secrets
-
-
-def _restore(value: str, secrets: dict) -> str:
-    for token, original in secrets.items():
-        value = value.replace(token, original)
-    return value
+redact = bank_redaction.redact
+strip_bank_numbers = bank_redaction.strip_bank_numbers
+_restore = bank_redaction.restore
 
 
 # --- 4. AI에게 읽히기 -------------------------------------------------------------
@@ -314,13 +294,62 @@ def _plain(text: str) -> str:
     return re.sub(r"\s+", " ", str(text or "")).strip().lower()
 
 
+_CURRENCY_MARK = re.compile(r"^@?\s*(?:US\$|[A-Z]{3}|[$€£¥₩])?\s*|\s*(?:[A-Z]{3}|[$€£¥₩])$")
+_PLAIN_NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
+# 점이 천 단위처럼 보이는 모양(1.000, 5.000). 유럽식이면 1,000이고 아니면 1.0입니다.
+_DOT_THOUSANDS = re.compile(r"\d{1,3}(?:\.\d{3})+")
+
+
 def _number(value) -> float | None:
-    text = str(value or "").replace(",", "").strip()
-    try:
-        number = float(text)
-    except ValueError:
+    """서류의 숫자를 읽습니다. 뜻이 둘로 갈리면 읽지 않습니다(None).
+
+    "USD 4.50", "$5,400.00", "₩3,200"처럼 통화 표시가 붙은 것은 떼고 읽습니다.
+    "3,20"(3.20? 320?), "1.000"(1? 1,000?), "1.234,56"처럼 나라마다 뜻이 다른
+    모양은 짐작하지 않습니다. 틀리게 읽으면 수량 1개 × 5 = 5가 계산까지 맞아
+    그대로 서류에 들어갑니다. 비워 두고 사람에게 묻습니다.
+    """
+
+    text = str(value or "").strip().upper()
+    for _ in range(2):
+        text = _CURRENCY_MARK.sub("", text).strip()
+    if not _PLAIN_NUMBER.fullmatch(text) or _DOT_THOUSANDS.fullmatch(text):
         return None
-    return number if number >= 0 else None
+    return float(text.replace(",", ""))
+
+
+def _read_number(value, name: str, problems: list) -> float | None:
+    """품목의 숫자 칸 하나. 없으면 "없다", 있는데 못 읽으면 "못 읽었다"고 적습니다."""
+
+    text = str(value or "").strip()
+    if not text:
+        problems.append(f"{name} 칸이 비어 있습니다.")
+        return None
+    number = _number(text)
+    if number is None:
+        problems.append(f"{name} '{text[:20]}'을(를) 숫자로 확실히 읽지 못했습니다. 직접 입력해 주세요.")
+    return number
+
+
+MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august",
+          "september", "october", "november", "december")
+
+
+def _date_in_source(iso: str, source: str) -> bool:
+    """그 날짜가 원문에 어떤 모양으로든 적혀 있는지. (source는 _plain으로 다듬은 글)"""
+
+    try:
+        day = date.fromisoformat(iso)
+    except ValueError:
+        return False
+    y, m, d = day.year, day.month, day.day
+    full, short = MONTHS[m - 1], MONTHS[m - 1][:3]
+    shapes = [f"{y}-{m:02d}-{d:02d}", f"{y}.{m:02d}.{d:02d}", f"{y}/{m:02d}/{d:02d}",
+              f"{y}.{m}.{d}", f"{y}/{m}/{d}", f"{y}년 {m}월 {d}일", f"{y}년{m}월{d}일",
+              f"{d:02d}/{m:02d}/{y}", f"{d:02d}.{m:02d}.{y}"]
+    for name in (full, short, f"{short}."):
+        shapes += [f"{name} {d}, {y}", f"{name} {d} {y}", f"{d} {name} {y}", f"{d} {name}, {y}",
+                   f"{name} {d:02d}, {y}", f"{d:02d} {name} {y}", f"{d}-{name}-{y}"]
+    return any(shape in source for shape in shapes)
 
 
 def _row(key: str, value: str, status: str, note: str = "") -> dict:
@@ -384,13 +413,38 @@ def verify(raw: dict, *, mode: str, source_text: str, secrets: dict) -> dict:
                 rows.append(_row(ours, written, "missing", "날짜로 읽히지 않습니다. 직접 입력해 주세요."))
                 continue
             status, note = text_status(theirs, written)
-            if status == "check" and mode == "text" and value in source:
+            # "2026년 10월 15일", "Oct. 15, 2026"처럼 원문 모양이 달라도 같은 날이면 확실합니다.
+            if status == "check" and mode == "text" and theirs not in uncertain \
+                    and _date_in_source(value, source):
                 status, note = "ok", ""
             rows.append(_row(ours, value, status, note))
+        elif ours == "bank_info" and mode == "image":
+            # 사진은 번호를 지운 뒤 보냈으니 AI가 적은 은행 정보에는 번호가 빠져 있습니다.
+            # 지운 번호를 짐작해 채우지 않습니다. 이용자가 직접 적습니다.
+            rows.append(_row(ours, "", "missing", "사진에서 계좌번호를 지우고 읽었습니다. "
+                                                   "은행 정보를 직접 입력해 주세요."))
+        elif ours == "bank_info":
+            status, note = text_status(theirs, written)
+            # 가린 번호는 원문 대조를 가린 글로 한 뒤, 은행 칸에만 되돌립니다.
+            rows.append(_row(ours, _restore(written, secrets), status, note))
         else:
             status, note = text_status(theirs, written)
-            # 가린 번호는 원문 대조를 가린 글로 한 뒤에 되돌립니다.
-            rows.append(_row(ours, _restore(written, secrets), status, note))
+            if ours not in PRIVATE_FIELDS:
+                # 결제 조건·비고에 계좌번호가 섞이면 서버에 저장되고 미리보기에도 보입니다.
+                # 지우고 사람에게 확인받습니다. 은행 정보는 은행 칸에 따로 있습니다.
+                written, had_bank = strip_bank_numbers(written)
+                if had_bank:
+                    status, note = "check", ("계좌번호가 섞여 있어 지웠습니다. 은행 정보는 은행 칸에 "
+                                             "따로 두고, 이 칸은 확인해 주세요.")
+            rows.append(_row(ours, written, status, note))
+
+    # 바이어 칸에 수출자 이름이 들어오는 식의 뒤바뀜은 원문 대조로 못 잡습니다.
+    # 둘 다 원문에 있으니까요. 같은 이름이면 둘 다 확인받습니다.
+    by_key = {row["key"]: row for row in rows}
+    seller, buyer = by_key["exporter_name"], by_key["buyer_name"]
+    if seller["value"] and _plain(seller["value"]) == _plain(buyer["value"]):
+        for row in (seller, buyer):
+            row["status"], row["note"] = "check", "수출자와 바이어 이름이 같습니다. 바뀌지 않았는지 봐 주세요."
 
     items, item_notes, totals = _items(raw, mode=mode, source=source, uncertain=uncertain)
     notes += item_notes
@@ -401,7 +455,8 @@ def verify(raw: dict, *, mode: str, source_text: str, secrets: dict) -> dict:
     private = {row["key"]: row["value"] for row in rows
                if row["key"] in PRIVATE_FIELDS and row["value"]}
 
-    readable = any(row["value"] for row in rows) or items
+    readable = any(row["value"] for row in rows) or any(
+        str(value or "").strip() for item in items for value in item["read"].values())
     if not readable:
         raise ServiceError("서류에서 글자를 읽지 못했습니다. 흐리거나 잘린 사진일 수 있습니다. "
                            "서류 작성 화면에서 직접 입력해 주세요.", "NOTHING_READ")
@@ -449,31 +504,33 @@ def _items(raw: dict, *, mode: str, source: str, uncertain: set) -> tuple[list, 
         notes.append(f"품목이 {len(rows)}개라 앞의 {MAX_ITEMS}개만 읽었습니다.")
         rows = rows[:MAX_ITEMS]
 
+    # AI가 "items" 또는 "items[0].unit_price"처럼 품목 쪽을 확실히 못 읽었다고 하면
+    # 품목 전체를 사람에게 확인받습니다. 어느 줄의 어느 칸인지까지 믿지 않습니다.
+    items_uncertain = any(name == "items" or name.startswith("items") for name in uncertain)
+
     amounts = []
     for no, row in enumerate(rows, start=1):
         problems = []
         description = str(row.get("description") or "").strip()[:300]
         written_unit = str(row.get("quantity_unit") or "").strip()
         unit = price_unit_of(written_unit)
-        quantity = _number(row.get("quantity"))
-        price = _number(row.get("unit_price"))
-        amount = _number(row.get("amount"))
-        per = _number(row.get("pieces_per_package"))
 
         if not description:
             problems.append("품명이 없습니다.")
-        if quantity is None:
-            problems.append("수량이 없습니다.")
+        quantity = _read_number(row.get("quantity"), "수량", problems)
         if not written_unit:
             problems.append("수량의 단위(PCS · KG 등)가 없습니다.")
         elif not unit:
-            problems.append(f"단위 '{written_unit}'을(를) 알 수 없습니다.")
-        if price is None:
-            problems.append("단가가 없습니다.")
-        if amount is None:
-            problems.append("금액이 없습니다.")
-        else:
+            problems.append(f"단위 '{written_unit}'을(를) 알 수 없습니다. 직접 골라 주세요.")
+        price = _read_number(row.get("unit_price"), "단가", problems)
+        amount = _read_number(row.get("amount"), "금액", problems)
+        if amount is not None:
             amounts.append(amount)
+        per = _number(row.get("pieces_per_package"))
+        # "20 PCS/CTN"의 PCS가 단가의 단위와 같아야 상자 수를 셀 수 있습니다.
+        # 상자당 값을 매긴 오퍼(100 CTN × 64.00)에 20 PCS/CTN을 적용하면 5상자가 됩니다.
+        content_unit = price_unit_of(row.get("package_content_unit"))
+        per_matches = bool(per) and bool(unit) and _same_count(content_unit, unit)
         if None not in (quantity, price, amount) and round(quantity * price, 2) != round(amount, 2):
             problems.append(f"수량 × 단가 = {quantity:,g} × {price:,g} = {quantity * price:,.2f} 인데 "
                             f"금액은 {amount:,.2f} 입니다.")
@@ -486,8 +543,11 @@ def _items(raw: dict, *, mode: str, source: str, uncertain: set) -> tuple[list, 
         price_ok = not problems
         if price_ok:
             line.update(unit_quantity=quantity, price_unit=unit, unit_price=price, amount=amount)
-            if per and package_type:
+            if per and package_type and per_matches:
                 line["units_per_package"] = per
+            elif per and not per_matches:
+                notes.append(f"품목 {no}: 포장당 수량의 단위가 단가 단위({unit})와 달라 "
+                             "포장 개수는 포장명세서에서 정합니다.")
             elif per:
                 # 무엇에 담는지 모르면 "100 CTN"이라고 적을 수 없습니다. 포장명세서에서 정합니다.
                 notes.append(f"품목 {no}: 포장 종류가 적혀 있지 않아 포장 개수는 "
@@ -508,7 +568,7 @@ def _items(raw: dict, *, mode: str, source: str, uncertain: set) -> tuple[list, 
 
         if not price_ok:
             status = "missing"
-        elif mode == "image" or "items" in uncertain:
+        elif mode == "image" or items_uncertain:
             status = "check"
         elif _plain(description) not in source:
             status = "check"
@@ -518,21 +578,35 @@ def _items(raw: dict, *, mode: str, source: str, uncertain: set) -> tuple[list, 
 
         items.append({"no": no, "status": status, "problems": problems, "line": line,
                       "read": {"description": description, "quantity": row.get("quantity"),
-                               "unit": written_unit, "unit_price": row.get("unit_price"),
+                               "unit": written_unit, "unit_code": unit,
+                               "unit_price": row.get("unit_price"),
                                "amount": row.get("amount"),
                                "pieces_per_package": row.get("pieces_per_package")}})
 
     stated = _number(raw.get("total_amount"))
     lines_sum = round(sum(amounts), 2) if amounts else None
     match = stated is not None and lines_sum is not None and round(stated, 2) == lines_sum
-    if stated is not None and lines_sum is not None and not match:
-        notes.append(f"품목 금액의 합({lines_sum:,.2f})이 서류 총액({stated:,.2f})과 다릅니다. "
-                     "빠진 품목이 있는지 봐 주세요.")
-        # 합이 안 맞으면 어느 줄이 빠졌는지 모릅니다. 모든 줄을 확인받습니다.
+    if not match and items:
+        if stated is None:
+            notes.append("서류에서 총액을 확실히 읽지 못해 품목 금액을 맞춰 보지 못했습니다. "
+                         "품목을 확인해 주세요.")
+        elif lines_sum is not None:
+            notes.append(f"품목 금액의 합({lines_sum:,.2f})이 서류 총액({stated:,.2f})과 다릅니다. "
+                         "빠진 품목이 있는지 봐 주세요.")
+        # 총액과 맞춰 보지 못하면 어느 줄이 빠졌는지 모릅니다. 모든 줄을 확인받습니다.
         for item in items:
             if item["status"] == "ok":
                 item["status"] = "check"
     return items, notes, {"stated": stated, "lines_sum": lines_sum, "match": match}
+
+
+# 셀 때 같은 뜻인 단위. EA(each)와 PCS(piece)는 둘 다 낱개입니다.
+# 상자 수를 셀 때만 같게 보고, 서류에는 적힌 단위 그대로 찍습니다.
+_COUNT_SAME = {"EA": "PCS"}
+
+
+def _same_count(left: str, right: str) -> bool:
+    return bool(left) and _COUNT_SAME.get(left, left) == _COUNT_SAME.get(right, right)
 
 
 def _package_word(value) -> str:
@@ -548,6 +622,23 @@ def _package_word(value) -> str:
 # --- 한 번에 -----------------------------------------------------------------------
 
 
+def _notice(mode: str, hidden: int) -> str:
+    """AI에 무엇이 갔는지 있는 그대로 알립니다. 못 가렸으면 가렸다고 하지 않습니다."""
+
+    if mode == "image":
+        if hidden:
+            return (f"사진에서 계좌번호·SWIFT {hidden}곳을 검게 지운 뒤 AI(OpenAI)에 보냈습니다. "
+                    "보낸 그림을 아래에 보여 드립니다. 지운 번호는 되살리지 않으니 은행 정보는 "
+                    "직접 적어 주세요.")
+        return ("사진에서 지울 계좌번호를 찾지 못했습니다. 보낸 그림을 아래에 보여 드립니다. "
+                "번호가 보이면 알려 주세요.")
+    if hidden:
+        return (f"계좌번호·SWIFT {hidden}개를 가린 뒤 AI(OpenAI)에 보냈습니다. "
+                "은행·계좌라는 말이 없는 곳에 적힌 번호는 알아보지 못할 수 있습니다.")
+    return ("서류에서 가릴 계좌번호를 찾지 못했습니다. 계좌번호가 있었다면 그대로 AI(OpenAI)에 "
+            "보내졌을 수 있습니다.")
+
+
 def read_offer(file_storage) -> dict:
     """파일을 받아 읽고 확인하고, 서버에 둘 것만 잠시 저장합니다."""
 
@@ -560,18 +651,29 @@ def read_offer(file_storage) -> dict:
                            "NOTHING_READ")
 
     secrets: dict = {}
+    hidden = 0
     if extracted["mode"] == "text":
         extracted["text"], secrets = redact(extracted["text"])
+        hidden = len(secrets)
+    else:
+        # 사진도 은행 번호를 지운 뒤에만 보냅니다. 지울 수 없으면 받지 않습니다.
+        if not bank_redaction.ocr_available():
+            raise ServiceError("사진 속 계좌번호를 지우는 도구(OCR)가 설치되어 있지 않아 사진은 "
+                               "받을 수 없습니다. 엑셀·워드·글자가 있는 PDF로 올려 주세요.",
+                               "OCR_UNAVAILABLE")
+        masked = [bank_redaction.redact_image(page) for page in extracted["images"]]
+        extracted["images"] = [page["image"] for page in masked]
+        hidden = sum(page["found"] for page in masked)
 
     raw = ask(extracted)
     result = verify(raw, mode=extracted["mode"], source_text=extracted["text"], secrets=secrets)
     result["source"] = {
         "filename": name, "mode": extracted["mode"], "pages": len(extracted["images"]) or 1,
-        "hidden_numbers": len(secrets),
-        "notice": ("사진·스캔본은 그림째로 AI(OpenAI)에 보내져 계좌번호를 가릴 수 없었습니다."
-                   if extracted["mode"] == "image" else
-                   f"계좌번호·SWIFT {len(secrets)}개를 가린 뒤 AI에 보냈습니다. "
-                   "이름표(A/C·SWIFT) 없이 숫자만 적힌 번호는 가리지 못합니다."),
+        "hidden_numbers": hidden,
+        "notice": _notice(extracted["mode"], hidden),
+        # 사진이면 AI에 실제로 보낸(번호를 지운) 그림을 이용자에게도 보여 줍니다.
+        "sent_images": ["data:image/png;base64," + base64.b64encode(page).decode()
+                        for page in extracted["images"]],
     }
     # 저장하는 줄에서는 은행·바이어 주소·연락처 값을 비웁니다. (draft_store도 한 번 더 거릅니다)
     stored_fields = [{**row, "value": ""} if row["private"] else row for row in result["fields"]]
@@ -601,6 +703,11 @@ def confirm(token: str, values: dict, items: list | None = None) -> dict:
         if not text:
             draft.pop(key, None)
             continue
+        # 사람이 결제 조건·비고에 계좌번호를 적어 보내도 서버에는 두지 않습니다.
+        text, had_bank = strip_bank_numbers(text)
+        if had_bank:
+            notes.append(f"{LABELS[key]}에 적힌 계좌번호는 저장하지 않았습니다. "
+                         "은행 정보 칸에 적어 주세요. (PDF를 만들 때만 씁니다)")
         if key == "incoterms":
             text = intake_service._pick(text, intake_service.INCOTERMS)
         elif key == "currency":
@@ -626,12 +733,16 @@ def confirm(token: str, values: dict, items: list | None = None) -> dict:
             if not str(line.get("product_description") or "").strip():
                 notes.append(f"품목 {no}: 품명이 없어 뺐습니다.")
                 continue
-            clean = {key: line.get(key) for key in (
-                "product_description", "hs_code", "package_type", "unit_quantity", "price_unit",
-                "unit_price", "amount", "units_per_package") if line.get(key) not in (None, "")}
-            if checked["quantity"] is not None:
-                clean["quantity"] = checked["quantity"]
-            accepted.append(clean)
+            # 받은 글자("2,000", "pcs")가 아니라 검증기가 읽은 값을 저장합니다.
+            # 다른 화면이 이 값을 그대로 이어 쓰므로 모양이 하나여야 합니다.
+            clean = {"product_description": str(line["product_description"]).strip()[:300],
+                     "hs_code": "".join(ch for ch in str(line.get("hs_code") or "")
+                                        if ch.isdigit())[:10],
+                     **{key: checked[key] for key in (
+                         "package_type", "quantity", "unit_quantity", "price_unit", "unit_price",
+                         "amount", "units_per_package")}}
+            accepted.append({key: value for key, value in clean.items()
+                             if value not in (None, "")})
         draft["items"] = accepted
 
     stored["draft"] = draft

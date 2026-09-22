@@ -210,6 +210,18 @@ def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
         if head:
             again = planning_service.search_locations(head, transport_mode, role)
             rows = again["data"] if again["success"] else []
+    # "미국 로스앤젤레스", "Los Angeles USA"처럼 나라가 앞뒤에 붙은 경우.
+    # 앞 낱말이나 뒤 낱말을 떼고 한 번씩 더 찾습니다. 짐작이 섞이므로 그렇다고 적어 둡니다.
+    if not rows:
+        words = text.replace(",", " ").split()
+        for shorter in (" ".join(words[1:]), " ".join(words[:-1])):
+            if len(words) < 2 or len(shorter) < 2:
+                continue
+            again = planning_service.search_locations(shorter, transport_mode, role)
+            rows = again["data"] if again["success"] else []
+            if rows:
+                notes.append(f"{label} '{text}'을(를) '{shorter}'(으)로 찾았습니다. 맞는지 봐 주세요.")
+                break
     if not rows:
         notes.append(f"{label} '{text}'을(를) 목록에서 찾지 못했습니다. 직접 골라 주세요.")
         return None

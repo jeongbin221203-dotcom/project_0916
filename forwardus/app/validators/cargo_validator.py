@@ -104,6 +104,11 @@ PRICE_UNIT_ALIASES = {
     "MTR": "M", "METER": "M", "METRE": "M", "SQM": "M2", "CBM": "M3",
     "ROLLS": "ROLL", "SHEETS": "SHEET", "BOXES": "BOX", "CARTON": "CTN", "CARTONS": "CTN",
     "BOTTLE": "BTL", "BOTTLES": "BTL",
+    # 한글 서류(견적서)에 흔한 단위. 뜻이 하나로 정해지는 것만 둡니다.
+    # ("상자"는 박스인지 카톤인지 서류마다 달라 넣지 않았습니다. 사람에게 묻습니다)
+    "개": "PCS", "세트": "SET", "켤레": "PR", "다스": "DZ", "박스": "BOX", "병": "BTL",
+    "장": "SHEET", "롤": "ROLL", "킬로그램": "KG", "킬로": "KG", "그램": "G", "톤": "MT",
+    "리터": "L", "미터": "M",
 }
 MAX_UNIT_QUANTITY = 1_000_000_000
 

@@ -25,8 +25,10 @@ def draft_file(kind: str):
     """
 
     payload = request.get_json(silent=True) or {}
+    # 은행 정보·바이어 주소는 브라우저가 따로(private) 보냅니다. 여기서만 합치고 버립니다.
+    draft = draft_document_service.with_private(payload.get("draft") or {}, payload.get("private"))
     try:
-        data = draft_document_service.pdf_bytes(kind, payload.get("draft") or {})
+        data = draft_document_service.pdf_bytes(kind, draft)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     return send_file(io.BytesIO(data), mimetype="application/pdf",

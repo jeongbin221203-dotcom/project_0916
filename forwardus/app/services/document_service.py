@@ -394,7 +394,12 @@ def _summary_unit_price(shipment, cargo):
     if not cargo:
         return None
     if priced_by_units(cargo):
-        return f"{cargo.unit_price:g} / {cargo.price_unit}" if cargo.unit_price is not None else ""
+        if cargo.unit_price is None:
+            return ""
+        # :g는 1234567을 1.23457e+06으로 반올림합니다. 단가는 한 푼도 달라지면 안 됩니다.
+        text = f"{cargo.unit_price:,.4f}".rstrip("0")
+        whole, _, cents = text.partition(".")
+        return f"{whole}.{cents.ljust(2, '0')} / {cargo.price_unit}"
     return round(shipment.invoice_value / cargo.quantity, 4) if cargo.quantity else None
 
 

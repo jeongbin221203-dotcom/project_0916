@@ -124,29 +124,12 @@ def api_agent():
 OFFER_FORMS = ("proforma_invoice", "commercial_invoice", "packing_list_std")
 
 
-def _with_private(draft: dict, private: dict) -> dict:
-    """그림을 그리는 순간에만 은행·바이어 주소를 합칩니다. 저장하지 않습니다.
-
-    미리보기는 그 칸을 덮어서 보여 주지만, 값이 있어야 "덮인 칸"으로 그려집니다.
-    없으면 빈 칸으로 보고 "서류 작성에서 입력" 안내가 나옵니다.
-    """
-
-    merged = dict(draft)
-    private = private if isinstance(private, dict) else {}
-    for ours, theirs in (("bank_info", "bank_info"), ("buyer_address", "buyer_address"),
-                         ("buyer_email", "buyer_contact")):
-        value = str(private.get(theirs) or "").strip()
-        if value:
-            merged[ours] = value[:500]
-    return merged
-
-
 def _offer_previews(draft: dict, private: dict) -> list[dict]:
     """초안 세 장. 은행·바이어 정보는 덮고, 빈 칸에는 어디서 채우는지 적습니다."""
 
     if not draft.get("items"):
         return []
-    merged = _with_private(draft, private)
+    merged = draft_document_service.with_private(draft, private)
     rows = []
     for kind in OFFER_FORMS:
         row = {"kind": kind, "title": draft_document_service.FORMS[kind],

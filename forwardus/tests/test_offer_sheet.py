@@ -90,10 +90,10 @@ def _answer(**changes) -> dict:
         "items": [
             {"description": "Hair Shampoo 500ml", "hs_code": "", "quantity": "2000",
              "quantity_unit": "PCS", "unit_price": "3.20", "amount": "6400.00",
-             "pieces_per_package": "20", "package_type": "carton"},
+             "pieces_per_package": "20", "package_content_unit": "PCS", "package_type": "carton"},
             {"description": "Toothpaste 120g", "hs_code": "", "quantity": "5000",
              "quantity_unit": "PCS", "unit_price": "0.85", "amount": "4250.00",
-             "pieces_per_package": "100", "package_type": "carton"},
+             "pieces_per_package": "100", "package_content_unit": "PCS", "package_type": "carton"},
         ],
         "uncertain_fields": [],
     }
@@ -248,7 +248,35 @@ def test_사진에서_읽은_글자는_모두_확인을_받는다(app, ai):
     # 숫자는 계산이 맞아도 품명은 대조할 원문이 없어 확인을 받습니다.
     assert all(item["status"] == "check" for item in result["items"])
     assert result["draft"]["items"] == []
-    assert "가릴 수 없었습니다" in result["source"]["notice"]
+    # 사진은 번호를 지운 그림을 보냈고, 그 그림을 이용자에게도 보여 줍니다.
+    assert result["source"]["sent_images"][0].startswith("data:image/png")
+    # 지운 번호는 되살리지 않습니다. 은행 정보는 이용자가 직접 적습니다.
+    bank = next(row for row in result["fields"] if row["key"] == "bank_info")
+    assert bank["status"] == "missing" and "bank_info" not in result["private"]
+
+
+def test_OCR이_없으면_사진을_받지_않는다(app, ai, monkeypatch):
+    """번호를 지우지 못한 사진을 보내느니 받지 않습니다."""
+
+    from app.processors import bank_redaction
+
+    monkeypatch.setattr(bank_redaction, "ocr_available", lambda: False)
+    with app.app_context(), pytest.raises(ServiceError) as caught:
+        offer.read_offer(_file(_png(), "scan.png"))
+
+    assert "엑셀" in str(caught.value)
+    assert ai.sent == []                                    # AI에는 아무것도 가지 않았습니다
+
+
+def test_가격_조건은_장소와_함께_저장하고_서류에_찍는다(app, ai):
+    with app.app_context():
+        result = offer.read_offer(_file(_xlsx(), "offer.xlsx"))
+        from app.services import draft_document_service as drafts
+        data = drafts.render("proforma_invoice", result["draft"])["data"]
+
+    assert result["draft"]["incoterms"] == "FOB"
+    assert result["draft"]["incoterms_place"] == "Busan, Korea"
+    assert data["incoterms"] == "FOB Busan, Korea"
 
 
 def test_AI가_확실하지_않다고_한_칸은_직접_입력하게_한다(app, ai):

@@ -258,8 +258,14 @@ def _extras(draft: dict) -> dict:
              "remarks", "bank_info", "po_no", "validity_date", "signed_by", "shipment_time",
              "accepted_by", "consignee_city_zip", "attention", "customer_order_no",
              "date_ordered", "container_no", "comments", "packed_by", "invoice_no")
-    return {name: str(draft.get(name) or "").strip()
-            for name in names if str(draft.get(name) or "").strip()}
+    extras = {name: str(draft.get(name) or "").strip()
+              for name in names if str(draft.get(name) or "").strip()}
+    # 가격 조건은 장소와 함께 적는 것이 맞습니다. "FOB" 대신 "FOB BUSAN".
+    code = str(draft.get("incoterms") or "").strip().upper()
+    place = str(draft.get("incoterms_place") or "").strip()
+    if code and place:
+        extras["incoterms"] = f"{code} {place}"
+    return extras
 
 
 def _items(kind: str, stand_in) -> list[dict]:
@@ -290,6 +296,32 @@ def _items(kind: str, stand_in) -> list[dict]:
 
 def _kg(value) -> str:
     return f"{value:,.2f} KG" if value else ""
+
+
+def with_private(draft: dict, private: dict | None) -> dict:
+    """은행 정보·바이어 주소·연락처를 그림을 그리는 순간에만 합칩니다. 저장하지 않습니다.
+
+    이 값들은 이용자 브라우저에만 있다가, 미리보기(가려서)나 PDF(그대로)를
+    만들 때만 서버를 지나갑니다. 미리보기와 PDF가 같은 방식으로 합치도록
+    한 곳에 둡니다.
+
+    연락처는 바이어 주소 아랫줄에 붙입니다. 견적송장·상업송장·포장명세서에는
+    연락처 칸이 따로 없어, 그렇게 하지 않으면 PDF 어디에도 찍히지 않습니다.
+    """
+
+    merged = dict(draft or {})
+    private = private if isinstance(private, dict) else {}
+    bank = str(private.get("bank_info") or "").strip()[:500]
+    address = str(private.get("buyer_address") or "").strip()[:500]
+    contact = str(private.get("buyer_contact") or "").strip()[:200]
+    if bank:
+        merged["bank_info"] = bank
+    if address or contact:
+        merged["buyer_address"] = "\n".join(part for part in (
+            address or str(merged.get("buyer_address") or "").strip(), contact) if part)
+    if contact:
+        merged["buyer_email"] = contact
+    return merged
 
 
 # 미리보기에서 가리는 칸. 은행 정보와 바이어(이름·주소·연락처)입니다.

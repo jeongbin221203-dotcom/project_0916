@@ -168,7 +168,21 @@ def test_견적송장에_오퍼시트_단가가_그대로_찍힌다(app):
     assert row["unit_price"] == 3.2
     assert row["amount"] == 6400.0
     # 합계 칸의 단가도 포장 기준(64)이 아니라 낱개 기준입니다.
-    assert rendered["data"]["unit_price"] == "3.2 / PCS"
+    assert rendered["data"]["unit_price"] == "3.20 / PCS"
+
+
+def test_큰_단가도_반올림하지_않는다(app):
+    """원화 단가 1,234,567원이 1.23457e+06으로 찍히던 일이 있었습니다."""
+
+    from app.services import draft_document_service as drafts
+
+    draft = {**DRAFT, "currency": "KRW",
+             "items": [{**BOX, "unit_quantity": 3, "price_unit": "SET",
+                        "unit_price": 1234567, "amount": 3703701, "quantity": 1}]}
+    with app.app_context():
+        data = drafts.render("proforma_invoice", draft)["data"]
+
+    assert data["unit_price"] == "1,234,567.00 / SET"
 
 
 def test_상업송장은_수량_칸에_단위까지_적고_포장은_따로_적는다(app):
