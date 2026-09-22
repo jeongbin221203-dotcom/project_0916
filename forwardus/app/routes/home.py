@@ -63,12 +63,9 @@ RAIL = [
      "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다"},
     {"key": "shipment", "icon": "📄", "tone": "green", "label": "서류 작성",
      "note": "상업송장·포장명세서를 Shipment 데이터로 자동 작성합니다"},
-    {"key": "reverse", "icon": "📅", "tone": "amber", "label": "일정 역산",
-     "note": "Buyer 납기일에서 거꾸로 언제 보내야 하는지 계산합니다"},
 ]
 
-RAIL_URLS = {"planning": "planning.new", "shipment": "document.new",
-             "reverse": "planning.index"}
+RAIL_URLS = {"planning": "planning.new", "shipment": "document.new"}
 
 
 @home_bp.get("/")

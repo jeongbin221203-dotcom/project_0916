@@ -11,11 +11,6 @@ from app.validators import ValidationError
 planning_bp = Blueprint("planning", __name__, url_prefix="/planning")
 
 
-@planning_bp.get("")
-def index():
-    return render_template("planning/index.html")
-
-
 @planning_bp.get("/new")
 def new():
     return _wizard(standalone=False)
@@ -166,14 +161,6 @@ def api_departure_check():
 
     try:
         return jsonify({"success": True, "data": planning_service.check_departure_date(request.get_json(silent=True) or {})})
-    except (ValidationError, ServiceError) as exc:
-        return error_response(exc)
-
-
-@planning_bp.post("/api/reverse-schedule")
-def api_reverse_schedule():
-    try:
-        return jsonify({"success": True, "data": planning_service.reverse_schedule(request.get_json(silent=True) or {})})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
 

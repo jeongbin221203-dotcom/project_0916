@@ -280,41 +280,6 @@ source = mock
 
 ---
 
-## 4.5 Reverse Schedule Planner
-
-Buyer Required Date를 입력하면 출고 준비일을 역산합니다.
-
-```text
-Buyer Required Date
-        ↓
-Final Delivery
-        ↓
-Import Customs
-        ↓
-ETA
-        ↓
-International Transport
-        ↓
-ETD
-        ↓
-CY / Cargo Cut-off
-        ↓
-Export Customs
-        ↓
-Cargo Ready Date
-```
-
-출력 예:
-
-```text
-Buyer Required Date : 2026-11-20
-Recommended ETA     : 2026-11-16
-Recommended ETD     : 2026-11-02
-Cargo Ready Date    : 2026-10-29
-```
-
----
-
 # 5. 핵심 기능 2 — Trade Document Center
 
 ## 목적
@@ -981,7 +946,6 @@ planning_bp = Blueprint(
 
 ```text
 /
-/planning
 /planning/new
 
 /shipments
@@ -1019,7 +983,6 @@ Processor / Repository
 - FCL / LCL
 - Cargo Calculation
 - Schedule
-- Reverse Schedule Planner
 
 주요 영역:
 
@@ -1476,7 +1439,6 @@ Primary Color:
 - Revenue Ton
 - Chargeable Weight
 - Schedule Date Calculation
-- Reverse Schedule
 - Document Validation
 - Tracking Event
 - ETA Change

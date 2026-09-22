@@ -131,33 +131,68 @@
       <div class="step_actions"><span></span><button type="button" class="button primary" data-next>다음</button></div>
     </section>
 
-    {# Step 2 — Incoterms #}
-    <section class="card step" data-step="2" hidden>
+    {# Step 2 — Incoterms
+       위: 공통 운송 흐름 그림(항상 보임). 아래: 11개 조건 선택 칸.
+       칸을 누르면 선택만, 옆의 물음표를 누르면 설명 팝업만 엽니다.
+       설명은 모두 INCOTERMS_INFO 한 표에서 옵니다. #}
+    {% set flow_icons = {
+      "factory": '<path d="M3 20V10l5 3V10l5 3V6h3v14z"/><path d="M16 6V3h3v17"/><path d="M6 17h2M11 17h2"/>',
+      "truck": '<path d="M2 6h11v10H2z"/><path d="M13 9h4l3 3v4h-7"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/>',
+      "terminal": '<path d="M3 20h18"/><path d="M4 20v-6h7v6M13 20v-9h7v9"/><path d="M4 17h7M13 14h7M13 17h7"/>',
+      "crane": '<path d="M6 21V4l12 3"/><path d="M6 7h13"/><path d="M16 7v5"/><path d="M14 12h4v3h-4z"/><path d="M3 21h8"/>',
+      "main": '<path d="M3 15l2 4h14l2-4z"/><path d="M6 15V9h12v6"/><path d="M9 9V6h6v3"/><path d="M2 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 4-1"/>',
+      "warehouse": '<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 16h10"/>',
+    } %}
+    <section class="card step incoterm_step" data-step="2" hidden>
       <h2>Incoterms 선택</h2>
-      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. Incoterms 2020 기준 11개 조건입니다.
-        <b>🚢</b>는 해상·내수로 전용, <b>🚢✈️</b>는 모든 운송수단에 쓸 수 있는 조건입니다.
-        항공에서는 FAS·FOB·CFR·CIF 대신 FCA·CPT·CIP를 쓰는 것이 맞습니다.
-        <b>카드에 마우스를 올리면 자세한 설명이 나옵니다.</b></p>
+      <p class="muted incoterm_intro">조건을 눌러 선택하고, 옆의 물음표를 눌러 설명을 확인하세요.</p>
       <p class="incoterm_warn" data-air-only hidden>
-        항공을 고르셨습니다. <b>🚢</b> 표시 조건은 해상 전용이라 항공 운송에는 맞지 않습니다.</p>
-      <div class="incoterm_grid">
-        {% for term in options.incoterms %}
-          <label class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}
-                 tabindex="0" aria-describedby="incoterm_help_{{ term.code }}">
-            <input type="radio" name="incoterms" value="{{ term.code }}">
-            <b>{{ term.code }}
-              <i class="incoterm_tag" title="{% if term.sea_only %}해상·내수로 운송에만 쓰는 조건입니다{% else %}해상·항공 모두 쓸 수 있는 조건입니다{% endif %}">
-                {% if term.sea_only %}🚢{% else %}🚢✈️{% endif %}</i></b>
-            <span>{{ term.label }}</span>
-            <small>위험 이전: {{ term.risk }}</small>
-            <small>수출자 부담: {{ term.seller_cost }}</small>
-            <div class="incoterm_help" id="incoterm_help_{{ term.code }}" role="tooltip">
-              <b>{{ term.code }} · {{ term.name }}</b>
-              <p>{{ term.detail }}</p>
-              <p class="incoterm_caution"><i>짚고 갈 점</i> {{ term.caution }}</p>
+        항공을 고르셨습니다. FAS·FOB·CFR·CIF는 해상·내수로 전용이라 항공 운송에는 FCA·CPT·CIP가 맞습니다.</p>
+
+      <figure class="incoterm_flow" aria-labelledby="incoterm_flow_title">
+        <figcaption id="incoterm_flow_title" class="sr_only">출발지에서 도착지까지의 운송 흐름 8단계</figcaption>
+        <div class="flow_ends" aria-hidden="true"><span>판매자(Seller) 쪽</span><span>Buyer 쪽</span></div>
+        <ol class="flow_track">
+          {% for step in options.incoterm_flow %}
+            <li class="flow_step">
+              <span class="flow_icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ flow_icons[step.icon]|safe }}</svg></span>
+              <span class="flow_label"><span class="flow_no">{{ loop.index }}</span>{{ step.label }}<small>{{ step.note }}</small></span>
+              {# 좁은 화면(4열·세로)에서 이 단계의 비용·위험 부담자를 보여줍니다. 넓은 화면은 아래 막대로 봅니다. #}
+              <span class="flow_chips" data-flow-chips aria-hidden="true"></span>
+            </li>
+          {% endfor %}
+        </ol>
+        {# 조건을 고르면 칠해지는 막대. 비용과 위험을 한 막대로 합치지 않습니다(C조건은 두 지점이 다릅니다). #}
+        <div class="flow_bars" data-flow-bars aria-hidden="true" hidden>
+          <div class="flow_bar_row"><span class="flow_bar_title">비용 부담</span><div class="flow_bar" data-flow-bar="cost"></div></div>
+          <div class="flow_bar_row"><span class="flow_bar_title">위험 부담</span><div class="flow_bar" data-flow-bar="risk"></div></div>
+        </div>
+        <div class="flow_legend" data-flow-legend aria-hidden="true" hidden>
+          <span class="lg lg_cost">판매자 비용</span>
+          <span class="lg lg_risk">판매자 위험</span>
+          <span class="lg lg_buyer">Buyer 부담</span>
+          <span class="lg lg_contract">운송계약 확인</span>
+          <span class="lg lg_place">인도 장소에 따라</span>
+        </div>
+      </figure>
+
+      <hr class="incoterm_divider">
+
+      <div class="incoterm_area">
+        <div class="incoterm_grid" role="group" aria-label="Incoterms 2020 조건 선택">
+          {% for term in options.incoterms %}
+            {# 선택값은 기존과 같은 radio(name=incoterms)에 담습니다. 임시 저장·요약·Shipment 생성이 이 값을 읽습니다. #}
+            <input type="radio" class="incoterm_radio" name="incoterms" value="{{ term.code }}" id="incoterm_{{ term.code }}" hidden>
+            {# 선택 단추와 물음표 단추는 서로 겹치지 않은 형제입니다. 선택 단추가 칸 전체를 덮고, 물음표만 그 위에 올라옵니다. #}
+            <div class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}>
+              <button type="button" class="incoterm_pick" data-incoterm-pick="{{ term.code }}" aria-pressed="false">{{ term.code }}</button>
+              <button type="button" class="incoterm_help_btn" data-incoterm-help="{{ term.code }}"
+                      aria-haspopup="dialog" aria-label="{{ term.code }} 설명 보기"><span aria-hidden="true">?</span></button>
+              <span class="incoterm_selected" aria-hidden="true">✓ 선택됨</span>
             </div>
-          </label>
-        {% endfor %}
+          {% endfor %}
+        </div>
       </div>
       <div class="step_actions">
         <button type="button" class="button ghost" data-prev>이전</button>
@@ -362,6 +397,20 @@
       </div>
     </section>
   </form>
+
+  {# Incoterms 설명 팝업. 물음표를 눌렀을 때만 열리고, 선택값은 바꾸지 않습니다. #}
+  <dialog class="incoterm_modal" data-incoterm-modal aria-labelledby="incoterm_modal_title">
+    <div class="incoterm_modal_inner">
+      <header class="incoterm_modal_head">
+        <div>
+          <h2 id="incoterm_modal_title" data-modal-title></h2>
+          <p class="incoterm_modal_sub" data-modal-sub></p>
+        </div>
+        <button type="button" class="incoterm_modal_close" data-modal-close aria-label="설명 닫기">×</button>
+      </header>
+      <div class="incoterm_modal_body" data-modal-body tabindex="0" aria-label="조건 설명"></div>
+    </div>
+  </dialog>
 {% endblock %}
 {% block scripts %}
   <script>
@@ -387,6 +436,8 @@
     // UN 위험물 등급 목록. 첫 품목과 추가 품목이 같은 목록을 씁니다.
     window.FORWARDUS_DG_CLASSES = {{ options.dg_classes|tojson }};
     window.FORWARDUS_PACKING_GROUPS = {{ options.packing_groups|tojson }};
+    // Incoterms 설명 팝업과 흐름 그림 색칠에 쓰는 조건별 정보(INCOTERMS_INFO)입니다.
+    window.FORWARDUS_INCOTERMS = {{ {"terms": options.incoterms, "steps": options.incoterm_flow}|tojson }};
   </script>
   <script src="{{ static_url('js/planning.js') }}"></script>
 {% endblock %}

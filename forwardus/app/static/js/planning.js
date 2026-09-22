@@ -1,4 +1,4 @@
-/* Shipment Planning: wizard (planning/new) and Reverse Schedule Planner (planning/index). */
+/* Shipment Planning: wizard (planning/new). */
 (function () {
   "use strict";
 
@@ -15,46 +15,6 @@
         });
         onChange(button.dataset.value);
       });
-    });
-  }
-
-  /* ---------- Reverse Schedule Planner ---------- */
-  const reverseForm = document.querySelector("[data-reverse-form]");
-  if (reverseForm) {
-    let reverseMode = "SEA";
-    bindToggle(reverseForm.querySelector("[data-toggle=transport_mode]"), (value) => { reverseMode = value; });
-    const resultBox = document.querySelector("[data-reverse-result]");
-    const errorBox = reverseForm.querySelector("[data-form-error]");
-
-    reverseForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      errorBox.hidden = true;
-      const response = await postJson(reverseForm.dataset.url, {
-        buyer_required_date: reverseForm.buyer_required_date.value,
-        transport_mode: reverseMode,
-        transit_days: plainNumber(reverseForm.transit_days.value),
-      });
-      if (!response.success) {
-        errorBox.textContent = response.message;
-        errorBox.hidden = false;
-        return;
-      }
-      const plan = response.data;
-      const steps = plan.steps.map((step) => `
-        <li class="${step.date ? "milestone" : "duration"}">
-          <span>${escapeHtml(step.label)}</span>
-          <b>${step.date ? escapeHtml(step.date) : `${step.days}일`}</b>
-        </li>`).join("");
-      const warnings = plan.warnings.map((w) => `<div class="flash flash_error">${escapeHtml(w)}</div>`).join("");
-      resultBox.innerHTML = `
-        <div class="row_between"><h2>역산 결과</h2><span class="badge source_calculated">Data Source: Calculated</span></div>
-        ${warnings}
-        <dl class="kpi_row">
-          <div><dt>Recommended ETA</dt><dd>${plan.recommended_eta}</dd></div>
-          <div><dt>Recommended ETD</dt><dd>${plan.recommended_etd}</dd></div>
-          <div class="highlight"><dt>Cargo Ready Date</dt><dd>${plan.cargo_ready_date}</dd></div>
-        </dl>
-        <ol class="reverse_steps">${steps}</ol>`;
     });
   }
 
@@ -694,6 +654,7 @@
     if (draft.incoterms) {
       const radio = form.querySelector(`input[name=incoterms][value="${draft.incoterms}"]`);
       if (radio) radio.checked = true;
+      syncIncotermCards();
     }
     if (draft.transport_mode && draft.transport_mode !== state.transport_mode) {
       const button = form.querySelector(`[data-toggle=transport_mode] [data-value=${draft.transport_mode}]`);
@@ -1597,6 +1558,174 @@
 
   bindToggle(document.querySelector("[data-sort]"), (value) => { state.sort = value; loadSchedules(); });
 
+  /* ----- Incoterms: 칸 선택 · 물음표 설명 팝업 ----- */
+  // 두 동작을 따로 둡니다. 칸을 누르면 선택만(selectedIncoterm = radio 값),
+  // 물음표를 누르면 설명만(helpIncoterm) 엽니다. 설명을 열고 닫아도 선택은 그대로입니다.
+  // 선택값은 기존 radio(name=incoterms)에 담아 임시 저장·요약·Shipment 생성이 그대로 읽습니다.
+  const INCOTERM_REQUIRED = "인코텀즈를 선택해 주세요.";
+  const incotermData = window.FORWARDUS_INCOTERMS || { terms: [], steps: [] };
+  const incotermByCode = Object.fromEntries(incotermData.terms.map((term) => [term.code, term]));
+  const incotermModal = document.querySelector("[data-incoterm-modal]");
+  let helpIncoterm = null;
+  let helpButton = null;
+
+  function checkedIncoterm() {
+    return form.querySelector("input[name=incoterms]:checked");
+  }
+
+  // 화면의 강조는 CSS(:checked + 칸)가 맡고, 읽어 주는 프로그램용 상태만 맞춥니다.
+  // 흐름 그림의 비용·위험 색칠도 같은 때에 다시 그립니다(선택·임시 저장 복원 모두 여기를 지납니다).
+  function syncIncotermCards() {
+    const current = checkedIncoterm();
+    document.querySelectorAll("[data-incoterm-pick]").forEach((button) => {
+      button.setAttribute("aria-pressed", current && current.value === button.dataset.incotermPick ? "true" : "false");
+    });
+    renderFlowHighlight(current ? incotermByCode[current.value] : null);
+  }
+
+  /* 흐름 그림 색칠: 비용과 위험을 따로 칠합니다.
+     flow.costs  단계별 비용 부담 S 판매자 / B Buyer / C 운송계약 확인 / P 인도 장소에 따라
+     flow.risk_at 위험이 넘어가는 단계 경계(0~8). [a, b]면 약정 장소에 따라 그 사이 어딘가입니다.
+     C조건은 판매자가 주운송 운임까지 내지만 위험은 출발지 쪽에서 넘어가, 두 막대의 끝이 다릅니다. */
+  const FLOW_COST_TEXT = { S: "판매자", B: "Buyer", C: "운송계약 확인", P: "인도 장소에 따라" };
+  const FLOW_RISK_TEXT = { S: "판매자", B: "Buyer", P: "인도지에 따라" };
+
+  function flowRuns(values, prefix, texts) {
+    const runs = [];
+    values.forEach((value, index) => {
+      const last = runs[runs.length - 1];
+      if (last && last.value === value) last.end = index + 1;
+      else runs.push({ value, start: index, end: index + 1 });
+    });
+    return runs.map((run) => `<span class="fbar ${prefix}_${run.value}" style="grid-column: ${run.start + 1} / ${run.end + 1}">`
+      + `${escapeHtml(texts[run.value])}</span>`).join("");
+  }
+
+  function flowMark(at, label, total) {
+    const edge = at === 0 ? " at_start" : at === total ? " at_end" : "";
+    return `<span class="fmark${edge}" style="--at: ${at}">${label ? `<span>${escapeHtml(label)}</span>` : ""}</span>`;
+  }
+
+  function renderFlowHighlight(term) {
+    const bars = document.querySelector("[data-flow-bars]");
+    const legend = document.querySelector("[data-flow-legend]");
+    const chips = document.querySelectorAll("[data-flow-chips]");
+    const stepEls = document.querySelectorAll(".flow_step");
+    if (!bars) return;
+    stepEls.forEach((el) => el.classList.remove("risk_edge", "cost_edge"));
+    if (!term || !term.flow) {
+      bars.hidden = true;
+      legend.hidden = true;
+      chips.forEach((el) => { el.innerHTML = ""; });
+      return;
+    }
+    const total = incotermData.steps.length;
+    const costs = term.flow.costs.split("");
+    const [riskFrom, riskTo] = Array.isArray(term.flow.risk_at) ? term.flow.risk_at : [term.flow.risk_at, term.flow.risk_at];
+    const risks = costs.map((_, index) => (index < riskFrom ? "S" : index < riskTo ? "P" : "B"));
+    // 판매자 비용이 끝나는 경계: 판매자(S)가 이어지는 마지막 단계 뒤
+    let costEnd = 0;
+    while (costEnd < total && costs[costEnd] === "S") costEnd += 1;
+
+    bars.querySelector('[data-flow-bar="cost"]').innerHTML = flowRuns(costs, "c", FLOW_COST_TEXT)
+      + (costEnd > 0 && costEnd < total ? flowMark(costEnd, "비용 이전", total) : "");
+    bars.querySelector('[data-flow-bar="risk"]').innerHTML = flowRuns(risks, "r", FLOW_RISK_TEXT)
+      + (riskFrom === riskTo ? flowMark(riskFrom, "위험 이전", total)
+        : flowMark(riskFrom, "위험 이전 범위", total) + flowMark(riskTo, "", total));
+    bars.hidden = false;
+    legend.hidden = false;
+    legend.querySelector(".lg_contract").hidden = !costs.includes("C");
+    legend.querySelector(".lg_place").hidden = !(costs.includes("P") || riskFrom !== riskTo);
+
+    chips.forEach((el, index) => {
+      el.innerHTML = `<span class="chip c_${costs[index]}">비용 ${escapeHtml(FLOW_COST_TEXT[costs[index]])}</span>`
+        + `<span class="chip r_${risks[index]}">위험 ${escapeHtml(FLOW_RISK_TEXT[risks[index]])}</span>`;
+    });
+    if (stepEls[riskFrom]) stepEls[riskFrom].classList.add("risk_edge");
+    if (costEnd < total && stepEls[costEnd]) stepEls[costEnd].classList.add("cost_edge");
+  }
+
+  function selectIncoterm(code) {
+    const radio = form.querySelector(`input[name=incoterms][value="${code}"]`);
+    // 이미 고른 조건을 다시 눌러도 해제하지 않습니다.
+    if (radio && !radio.checked) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    syncIncotermCards();
+    if (errorBox.textContent === INCOTERM_REQUIRED) showError("");
+  }
+
+  document.querySelectorAll("[data-incoterm-pick]").forEach((button) => {
+    button.addEventListener("click", () => selectIncoterm(button.dataset.incotermPick));
+  });
+
+  function renderIncotermHelp(term) {
+    const mode = term.sea_only ? "해상·내수로 전용" : "모든 운송수단";
+    incotermModal.querySelector("[data-modal-title]").textContent = `${term.code} · ${term.name}`;
+    incotermModal.querySelector("[data-modal-sub]").textContent = `${term.label} · ${mode}`;
+    incotermModal.querySelector("[data-modal-body]").innerHTML = `
+      <p>${escapeHtml(term.detail)}</p>
+      <dl class="tip_facts">
+        <div><dt>판매자 주요 비용</dt><dd>${escapeHtml(term.seller_cost)}</dd></div>
+        <div><dt>Buyer 주요 비용</dt><dd>${escapeHtml(term.buyer_cost)}</dd></div>
+        <div><dt>위험 이전</dt><dd>${escapeHtml(term.risk)}</dd></div>
+      </dl>
+      <p class="incoterm_caution"><i>헷갈리기 쉬운 점</i>${escapeHtml(term.caution)}</p>`;
+  }
+
+  function openIncotermHelp(button) {
+    const term = incotermByCode[button.dataset.incotermHelp];
+    if (!incotermModal || !term) return;
+    helpIncoterm = term.code;
+    helpButton = button;
+    renderIncotermHelp(term);
+    if (!incotermModal.open) {
+      incotermModal.showModal();
+      document.documentElement.classList.add("modal_open");
+    }
+    incotermModal.querySelector("[data-modal-body]").scrollTop = 0;
+    incotermModal.querySelector(".incoterm_modal_close").focus();
+  }
+
+  document.querySelectorAll("[data-incoterm-help]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      // 칸의 선택 동작이 함께 돌지 않게 합니다.
+      event.stopPropagation();
+      openIncotermHelp(button);
+    });
+  });
+
+  if (incotermModal) {
+    incotermModal.addEventListener("click", (event) => {
+      // X 단추, 또는 팝업 바깥(어두운 배경)을 누르면 닫습니다.
+      if (event.target.closest("[data-modal-close]") || event.target === incotermModal) incotermModal.close();
+    });
+    // Esc는 브라우저가 dialog를 닫아 줍니다. 어떤 길로 닫히든 여기서 마무리하고 물음표로 초점을 돌려줍니다.
+    incotermModal.addEventListener("close", () => {
+      document.documentElement.classList.remove("modal_open");
+      helpIncoterm = null;
+      if (helpButton) helpButton.focus();
+    });
+    // 팝업이 열린 동안 Tab 초점이 팝업 안에서만 돕니다.
+    incotermModal.addEventListener("keydown", (event) => {
+      if (event.key !== "Tab") return;
+      const focusables = Array.from(incotermModal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter((el) => !el.disabled && el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+  }
+
   /* ----- Step validation ----- */
   // 스케줄 조회에 실제로 필요한 것만 봅니다. 견적명은 견적에 붙이는 이름일 뿐이라
   // 운항 정보를 보는 데는 필요하지 않습니다.
@@ -1616,7 +1745,7 @@
       if (!state.origin) return "출발지를 목록에서 선택해주세요.";
       if (!state.destination) return "도착지를 목록에서 선택해주세요.";
     }
-    if (step === 2 && !form.querySelector("input[name=incoterms]:checked")) return "Incoterms를 선택해주세요.";
+    if (step === 2 && !checkedIncoterm()) return INCOTERM_REQUIRED;
     if (step === 3) {
       if (!f.product_description.value.trim()) return "품명을 입력해주세요.";
       if (!state.metrics) return "화물 치수·수량·중량을 올바르게 입력해주세요.";
@@ -1691,7 +1820,16 @@
 
   form.addEventListener("click", (event) => {
     if (event.target.matches("[data-prev]")) openStep(state.step - 1);
-    if (event.target.matches("[data-next]")) openStep(state.step + 1);
+    if (event.target.matches("[data-next]")) {
+      // Incoterms 단계는 조건을 골라야 넘어갑니다. 그림 팝업을 봤는지는 따지지 않습니다.
+      if (state.step === 2 && !checkedIncoterm()) {
+        showError(INCOTERM_REQUIRED);
+        const first = document.querySelector("[data-incoterm-pick]");
+        if (first) first.focus({ preventScroll: true });
+        return;
+      }
+      openStep(state.step + 1);
+    }
     const goto = event.target.closest("[data-goto-step]");
     if (goto) openStep(Number(goto.dataset.gotoStep));
   });

@@ -1,4 +1,4 @@
-"""Schedule, reverse schedule, and shipment creation tests."""
+"""Schedule and shipment creation tests."""
 
 from __future__ import annotations
 
@@ -9,26 +9,32 @@ import pytest
 from app.processors.schedule_calculator import (
     calculate_cargo_ready_date,
     calculate_eta,
-    calculate_reverse_schedule,
     check_buyer_deadline,
 )
 from app.services import planning_service
 from app.validators import ValidationError
 
 
-def test_reverse_schedule_matches_spec_example():
-    plan = calculate_reverse_schedule(date(2026, 11, 20), "SEA", 14)
-    assert plan["recommended_eta"] == date(2026, 11, 16)
-    assert plan["recommended_etd"] == date(2026, 11, 2)
-    assert plan["cargo_ready_date"] == date(2026, 10, 29)
+def test_reverse_schedule_planner_is_removed(app, client):
+    """일정 역산 화면·API는 없앴습니다. 옛 주소로 와도 정상적인 404만 돌려줍니다."""
 
+    from app.processors import schedule_calculator
 
-def test_reverse_schedule_air_defaults():
-    plan = calculate_reverse_schedule(date(2026, 11, 20), "AIR")
-    assert plan["transit_days"] == 2
-    assert plan["recommended_eta"] == date(2026, 11, 18)
-    assert plan["recommended_etd"] == date(2026, 11, 16)
-    assert plan["cargo_ready_date"] == date(2026, 11, 14)
+    assert not hasattr(schedule_calculator, "calculate_reverse_schedule")
+    assert not hasattr(planning_service, "reverse_schedule")
+
+    page = client.get("/planning")
+    assert page.status_code == 404
+    assert "Reverse Schedule" not in page.get_data(as_text=True)
+
+    api = client.post("/planning/api/reverse-schedule",
+                      json={"buyer_required_date": "2026-11-20", "transport_mode": "SEA"})
+    assert api.status_code == 404
+    assert api.get_json()["error_code"] == "NOT_FOUND"
+    assert client.get("/planning/api/reverse-schedule").status_code == 404
+
+    # 운송 계획 위저드는 그대로 열립니다.
+    assert client.get("/planning/new").status_code == 200
 
 
 def test_schedule_date_calculation():
@@ -153,13 +159,6 @@ def test_departure_check_without_buyer_date(app):
 
     # 출발일이 없으면 계산하지 않습니다.
     assert planning_service.check_departure_date({})["available"] is False
-
-
-def test_reverse_schedule_service_validation(app):
-    with pytest.raises(ValidationError):
-        planning_service.reverse_schedule({"buyer_required_date": "not-a-date"})
-    with pytest.raises(ValidationError):
-        planning_service.reverse_schedule({"buyer_required_date": "2026-11-20", "transit_days": "0"})
 
 
 def test_location_search_filters_by_mode_and_role(app):
@@ -833,13 +832,141 @@ def test_incoterms_cover_all_2020_rules(app):
         assert term["group"] in "EFCD"
 
 
-def test_incoterms_help_is_rendered(app, client):
-    """카드마다 마우스를 올렸을 때 보여줄 설명이 화면에 들어 있습니다."""
+def test_incoterms_step_layout(app, client):
+    """위에는 운송 흐름 그림이 늘 있고, 아래 칸에는 약어·물음표·선택 표시만 있습니다."""
+
+    import re
 
     html = client.get("/planning/new").get_data(as_text=True)
-    assert html.count('class="incoterm_card"') == 11
-    assert html.count("incoterm_help_") == 22            # 카드 11개 × (aria-describedby + id)
-    assert "Free Alongside Ship" in html and "ICC A" in html
+    step = html.split('data-step="2"')[1].split('data-step="3"')[0]
+    assert "조건을 눌러 선택하고, 옆의 물음표를 눌러 설명을 확인하세요." in step
+    assert "마우스를 올리" not in step and "그림 설명" not in step
+    # 공통 흐름 8단계가 순서대로 들어 있고, 그 아래에 구분선과 선택 칸이 옵니다.
+    flow = step.split('class="incoterm_flow"')[1].split("</figure>")[0]
+    assert re.findall(r'class="flow_no">(\d)</span>([^<]+)<', flow) == [
+        ("1", "출발지 적재"), ("2", "출발지 내륙운송"), ("3", "출발지 터미널"), ("4", "본선·항공기 적재"),
+        ("5", "주운송"), ("6", "도착지 양하·터미널"), ("7", "도착지 내륙운송"), ("8", "목적지 양하")]
+    assert step.index("incoterm_flow") < step.index("incoterm_divider") < step.index("incoterm_grid")
+
+    grid = step.split('class="incoterm_grid"')[1].split('class="step_actions"')[0]
+    assert re.findall(r'data-incoterm-pick="(\w+)"', grid) == [
+        "EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]
+    assert grid.count('class="incoterm_card"') == 11
+    assert grid.count("✓ 선택됨") == 11                   # 선택된 칸에만 CSS로 보입니다
+    for code in ("EXW", "CIF", "DDP"):
+        assert f'aria-label="{code} 설명 보기"' in grid
+    # 한글명·영문명·요약·운송수단 이모지·title 설명은 칸에서 뺐습니다.
+    for gone in ("공장 인도", "Ex Works", "판매자 사업장에서", "🚢", "title=", 'id="incoterm_help_', "aria-describedby"):
+        assert gone not in grid, gone
+    # 선택 단추 안에 물음표 단추를 넣지 않습니다(형제로 둡니다).
+    assert not re.search(r'<button[^>]*incoterm_pick[^>]*>[^<]*<button', grid)
+
+
+def test_incoterms_flow_highlight_markup(app, client):
+    """조건을 고르면 칠할 비용·위험 막대 자리가 그림 안에 따로 있습니다(비용과 위험을 한 막대로 합치지 않습니다)."""
+
+    import json
+
+    html = client.get("/planning/new").get_data(as_text=True)
+    flow = html.split('class="incoterm_flow"')[1].split("</figure>")[0]
+    assert 'data-flow-bar="cost"' in flow and 'data-flow-bar="risk"' in flow
+    assert flow.count("data-flow-chips") == 8 and "data-flow-summary" not in flow
+    data = json.loads(html.split("window.FORWARDUS_INCOTERMS = ")[1].split(";\n")[0])
+    assert len(data["steps"]) == 8
+    terms = {t["code"]: t["flow"] for t in data["terms"]}
+    # C조건: 판매자 비용은 주운송(5단계)까지, 위험은 그보다 앞에서 넘어갑니다.
+    for code in ("CFR", "CIF", "CPT", "CIP"):
+        risk_end = terms[code]["risk_at"][1] if isinstance(terms[code]["risk_at"], list) else terms[code]["risk_at"]
+        assert terms[code]["costs"][:5] == "SSSSS" and risk_end < 5, code
+    # 나머지는 비용과 위험이 같은 지점에서 넘어갑니다.
+    for code in ("FAS", "FOB", "DAP", "DDP"):
+        assert terms[code]["costs"].count("S") == terms[code]["risk_at"], code
+
+
+def test_incoterms_help_popup_shell_and_data(app, client):
+    """물음표로 여는 설명 팝업의 틀과, 그 안에 쓰는 검증된 설명 자료가 화면에 들어 있습니다."""
+
+    import json
+
+    html = client.get("/planning/new").get_data(as_text=True)
+    assert "<dialog" in html and "data-incoterm-modal" in html and 'aria-label="설명 닫기"' in html
+    assert "<iframe" not in html and "searates" not in html.lower()
+    data = json.loads(html.split("window.FORWARDUS_INCOTERMS = ")[1].split(";\n")[0])
+    terms = {t["code"]: t for t in data["terms"]}
+    assert len(terms) == 11
+    for term in terms.values():
+        for key in ("name", "label", "detail", "seller_cost", "buyer_cost", "risk", "caution"):
+            assert term[key], (term["code"], key)
+    assert terms["FAS"]["name"] == "Free Alongside Ship"
+    assert "ICC(A)" in terms["CIP"]["caution"] and "ICC(C)" in terms["CIF"]["caution"]
+
+
+def test_incoterms_facts_follow_icc_2020(app):
+    """카드·툴팁·팝업이 함께 쓰는 조건별 사실이 Incoterms 2020과 맞습니다."""
+
+    from app.processors.cost_calculator import EXPORTER_PAYS, INCOTERMS_FLOW_STEPS, INCOTERMS_INFO
+
+    terms = {t["code"]: t for t in INCOTERMS_INFO}
+    steps = len(INCOTERMS_FLOW_STEPS)
+    for code, term in terms.items():
+        flow = term["flow"]
+        assert len(flow["costs"]) == steps and set(flow["costs"]) <= set("SBCP"), code
+        at = flow["risk_at"] if isinstance(flow["risk_at"], list) else [flow["risk_at"]] * 2
+        assert 0 <= at[0] <= at[1] <= steps, code
+        assert set(term["duties"]) == {"insurance", "export", "import", "loading", "unloading"}, code
+        assert term["short"] and len(term["short"]) <= 24, code   # 카드 안 1~2줄
+        assert "+" not in term["short"], code                     # 다른 카드를 읽어야 하는 표현 금지
+        assert code in EXPORTER_PAYS, code
+
+    duty = lambda code, key: terms[code]["duties"][key][0]
+    # 보험 의무는 CIF·CIP뿐이고, 담보 수준이 다릅니다. 나머지는 '보험 없음'이 아니라 '의무 없음'.
+    assert [c for c in terms if duty(c, "insurance") == "seller"] == ["CIF", "CIP"]
+    assert "ICC(C)" in terms["CIF"]["duties"]["insurance"][1]
+    assert "ICC(A)" in terms["CIP"]["duties"]["insurance"][1]
+    assert all("의무는 없습니다" in terms[c]["duties"]["insurance"][1]
+               for c in terms if c not in ("CIF", "CIP"))
+    # 수출통관은 EXW만 Buyer, 수입통관·관세는 DDP만 판매자.
+    assert [c for c in terms if duty(c, "export") == "buyer"] == ["EXW"]
+    assert [c for c in terms if duty(c, "import") == "seller"] == ["DDP"]
+    # 목적지 하역 의무는 DPU만 판매자. DAP·DDP는 Buyer(운송계약에 든 하역비는 따로 구분).
+    assert [c for c in terms if duty(c, "unloading") == "seller"] == ["DPU"]
+    for code in ("DAP", "DDP"):
+        assert duty(code, "unloading") == "buyer" and "운송계약" in terms[code]["duties"]["unloading"][1]
+        assert terms[code]["flow"]["costs"][-1] == "C"
+    # EXW는 판매자 의무가 '없는' 조건이 아닙니다.
+    assert "없는" in terms["EXW"]["caution"] and "거의 없음" not in terms["EXW"]["seller_cost"]
+    # FCA는 판매자 사업장 인도와 다른 장소 인도의 적재·하역을 구분합니다.
+    assert duty("FCA", "loading") == "varies" and isinstance(terms["FCA"]["flow"]["risk_at"], list)
+    # CFR·CIF: 운임은 주운송까지 판매자, 위험은 본선 적재(4번째 구간 뒤)에서 이전.
+    for code in ("CFR", "CIF"):
+        assert terms[code]["flow"]["costs"][4] == "S" and terms[code]["flow"]["risk_at"] == 4
+    # CPT·CIP: 목적지까지 운송비는 판매자, 위험은 출발지 쪽 약정 인도지에서 이전.
+    for code in ("CPT", "CIP"):
+        assert terms[code]["flow"]["costs"][4] == "S" and terms[code]["flow"]["risk_at"][1] < 4
+    assert terms["DPU"]["flow"]["risk_at"] == steps and terms["DAP"]["flow"]["risk_at"] == steps - 1
+
+
+def test_every_incoterm_passes_shipment_validation(app):
+    """화면에서 고를 수 있는 11개 조건은 모두 저장 단계에서도 받아 줍니다(FAS 포함)."""
+
+    from app.processors.cost_calculator import INCOTERMS_INFO
+    from app.validators.shipment_validator import validate_trade_terms
+
+    for term in INCOTERMS_INFO:
+        result = validate_trade_terms({"incoterms": term["code"], "currency": "USD",
+                                       "invoice_value": "1000"}, "SEA")
+        assert result["incoterms"] == term["code"]
+    # FAS도 해상 전용이라 항공이면 한 번 더 확인받습니다.
+    with pytest.raises(ValidationError) as caught:
+        validate_trade_terms({"incoterms": "FAS", "currency": "USD", "invoice_value": "1000"}, "AIR")
+    assert caught.value.code == "INCOTERMS_CONFIRM"
+
+
+def test_fas_shipment_is_created_with_its_incoterm(create_shipment):
+    """FAS로 고른 계획도 Shipment와 물류비 계산까지 그대로 이어집니다."""
+
+    shipment = create_shipment(incoterms="FAS")
+    assert shipment.incoterms == "FAS"
 
 
 def test_direct_call_guide_is_shown_for_sea(app, client):
@@ -879,18 +1006,15 @@ def test_origin_ports_carry_official_cargo_volume(app):
 
 
 def test_all_incoterms_selectable_in_air_mode(app, client):
-    """항공을 골라도 모든 Incoterms를 고를 수 있고, 적용 운송수단은 아이콘으로 알립니다."""
+    """항공을 골라도 모든 Incoterms를 고를 수 있고, 항공일 때 안내가 뜹니다."""
 
     html = client.get("/planning/new").get_data(as_text=True)
-    # 선택을 막는 disabled 속성이 카드에 붙지 않습니다.
-    assert 'name="incoterms"' in html
+    grid = html.split('class="incoterm_grid"')[1].split('class="step_actions"')[0]
     assert html.count('name="incoterms"') == 11
-    assert "disabled" not in html.split('class="incoterm_grid"')[1].split("</div>")[0]
-    # 해상 전용은 배 아이콘만, 나머지는 배·비행기 아이콘을 함께 보여줍니다.
-    grid = html.split('class="incoterm_grid"')[1].split("</section>")[0]
-    assert grid.count("🚢✈️") == 7          # 전(全)운송수단 조건 7개
-    assert grid.count("incoterm_tag") == 11
-    assert "해상·내수로 운송에만 쓰는 조건입니다" in html
+    # 선택을 막는 disabled 속성이 칸에 붙지 않습니다.
+    assert "disabled" not in grid
+    # 해상 전용 네 조건은 항공일 때 점선 칸으로 알려 줍니다.
+    assert grid.count("data-sea-only-term") == 4
     assert "incoterm_warn" in html          # 항공일 때 뜨는 안내
 
 
@@ -996,8 +1120,6 @@ def test_number_fields_accept_thousands_separators(app, client):
     assert 'name="weight_per_package_kg" inputmode="decimal" autocomplete="off" data-number data-step="10"' in html
     assert 'name="invoice_value" inputmode="decimal" autocomplete="off" data-number data-step="100"' in html
 
-    reverse = client.get("/planning").get_data(as_text=True)
-    assert 'type="number"' not in reverse and reverse.count("data-number") == 1
 
 
 def test_selected_date_chips_are_small(app):

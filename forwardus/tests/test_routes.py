@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.mark.parametrize("path", ["/", "/planning", "/planning/new", "/shipments", "/dashboard", "/health"])
+@pytest.mark.parametrize("path", ["/", "/planning/new", "/shipments", "/dashboard", "/health"])
 def test_static_pages_render(client, path):
     assert client.get(path).status_code == 200
 

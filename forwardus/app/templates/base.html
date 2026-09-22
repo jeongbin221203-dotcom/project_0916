@@ -29,7 +29,6 @@
         <nav class="main_nav" data-nav>
           <a href="{{ url_for('planning.new') }}" class="{{ 'active' if nav_active == 'planning' }}">운송 계획</a>
           <a href="{{ url_for('shipment.index') }}" class="{{ 'active' if nav_active in ('shipment', 'document', 'tracking', 'assistant') }}">Shipments</a>
-          <a href="{{ url_for('planning.index') }}" class="{{ 'active' if request.endpoint == 'planning.index' }}">일정 역산</a>
           <a href="{{ url_for('tracking.container_lookup') }}" class="{{ 'active' if request.endpoint == 'tracking.container_lookup' }}">컨테이너 조회</a>
           <a href="{{ url_for('lookup.index') }}" class="{{ 'active' if nav_active == 'lookup' }}">관세청 조회</a>
           <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active == 'dashboard' }}">Dashboard</a>
