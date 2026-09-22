@@ -6,12 +6,12 @@
 글자  은행 이야기를 하는 줄(은행·계좌·A/C·SWIFT…)과 그 아래 두 줄에서
       번호를 [ACCOUNT_1] 같은 표시로 바꿉니다. 돌아온 뒤 은행 칸에만 되돌립니다.
 
-그림  우리 컴퓨터에서 먼저 글자를 읽고(OCR, 인터넷 안 씀) 번호 자리를 칠합니다.
-      칠한 그림을 한 번 더 읽어 번호가 아직 보이면 그 줄 전체를 칠합니다.
+그림  우리 컴퓨터에서 먼저 글자를 읽고(Tesseract OCR, 인터넷 안 씀) 번호 자리를
+      칠합니다. 칠한 그림을 한 번 더 읽어 번호가 아직 보이면 그 줄 전체를 칠합니다.
       칠한 그림만 AI에게 보내고, 이용자에게도 그 그림을 보여 줍니다.
 
-      이 OCR은 한글을 읽지 못합니다("입금계좌" 같은 이름표를 못 봄). 그래서
-      그림에서는 은행이라는 말이 없어도 9자리 이상의 번호는 모두 지웁니다.
+      OCR은 이름표를 잘못 읽거나 놓칠 수 있습니다. 그래서 그림에서는 은행이라는
+      말이 없어도 9자리 이상의 번호는 모두 지웁니다.
       OCR이 설치되어 있지 않으면 그림을 받지 않습니다. 가리지 못한 그림을
       보내는 것보다 받지 않는 것이 낫습니다.
 """
@@ -19,9 +19,9 @@
 from __future__ import annotations
 
 import io
-import logging
 import re
-import threading
+
+from app.collectors import ocr_client
 
 # 은행 정보가 나오는 줄을 알아보는 말. 이 줄과 그 아래 BANK_WINDOW 줄 안의 번호를 가립니다.
 #
@@ -64,8 +64,8 @@ def redact(text: str, *, everywhere: bool = False) -> tuple[str, dict]:
     은행 이야기를 하는 줄과 그 아래 두 줄만 봅니다. 오퍼 번호·날짜·금액을 가리면
     AI가 그 값을 못 읽기 때문입니다.
 
-    everywhere=True는 그림용입니다. 한글 이름표를 못 읽으니, 은행 줄이 아니어도
-    9자리 이상 번호는 가립니다.
+    everywhere=True는 그림용입니다. OCR이 이름표를 놓칠 수 있으니, 은행 줄이
+    아니어도 9자리 이상 번호는 가립니다.
     """
 
     secrets: dict[str, str] = {}
@@ -124,44 +124,63 @@ def restore(value: str, secrets: dict) -> str:
 
 # --- 그림 --------------------------------------------------------------------------
 
-_engine = None
-_engine_lock = threading.Lock()
 # 칠한 자리 둘레로 이만큼 더 칠합니다. 글자 폭을 어림해 칠하므로 넉넉하게 둡니다.
 PAD_CHARS = 2
 PAD_PIXELS = 4
 # OCR이 이보다 자신 없게 읽은 줄에 숫자가 이만큼 있으면 줄 전체를 지웁니다.
-# 잘못 읽은 줄("H 00 00 0 0 00", 자신감 0.69)에 계좌번호가 있어도 우리 규칙은
-# 번호를 못 찾습니다. 품목 줄이 지워질 수 있지만, 번호가 새는 것보다 낫습니다.
-LOW_CONFIDENCE = 0.85
+# 잘못 읽은 줄("H 00 00 0 0 00")에 계좌번호가 있어도 우리 규칙은 번호를 못 찾습니다.
+# 품목 줄이 지워질 수 있지만, 번호가 새는 것보다 낫습니다. (Tesseract 자신감 0~100을 0~1로 봅니다)
+LOW_CONFIDENCE = 0.6
 UNSURE_DIGITS = 6
+# 이보다 좁은 그림은 키워서 읽습니다. 작은 글자는 Tesseract가 놓치기 쉽습니다.
+OCR_MIN_WIDTH = 1500
 
 
 def ocr_available() -> bool:
-    try:
-        import rapidocr  # noqa: F401
-    except ImportError:
-        return False
-    return True
+    return ocr_client.available()
 
 
 def _read(image) -> list[tuple[list, str, float]]:
-    """(네 꼭짓점, 글자, 자신감) 목록. 위에서 아래, 왼쪽에서 오른쪽 순서입니다."""
+    """(네 꼭짓점, 글자, 자신감 0~1) 목록. 한 줄이 한 항목이고, 위에서 아래 순서입니다.
 
-    global _engine
-    import numpy
+    Tesseract가 단어마다 돌려주는 상자를 줄 단위로 묶습니다. 좌표는 원래 그림 기준입니다.
+    """
 
-    with _engine_lock:
-        if _engine is None:
-            from rapidocr import RapidOCR
+    from PIL import ImageOps
 
-            logging.getLogger("RapidOCR").setLevel(logging.WARNING)
-            _engine = RapidOCR()
-        result = _engine(numpy.array(image.convert("RGB")))
-    if result.boxes is None:
-        return []
-    rows = [([list(map(float, point)) for point in box], str(text), float(score))
-            for box, text, score in zip(result.boxes, result.txts, result.scores)]
-    rows.sort(key=lambda row: (round(min(p[1] for p in row[0]) / 12), min(p[0] for p in row[0])))
+    pytesseract = ocr_client._pytesseract()
+    gray = ImageOps.grayscale(image)
+    scale = 1.0
+    if gray.width < OCR_MIN_WIDTH:
+        scale = OCR_MIN_WIDTH / gray.width
+        gray = gray.resize((OCR_MIN_WIDTH, round(gray.height * scale)))
+    data = pytesseract.image_to_data(gray, lang=ocr_client.languages(),
+                                     output_type=pytesseract.Output.DICT)
+
+    lines: dict[tuple, list] = {}
+    for index, word in enumerate(data["text"]):
+        word = str(word).strip()
+        conf = float(data["conf"][index])
+        if not word or conf < 0:
+            continue
+        key = (data["block_num"][index], data["par_num"][index], data["line_num"][index])
+        left, top = data["left"][index] / scale, data["top"][index] / scale
+        right = left + data["width"][index] / scale
+        bottom = top + data["height"][index] / scale
+        lines.setdefault(key, []).append((left, top, right, bottom, word, conf))
+
+    rows = []
+    for words in lines.values():
+        words.sort(key=lambda item: item[0])
+        left = min(item[0] for item in words)
+        top = min(item[1] for item in words)
+        right = max(item[2] for item in words)
+        bottom = max(item[3] for item in words)
+        quad = [[left, top], [right, top], [right, bottom], [left, bottom]]
+        text = ocr_client.tidy(" ".join(item[4] for item in words))
+        score = sum(item[5] for item in words) / len(words) / 100
+        rows.append((quad, text, score))
+    rows.sort(key=lambda row: (round(row[0][0][1] / 12), row[0][0][0]))
     return rows
 
 
