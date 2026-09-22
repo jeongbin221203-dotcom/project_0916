@@ -1,4 +1,4 @@
-/* Shipment Planning: wizard (planning/new). */
+/* Shipment Planning: wizard (planning/new) and Reverse Schedule Planner (planning/index). */
 (function () {
   "use strict";
 
@@ -15,6 +15,46 @@
         });
         onChange(button.dataset.value);
       });
+    });
+  }
+
+  /* ---------- Reverse Schedule Planner ---------- */
+  const reverseForm = document.querySelector("[data-reverse-form]");
+  if (reverseForm) {
+    let reverseMode = "SEA";
+    bindToggle(reverseForm.querySelector("[data-toggle=transport_mode]"), (value) => { reverseMode = value; });
+    const resultBox = document.querySelector("[data-reverse-result]");
+    const errorBox = reverseForm.querySelector("[data-form-error]");
+
+    reverseForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      const response = await postJson(reverseForm.dataset.url, {
+        buyer_required_date: reverseForm.buyer_required_date.value,
+        transport_mode: reverseMode,
+        transit_days: plainNumber(reverseForm.transit_days.value),
+      });
+      if (!response.success) {
+        errorBox.textContent = response.message;
+        errorBox.hidden = false;
+        return;
+      }
+      const plan = response.data;
+      const steps = plan.steps.map((step) => `
+        <li class="${step.date ? "milestone" : "duration"}">
+          <span>${escapeHtml(step.label)}</span>
+          <b>${step.date ? escapeHtml(step.date) : `${step.days}일`}</b>
+        </li>`).join("");
+      const warnings = plan.warnings.map((w) => `<div class="flash flash_error">${escapeHtml(w)}</div>`).join("");
+      resultBox.innerHTML = `
+        <div class="row_between"><h2>역산 결과</h2><span class="badge source_calculated">Data Source: Calculated</span></div>
+        ${warnings}
+        <dl class="kpi_row">
+          <div><dt>Recommended ETA</dt><dd>${plan.recommended_eta}</dd></div>
+          <div><dt>Recommended ETD</dt><dd>${plan.recommended_etd}</dd></div>
+          <div class="highlight"><dt>Cargo Ready Date</dt><dd>${plan.cargo_ready_date}</dd></div>
+        </dl>
+        <ol class="reverse_steps">${steps}</ol>`;
     });
   }
 
@@ -322,8 +362,110 @@
   applyMode();
 
   /* ----- Autocomplete ----- */
-  // HS CODE 간편 검색 창도 같은 것을 쓰도록 base.js로 옮겼습니다.
-  const { debounce, setupAutocomplete } = window.Forwardus;
+  function debounce(fn, wait) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); };
+  }
+
+  function setupAutocomplete(container, fetchItems, renderItem, onSelect, options = {}) {
+    const input = container.querySelector("[data-ac-input]");
+    const list = container.querySelector("[data-ac-list]");
+    let items = [];
+    let searchVersion = 0;
+
+    let overrideQuery = null;
+
+    const search = debounce(async () => {
+      const version = ++searchVersion;
+      list.innerHTML = `<li class="empty">${escapeHtml(options.loadingMessage || "검색 중…")}</li>`;
+      list.hidden = false;
+      const query = overrideQuery === null ? input.value.trim() : overrideQuery;
+      overrideQuery = null;
+      const fetched = await fetchItems(query);
+      if (version !== searchVersion) return;
+      items = fetched;
+      if (!items.length) {
+        const message = options.emptyMessage
+          ? options.emptyMessage(items)
+          : `검색 결과가 없습니다. 목록에 없으면 "직접 입력"을 사용하세요.`;
+        list.innerHTML = `<li class="empty">${escapeHtml(message)}</li>`;
+        return;
+      }
+      let html = "";
+      if (options.groupBy) {
+        // 같은 그룹을 한 번만 표시합니다. 서버가 보내는 순서가 섞여 있어도
+        // 머리글이 중복되지 않도록 그룹별로 모아서 그립니다.
+        const groups = new Map();
+        items.forEach((item, index) => {
+          const value = options.groupBy(item);
+          if (!groups.has(value)) groups.set(value, []);
+          groups.get(value).push({ item, index });
+        });
+        groups.forEach((entries, value) => {
+          const other = value === "환승 필요" || value === "환적 필요"
+            || value === "정기 항로 확인 필요";
+          const GROUP_NOTES = {
+            "환승 필요": "고른 출발 공항에서 직항편이 없어 환승이 필요합니다",
+            "환적 필요": "한국에서 직기항 선박이 없어 환적항을 거칩니다",
+            "정기 항로 확인 필요": "정기 항로 기록이 없어 선사에 확인이 필요합니다",
+          };
+          const note = GROUP_NOTES[value];
+          html += `<li class="ac_group${other ? " ac_group_other" : ""}">${escapeHtml(value)}`
+            + (note ? `<small>${escapeHtml(note)}</small>` : "")
+            + `</li>`;
+          entries.forEach(({ item, index }) => {
+            html += `<li role="option" tabindex="0" data-index="${index}">${renderItem(item)}</li>`;
+          });
+        });
+      } else {
+        items.forEach((item, index) => {
+          html += `<li role="option" tabindex="0" data-index="${index}">${renderItem(item)}</li>`;
+        });
+      }
+      // 목록 맨 위에 덧붙일 안내가 있으면 함께 그립니다. (예: 영문을 한글로 바꿔 찾음)
+      if (options.leadRow) html = options.leadRow(items) + html;
+      list.innerHTML = html;
+      // 목록을 그린 뒤 덧붙일 것이 있으면 (예: HS 후보별 협정) 이어서 채웁니다.
+      if (options.afterRender) options.afterRender(items, list);
+    }, options.delayMs || 200);
+
+    input.addEventListener("input", () => { ++searchVersion; onSelect(null, input); search(); });
+    // 이미 고른 항구가 있어도 다시 누르면 전체 목록을 보여줍니다.
+    input.addEventListener("focus", () => {
+      input.select();
+      overrideQuery = "";
+      search();
+    });
+    input.addEventListener("blur", () => { if (!options.keepOpen) setTimeout(() => { list.hidden = true; }, 150); });
+    list.addEventListener("mousedown", (event) => {
+      if (event.target.closest(".info_tip")) return;
+      const li = event.target.closest("li[data-index]");
+      if (!li) return;
+      onSelect(items[Number(li.dataset.index)], input);
+      list.hidden = true;
+    });
+    list.addEventListener("keydown", (event) => {
+      if (event.target.closest(".info_tip") || !["Enter", " "].includes(event.key)) return;
+      const li = event.target.closest("li[data-index]");
+      if (!li) return;
+      event.preventDefault();
+      onSelect(items[Number(li.dataset.index)], input);
+      list.hidden = true;
+    });
+    return {
+      search,
+      showAll() {
+        ++searchVersion;
+        overrideQuery = "";
+        search();
+      },
+      // 목록이 열려 있을 때만 다시 그립니다. 닫혀 있는데 다시 검색하면
+      // 이미 고른 값("로테르담항 (NLRTM)")으로 검색해 빈 목록이 떠 버립니다.
+      refresh() {
+        if (!list.hidden) { ++searchVersion; search(); }
+      },
+    };
+  }
 
   /* ----- Destination country filter and direct input ----- */
   const countryCache = {};
@@ -561,7 +703,6 @@
     if (draft.incoterms) {
       const radio = form.querySelector(`input[name=incoterms][value="${draft.incoterms}"]`);
       if (radio) radio.checked = true;
-      syncIncotermCards();
     }
     if (draft.transport_mode && draft.transport_mode !== state.transport_mode) {
       const button = form.querySelector(`[data-toggle=transport_mode] [data-value=${draft.transport_mode}]`);
@@ -650,8 +791,67 @@
     }));
   }
 
-  // ⓘ 설명은 간편 검색 창과 같이 쓰려고 hs_search.js로 옮겼습니다.
-  const { infoTip } = window.ForwardusHs;
+  // ? 아이콘. 마우스를 올리거나 키보드·탭으로 고르면 자세한 설명이 뜹니다.
+  // 화면에는 핵심만 두고, 긴 설명은 여기로 옮깁니다. lines는 빈 값을 건너뜁니다.
+  function infoTip(title, lines, { start = false } = {}) {
+    const body = lines.filter(Boolean).map((line) => `<p>${escapeHtml(line)}</p>`).join("");
+    if (!body) return "";
+    return `<span class="info_tip${start ? " start" : ""}" tabindex="0" role="button" aria-label="${escapeHtml(title)} 자세히">`
+      + `<i aria-hidden="true">i</i><span class="info_tip_body" role="tooltip">`
+      + `<b>${escapeHtml(title)}</b>${body}</span></span>`;
+  }
+
+  const tipPopup = document.createElement("div");
+  tipPopup.className = "cargo_tip_popup";
+  tipPopup.id = "cargo-detail-tip";
+  tipPopup.setAttribute("role", "tooltip");
+  tipPopup.hidden = true;
+  document.body.append(tipPopup);
+  let tipOwner = null;
+  let tipTimer;
+  function hideTip() {
+    tipPopup.hidden = true;
+    tipOwner?.removeAttribute("aria-describedby");
+    tipOwner = null;
+  }
+  function showTip(owner) {
+    clearTimeout(tipTimer);
+    if (tipOwner !== owner) hideTip();
+    tipOwner = owner;
+    tipPopup.innerHTML = owner.querySelector(".info_tip_body").innerHTML;
+    tipPopup.hidden = false;
+    owner.setAttribute("aria-describedby", tipPopup.id);
+    const box = owner.getBoundingClientRect();
+    tipPopup.style.left = `${Math.max(8, Math.min(box.right - tipPopup.offsetWidth, innerWidth - tipPopup.offsetWidth - 8))}px`;
+    tipPopup.style.top = `${Math.max(8, Math.min(box.bottom + 6, innerHeight - tipPopup.offsetHeight - 8))}px`;
+  }
+  document.addEventListener("pointerover", event => {
+    const owner = event.target.closest(".info_tip");
+    if (owner) showTip(owner);
+    else if (tipPopup.contains(event.target)) clearTimeout(tipTimer);
+  });
+  document.addEventListener("pointerout", event => {
+    if (event.target.closest(".info_tip") || tipPopup.contains(event.target)) {
+      clearTimeout(tipTimer);
+      tipTimer = setTimeout(hideTip, 180);
+    }
+  });
+  document.addEventListener("focusin", event => {
+    const owner = event.target.closest(".info_tip");
+    if (owner) showTip(owner); else hideTip();
+  });
+  document.addEventListener("click", event => {
+    const owner = event.target.closest(".info_tip");
+    if (owner) showTip(owner); else if (!tipPopup.contains(event.target)) hideTip();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") hideTip();
+    if (["Enter", " "].includes(event.key) && event.target.closest(".info_tip")) {
+      event.preventDefault(); showTip(event.target.closest(".info_tip"));
+    }
+  });
+  document.addEventListener("scroll", event => { if (!tipPopup.contains(event.target)) hideTip(); }, true);
+  window.addEventListener("resize", hideTip);
 
   async function renderTariffFor(hs, country, slot) {
     if (!slot) return;
@@ -802,11 +1002,72 @@
   const hsControllers = [];
 
   // 품명(한글·영문)이나 HS부호로 관세청에서 찾습니다.
-  // 조회·그리기는 hs_search.js에 있습니다. HS CODE 간편 검색 창과 같은 것을 씁니다.
-  const { renderHsItem, hsSearchedAsRow, hsEmptyMessage, HS_AUTOCOMPLETE_OPTIONS } = window.ForwardusHs;
-  const fetchHsCodes = (query, fallback) => window.ForwardusHs.fetchHsCodes(query, fallback, {
-    url: urls.hsCodes, country: state.destination?.country_code || "",
-    order: hsOrder?.value || "frequency" });
+  async function fetchHsCodes(query, fallback) {
+    const text = (query || "").trim() || (fallback || "").trim();
+    if (text.length < 2) return Object.assign([], { hsMeta: { query: text } });
+    const response = await getJson(`${urls.hsCodes}?${new URLSearchParams({ q: text,
+      country: state.destination?.country_code || "", order: hsOrder?.value || "frequency" })}`, 120000);
+    const items = response.success ? response.data.map((item) => ({ ...item, source: response.source })) : [];
+    return Object.assign(items, { hsMeta: { ...response, query: text,
+      error: response.success ? "" : (response.message || "관세청 조회에 실패했습니다.") } });
+  }
+
+  // 영문·오타를 다른 낱말로 바꿔 찾았으면 목록 맨 위에 그 사실을 적습니다.
+  function hsSearchedAsRow(items) {
+    const m = items.hsMeta || {};
+    const analysis = m.ai_analysis;
+    const notes = [m.searched_as && `확장 검색: ${m.searched_as}`, analysis?.summary,
+      analysis?.missing_details?.length && `추가 확인: ${analysis.missing_details.join(" / ")}`,
+      m.offline_note, m.ai_review?.message, m.ranking?.label,
+      m.ranking?.mixed_years && "기준연도가 달라 관세 순위를 비교하지 않았습니다.",
+      m.navigation_summary?.note, m.ranking?.tariff_note];
+    return `<li class="ac_group hs_summary"><span>후보 ${items.length}개 · 적합도 우선</span>`
+      + infoTip("검색·비교 기준", notes)
+      + `<small>초록 높음 · 노랑 조건 확인 · 빨강 낮음 · 회색 미확인</small>`
+      + (m.offline_note ? `<small>내부 품목표 기준</small>` : "")
+      + (m.partial_note ? `<small>HS 6자리만 조회됨 · 신고용 부호 확인 필요</small>` : "") + `</li>`;
+  }
+
+  function renderHsItem(item) {
+    const relevance = item.relevance || {};
+    const match = ["high", "medium", "low"].includes(relevance.match) ? relevance.match : "unknown";
+    const labels = {high: "적합도 높음", medium: "조건 확인", low: "관련성 낮음", unknown: "미확인"};
+    const nav = item.navigation;
+    const tax = item.tariff;
+    const path = item.path?.slice(1).join(" · ");
+    const notes = [relevance.reason,
+      relevance.missing_details?.length && `확인할 정보: ${relevance.missing_details.join(" / ")}`,
+      path && `분류: ${path}`, item.name_en,
+      item.base_date ? `관세청 품목표 · ${item.base_date} 기준` : (item.source === "api" ? "관세청 HS부호" : "예시 목록"),
+      nav?.available && `조회 품목란 ${Number(nav.count).toLocaleString()}건` ,
+      nav?.available && nav.share != null && `비교 후보 내 ${nav.share.toFixed(1)}% (적합 확률 아님)`,
+      nav?.names?.length && `신고 품명 예: ${nav.names.map(row => row.name).join(" · ")}`,
+      nav && !nav.available && nav.message,
+      tax?.available && `${tax.country} · ${tax.label} · ${tax.year}년 · 범위 ${tax.min ?? "—"}~${tax.max ?? "—"}%`,
+      tax && !tax.available && tax.message];
+    return `<div class="hs_candidate match_${match}"><div class="hs_candidate_head">`
+      + `<span class="mono">${escapeHtml(item.code)}</span><span class="hs_match">${item.partial ? "6자리 · 확인 필요" : labels[match]}</span>`
+      + infoTip("분류 근거·통계", notes) + `</div>`
+      + `<b class="hs_name">${escapeHtml(item.name || item.name_en || "품목명 미확인")}</b>`
+      + (path ? `<span class="hs_path">${escapeHtml(path)}</span>` : "")
+      + `<div class="hs_metrics">${item.priority ? `${item.priority}순위` : ""}`
+      + (tax?.available ? ` · ${escapeHtml(tax.country)} MFN 평균 ${escapeHtml(String(tax.rate))}%` : "")
+      + (relevance.missing_details?.length ? ` · ${escapeHtml(relevance.missing_details[0])}` : "") + `</div></div>`;
+  }
+
+  function hsEmptyMessage(items) {
+    const {query: lastHsQuery = "", error: lastHsError, ai_analysis: lastHsAnalysis} = items.hsMeta || {};
+    if (lastHsError) return lastHsError;
+    if (lastHsAnalysis?.missing_details?.length) return `후보를 찾으려면 확인이 필요합니다: ${lastHsAnalysis.missing_details.join(" / ")}`;
+    if (lastHsQuery.length === 1) return "품명을 두 글자 이상 입력하세요.";
+    const digits = lastHsQuery.replace(/[.\-\s]/g, "");
+    if (/^\d+$/.test(digits) && digits.length !== 10) {
+      return "HS부호는 10자리를 모두 입력해야 조회됩니다. 품명으로 찾아보세요.";
+    }
+    if (!lastHsQuery) return "품명(예: 립스틱, 샴푸) 또는 HS부호 10자리를 입력하세요.";
+    return `"${lastHsQuery}" 검색 결과가 없습니다.`
+      + " 한글·영문 모두 됩니다. 더 일반적인 낱말로 적어보세요. (예: 가죽 가방 → 가방)";
+  }
 
   const hsSearch = setupAutocomplete(
     form.querySelector("[data-autocomplete=hs_code]"),
@@ -817,8 +1078,13 @@
       input.value = item.code;
       refreshTariff();     // 고른 품목의 협정세율을 아래에 보여줍니다.
     },
-    // 간편 검색 창과 같은 설정입니다. (hs_search.js)
-    HS_AUTOCOMPLETE_OPTIONS,
+    {
+      leadRow: hsSearchedAsRow,
+      keepOpen: true,
+      delayMs: 650,
+      loadingMessage: "AI 품명 해석·후보 적합도·건수·관세를 비교 중…",
+      emptyMessage: hsEmptyMessage,
+    },
   );
   hsControllers.push(hsSearch);
   hsOrder?.addEventListener("change", () => {
@@ -1432,174 +1698,6 @@
 
   bindToggle(document.querySelector("[data-sort]"), (value) => { state.sort = value; loadSchedules(); });
 
-  /* ----- Incoterms: 칸 선택 · 물음표 설명 팝업 ----- */
-  // 두 동작을 따로 둡니다. 칸을 누르면 선택만(selectedIncoterm = radio 값),
-  // 물음표를 누르면 설명만(helpIncoterm) 엽니다. 설명을 열고 닫아도 선택은 그대로입니다.
-  // 선택값은 기존 radio(name=incoterms)에 담아 임시 저장·요약·Shipment 생성이 그대로 읽습니다.
-  const INCOTERM_REQUIRED = "인코텀즈를 선택해 주세요.";
-  const incotermData = window.FORWARDUS_INCOTERMS || { terms: [], steps: [] };
-  const incotermByCode = Object.fromEntries(incotermData.terms.map((term) => [term.code, term]));
-  const incotermModal = document.querySelector("[data-incoterm-modal]");
-  let helpIncoterm = null;
-  let helpButton = null;
-
-  function checkedIncoterm() {
-    return form.querySelector("input[name=incoterms]:checked");
-  }
-
-  // 화면의 강조는 CSS(:checked + 칸)가 맡고, 읽어 주는 프로그램용 상태만 맞춥니다.
-  // 흐름 그림의 비용·위험 색칠도 같은 때에 다시 그립니다(선택·임시 저장 복원 모두 여기를 지납니다).
-  function syncIncotermCards() {
-    const current = checkedIncoterm();
-    document.querySelectorAll("[data-incoterm-pick]").forEach((button) => {
-      button.setAttribute("aria-pressed", current && current.value === button.dataset.incotermPick ? "true" : "false");
-    });
-    renderFlowHighlight(current ? incotermByCode[current.value] : null);
-  }
-
-  /* 흐름 그림 색칠: 비용과 위험을 따로 칠합니다.
-     flow.costs  단계별 비용 부담 S 판매자 / B Buyer / C 운송계약 확인 / P 인도 장소에 따라
-     flow.risk_at 위험이 넘어가는 단계 경계(0~8). [a, b]면 약정 장소에 따라 그 사이 어딘가입니다.
-     C조건은 판매자가 주운송 운임까지 내지만 위험은 출발지 쪽에서 넘어가, 두 막대의 끝이 다릅니다. */
-  const FLOW_COST_TEXT = { S: "판매자", B: "Buyer", C: "운송계약 확인", P: "인도 장소에 따라" };
-  const FLOW_RISK_TEXT = { S: "판매자", B: "Buyer", P: "인도지에 따라" };
-
-  function flowRuns(values, prefix, texts) {
-    const runs = [];
-    values.forEach((value, index) => {
-      const last = runs[runs.length - 1];
-      if (last && last.value === value) last.end = index + 1;
-      else runs.push({ value, start: index, end: index + 1 });
-    });
-    return runs.map((run) => `<span class="fbar ${prefix}_${run.value}" style="grid-column: ${run.start + 1} / ${run.end + 1}">`
-      + `${escapeHtml(texts[run.value])}</span>`).join("");
-  }
-
-  function flowMark(at, label, total) {
-    const edge = at === 0 ? " at_start" : at === total ? " at_end" : "";
-    return `<span class="fmark${edge}" style="--at: ${at}">${label ? `<span>${escapeHtml(label)}</span>` : ""}</span>`;
-  }
-
-  function renderFlowHighlight(term) {
-    const bars = document.querySelector("[data-flow-bars]");
-    const legend = document.querySelector("[data-flow-legend]");
-    const chips = document.querySelectorAll("[data-flow-chips]");
-    const stepEls = document.querySelectorAll(".flow_step");
-    if (!bars) return;
-    stepEls.forEach((el) => el.classList.remove("risk_edge", "cost_edge"));
-    if (!term || !term.flow) {
-      bars.hidden = true;
-      legend.hidden = true;
-      chips.forEach((el) => { el.innerHTML = ""; });
-      return;
-    }
-    const total = incotermData.steps.length;
-    const costs = term.flow.costs.split("");
-    const [riskFrom, riskTo] = Array.isArray(term.flow.risk_at) ? term.flow.risk_at : [term.flow.risk_at, term.flow.risk_at];
-    const risks = costs.map((_, index) => (index < riskFrom ? "S" : index < riskTo ? "P" : "B"));
-    // 판매자 비용이 끝나는 경계: 판매자(S)가 이어지는 마지막 단계 뒤
-    let costEnd = 0;
-    while (costEnd < total && costs[costEnd] === "S") costEnd += 1;
-
-    bars.querySelector('[data-flow-bar="cost"]').innerHTML = flowRuns(costs, "c", FLOW_COST_TEXT)
-      + (costEnd > 0 && costEnd < total ? flowMark(costEnd, "비용 이전", total) : "");
-    bars.querySelector('[data-flow-bar="risk"]').innerHTML = flowRuns(risks, "r", FLOW_RISK_TEXT)
-      + (riskFrom === riskTo ? flowMark(riskFrom, "위험 이전", total)
-        : flowMark(riskFrom, "위험 이전 범위", total) + flowMark(riskTo, "", total));
-    bars.hidden = false;
-    legend.hidden = false;
-    legend.querySelector(".lg_contract").hidden = !costs.includes("C");
-    legend.querySelector(".lg_place").hidden = !(costs.includes("P") || riskFrom !== riskTo);
-
-    chips.forEach((el, index) => {
-      el.innerHTML = `<span class="chip c_${costs[index]}">비용 ${escapeHtml(FLOW_COST_TEXT[costs[index]])}</span>`
-        + `<span class="chip r_${risks[index]}">위험 ${escapeHtml(FLOW_RISK_TEXT[risks[index]])}</span>`;
-    });
-    if (stepEls[riskFrom]) stepEls[riskFrom].classList.add("risk_edge");
-    if (costEnd < total && stepEls[costEnd]) stepEls[costEnd].classList.add("cost_edge");
-  }
-
-  function selectIncoterm(code) {
-    const radio = form.querySelector(`input[name=incoterms][value="${code}"]`);
-    // 이미 고른 조건을 다시 눌러도 해제하지 않습니다.
-    if (radio && !radio.checked) {
-      radio.checked = true;
-      radio.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    syncIncotermCards();
-    if (errorBox.textContent === INCOTERM_REQUIRED) showError("");
-  }
-
-  document.querySelectorAll("[data-incoterm-pick]").forEach((button) => {
-    button.addEventListener("click", () => selectIncoterm(button.dataset.incotermPick));
-  });
-
-  function renderIncotermHelp(term) {
-    const mode = term.sea_only ? "해상·내수로 전용" : "모든 운송수단";
-    incotermModal.querySelector("[data-modal-title]").textContent = `${term.code} · ${term.name}`;
-    incotermModal.querySelector("[data-modal-sub]").textContent = `${term.label} · ${mode}`;
-    incotermModal.querySelector("[data-modal-body]").innerHTML = `
-      <p>${escapeHtml(term.detail)}</p>
-      <dl class="tip_facts">
-        <div><dt>판매자 주요 비용</dt><dd>${escapeHtml(term.seller_cost)}</dd></div>
-        <div><dt>Buyer 주요 비용</dt><dd>${escapeHtml(term.buyer_cost)}</dd></div>
-        <div><dt>위험 이전</dt><dd>${escapeHtml(term.risk)}</dd></div>
-      </dl>
-      <p class="incoterm_caution"><i>헷갈리기 쉬운 점</i>${escapeHtml(term.caution)}</p>`;
-  }
-
-  function openIncotermHelp(button) {
-    const term = incotermByCode[button.dataset.incotermHelp];
-    if (!incotermModal || !term) return;
-    helpIncoterm = term.code;
-    helpButton = button;
-    renderIncotermHelp(term);
-    if (!incotermModal.open) {
-      incotermModal.showModal();
-      document.documentElement.classList.add("modal_open");
-    }
-    incotermModal.querySelector("[data-modal-body]").scrollTop = 0;
-    incotermModal.querySelector(".incoterm_modal_close").focus();
-  }
-
-  document.querySelectorAll("[data-incoterm-help]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      // 칸의 선택 동작이 함께 돌지 않게 합니다.
-      event.stopPropagation();
-      openIncotermHelp(button);
-    });
-  });
-
-  if (incotermModal) {
-    incotermModal.addEventListener("click", (event) => {
-      // X 단추, 또는 팝업 바깥(어두운 배경)을 누르면 닫습니다.
-      if (event.target.closest("[data-modal-close]") || event.target === incotermModal) incotermModal.close();
-    });
-    // Esc는 브라우저가 dialog를 닫아 줍니다. 어떤 길로 닫히든 여기서 마무리하고 물음표로 초점을 돌려줍니다.
-    incotermModal.addEventListener("close", () => {
-      document.documentElement.classList.remove("modal_open");
-      helpIncoterm = null;
-      if (helpButton) helpButton.focus();
-    });
-    // 팝업이 열린 동안 Tab 초점이 팝업 안에서만 돕니다.
-    incotermModal.addEventListener("keydown", (event) => {
-      if (event.key !== "Tab") return;
-      const focusables = Array.from(incotermModal.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
-        .filter((el) => !el.disabled && el.offsetParent !== null);
-      if (!focusables.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    });
-  }
-
   /* ----- Step validation ----- */
   // 스케줄 조회에 실제로 필요한 것만 봅니다. 견적명은 견적에 붙이는 이름일 뿐이라
   // 운항 정보를 보는 데는 필요하지 않습니다.
@@ -1619,7 +1717,7 @@
       if (!state.origin) return "출발지를 목록에서 선택해주세요.";
       if (!state.destination) return "도착지를 목록에서 선택해주세요.";
     }
-    if (step === 2 && !checkedIncoterm()) return INCOTERM_REQUIRED;
+    if (step === 2 && !form.querySelector("input[name=incoterms]:checked")) return "Incoterms를 선택해주세요.";
     if (step === 3) {
       if (!f.product_description.value.trim()) return "품명을 입력해주세요.";
       if (!state.metrics) return "화물 치수·수량·중량을 올바르게 입력해주세요.";
@@ -1694,16 +1792,7 @@
 
   form.addEventListener("click", (event) => {
     if (event.target.matches("[data-prev]")) openStep(state.step - 1);
-    if (event.target.matches("[data-next]")) {
-      // Incoterms 단계는 조건을 골라야 넘어갑니다. 그림 팝업을 봤는지는 따지지 않습니다.
-      if (state.step === 2 && !checkedIncoterm()) {
-        showError(INCOTERM_REQUIRED);
-        const first = document.querySelector("[data-incoterm-pick]");
-        if (first) first.focus({ preventScroll: true });
-        return;
-      }
-      openStep(state.step + 1);
-    }
+    if (event.target.matches("[data-next]")) openStep(state.step + 1);
     const goto = event.target.closest("[data-goto-step]");
     if (goto) openStep(Number(goto.dataset.gotoStep));
   });
