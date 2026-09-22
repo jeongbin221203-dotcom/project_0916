@@ -58,7 +58,9 @@
     history.push({ role: "user", content: text });
 
     const waiting = bubble("bot", "답변을 준비하고 있습니다…", "support_waiting");
-    const response = await postJson(config.url, { question: text, history: history.slice(0, -1) });
+    // 이 창은 서식을 그리지 않으니 짧은 답을 받습니다. (메인 화면은 긴 템플릿 답)
+    const response = await postJson(config.url,
+      { question: text, history: history.slice(0, -1), style: "brief" });
     waiting.remove();
 
     if (response.success) {

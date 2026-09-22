@@ -94,6 +94,9 @@ def checklist() -> dict:
               "placeholder": "Los Angeles, CA 90001"},
              {"name": "buyer_email", "label": "Buyer 이메일", "placeholder": "a@b.com"},
              {"name": "attention", "label": "담당자 (ATTENTION)", "placeholder": "Mr. Kim"},
+             {"name": "notify_party", "label": "Notify Party", "wide": True,
+              "placeholder": "SAME AS CONSIGNEE",
+              "hint": "도착 통지를 받을 곳. B/L을 올리면 그대로 옮겨 옵니다"},
          ]},
         {"key": "terms", "tab": "doc", "label": "거래 · 결제 조건", "icon": "📝",
          "note": "비워 두면 상업송장의 TERMS OF PAYMENT와 L/C 칸이 —로 남습니다.",
@@ -121,8 +124,11 @@ def checklist() -> dict:
              {"name": "comments", "label": "비고 (포장명세서)", "wide": True},
          ]},
     ]
-    return {"groups": groups, "item_fields": _item_fields(options),
-            "required_count": _required_count(groups)}
+    item_fields = _item_fields(options)
+    # 화면의 "채운 칸 / 전체"는 첫 품목의 필수 칸도 셉니다. 전체에서 빠뜨리면 9/8이 됩니다.
+    return {"groups": groups, "item_fields": item_fields,
+            "required_count": _required_count(groups)
+                              + sum(1 for field in item_fields if field.get("required"))}
 
 
 def _item_fields(options: dict) -> list[dict]:

@@ -91,23 +91,42 @@
       {# 적는 칸 덩어리. 대화를 시작하면 화면 아래에 붙습니다. #}
       <div class="home_composer" data-home-composer>
         {# 빠른 시작 셋. 적는 칸 바로 위에 둡니다. #}
-        <div class="home_actions" role="tablist" aria-label="무엇을 도와드릴까요">
-          {% for action in actions %}
-            <button type="button" role="tab" data-home-action="{{ action.key }}"
-                    class="{{ 'active' if loop.first }}"
-                    aria-selected="{{ 'true' if loop.first else 'false' }}"
-                    {{ 'disabled' if home_locked }}>
-              <span aria-hidden="true">{{ action.icon }}</span> {{ action.label }}
-            </button>
-          {% endfor %}
+        <div class="home_actions">
+          {# 대화 모드를 고르는 탭 셋. 탭 묶음(tablist)에는 탭만 둡니다. #}
+          <div class="home_tabs" role="tablist" aria-label="무엇을 도와드릴까요">
+            {% for action in actions %}
+              <button type="button" role="tab" data-home-action="{{ action.key }}"
+                      class="{{ 'active' if loop.first }}"
+                      aria-selected="{{ 'true' if loop.first else 'false' }}"
+                      {{ 'disabled' if home_locked }}>
+                <span aria-hidden="true">{{ action.icon }}</span> {{ action.label }}
+              </button>
+            {% endfor %}
+          </div>
+          {# 모드가 아니라 창을 여는 단추입니다. 화면을 옮기지 않고 HS CODE 간편 검색을 띄웁니다. #}
+          <button type="button" class="home_hs_open" data-home-hs-open aria-haspopup="dialog"
+                  {{ 'disabled' if home_locked }}>
+            <span aria-hidden="true">🔎</span> HS CODE 조회
+          </button>
         </div>
 
         <form class="home_box" data-home-form>
+          {# 파일 붙이기. 왼쪽 아래 + 로 고르거나 이 칸에 끌어다 놓습니다. 세 탭이 같이 씁니다.
+             붙이면 바로 보내지 않고 위에 칩으로 보여 줍니다. 할 말을 적어 함께 보냅니다. #}
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+                 hidden data-home-upload>
+          <div class="home_attach" data-home-attach hidden></div>
           <textarea data-home-input rows="3" maxlength="2000"
                     {{ 'disabled' if home_locked }}
                     placeholder="{{ actions[0].placeholder }}"
                     aria-label="물어볼 내용"></textarea>
           <div class="home_box_foot">
+            <button type="button" class="home_plus" data-home-plus aria-label="파일·이미지 첨부"
+                    title="파일·이미지 첨부 (PDF·JPG·PNG)" {{ 'disabled' if home_locked }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2"
+                      stroke-linecap="round" fill="none"/></svg>
+            </button>
             <div class="home_chips" data-home-chips></div>
             <button class="home_send" type="submit" aria-label="보내기"
                     {{ 'disabled' if home_locked }}>↑</button>
@@ -123,6 +142,38 @@
      </div>
     </div>
   </div>
+
+  {# 서류 미리보기 & 검토. 만든 서류를 탭별로 보고 그 자리에서 고친 뒤 PDF로 받습니다. (doc_preview.js) #}
+  <div class="dp_modal" data-dp-modal hidden>
+    <div class="dp_backdrop" data-dp-close></div>
+    <div class="dp_box" role="dialog" aria-modal="true" aria-labelledby="dp_title">
+      <header class="dp_head">
+        <div>
+          <h2 id="dp_title">📑 서류 미리보기 &amp; 검토</h2>
+          <small>오탈자·수량을 최종 확인하세요. 칸을 고치면 오른쪽 미리보기와 PDF에 그대로 반영됩니다.</small>
+        </div>
+        <div class="dp_head_actions">
+          <button type="button" class="button small" data-dp-print>🖨 인쇄</button>
+          <button type="button" class="button primary small" data-dp-pdf>⬇ PDF 다운로드</button>
+          <button type="button" class="dp_close" data-dp-close aria-label="닫기">×</button>
+        </div>
+      </header>
+      <div class="dp_bar">
+        <div class="dp_tabs" role="tablist" aria-label="서류" data-dp-tabs></div>
+        <label class="dp_sync"><input type="checkbox" data-dp-sync checked>
+          같은 칸은 다른 서류에도 함께 고치기</label>
+        <button type="button" class="link_button" data-dp-pdf-one>이 서류만 PDF</button>
+      </div>
+      <div class="dp_body">
+        <div class="dp_edit" data-dp-edit></div>
+        <figure class="dp_sheet">
+          <img data-dp-image alt="">
+          <figcaption data-dp-caption></figcaption>
+        </figure>
+      </div>
+      <p class="dp_status" data-dp-status role="status" hidden></p>
+    </div>
+  </div>
 {% endblock %}
 {% block scripts %}
   <script>
@@ -131,6 +182,11 @@
       chatUrl: "{{ url_for('home.api_support_chat') }}",
       ratesUrl: "{{ url_for('planning.api_exchange_rate') }}",
       intakeUrl: "{{ url_for('home.api_intake') }}",
+      extractUrl: "{{ url_for('document.extract') }}",
+      attachUrl: "{{ url_for('home.api_attach') }}",
+      pipelineUrl: "{{ url_for('home.api_doc_pipeline', step='__STEP__') }}",
+      previewUrl: "{{ url_for('document.draft_preview') }}",
+      reviewPdfUrl: "{{ url_for('document.draft_review_pdf') }}",
       agentUrl: "{{ url_for('home.api_agent') }}",
       planningUrl: "{{ url_for('planning.new') }}",
       docFormUrl: "{{ url_for('document.new') }}",
@@ -140,6 +196,8 @@
   {# 잠겼으면 스크립트를 아예 붙이지 않습니다. 눌리지 않는 것이
      보이기만 그런 것이 아니라 실제로 아무 일도 하지 않아야 합니다. #}
   {% if not home_locked %}
+    <script src="{{ static_url('js/doc_upload.js') }}"></script>
+    <script src="{{ static_url('js/doc_preview.js') }}"></script>
     <script src="{{ static_url('js/home.js') }}"></script>
   {% endif %}
 {% endblock %}

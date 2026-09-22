@@ -173,6 +173,10 @@ a.rail_item.active .rail_icon { background: var(--surface); }
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em;
 }
 .home_msg.bot a { text-decoration: underline; }
+.home_msg.bot blockquote {
+  margin: 0 0 13px; padding: 10px 14px; border-left: 3px solid var(--line, #d0d7de);
+  border-radius: 0 10px 10px 0; background: var(--surface);
+}
 
 .home_msg.wait { color: var(--muted); font-size: 14.5px; }
 .home_msg.bad {
@@ -526,3 +530,216 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 }
 .home_chips .chip_file::before { content: "📄 "; }
 .home_chips .chip_file:hover { border-color: var(--navy); background: #f1f5f9; }
+
+/* 서류 올려서 칸 채우기 (doc_upload.js). 시작 화면과 서류 작성 화면이 같이 씁니다. */
+.doc_upload_wrap { width: min(920px, 100%); margin: 0 auto 16px; }
+.doc_drop { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; align-items: center;
+  padding: 16px 20px; border: 2px dashed #c7d7fd; border-radius: var(--radius);
+  background: var(--blue_soft); transition: border-color .12s, background .12s; }
+.doc_drop.is_over { border-color: var(--blue); background: #dbe7ff; }
+.doc_drop.is_busy { opacity: .75; }
+.doc_drop_icon { font-size: 26px; }
+.doc_drop_text b { display: block; font-size: 14px; }
+.doc_drop_text small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.doc_drop_status { grid-column: 1 / -1; margin: 4px 0 0; font-size: 13px; font-weight: 700; color: var(--blue_dark); }
+.doc_drop_status.ok { color: #07694f; }
+.doc_drop_status.bad { color: var(--red); }
+@media (max-width: 620px) {
+  .doc_drop { grid-template-columns: auto 1fr; }
+  .doc_drop [data-drop-pick] { grid-column: 1 / -1; }
+}
+.doc_upload_result { margin-top: 12px; padding: 18px 20px; border: 1px solid var(--line);
+  border-radius: var(--radius); background: #fff; }
+.upload_title { margin: 0 0 10px; }
+.upload_summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px 16px; margin: 0 0 12px; }
+.upload_summary dt { color: var(--muted); font-size: 11.5px; font-weight: 800; }
+.upload_summary dd { margin: 2px 0 0; font-size: 13.5px; word-break: break-word; }
+.upload_missing { margin: 0 0 10px; padding: 9px 12px; border-radius: 10px; background: var(--amber_soft);
+  color: #8a4f00; font-size: 13px; }
+.upload_missing.ok { background: var(--green_soft); color: #07694f; }
+.upload_notes { margin: 0 0 10px; font-size: 13px; }
+.upload_notes ul { margin: 6px 0 0; padding-left: 20px; }
+.upload_notes li { margin-bottom: 4px; }
+.upload_hs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; }
+.upload_hs > span { color: var(--muted); font-weight: 700; margin-right: 4px; }
+
+/* 서류에서 읽어 온 값으로 채운 칸. 사람이 고치면 표시가 사라집니다. */
+/* .doc_field input[type=text]보다 구체적이어야 덮입니다. */
+.doc_field input.is_prefilled, .doc_field select.is_prefilled {
+  background: #fffbe6; border-color: #f5c518; }
+.doc_hs_find { justify-self: start; padding: 2px 0; font-size: 12.5px; }
+
+/* 시작 화면: 적는 칸에 파일을 끌어다 놓을 때 */
+.home_box.is_over { outline: 2px dashed var(--blue); outline-offset: 4px; }
+.home_msg.bot a.hs_link { font-weight: 800; }
+
+/* 모드 탭 셋과 HS CODE 조회 단추가 한 줄에 같은 모양으로 섭니다.
+   탭 묶음 상자는 줄 배치에서 빠지게 해 단추들이 바로 home_actions의 flex를 따릅니다. */
+.home_tabs { display: contents; }
+.home_actions .home_hs_open { border-style: dashed; }
+
+/* ----- 만들 서류 고르기 (올린 서류로 만들 때) ----- */
+.pick_card { padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.pick_title { margin: 0 0 10px; }
+.pick_title small { display: block; color: var(--muted); font-size: 12.5px; }
+.pick_list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.pick_opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 12px; line-height: 1.45; }
+.pick_opt:has(input:checked) { border-color: var(--blue); background: var(--blue_soft); }
+.pick_opt input { margin-top: 3px; accent-color: var(--blue); }
+.pick_opt b { display: block; font-size: 13.5px; }
+.pick_opt small { display: block; color: var(--muted); font-size: 12px; }
+.pick_need { margin: 12px 0 0; padding: 9px 12px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+.pick_need.ok { background: var(--green_soft); color: #07694f; }
+.pick_need.warn { background: var(--amber_soft); color: #8a4f00; }
+.pick_need.bad { background: var(--red_soft); color: var(--red); }
+.pick_card .draft_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.pick_card [data-pick-make]:disabled { opacity: .5; cursor: not-allowed; }
+
+.made_docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.made_doc { margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: #fff; cursor: zoom-in; }
+.made_doc img { display: block; width: 100%; max-height: 190px; object-fit: cover; object-position: top; border-radius: 6px; }
+.made_doc figcaption { margin-top: 5px; font-size: 12px; font-weight: 700; text-align: center; }
+
+/* ----- 서류 미리보기 & 검토 창 (doc_preview.js) ----- */
+.dp_modal { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; padding: 3vh 16px; }
+.dp_modal[hidden] { display: none; }
+.dp_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.5); }
+.dp_box { position: relative; display: flex; flex-direction: column; gap: 10px;
+  width: min(1240px, 100%); height: min(94vh, 980px); padding: 18px 20px; overflow: hidden;
+  border-radius: 20px; background: #fff; box-shadow: 0 30px 80px rgba(15,23,42,.35); text-align: left; }
+.dp_head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.dp_head h2 { margin: 0; font-size: 18px; }
+.dp_head small { display: block; margin-top: 3px; color: var(--muted); font-size: 12.5px; }
+.dp_head_actions { display: flex; gap: 8px; align-items: center; }
+.dp_close { width: 34px; height: 34px; border: 0; border-radius: 10px; background: var(--surface);
+  font-size: 22px; line-height: 1; cursor: pointer; }
+.dp_bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.dp_tabs { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.dp_tabs button { padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; }
+.dp_tabs button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
+.dp_badge { margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--amber_soft);
+  color: #8a4f00; font-size: 11px; }
+.dp_tabs button.active .dp_badge { background: rgba(255,255,255,.2); color: #fff; }
+.dp_sync { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12.5px; }
+.dp_body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 16px; flex: 1; min-height: 0; }
+.dp_edit { overflow-y: auto; padding-right: 6px; }
+.dp_note { margin: 0 0 10px; padding: 8px 11px; border-radius: 10px; background: var(--surface);
+  color: var(--muted); font-size: 12.5px; }
+.dp_fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.dp_field { display: grid; gap: 3px; min-width: 0; }
+.dp_field span { color: var(--muted); font-size: 11.5px; font-weight: 800; }
+.dp_field input, .dp_field textarea, .dp_items input { width: 100%; min-width: 0; padding: 7px 9px;
+  border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13px; background: #fff; }
+.dp_field textarea { resize: vertical; }
+.dp_field:has(textarea) { grid-column: 1 / -1; }
+.dp_field.is_empty input, .dp_field.is_empty textarea { border-color: #f5c518; background: #fffbe6; }
+.dp_field.is_undecided input { color: var(--muted); font-style: italic; }
+.dp_field input:focus, .dp_field textarea:focus, .dp_items input:focus { outline: none; border-color: var(--blue); }
+.dp_items { margin-top: 14px; }
+.dp_items > b { font-size: 13px; }
+.dp_table_wrap { margin-top: 6px; overflow-x: auto; }
+.dp_items table { border-collapse: collapse; min-width: 100%; font-size: 12px; }
+.dp_items th { padding: 6px; background: var(--surface); color: var(--muted); font-weight: 800; text-align: left; white-space: nowrap; }
+.dp_items td { padding: 3px; min-width: 110px; }
+.dp_sheet { margin: 0; overflow-y: auto; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: #eef2f7; }
+.dp_sheet img { display: block; width: 100%; background: #fff; box-shadow: 0 4px 18px rgba(15,23,42,.12); }
+.dp_sheet figcaption { margin-top: 6px; color: var(--muted); font-size: 12px; text-align: center; }
+.dp_status { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--surface); font-size: 13px; }
+.dp_status.ok { background: var(--green_soft); color: #07694f; }
+.dp_status.warn { background: var(--amber_soft); color: #8a4f00; }
+.dp_status.bad { background: var(--red_soft); color: var(--red); }
+@media (max-width: 860px) {
+  .dp_box { height: 96vh; padding: 14px; }
+  .dp_body { grid-template-columns: 1fr; overflow-y: auto; }
+  .dp_edit, .dp_sheet { overflow: visible; }
+  .dp_fields { grid-template-columns: 1fr; }
+}
+
+/* ----- 파일 붙이기 (세 탭 공통) -----
+   적는 칸 왼쪽 아래 + 단추. 붙인 파일은 적는 칸 위에 칩(썸네일·파일명·×)으로 보입니다. */
+.home_plus {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%;
+  background: var(--surface); color: var(--navy); cursor: pointer;
+  transition: background .12s, border-color .12s, transform .12s;
+}
+.home_plus:hover { border-color: #c7d7fd; background: var(--blue_soft); color: var(--blue_dark); }
+.home_plus:active { transform: scale(.94); }
+.home_plus:disabled { opacity: .5; cursor: default; }
+.home_center.talking .home_plus { width: 32px; height: 32px; }
+
+.home_attach { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.attach_chip {
+  display: inline-flex; align-items: center; gap: 9px; max-width: 100%;
+  padding: 6px 8px 6px 6px; border: 1px solid #c7d7fd; border-radius: 12px;
+  background: var(--blue_soft); color: var(--ink); text-align: left;
+}
+.attach_thumb {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 8px;
+  object-fit: cover; background: #fff; border: 1px solid var(--line);
+}
+.attach_thumb.is_pdf {
+  display: grid; place-items: center; background: #fee2e2; border-color: #fecaca;
+  color: #b91c1c; font-size: 11px; font-weight: 900; letter-spacing: .02em;
+}
+.attach_meta { display: grid; min-width: 0; line-height: 1.3; }
+.attach_meta b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 260px; }
+.attach_meta small { color: var(--muted); font-size: 11.5px; }
+.attach_remove {
+  flex: 0 0 auto; width: 24px; height: 24px; border: 0; border-radius: 50%;
+  background: rgba(15, 23, 42, .08); color: var(--ink); font-size: 16px; line-height: 1;
+  cursor: pointer;
+}
+.attach_remove:hover { background: var(--red_soft); color: var(--red); }
+.home_center.talking .home_attach { margin-bottom: 6px; }
+.home_center.talking .attach_thumb { width: 32px; height: 32px; }
+
+/* 보낸 말 안의 파일 칩 */
+.home_msg.me .attach_chip { background: #fff; white-space: normal; }
+.home_msg.me .me_text { display: block; margin-top: 8px; }
+
+/* 탭을 대신 옮겼다는 알림. 조용히 바뀌면 사람이 헷갈립니다. */
+.home_msg.note {
+  justify-self: center; padding: 6px 14px; border-radius: 999px;
+  background: #eef2ff; color: var(--blue_dark); font-size: 12.5px; font-weight: 700;
+}
+.home_actions button.just_used { box-shadow: 0 0 0 3px rgba(43, 102, 246, .35); }
+
+@media (max-width: 860px) {
+  .attach_meta b { max-width: 48vw; }
+}
+
+/* 답의 근거가 된 공공데이터. 숫자가 어디서 왔는지 보이게 둡니다. */
+.home_msg.bot .answer_sources {
+  margin: 10px 0 0; padding: 6px 10px; border-radius: 8px;
+  background: #f1f5f9; color: var(--muted); font-size: 12px; font-weight: 600;
+}
+/* 데이터 브리핑 답변의 표. 좁은 화면에서는 표만 옆으로 밀어 봅니다. */
+.home_msg.bot table.answer_table { width: 100%; border-collapse: collapse; margin: 6px 0 4px; font-size: 13.5px; }
+.home_msg.bot table.answer_table th,
+.home_msg.bot table.answer_table td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.home_msg.bot table.answer_table th { background: #f8fafc; font-weight: 800; white-space: nowrap; }
+.home_msg.bot table.answer_table td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.home_msg.bot .answer_table_wrap { overflow-x: auto; }
+.home_msg.bot .answer_sources small { display: block; margin-top: 3px; font-weight: 500; }
+/* K-stat처럼: 표 둘째 줄(|:---:|---:|)의 정렬을 따릅니다. 증감률은 방향을 색으로. */
+.home_msg.bot table.answer_table .al_center { text-align: center; }
+.home_msg.bot table.answer_table .al_right { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.home_msg.bot table.answer_table .al_left { text-align: left; }
+.home_msg.bot table.answer_table td.up { color: #1d4ed8; font-weight: 700; }
+.home_msg.bot table.answer_table td.down { color: var(--red); font-weight: 700; }
+.home_msg.bot table.answer_table tr.total td { background: #f8fafc; font-weight: 800; border-top: 2px solid var(--line); }
+.home_msg.bot table.answer_table tbody tr:hover td { background: #f8fafc; }
+
+/* 답 속 ForwardUs 액션 버튼 ([📄 …](/documents/new), [🔎 …](#hs:품명)) */
+.home_msg.bot a.answer_action {
+  display: inline-flex; align-items: center; gap: 4px; margin: 4px 6px 4px 0;
+  padding: 8px 14px; border: 1px solid #c7d7fd; border-radius: 999px;
+  background: var(--blue_soft); color: var(--blue_dark); font-size: 13.5px; font-weight: 800;
+  text-decoration: none;
+}
+.home_msg.bot a.answer_action:hover { background: var(--blue); border-color: var(--blue); color: #fff; }

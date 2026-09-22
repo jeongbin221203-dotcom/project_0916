@@ -45,29 +45,7 @@
 .selected_date .buyer { background: #fef3c7; color: #7c4a03; }
 .selected_date .buyer i { background: #f5c518; }
 
-/* Autocomplete */
-.autocomplete { position: relative; }
-.ac_list { position: absolute; z-index: 20; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(15,23,42,.12); max-height: 300px; overflow-y: auto; }
-.ac_list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 11px; border-radius: 10px; cursor: pointer; align-items: baseline; }
-.ac_list .ac_title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.ac_list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
-.ac_list li:hover { background: var(--blue_soft); }
-.ac_list li.empty { color: var(--muted); cursor: default; }
-/* HS 입력칸 오른쪽에 후보 정렬을 나란히 둡니다. 좁은 화면에서는 아래로 내려갑니다. */
-.hs_input_row { display: flex; gap: 8px; align-items: stretch; }
-.hs_input_row .text_input { flex: 1 1 auto; min-width: 0; }
-.hs_input_row .hs_order { flex: 0 0 auto; width: auto; min-width: 132px; font-size: 13px; }
-@media (max-width: 520px) {
-  .hs_input_row { flex-wrap: wrap; }
-  .hs_input_row .hs_order { flex: 1 1 100%; }
-}
-[data-autocomplete="hs_code"] .ac_list, [data-line-hs] .ac_list {
-  position: static; max-height: 580px; width: 100%; box-shadow: none; margin: 8px 0;
-}
-[data-autocomplete="hs_code"] .ac_list li, [data-line-hs] .ac_list li { display: block; }
-[data-autocomplete="hs_code"] .ac_list small, [data-line-hs] .ac_list small { display: block; margin-top: 4px; }
-.ac_list .hs_stats { color: var(--blue_dark); }
-.ac_list details summary { cursor: pointer; }
+/* Autocomplete · HS 후보 목록은 base.css로 옮겼습니다. (HS CODE 간편 검색 창과 같이 씁니다) */
 
 /* Incoterms */
 .incoterm_grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
@@ -146,9 +124,6 @@
 /* Country filter and direct input */
 .link_button.inline { font-size: 12px; margin-left: 6px; padding: 0; }
 .autocomplete select[data-country-filter] { margin-bottom: 6px; }
-.ac_list .ac_group { display: block; padding: 8px 11px 3px; color: var(--muted); font-size: 12px; font-weight: 800; cursor: default; background: none; }
-.ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #94a3b8; }
-.ac_list .ac_group_other small { font-weight: 600; margin-left: 6px; }
 .ac_list .ac_note { margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: var(--blue_soft); color: var(--blue_dark); font-size: 11px; font-style: normal; font-weight: 800; }
 .custom_box { display: grid; grid-template-columns: 110px 1fr 130px auto; gap: 6px; align-items: center; margin-top: 6px; padding: 10px; border: 1px dashed var(--line); border-radius: 12px; background: #f8fafc; }
 .custom_box input, .custom_box select { min-height: 36px; font-size: 13px; padding: 0 9px; border-radius: 10px; }

@@ -32,6 +32,7 @@ SCHEDULE_FIELDS = {
     "packing_list": ("date_shipped", "shipped_via"),
     "packing_list_std": ("etd", "vessel_or_flight"),
     "proforma_invoice": ("shipment_time",),
+    "shipping_instruction": ("etd", "vessel_or_flight", "carrier"),
 }
 
 # 초안으로 그릴 수 있는 서식.
@@ -44,7 +45,13 @@ FORMS = {
     "packing_list": "포장명세서 (ORDER # 양식)",
     "packing_list_std": "포장명세서 (표준 ①~⑯ 양식)",
     "proforma_invoice": "견적송장 (Proforma Invoice)",
+    "shipping_instruction": "선적의뢰서 (Shipping Request)",
 }
+
+# 미리보기에서 고친 값을 다시 그릴 때의 한도. 화면이 보낸 값은 믿지 않고 자릅니다.
+MAX_FIELD_CHARS = 500
+MAX_CELL_CHARS = 300
+MAX_ITEM_ROWS = 20
 
 # 표준 포장명세서는 상업송장과 같은 칸을 쓰되 순서와 이름이 서식대로입니다.
 STD_PACKING_FIELDS = [
@@ -236,9 +243,14 @@ def _extras(draft: dict) -> dict:
     names = ("buyer", "lc_no", "other_references", "payment_terms", "shipping_marks",
              "remarks", "bank_info", "po_no", "validity_date", "signed_by",
              "accepted_by", "consignee_city_zip", "attention", "customer_order_no",
-             "date_ordered", "container_no", "comments", "packed_by", "invoice_no")
-    return {name: str(draft.get(name) or "").strip()
-            for name in names if str(draft.get(name) or "").strip()}
+             "date_ordered", "container_no", "comments", "packed_by", "invoice_no",
+             "booking_no", "container_seal_no")
+    extras = {name: str(draft.get(name) or "").strip()
+              for name in names if str(draft.get(name) or "").strip()}
+    # 선적의뢰서의 컨테이너 칸. 올린 B/L에서 읽은 컨테이너 번호가 있으면 씁니다.
+    if "container_seal_no" not in extras and extras.get("container_no"):
+        extras["container_seal_no"] = extras["container_no"]
+    return extras
 
 
 def _items(kind: str, stand_in) -> list[dict]:
@@ -247,9 +259,14 @@ def _items(kind: str, stand_in) -> list[dict]:
     if kind != "packing_list_std":
         return document_service.build_items(stand_in, kind)
 
+    from app.validators.cargo_validator import PACKAGE_UNITS
+
     rows = []
     for cargo in stand_in.cargos:
-        packages = f"{cargo.quantity or 0:,} {cargo.package_type or ''}".strip()
+        # 상업송장과 같은 단위 약어(CTN·PLT…)로 찍습니다. 두 서류의 포장 표기가 달라 보이면
+        # 세관이 같은 화물인지 다시 묻습니다.
+        unit = PACKAGE_UNITS.get(cargo.package_type, cargo.package_type or "")
+        packages = f"{cargo.quantity or 0:,} {unit}".strip()
         rows.append({
             "shipping_marks": "",
             "packages": packages,
@@ -298,7 +315,79 @@ def file_name(kind: str) -> str:
     return {"commercial_invoice": "commercial_invoice",
             "packing_list": "packing_list",
             "packing_list_std": "packing_list",
-            "proforma_invoice": "proforma_invoice"}.get(kind, kind) + "_draft.pdf"
+            "proforma_invoice": "proforma_invoice",
+            "shipping_instruction": "shipping_request"}.get(kind, kind) + "_draft.pdf"
+
+
+# --- 미리보기에서 고친 값으로 다시 그리기 -----------------------------------------------
+# 검토 창에서 사람이 칸을 고치면, draft가 아니라 **고친 서류 값 그대로** 그립니다.
+# 고친 값을 draft로 되돌려 다시 계산하면 사람이 고친 글자가 계산 값으로 덮입니다.
+
+def as_text(data: dict) -> dict:
+    """그려질 모양 그대로의 글자로. 검토 창의 칸에 넣는 값입니다.
+
+    draw_form은 칸 값을 str()로, 품목 표 숫자를 천 단위 쉼표로 찍습니다.
+    검토 창이 같은 글자를 보여 줘야 고치지 않은 칸이 다시 그려도 똑같습니다.
+    """
+
+    text = {key: ("" if value is None else str(value))
+            for key, value in data.items() if key != "items"}
+    text["items"] = [
+        {key: (f"{value:,}" if isinstance(value, (int, float)) and not isinstance(value, bool)
+               else ("" if value is None else str(value)))
+         for key, value in row.items()}
+        for row in data.get("items") or []]
+    return text
+
+
+def clean_data(kind: str, data) -> dict:
+    """화면이 보낸 서류 값. 이 서식의 칸과 품목 표 열만 받고, 길이를 자릅니다."""
+
+    _require_form(kind)
+    if not isinstance(data, dict):
+        raise ValidationError("서류 내용을 읽지 못했습니다.", "data")
+    cleaned = {name: str(data.get(name) if data.get(name) is not None else "")[:MAX_FIELD_CHARS]
+               for name in fields_for(kind)}
+    keys = [column["key"] for column in item_columns(kind)]
+    rows = data.get("items") if isinstance(data.get("items"), list) else []
+    cleaned["items"] = [
+        {key: str(row.get(key) if row.get(key) is not None else "")[:MAX_CELL_CHARS] for key in keys}
+        for row in rows[:MAX_ITEM_ROWS] if isinstance(row, dict)]
+    return cleaned
+
+
+def _page(kind: str, data) -> "object":
+    from app.processors import document_form
+
+    return document_form.draw_form(kind, clean_data(kind, data), item_columns(kind))
+
+
+def preview_data(kind: str, data) -> str:
+    """고친 값으로 그린 미리보기 그림 (data URI)."""
+
+    import base64
+
+    from app.processors import document_form
+
+    png = document_form.as_png(document_form.crop_to_content(_page(kind, data)))
+    return "data:image/png;base64," + base64.b64encode(png).decode()
+
+
+def pdf_documents(documents) -> bytes:
+    """검토를 마친 서류들을 한 PDF로. 서류마다 A4 한 쪽입니다."""
+
+    from app.processors import document_form
+
+    if not isinstance(documents, list) or not documents:
+        raise ValidationError("내려받을 서류를 골라 주세요.", "documents")
+    if len(documents) > len(FORMS):
+        raise ValidationError("서류가 너무 많습니다.", "documents")
+    pages = []
+    for row in documents:
+        if not isinstance(row, dict):
+            raise ValidationError("서류 내용을 읽지 못했습니다.", "documents")
+        pages.append(_page(str(row.get("kind") or ""), row.get("data")))
+    return document_form.as_pdf_pages(pages)
 
 
 def _missing(kind: str, data: dict) -> list[dict]:

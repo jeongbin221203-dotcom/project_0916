@@ -307,3 +307,66 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .back_home { display: inline-block; margin-bottom: 6px; font-size: 13.5px; font-weight: 700; }
 /* 단독 화면은 머리말이 없으므로 위쪽 여백을 스스로 만듭니다. */
 body.standalone .page { padding-top: 28px; }
+
+/* Autocomplete — 운송 계획(planning.css)에서 옮겼습니다.
+   HS CODE 간편 검색 창이 어느 화면에서나 같은 모양으로 뜨게 하려는 것입니다. */
+/* Autocomplete */
+.autocomplete { position: relative; }
+.ac_list { position: absolute; z-index: 20; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(15,23,42,.12); max-height: 300px; overflow-y: auto; }
+.ac_list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 11px; border-radius: 10px; cursor: pointer; align-items: baseline; }
+.ac_list .ac_title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ac_list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.ac_list li:hover { background: var(--blue_soft); }
+.ac_list li.empty { color: var(--muted); cursor: default; }
+/* HS 입력칸 오른쪽에 후보 정렬을 나란히 둡니다. 좁은 화면에서는 아래로 내려갑니다. */
+.hs_input_row { display: flex; gap: 8px; align-items: stretch; }
+.hs_input_row .text_input { flex: 1 1 auto; min-width: 0; }
+.hs_input_row .hs_order { flex: 0 0 auto; width: auto; min-width: 132px; font-size: 13px; }
+@media (max-width: 520px) {
+  .hs_input_row { flex-wrap: wrap; }
+  .hs_input_row .hs_order { flex: 1 1 100%; }
+}
+[data-autocomplete="hs_code"] .ac_list, [data-line-hs] .ac_list, .hs_modal .ac_list {
+  position: static; max-height: 580px; width: 100%; box-shadow: none; margin: 8px 0;
+}
+[data-autocomplete="hs_code"] .ac_list li, [data-line-hs] .ac_list li, .hs_modal .ac_list li { display: block; }
+[data-autocomplete="hs_code"] .ac_list small, [data-line-hs] .ac_list small, .hs_modal .ac_list small { display: block; margin-top: 4px; }
+.ac_list .hs_stats { color: var(--blue_dark); }
+.ac_list details summary { cursor: pointer; }
+.ac_list .ac_group { display: block; padding: 8px 11px 3px; color: var(--muted); font-size: 12px; font-weight: 800; cursor: default; background: none; }
+.ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #94a3b8; }
+.ac_list .ac_group_other small { font-weight: 600; margin-left: 6px; }
+
+/* HS CODE 간편 검색 창. 어느 화면에서나 [data-hs-open]으로 뜹니다. (hs_modal.js) */
+body.hs_modal_open { overflow: hidden; }
+.hs_modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center;
+  padding: 6vh 16px 16px; }
+.hs_modal[hidden] { display: none; }
+.hs_modal_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.45); }
+.hs_modal_box { position: relative; display: flex; flex-direction: column; gap: 12px;
+  width: min(760px, 100%); max-height: 88vh; padding: 20px 22px; overflow: hidden;
+  border-radius: 20px; background: #fff; box-shadow: 0 30px 80px rgba(15,23,42,.35); }
+.hs_modal_head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.hs_modal_head h2 { margin: 0; font-size: 18px; }
+.hs_modal_head small { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
+.hs_modal_close { flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 10px;
+  background: var(--surface); font-size: 22px; line-height: 1; cursor: pointer; }
+.hs_modal_close:hover { background: var(--line); }
+.hs_modal_target { margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--blue_soft);
+  color: var(--blue_dark); font-size: 13px; font-weight: 700; }
+.hs_modal_body { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; }
+.hs_modal_body .ac_list { max-height: none; margin: 0; }
+.hs_modal_row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hs_modal_row .hs_country { width: auto; min-width: 190px; font-size: 13px; }
+.hs_modal_chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hs_chip { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  color: var(--blue_dark); font-size: 12px; font-weight: 700; cursor: pointer; }
+.hs_chip:hover { border-color: var(--blue); background: var(--blue_soft); }
+.hs_modal_status { margin: 0; padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; }
+.hs_modal_status.ok { background: var(--green_soft); color: #07694f; }
+.hs_modal_status.warn { background: var(--amber_soft); color: #8a4f00; }
+@media (max-width: 520px) {
+  .hs_modal { padding: 12px 8px; }
+  .hs_modal_box { padding: 16px; max-height: 94vh; }
+  .hs_modal_row .hs_country { flex: 1 1 100%; }
+}

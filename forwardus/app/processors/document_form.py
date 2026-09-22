@@ -135,6 +135,30 @@ LAYOUTS = {
             [("comments", "COMMENTS", 0.5), ("packed_by", "PACKED BY", 0.5)],
         ],
     },
+    # 선적의뢰서 (Shipping Request / S·I). 포워더·선사에 B/L 내용을 알려 주는 서식입니다.
+    # 칸 구성은 document_service.DOCUMENT_SECTIONS["shipping_instruction"]과 같습니다.
+    "shipping_instruction": {
+        "title": "SHIPPING REQUEST",
+        "rows": [
+            [("exporter+exporter_address", "Shipper", 0.5),
+             ("booking_no+doc_no+doc_date", "Booking No. · S/R No. · Date", 0.5)],
+            [("consignee+consignee_address", "Consignee", 0.5),
+             ("notify_party", "Notify Party", 0.5)],
+            [("pol", "Port of Loading", 0.25), ("pod", "Port of Discharge", 0.25),
+             ("vessel_or_flight", "Vessel / Voyage", 0.25), ("etd", "ETD", 0.25)],
+            [("carrier", "Carrier", 0.34), ("freight_term", "Freight", 0.33),
+             ("incoterms", "Terms of delivery", 0.33)],
+        ],
+        "table": True,
+        "footer": [
+            [("gross_weight_kg", "Total gross weight (kg)", 0.34),
+             ("total_cbm", "Total measurement (CBM)", 0.33),
+             ("container_seal_no", "Container No. / Seal No.", 0.33)],
+            [("shipping_marks", "Shipping marks", 0.5),
+             ("dangerous_goods", "Dangerous goods", 0.5)],
+            [("remarks", "Remarks", 0.5), ("signed_by", "Signed by", 0.5)],
+        ],
+    },
     "proforma_invoice": {
         "title": "PROFORMA INVOICE",
         "rows": [
@@ -307,4 +331,13 @@ def as_png(image: Image.Image) -> bytes:
 def as_pdf(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, "PDF", resolution=150.0)
+    return buffer.getvalue()
+
+
+def as_pdf_pages(images: list[Image.Image]) -> bytes:
+    """여러 서류를 한 파일로. 서류 한 장이 A4 한 쪽입니다."""
+
+    buffer = io.BytesIO()
+    first, rest = images[0], images[1:]
+    first.save(buffer, "PDF", resolution=150.0, save_all=True, append_images=rest)
     return buffer.getvalue()
