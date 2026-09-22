@@ -104,6 +104,9 @@ class Config:
     # HS 품목분류는 틀리면 관세포탈이 되는 자리라 더 나은 모형을 씁니다.
     # 상담·서류 읽기는 gpt-4o-mini로 충분하지만 여기만 따로 둡니다.
     AI_HS_MODEL = os.getenv("AI_HS_MODEL", "gpt-4o")
+    # 올린 서류(오퍼시트)를 읽는 모형. 스캔 사진도 읽어야 해서 그림을 보는 모형이어야 합니다.
+    # 단가·금액이 서류에 그대로 찍히는 자리라 상담용(mini)보다 나은 모형을 씁니다.
+    AI_DOC_MODEL = os.getenv("AI_DOC_MODEL", "gpt-4o")
 
     UNIPASS_API_KEYS = {name: os.getenv(f"UNIPASS_KEY_{name}", "") for name in UNIPASS_SERVICES}
 
@@ -112,7 +115,7 @@ class Config:
     #
     # 왼쪽 줄, 탭, 적는 칸, 고객 상담 단추가 모두 눌리지 않습니다.
     # 위쪽 메뉴(운송 계획 · Shipments · 일정 역산 · 컨테이너 조회 ·
-    # 관세청 조회 · Dashboard)만 그대로 씁니다.
+    # 관세청 조회 · 로그인)만 그대로 씁니다.
     #
     # 보여 주기용으로 시작 화면만 막아 둘 때 씁니다.
     #

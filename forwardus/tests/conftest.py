@@ -56,6 +56,21 @@ def _fresh_outages():
     base_client.clear_outages()
 
 
+@pytest.fixture(autouse=True)
+def _isolated_offer_drafts(tmp_path, monkeypatch):
+    """오퍼시트에서 읽은 값을 잠시 두는 폴더를 테스트마다 빈 폴더로 바꿉니다.
+
+    실제 instance/offer_drafts에 시험용 파일이 쌓이지 않게 합니다.
+    """
+
+    from app.services import draft_store
+
+    folder = tmp_path / "offer_drafts"
+    folder.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(draft_store, "_root", lambda: folder)
+    yield folder
+
+
 @pytest.fixture()
 def app():
     flask_app = create_app(TestConfig)

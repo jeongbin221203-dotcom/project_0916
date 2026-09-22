@@ -1278,6 +1278,10 @@ def create_shipment(payload: dict) -> Shipment:
             # 품목마다 단가·금액을 따로 적습니다. (송장의 Unit price / Amount 칸)
             unit_price=line["unit_price"],
             amount=line["amount"],
+            # 단가를 낱개로 매겼으면 그 기준을 같이 남깁니다. 없으면 포장 개수가 기준입니다.
+            unit_quantity=line["unit_quantity"],
+            price_unit=line["price_unit"],
+            units_per_package=line["units_per_package"],
             total_cbm=line["total_cbm"],
             total_weight_kg=line["total_weight_kg"],
             revenue_ton=line["revenue_ton"],

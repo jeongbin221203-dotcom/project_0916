@@ -50,14 +50,18 @@ def available() -> bool:
 
 
 def structured_chat(messages: list[dict], schema: dict, *, name: str,
-                    max_tokens: int = 1800) -> dict:
-    """Schema-constrained output for product interpretation, with explicit failure."""
+                    max_tokens: int = 1800, model: str = "", timeout: float = 25) -> dict:
+    """Schema-constrained output for product interpretation, with explicit failure.
+
+    messages의 content에는 그림도 넣을 수 있습니다({"type": "image_url", ...}).
+    서류 사진을 읽을 때는 시간이 더 걸려 timeout을 늘려 부릅니다.
+    """
     key = get_config("AI_API_KEY", "")
     if not key:
         return fail("API_AUTH_FAILED", "api", "OpenAI 키가 없어 일반 검색을 사용합니다.")
-    result = request_text("POST", OPENAI_URL, timeout=25,
+    result = request_text("POST", OPENAI_URL, timeout=timeout,
                           headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                          json={"model": get_config("AI_HS_MODEL", MODEL), "temperature": 0,
+                          json={"model": model or get_config("AI_HS_MODEL", MODEL), "temperature": 0,
                                 "max_tokens": max_tokens, "messages": messages,
                                 "response_format": {"type": "json_schema", "json_schema": {
                                     "name": name, "strict": True, "schema": schema}}})

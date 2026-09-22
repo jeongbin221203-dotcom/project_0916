@@ -28,6 +28,13 @@ class Cargo(db.Model):
     unit_price = db.Column(db.Float, nullable=True)
     amount = db.Column(db.Float, nullable=True)
 
+    # 단가의 기준. 비어 있으면 예전처럼 포장 개수(quantity)가 기준입니다.
+    # 적혀 있으면 단가는 unit_quantity 기준이고 송장에는 "2,000 PCS × 3.20"으로
+    # 찍힙니다. quantity(포장 개수)는 포장명세서에 씁니다.
+    unit_quantity = db.Column(db.Float, nullable=True)
+    price_unit = db.Column(db.String(10), nullable=False, default="")
+    units_per_package = db.Column(db.Float, nullable=True)
+
     # 위험물이면 UN번호와 급(class)이 모든 운송 서류의 기준이 됩니다.
     is_dangerous = db.Column(db.Boolean, nullable=False, default=False)
     un_number = db.Column(db.String(10), nullable=False, default="")
@@ -62,6 +69,9 @@ class Cargo(db.Model):
             "net_weight_kg": self.net_weight_kg,
             "unit_price": self.unit_price,
             "amount": self.amount,
+            "unit_quantity": self.unit_quantity,
+            "price_unit": self.price_unit,
+            "units_per_package": self.units_per_package,
             "total_cbm": self.total_cbm,
             "total_weight_kg": self.total_weight_kg,
             "revenue_ton": self.revenue_ton,

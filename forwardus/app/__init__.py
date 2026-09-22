@@ -44,7 +44,11 @@ def migrate_cargo_lines(database) -> None:
              "proper_shipping_name": "VARCHAR(200) NOT NULL DEFAULT ''",
              # 품목별 금액도 나중에 더해졌습니다.
              "unit_price": "FLOAT",
-             "amount": "FLOAT"}
+             "amount": "FLOAT",
+             # 단가의 기준(낱개 수량 · 가격 단위 · 포장당 낱개 수)도 나중에 더해졌습니다.
+             "unit_quantity": "FLOAT",
+             "price_unit": "VARCHAR(10) NOT NULL DEFAULT ''",
+             "units_per_package": "FLOAT"}
     missing = {name: spec for name, spec in added.items() if name not in columns}
     if missing:
         with database.engine.begin() as connection:
@@ -148,7 +152,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         # 고객상담 창은 모든 화면에 붙으므로 여기서 한 번만 준비합니다.
         from app.services import support_chat_service
 
+        from app.routes.auth import current_user
+
         return {"nav_active": request.blueprint or "", "static_url": static_url,
+                "current_user": current_user(),
                 "support_chat_intro": support_chat_service.intro(),
                 "support_icon": support_icon(),
                 "brand_logo": _pick_image("logo"),

@@ -10,7 +10,7 @@ from app.processors.document_validator import validate_documents
 from app.repositories import document_repository, shipment_repository
 from app.services import ServiceError
 from app.validators import ValidationError
-from app.validators.cargo_validator import PACKAGE_UNITS
+from app.validators.cargo_validator import PACKAGE_UNITS, priced_by_units
 from app.validators.document_validator import clean_document_fields
 
 PREPAID_INCOTERMS = {"CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"}
@@ -275,6 +275,14 @@ DOC_PREFIX = {
 }
 
 
+def _port(name: str, code: str) -> str:
+    """"Busan (KRPUS)". 아직 항구를 안 정했으면(초안) " ()"가 아니라 빈 값입니다."""
+
+    if not code:
+        return ""
+    return f"{name} ({code})"
+
+
 def build_reference(shipment) -> dict:
     """Expected values for every shared field, taken from the Shipment record."""
 
@@ -304,8 +312,8 @@ def build_reference(shipment) -> dict:
         "consignee_address": buyer.address if buyer else "",
         "notify_party": shipment.notify_party,
         "incoterms": f"{shipment.incoterms}",
-        "pol": f"{shipment.origin_name} ({shipment.origin_code})",
-        "pod": f"{shipment.destination_name} ({shipment.destination_code})",
+        "pol": _port(shipment.origin_name, shipment.origin_code),
+        "pod": _port(shipment.destination_name, shipment.destination_code),
         "carrier": shipment.carrier or "",
         "vessel_or_flight": shipment.vessel_or_flight or "",
         "etd": shipment.etd.isoformat() if shipment.etd else "",
@@ -314,7 +322,7 @@ def build_reference(shipment) -> dict:
         "hs_code": cargo.hs_code if cargo else "",
         "quantity": cargo.quantity if cargo else None,
         "package_type": PACKAGE_UNITS.get(cargo.package_type, cargo.package_type) if cargo else "",
-        "unit_price": round(shipment.invoice_value / cargo.quantity, 4) if cargo and cargo.quantity else None,
+        "unit_price": _summary_unit_price(shipment, cargo),
         "invoice_value": shipment.invoice_value,
         "currency": shipment.currency,
         "gross_weight_kg": gross,
@@ -327,7 +335,7 @@ def build_reference(shipment) -> dict:
         # 표준 서식 칸 가운데 Shipment에서 바로 채울 수 있는 것
         "country_of_origin": "THE REPUBLIC OF KOREA",
         "carriage_by": "AIR" if shipment.transport_mode == "AIR" else "SEA",
-        "final_destination": f"{shipment.destination_name} ({shipment.destination_code})",
+        "final_destination": _port(shipment.destination_name, shipment.destination_code),
         "hs6": f"{hs_digits[:4]}.{hs_digits[4:6]}" if len(hs_digits) >= 6 else "",
         "shipment_time": f"ON OR ABOUT {shipment.etd.isoformat()}" if shipment.etd else "",
         "signed_by": shipment.exporter_name,
@@ -354,11 +362,50 @@ def build_reference(shipment) -> dict:
     }
 
 
+# 단가가 찍히는 서류. 여기서는 낱개 기준으로 값을 매겼으면 그 기준을 그대로 씁니다.
+INVOICE_TYPES = ("commercial_invoice", "proforma_invoice")
+
+
+def packages_text(cargo) -> str:
+    """"100 CTN". 포장 개수를 모르면(오퍼시트에 없으면) 빈 값입니다. "None CTN"을 찍지 않습니다."""
+
+    if cargo.quantity is None:
+        return ""
+    unit = PACKAGE_UNITS.get(cargo.package_type, cargo.package_type)
+    return f"{cargo.quantity} {unit}"
+
+
+def count_text(value) -> str:
+    """2000.0 → '2,000', 12.5 → '12.5'. 수량에 쓸데없는 .0을 붙이지 않습니다."""
+
+    number = float(value)
+    if number.is_integer():
+        return f"{number:,.0f}"
+    return f"{number:,.4f}".rstrip("0").rstrip(".")
+
+
+def _summary_unit_price(shipment, cargo):
+    """서류 아래 합계 칸의 단가.
+
+    낱개 기준이면 적힌 단가에 단위를 붙여 씁니다("3.2 / PCS"). 금액을 포장
+    개수로 나눈 값(64.0)은 오퍼시트·L/C와 다른 단가라 쓰지 않습니다.
+    """
+
+    if not cargo:
+        return None
+    if priced_by_units(cargo):
+        return f"{cargo.unit_price:g} / {cargo.price_unit}" if cargo.unit_price is not None else ""
+    return round(shipment.invoice_value / cargo.quantity, 4) if cargo.quantity else None
+
+
 def build_items(shipment, doc_type: str) -> list[dict]:
     """화물 품목을 그 서류의 표 모양으로 바꿉니다.
 
     품목이 하나뿐이면 송장 금액을 그 줄에 넣을 수 있지만, 여러 개면 금액을
     어떻게 나눌지 우리가 알 수 없어 비워 둡니다. (지어내지 않습니다)
+
+    단가를 낱개로 매긴 품목이면 송장에는 낱개 수량과 그 단가를 씁니다.
+    포장 개수는 포장명세서와 송장의 포장 칸(No. & kind of packages)에만 씁니다.
     """
 
     columns = DOCUMENT_ITEM_FIELDS.get(doc_type)
@@ -371,21 +418,24 @@ def build_items(shipment, doc_type: str) -> list[dict]:
     single = len(cargos) == 1
     rows = []
     for cargo in cargos:
+        if doc_type in INVOICE_TYPES and priced_by_units(cargo):
+            rows.append({key: _unit_priced_row(cargo, doc_type).get(key, "") for key, _ in columns})
+            continue
         unit = PACKAGE_UNITS.get(cargo.package_type, cargo.package_type)
         dangerous = (f"{cargo.un_number} · {cargo.proper_shipping_name}"
                      if cargo.is_dangerous and cargo.un_number else "")
         row = {
             "item_number": cargo.hs_code or "",
-            "shipped": cargo.quantity,
+            "shipped": cargo.quantity if cargo.quantity is not None else "",
             "backordered": 0,
             "unit_weight": cargo.weight_per_package_kg,
             "description": " / ".join(part for part in [cargo.product_description, dangerous] if part),
-            "quantity": cargo.quantity,
+            "quantity": cargo.quantity if cargo.quantity is not None else "",
             # 포장명세서 ⑬칸은 "수량 또는 순중량"입니다. 순중량을 적었으면 그 값을 씁니다.
             "net_quantity": (f"{cargo.net_weight_kg} kg" if cargo.net_weight_kg is not None
-                             else f"{cargo.quantity} {unit}"),
+                             else packages_text(cargo)),
             "unit": unit,
-            "packages": f"{cargo.quantity} {unit}",
+            "packages": packages_text(cargo),
             "unit_weight": cargo.weight_per_package_kg,
             "total_weight": cargo.total_weight_kg,
             "measurement": cargo.total_cbm,
@@ -398,6 +448,28 @@ def build_items(shipment, doc_type: str) -> list[dict]:
         }
         rows.append({key: row.get(key, "") for key, _ in columns})
     return rows
+
+
+def _unit_priced_row(cargo, doc_type: str) -> dict:
+    """낱개 기준 품목의 송장 줄. 오퍼시트에 적힌 그대로 "2,000 PCS × 3.2"입니다.
+
+    단가가 비어 있으면 비워 둡니다. 금액을 수량으로 나눠 채우지 않습니다.
+    그 계산이 맞는지는 검증기가 이미 봤고, 맞지 않으면 비워 두었습니다.
+    """
+
+    dangerous = (f"{cargo.un_number} · {cargo.proper_shipping_name}"
+                 if cargo.is_dangerous and cargo.un_number else "")
+    count = count_text(cargo.unit_quantity)
+    return {
+        "description": " / ".join(part for part in [cargo.product_description, dangerous] if part),
+        # 견적송장은 단위 칸이 따로 있고, 상업송장은 수량 칸에 단위까지 적습니다.
+        "quantity": count if doc_type == "proforma_invoice" else f"{count} {cargo.price_unit}",
+        "unit": cargo.price_unit,
+        "unit_price": cargo.unit_price if cargo.unit_price is not None else "",
+        "amount": cargo.amount if cargo.amount is not None else "",
+        "packages": packages_text(cargo),
+        "shipping_marks": "",
+    }
 
 
 def item_columns(doc_type: str) -> list[dict]:

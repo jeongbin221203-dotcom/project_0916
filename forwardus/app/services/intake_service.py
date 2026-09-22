@@ -203,6 +203,13 @@ def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
 
     result = planning_service.search_locations(text, transport_mode, role)
     rows = result["data"] if result["success"] else []
+    # 서류에는 "Busan, Korea"처럼 나라가 붙어 옵니다. 그대로는 목록에 없으니
+    # 쉼표 앞("Busan")만 다시 찾습니다.
+    if not rows and "," in text:
+        head = text.split(",")[0].strip()
+        if head:
+            again = planning_service.search_locations(head, transport_mode, role)
+            rows = again["data"] if again["success"] else []
     if not rows:
         notes.append(f"{label} '{text}'을(를) 목록에서 찾지 못했습니다. 직접 골라 주세요.")
         return None
