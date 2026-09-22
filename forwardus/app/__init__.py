@@ -119,6 +119,46 @@ def migrate_cost_sources(database) -> None:
             f"WHERE source = 'mock' AND code IN ({codes})"))
 
 
+def migrate_user_columns(database) -> None:
+    """마스터 표시 칸을 기존 users 표에 덧붙입니다."""
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    if "is_master" not in columns:
+        with database.engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE users ADD COLUMN is_master BOOLEAN NOT NULL DEFAULT 0"))
+
+
+def ensure_master_account(database, email: str, password: str) -> None:
+    """마스터 계정이 없으면 만듭니다.
+
+    같은 이메일로 먼저 가입한 일반 계정이 있으면 마스터로 올리고 비밀번호도
+    정해 둔 값으로 바꿉니다. 그대로 두면 먼저 가입한 사람이 마스터가 됩니다.
+    이미 마스터이면 비밀번호를 건드리지 않습니다.
+    """
+
+    from app.models import User
+
+    if not email or not password:
+        return
+    user = User.query.filter_by(email=email).first()
+    if user is None:
+        user = User(email=email, name="ForwardUs 마스터", is_master=True)
+        user.set_password(password)
+        database.session.add(user)
+    elif not user.is_master:
+        user.is_master = True
+        user.set_password(password)
+    else:
+        return
+    database.session.commit()
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     """Create and configure the Flask application."""
 
@@ -142,6 +182,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         migrate_shipment_columns(db)
         migrate_cost_sources(db)
         migrate_requirement_documents(db)
+        migrate_user_columns(db)
+        ensure_master_account(db, flask_app.config.get("MASTER_EMAIL", ""),
+                              flask_app.config.get("MASTER_PASSWORD", ""))
 
     @flask_app.get("/health")
     def health():

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Flask, abort, jsonify
+from flask import Flask, abort, jsonify, make_response
 
 from app.services import ServiceError
 from app.validators import ValidationError
@@ -21,10 +21,16 @@ def error_response(exc: Exception):
 
 
 def load_shipment(shipment_id: str):
+    """주소의 Shipment를 읽습니다. 볼 권한이 없으면 없는 것처럼 404로 답합니다."""
+
+    from app.routes.auth import current_user, login_required_response
     from app.services import shipment_service
 
+    denied = login_required_response()
+    if denied is not None:
+        abort(make_response(denied))
     try:
-        return shipment_service.get_or_404(shipment_id)
+        return shipment_service.get_or_404(shipment_id, viewer=current_user())
     except ServiceError:
         abort(404)
 

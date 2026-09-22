@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from functools import wraps
 from urllib.parse import urlparse
 
-from flask import (Blueprint, flash, g, redirect, render_template, request, session,
-                   url_for)
+from flask import (Blueprint, flash, g, jsonify, redirect, render_template, request,
+                   session, url_for)
 
 from app.extensions import db
 from app.models import User
@@ -18,12 +19,46 @@ MIN_PASSWORD_LENGTH = 8
 
 
 def current_user() -> User | None:
-    """세션에 담긴 회원을 돌려줍니다. 한 요청 안에서는 한 번만 읽습니다."""
+    """세션에 담긴 회원을 돌려줍니다. 한 요청 안에서는 한 번만 읽습니다.
 
-    if "current_user" not in g:
-        user_id = session.get("user_id")
-        g.current_user = db.session.get(User, user_id) if user_id else None
-    return g.current_user
+    기억해 둔 회원이 세션의 회원과 다르면 다시 읽습니다. 앱 컨텍스트를 여러
+    요청이 나눠 쓰는 경우(테스트)에 앞 요청의 회원이 남지 않게 합니다.
+    """
+
+    user_id = session.get("user_id")
+    cached = g.get("current_user_cache")
+    if cached is None or cached[0] != user_id:
+        cached = (user_id, db.session.get(User, user_id) if user_id else None)
+        g.current_user_cache = cached
+    return cached[1]
+
+
+def login_required_response():
+    """로그인하지 않았을 때 돌려줄 응답. 로그인했으면 None입니다.
+
+    화면은 로그인 화면으로 보냈다가 돌아오게 하고, API는 401 JSON으로 답합니다.
+    """
+
+    if current_user():
+        return None
+    wants_json = (request.path.startswith("/api") or "/api/" in request.path
+                  or request.is_json)
+    if wants_json:
+        return jsonify({"success": False, "error_code": "LOGIN_REQUIRED",
+                        "message": "로그인이 필요합니다."}), 401
+    # 폼을 보낸 경우에는 그 주소로 돌아갈 수 없으므로 로그인 화면만 엽니다.
+    next_url = request.full_path.rstrip("?") if request.method == "GET" else None
+    return redirect(url_for("auth.login", next=next_url))
+
+
+def login_required(view):
+    """이 화면은 로그인한 회원만 씁니다."""
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        return login_required_response() or view(*args, **kwargs)
+
+    return wrapper
 
 
 def _safe_next(target: str | None) -> str:
@@ -48,7 +83,7 @@ def _log_in(user: User) -> None:
     session.clear()
     session.update(kept)
     session["user_id"] = user.id
-    g.current_user = user
+    g.current_user_cache = (user.id, user)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -112,6 +147,6 @@ def signup():
 @auth_bp.post("/logout")
 def logout():
     session.clear()
-    g.pop("current_user", None)
+    g.pop("current_user_cache", None)
     flash("로그아웃되었습니다.", "success")
     return redirect(url_for("home.index"))

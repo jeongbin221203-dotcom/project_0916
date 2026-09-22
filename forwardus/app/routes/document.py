@@ -8,6 +8,7 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
 from app.routes import error_response, load_shipment
+from app.routes.auth import current_user, login_required
 from app.services import (ServiceError, customs_filing_service, document_service,
                           document_start_service, draft_document_service,
                           requirement_service, shipment_service)
@@ -37,6 +38,7 @@ def draft_file(kind: str):
 
 
 @document_bp.get("/new")
+@login_required
 def new():
     """서식이 요구하는 칸을 직접 채워 서류를 만드는 화면.
 
@@ -46,15 +48,17 @@ def new():
 
     return render_template("document/new.html",
                            checklist=document_start_service.checklist(),
-                           recent=shipment_service.list_shipments()[:3])
+                           recent=shipment_service.list_shipments(viewer=current_user())[:3])
 
 
 @document_bp.post("/start")
+@login_required
 def start():
     """시작 화면에서 채운 내용으로 Shipment와 서류를 한 번에 만듭니다."""
 
     try:
-        result = document_start_service.create(request.get_json(silent=True) or {})
+        result = document_start_service.create(request.get_json(silent=True) or {},
+                                               user_id=current_user().id)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     result["url"] = url_for("document.center", shipment_id=result["shipment_id"])

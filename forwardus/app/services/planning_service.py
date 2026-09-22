@@ -1165,8 +1165,10 @@ def cargo_metrics(payload: dict, *, strict: bool = False) -> dict:
     return calculate_cargo_lines(cargo_items(payload), strict=strict)
 
 
-def create_shipment(payload: dict) -> Shipment:
+def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
     """Create a quoted Shipment from the planning wizard.
+
+    user_id is the member who owns it; only they and the master can see it.
 
     Every value is re-validated and recalculated on the server; the selected
     schedule is looked up again rather than trusting client-side freight.
@@ -1226,6 +1228,7 @@ def create_shipment(payload: dict) -> Shipment:
     shipment = Shipment(
         shipment_id=shipment_repository.next_shipment_id(date.today().year),
         project_name=route["project_name"],
+        user_id=user_id,
         buyer=buyer,
         trade_type="export",
         transport_mode=route["transport_mode"],

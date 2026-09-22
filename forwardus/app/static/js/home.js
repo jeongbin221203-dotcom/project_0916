@@ -412,6 +412,9 @@
     button.textContent = label;
   }
 
+  // 오퍼시트 올리기(offer_sheet.js)가 같은 대화창에 말을 붙일 수 있게 엽니다.
+  window.ForwardusHome = { say, renderAnswer, startTalking };
+
   /* ----- 보내기 ----- */
   stage.addEventListener("submit", (event) => {
     event.preventDefault();

@@ -65,7 +65,7 @@ def test_signup_logs_in_and_hashes_password(client):
     user = User.query.filter_by(email="kim@example.com").one()
     assert user.password_hash != "secret123"
     html = client.get("/dashboard").get_data(as_text=True)
-    assert "김무역님" in html and "로그아웃" in html and "<h1>Dashboard</h1>" in html
+    assert "김무역님" in html and "로그아웃" in html and "<h1>내 Dashboard</h1>" in html
 
 
 @pytest.mark.parametrize("overrides", [
@@ -75,7 +75,7 @@ def test_signup_logs_in_and_hashes_password(client):
 ])
 def test_signup_rejects_bad_input(client, overrides):
     assert _signup(client, **overrides).status_code == 400
-    assert User.query.count() == 0
+    assert User.query.filter_by(is_master=False).count() == 0
 
 
 def test_signup_rejects_duplicate_email(client):

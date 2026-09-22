@@ -5,10 +5,12 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request, session, url_for
 
 from app.routes import error_response
+from app.routes.auth import current_user
 from app.services import (ServiceError, agent_service, draft_document_service, draft_store,
                           intake_service, offer_sheet_service, shipment_service,
                           support_chat_service)
 from app.validators import ValidationError
+from app.validators.cargo_validator import PRICE_UNITS
 
 home_bp = Blueprint("home", __name__)
 
@@ -77,7 +79,9 @@ def index():
     rail = [{**item, "url": url_for(RAIL_URLS[item["key"]])} for item in RAIL]
     # 서식 칸은 더 이상 여기서 만들지 않습니다. 사이드바의 "서류 작성"
     # 화면(/documents/new)으로 옮겼습니다. 홈은 대화하는 자리입니다.
-    return render_template("home/index.html", recent=shipment_service.list_shipments()[:3],
+    # 최근 Shipment는 보는 사람 것만. 로그인 전이면 비어 있습니다.
+    return render_template("home/index.html",
+                           recent=shipment_service.list_shipments(viewer=current_user())[:3],
                            actions=quick_actions(), rail=rail)
 
 
@@ -158,6 +162,7 @@ def api_offer_sheet():
         return error_response(exc)
     session["offer_draft"] = result["token"]
     result["documents"] = _offer_previews(result["draft"], result["private"])
+    result["price_units"] = PRICE_UNITS
     return jsonify({"success": True, "data": result})
 
 
@@ -176,6 +181,7 @@ def api_offer_sheet_confirm():
         return error_response(exc)
     session["offer_draft"] = result["token"]
     result["documents"] = _offer_previews(result["draft"], payload.get("private") or {})
+    result["price_units"] = PRICE_UNITS
     return jsonify({"success": True, "data": result})
 
 

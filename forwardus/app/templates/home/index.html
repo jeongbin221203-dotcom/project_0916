@@ -108,6 +108,14 @@
                     placeholder="{{ actions[0].placeholder }}"
                     aria-label="물어볼 내용"></textarea>
           <div class="home_box_foot">
+            {# 오퍼시트를 올리는 자리. 파일을 적는 칸에 끌어다 놓아도 됩니다. #}
+            <label class="home_attach" title="오퍼시트 올리기 (PDF · 사진 · 엑셀 · 워드)"
+                   {% if home_locked %}aria-disabled="true"{% endif %}>
+              <input type="file" data-offer-file hidden
+                     accept=".pdf,.png,.jpg,.jpeg,.xlsx,.docx,.txt"
+                     {{ 'disabled' if home_locked }}>
+              <span aria-hidden="true">📎</span><span class="sr_only">오퍼시트 올리기</span>
+            </label>
             <div class="home_chips" data-home-chips></div>
             <button class="home_send" type="submit" aria-label="보내기"
                     {{ 'disabled' if home_locked }}>↑</button>
@@ -132,6 +140,8 @@
       ratesUrl: "{{ url_for('planning.api_exchange_rate') }}",
       intakeUrl: "{{ url_for('home.api_intake') }}",
       agentUrl: "{{ url_for('home.api_agent') }}",
+      offerUrl: "{{ url_for('home.api_offer_sheet') }}",
+      offerConfirmUrl: "{{ url_for('home.api_offer_sheet_confirm') }}",
       planningUrl: "{{ url_for('planning.new') }}",
       docFormUrl: "{{ url_for('document.new') }}",
       locked: {{ 'true' if home_locked else 'false' }}
@@ -141,5 +151,6 @@
      보이기만 그런 것이 아니라 실제로 아무 일도 하지 않아야 합니다. #}
   {% if not home_locked %}
     <script src="{{ static_url('js/home.js') }}"></script>
+    <script src="{{ static_url('js/offer_sheet.js') }}"></script>
   {% endif %}
 {% endblock %}
