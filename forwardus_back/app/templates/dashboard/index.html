@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block title %}Dashboard{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">운영·분석</p>
+      <h1>Dashboard</h1>
+      <p class="muted">취소·작성 중 Shipment는 제외합니다. 금액은 저장된 견적(Mock 요율 기반)으로 집계됩니다.</p>
+    </div>
+  </div>
+
+  <section class="kpi_grid">
+    <div class="kpi_card"><small>Total Shipment</small><b>{{ kpi.total_shipments }}</b></div>
+    <div class="kpi_card"><small>Total Freight Cost</small><b>{{ kpi.total_freight_krw|won }}</b></div>
+    <div class="kpi_card"><small>Total Logistics Cost</small><b>{{ kpi.total_logistics_krw|won }}</b></div>
+    <div class="kpi_card"><small>Average Cost / CBM</small><b>{{ kpi.avg_cost_per_cbm|won }}</b></div>
+    <div class="kpi_card"><small>Average Cost / KG</small><b>{{ kpi.avg_cost_per_kg|won }}</b></div>
+    <div class="kpi_card"><small>Average Transit Time</small><b>{{ kpi.avg_transit_days|num(1) }}{% if kpi.avg_transit_days is not none %}일{% endif %}</b></div>
+    <div class="kpi_card"><small>Delay Rate</small><b>{% if kpi.delay_rate is not none %}{{ kpi.delay_rate|num(1) }}%{% else %}-{% endif %}</b><span class="muted small">표본 {{ kpi.delay_sample }}건 (도착 또는 지연 확인)</span></div>
+    <div class="kpi_card"><small>Customs Hold Rate</small><b>-</b><span class="muted small">통관 보류 이벤트 미수집</span></div>
+  </section>
+
+  <div class="grid two">
+    <section class="card">
+      <h2>Route KPI</h2>
+      {% if routes %}
+        <table class="table compact">
+          <thead><tr><th>Route</th><th>Count</th><th class="num">Avg Freight</th><th class="num">Avg Transit</th><th class="num">Delay</th></tr></thead>
+          <tbody>
+            {% for r in routes %}
+              <tr>
+                <td><b>{{ r.route }}</b><br><span class="muted small">{{ r.mode }}</span></td>
+                <td><div class="bar"><span style="width: {{ (r.count / max_route_count * 100)|round }}%"></span></div>{{ r.count }}</td>
+                <td class="num">{{ r.avg_freight_krw|won }}</td>
+                <td class="num">{{ r.avg_transit_days|num(1) }}일</td>
+                <td class="num">{% if r.delay_rate is not none %}{{ r.delay_rate|num(0) }}%{% else %}-{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}<p class="muted">데이터가 없습니다.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Buyer KPI</h2>
+      {% if buyers %}
+        <table class="table compact">
+          <thead><tr><th>Buyer</th><th>출하</th><th class="num">평균 물류비</th><th class="num">평균 운송</th><th>최근 Shipment</th></tr></thead>
+          <tbody>
+            {% for b in buyers %}
+              <tr>
+                <td>{{ b.buyer }}</td>
+                <td>{{ b.count }}</td>
+                <td class="num">{{ b.avg_cost_krw|won }}</td>
+                <td class="num">{{ b.avg_transit_days|num(1) }}일</td>
+                <td><a class="mono" href="{{ url_for('shipment.detail', shipment_id=b.latest_shipment.shipment_id) }}">{{ b.latest_shipment.shipment_id }}</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}<p class="muted">데이터가 없습니다.</p>{% endif %}
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Shipment History</h2>
+    {% if history %}
+      <table class="table">
+        <thead><tr><th>Shipment ID</th><th>생성일</th><th>Route</th><th>Buyer</th><th class="num">물류비</th><th>Transit</th><th>상태</th></tr></thead>
+        <tbody>
+          {% for s in history %}
+            <tr>
+              <td><a class="mono" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">{{ s.shipment_id }}</a></td>
+              <td>{{ s.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>{{ s.origin_code }} → {{ s.destination_code }} <span class="muted small">{{ s.mode_label }}</span></td>
+              <td>{{ s.buyer.name if s.buyer else '-' }}</td>
+              <td class="num">{{ s.total_cost_krw|won }}</td>
+              <td>{{ s.transit_days }}일{% if s.delay_days > 0 %} <span class="badge warn">+{{ s.delay_days }}</span>{% endif %}</td>
+              <td>{{ status_badge(s.status, s.status_label) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}<p class="muted">Shipment가 없습니다.</p>{% endif %}
+  </section>
+{% endblock %}

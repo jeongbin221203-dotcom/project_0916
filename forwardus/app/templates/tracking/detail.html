@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "_macros.html" import source_badge, shipment_tabs, shipment_header %}
+{% from "tracking/_container.html" import container_result %}
+{% block title %}Tracking · {{ shipment.shipment_id }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/tracking.css') }}">{% endblock %}
+{% block content %}
+  {{ shipment_header(shipment) }}
+  {{ shipment_tabs(shipment, 'tracking') }}
+
+  <div class="eta_strip card">
+    <div><small>ETD</small><b>{{ shipment.etd|d }}</b></div>
+    <div><small>최초 계획 ETA</small><b>{{ shipment.planned_eta|d }}</b></div>
+    <div class="{{ 'late' if shipment.delay_days > 0 }}"><small>현재 ETA</small><b>{{ shipment.eta|d }}</b>
+      {% if shipment.delay_days > 0 %}<span class="badge warn">Delay +{{ shipment.delay_days }} Days</span>{% endif %}
+    </div>
+    {% if deadline %}
+      <div><small>Buyer Required</small><b>{{ shipment.buyer_required_date|d }}</b>
+        {% if deadline.on_time %}<span class="badge ok">여유 {{ deadline.margin_days }}일</span>{% else %}<span class="badge warn">{{ -deadline.margin_days }}일 초과 위험</span>{% endif %}
+      </div>
+    {% endif %}
+    <div class="sources">
+      {% if sources %}{% for s in sources %}{{ source_badge(s) }}{% endfor %}{% else %}<span class="muted small">이벤트 없음</span>{% endif %}
+    </div>
+  </div>
+
+  {% if exceptions %}
+    <div class="alert warn">
+      <b>Delay Alert</b> — {% for e in exceptions %}{{ e.description }}{{ ', ' if not loop.last }}{% endfor %}
+      <a href="{{ url_for('assistant.index', shipment_id=shipment.shipment_id) }}#exception">대응 가이드 →</a>
+    </div>
+  {% endif %}
+
+  <div class="tracking_layout">
+    <section class="card">
+      <div class="row_between wrap">
+        <h2>Shipment Timeline</h2>
+        <form method="post" action="{{ url_for('tracking.refresh', shipment_id=shipment.shipment_id) }}">
+          <button class="button primary small" {{ 'disabled' if shipment.status in ('delivered', 'closed', 'cancelled') }}>Tracking 조회 (Mock)</button>
+        </form>
+      </div>
+      <p class="muted small">실시간 Tracking API가 연결되지 않아, 조회할 때마다 Mock 제공자가 다음 표준 이벤트를 한 단계씩 반환합니다. 실제 위치 정보가 아닙니다.</p>
+      <ol class="timeline">
+        {% for step in steps %}
+          <li class="{{ step.state }}">
+            <span class="dot">{{ '✓' if step.state == 'done' else ('●' if step.state == 'current' else '○') }}</span>
+            <div>
+              <b>{{ step.label }}</b>
+              {% if step.event %}
+                <span class="muted small">{{ step.event.event_time.strftime('%Y-%m-%d') }} · {{ step.event.location or '-' }}{% if step.event.description %} · {{ step.event.description }}{% endif %}</span>
+                {{ source_badge(step.event.source) }}
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    <aside class="stack">
+      <section class="card">
+        <h3>ETA 변경 입력 (Manual)</h3>
+        <form method="post" action="{{ url_for('tracking.update_eta', shipment_id=shipment.shipment_id) }}" class="stack">
+          <label class="field"><span class="field_label">새 ETA</span><input type="date" name="new_eta" required></label>
+          <button class="button ghost block">ETA 변경 기록</button>
+        </form>
+      </section>
+      <section class="card">
+        <h3>이벤트 수동 기록</h3>
+        <form method="post" action="{{ url_for('tracking.add_event', shipment_id=shipment.shipment_id) }}" class="stack">
+          <label class="field"><span class="field_label">이벤트</span>
+            <select name="event_code">{% for code, label in event_options %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+          </label>
+          <label class="field"><span class="field_label">일자</span><input type="date" name="event_date" required></label>
+          <label class="field"><span class="field_label">위치</span><input type="text" name="location" maxlength="200"></label>
+          <label class="field"><span class="field_label">메모</span><input type="text" name="description" maxlength="500"></label>
+          <button class="button ghost block">기록</button>
+        </form>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card">
+    <div class="row_between wrap">
+      <div>
+        <h2>컨테이너 · 통관 조회</h2>
+        <p class="muted">관세청 UNI-PASS에서 실제 값을 받아옵니다.</p>
+      </div>
+      <a class="button ghost" href="{{ url_for('tracking.container_lookup') }}">번호로 직접 조회</a>
+    </div>
+
+    <form method="post" class="ctr_numbers"
+          action="{{ url_for('tracking.save_numbers', shipment_id=shipment.shipment_id) }}">
+      <label class="field">
+        <span class="field_label">B/L번호</span>
+        <input class="text_input" type="text" name="bl_no" value="{{ shipment.bl_no }}"
+               maxlength="30" autocomplete="off" placeholder="부킹 뒤 선사가 줍니다">
+      </label>
+      <label class="field">
+        <span class="field_label">수출신고번호</span>
+        <input class="text_input" type="text" name="export_declaration_no"
+               value="{{ shipment.export_declaration_no }}" maxlength="20" inputmode="numeric"
+               autocomplete="off" placeholder="숫자 15자리">
+      </label>
+      <label class="field">
+        <span class="field_label">화물관리번호 <small class="muted">(선택)</small></span>
+        <input class="text_input" type="text" name="cargo_no" value="{{ shipment.cargo_no }}"
+               maxlength="20" autocomplete="off" placeholder="15~19자리">
+      </label>
+      <button class="button primary">저장하고 조회</button>
+    </form>
+
+    {{ container_result(container) }}
+  </section>
+
+  <section class="card">
+    <h2>Event Log</h2>
+    {% if events %}
+      <table class="table">
+        <thead><tr><th>일시</th><th>이벤트</th><th>위치</th><th>내용</th><th>Source</th></tr></thead>
+        <tbody>
+          {% for e in events %}
+            <tr class="{{ 'exception_row' if e.is_exception }}">
+              <td>{{ e.event_time.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>{{ e.label }}</td>
+              <td>{{ e.location or '-' }}</td>
+              <td>{{ e.description or '-' }}</td>
+              <td>{{ source_badge(e.source) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">기록된 이벤트가 없습니다.</p>
+    {% endif %}
+  </section>
+{% endblock %}

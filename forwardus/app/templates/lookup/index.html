@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}관세청 조회{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Lookup</p>
+      <h1>관세청 조회</h1>
+      <p class="muted">선사·항공사·포워더 부호, 통관고유부호, 수출요건, 환급율을
+        관세청 UNI-PASS에 바로 물어봅니다.</p>
+    </div>
+    <a class="button ghost" href="{{ url_for('lookup.declaration') }}">수출신고필증 검증</a>
+  </div>
+
+  <section class="card">
+    <form method="get" class="ctr_form">
+      <label class="field">
+        <span class="field_label">무엇을 찾나요</span>
+        <select name="kind" data-lookup-kind>
+          {% for item in catalog %}
+            <option value="{{ item.key }}" {{ 'selected' if item.key == kind }}
+                    data-hint="{{ item.hint }}" data-example="{{ item.example }}"
+                    {{ 'disabled' if not item.ready }}>
+              {{ item.label }}{{ '' if item.ready else ' (키 없음)' }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field_label">찾을 값</span>
+        <input class="text_input" type="text" name="q" value="{{ query }}"
+               maxlength="100" autocomplete="off" data-lookup-query autofocus>
+        <small class="muted small" data-lookup-hint></small>
+      </label>
+      <button class="button primary">조회</button>
+    </form>
+
+    <div class="ctr_help">
+      <p class="muted small"><b>무엇을 찾을 수 있나요</b></p>
+      <ul class="ctr_help_list">
+        {% for item in catalog %}
+          <li><b>{{ item.label }}</b> — {{ item.about }}
+            {% if not item.ready %}<span class="badge warn">키 없음 ({{ item.env }})</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>결과</h2>
+    {% if error %}
+      <div class="alert warn">{{ error }}</div>
+    {% elif not result %}
+      <p class="muted">찾을 값을 넣고 조회를 눌러주세요.</p>
+    {% elif not result.success %}
+      <div class="alert warn">{{ result.message or '조회하지 못했습니다.' }}</div>
+    {% elif not result.rows %}
+      <p class="muted">"{{ result.query }}" 검색 결과가 없습니다.</p>
+    {% else %}
+      <p class="muted small">{{ result.label }} · {{ result.rows|length }}건
+        <span class="badge source_{{ result.source }}">Data Source:
+          {{ {'api': 'API', 'internal': '관세청 품목표'}.get(result.source, result.source) }}</span></p>
+      {% if result.offline_note %}<p class="alert warn small">{{ result.offline_note }}</p>{% endif %}
+      <div class="table_scroll">
+        <table class="table">
+          <thead><tr>{% for col in result.columns %}<th>{{ col.label }}</th>{% endfor %}</tr></thead>
+          <tbody>
+            {% for row in result.rows %}
+              <tr>{% for col in result.columns %}
+                <td{{ ' class=mono' | safe if col.key in ('code', 'hs_code', 'clearance_code', 'business_no') }}>{{ row.get(col.key) or '-' }}</td>
+              {% endfor %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    (function () {
+      const select = document.querySelector("[data-lookup-kind]");
+      const input = document.querySelector("[data-lookup-query]");
+      const hint = document.querySelector("[data-lookup-hint]");
+      function sync() {
+        const option = select.selectedOptions[0];
+        if (!option) return;
+        hint.textContent = option.dataset.hint || "";
+        input.placeholder = "예: " + (option.dataset.example || "");
+      }
+      select.addEventListener("change", sync);
+      sync();
+    })();
+  </script>
+{% endblock %}
