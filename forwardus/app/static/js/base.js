@@ -10,9 +10,9 @@
 
   const REQUEST_TIMEOUT_MS = 20000;
 
-  async function requestJson(url, options) {
+  async function requestJson(url, options, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       try {
@@ -36,7 +36,7 @@
     }
   }
 
-  const getJson = (url) => requestJson(url, { headers: { Accept: "application/json" } });
+  const getJson = (url, timeoutMs) => requestJson(url, { headers: { Accept: "application/json" } }, timeoutMs);
   const postJson = (url, body) => requestJson(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -121,6 +121,27 @@
     toggle.addEventListener("click", () => {
       const open = nav.classList.toggle("open");
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  }
+
+  // 로그인한 사람의 이름을 누르면 '내 Dashboard' · 로그아웃 메뉴가 열립니다.
+  const userMenu = document.querySelector("[data-user-menu]");
+  if (userMenu) {
+    const userToggle = userMenu.querySelector("[data-user-menu-toggle]");
+    const userPanel = userMenu.querySelector("[data-user-menu-panel]");
+    const setUserMenu = (open) => {
+      userPanel.hidden = !open;
+      userToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    userToggle.addEventListener("click", () => setUserMenu(userPanel.hidden));
+    document.addEventListener("click", (event) => {
+      if (!userMenu.contains(event.target)) setUserMenu(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !userPanel.hidden) {
+        setUserMenu(false);
+        userToggle.focus();
+      }
     });
   }
 

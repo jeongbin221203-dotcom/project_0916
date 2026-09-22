@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from app.repositories import shipment_repository
+from app.services import shipment_service
 
 EXCLUDED_STATUSES = {"draft", "cancelled"}
 # Statuses where the delay outcome is known (the cargo has arrived).
@@ -19,8 +19,11 @@ def _freight_krw(shipment) -> int:
     return sum(cost.krw_amount for cost in shipment.costs if cost.category == "Freight")
 
 
-def build_dashboard() -> dict:
-    shipments = [s for s in shipment_repository.list_shipments() if s.status not in EXCLUDED_STATUSES]
+def build_dashboard(viewer) -> dict:
+    """보는 사람의 Shipment로 집계합니다. 마스터는 모든 사용자의 것을 봅니다."""
+
+    history = shipment_service.list_shipments(viewer=viewer)
+    shipments = [s for s in history if s.status not in EXCLUDED_STATUSES]
 
     tracked = [s for s in shipments if s.status in ARRIVED_STATUSES or s.delay_days > 0]
     delayed = [s for s in tracked if s.delay_days > 0]
@@ -80,5 +83,5 @@ def build_dashboard() -> dict:
         "routes": route_rows,
         "max_route_count": max_route_count,
         "buyers": buyer_rows,
-        "history": shipment_repository.list_shipments(),
+        "history": history,
     }

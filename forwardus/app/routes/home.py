@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, jsonify, render_template, request, session, url_for
 
 from app.routes import error_response
-from app.services import (ServiceError, agent_service, draft_document_service,
-                          intake_service, shipment_service, support_chat_service)
+from app.routes.auth import current_user
+from app.services import (ServiceError, agent_service, draft_document_service, draft_store,
+                          intake_service, offer_sheet_service, shipment_service,
+                          support_chat_service)
 from app.validators import ValidationError
+from app.validators.cargo_validator import PRICE_UNITS
 
 home_bp = Blueprint("home", __name__)
 
@@ -76,7 +79,9 @@ def index():
     rail = [{**item, "url": url_for(RAIL_URLS[item["key"]])} for item in RAIL]
     # 서식 칸은 더 이상 여기서 만들지 않습니다. 사이드바의 "서류 작성"
     # 화면(/documents/new)으로 옮겼습니다. 홈은 대화하는 자리입니다.
-    return render_template("home/index.html", recent=shipment_service.list_shipments()[:3],
+    # 최근 Shipment는 보는 사람 것만. 로그인 전이면 비어 있습니다.
+    return render_template("home/index.html",
+                           recent=shipment_service.list_shipments(viewer=current_user())[:3],
                            actions=quick_actions(), rail=rail)
 
 
@@ -115,6 +120,82 @@ def api_agent():
             row["preview"] = draft_document_service.preview(row["kind"], result["draft"])
             row["file_url"] = url_for("document.draft_file", kind=row["kind"])
     return jsonify({"success": True, "data": result})
+
+
+# --- 오퍼시트 올리기 ----------------------------------------------------------------
+
+# 오퍼시트를 올리면 이 세 장을 한 번에 초안으로 그립니다.
+OFFER_FORMS = ("proforma_invoice", "commercial_invoice", "packing_list_std")
+
+
+def _offer_previews(draft: dict, private: dict) -> list[dict]:
+    """초안 세 장. 은행·바이어 정보는 덮고, 빈 칸에는 어디서 채우는지 적습니다."""
+
+    if not draft.get("items"):
+        return []
+    merged = draft_document_service.with_private(draft, private)
+    rows = []
+    for kind in OFFER_FORMS:
+        row = {"kind": kind, "title": draft_document_service.FORMS[kind],
+               "file_url": url_for("document.draft_file", kind=kind)}
+        try:
+            row["preview"] = draft_document_service.preview(kind, merged, masked=True, hints=True)
+            row["missing"] = draft_document_service.render(kind, merged)["missing"]
+        except (ValidationError, ServiceError) as exc:
+            row["error"] = str(exc)
+        rows.append(row)
+    return rows
+
+
+@home_bp.post("/api/offer-sheet")
+def api_offer_sheet():
+    """오퍼시트를 올려 읽습니다.
+
+    원본 파일은 서버에 남기지 않습니다. 읽은 값 중 은행·바이어 주소·연락처는
+    `private`로 돌려주고 서버에는 두지 않습니다. 나머지는 잠시 저장해 운송 계획·
+    서류 작성 화면에서 이어 씁니다.
+    """
+
+    try:
+        result = offer_sheet_service.read_offer(request.files.get("file"))
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    session["offer_draft"] = result["token"]
+    result["documents"] = _offer_previews(result["draft"], result["private"])
+    result["price_units"] = PRICE_UNITS
+    return jsonify({"success": True, "data": result})
+
+
+@home_bp.post("/api/offer-sheet/confirm")
+def api_offer_sheet_confirm():
+    """사람이 확인·입력한 값으로 초안을 다시 그립니다.
+
+    은행·바이어 주소는 브라우저가 들고 있다가 그림을 그릴 때만 보냅니다.
+    """
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = offer_sheet_service.confirm(payload.get("token", ""),
+                                             payload.get("values") or {}, payload.get("items"))
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    session["offer_draft"] = result["token"]
+    result["documents"] = _offer_previews(result["draft"], payload.get("private") or {})
+    result["price_units"] = PRICE_UNITS
+    return jsonify({"success": True, "data": result})
+
+
+@home_bp.get("/api/offer-draft")
+def api_offer_draft():
+    """운송 계획·서류 작성 화면이 이어 쓸 값. 은행·바이어 주소는 들어 있지 않습니다."""
+
+    token = request.args.get("token") or session.get("offer_draft", "")
+    stored = draft_store.load(token)
+    if not stored:
+        return jsonify({"success": False, "message": "이어 쓸 오퍼시트가 없습니다.",
+                        "error_code": "NOT_FOUND"}), 404
+    return jsonify({"success": True, "data": {"token": token, "draft": stored.get("draft") or {},
+                                              "source": stored.get("source") or {}}})
 
 
 @home_bp.post("/api/support-chat")

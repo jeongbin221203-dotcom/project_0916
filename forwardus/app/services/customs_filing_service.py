@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from app.processors.korean import particle
-from app.validators.cargo_validator import PACKAGE_TYPES, PACKAGE_UNITS
+from app.validators.cargo_validator import PACKAGE_TYPES, PACKAGE_UNITS, priced_by_units
 
 # 관세청 수출신고서의 거래구분. 대부분의 일반 수출은 11입니다.
 TRADE_KINDS = {
@@ -169,8 +169,11 @@ def filing_sheet(shipment) -> dict:
             "product_description": cargo.product_description,
             # 규격은 포장 치수가 아니라 물품 자체의 규격입니다. 우리가 아는 것만 적습니다.
             "spec": f"{cargo.length_cm:g} × {cargo.width_cm:g} × {cargo.height_cm:g} cm / 포장",
-            "quantity": cargo.quantity,
-            "unit": PACKAGE_UNITS.get(cargo.package_type, cargo.package_type),
+            # 신고서의 수량·단가는 송장과 같은 기준이어야 합니다. 낱개로 값을 매겼으면
+            # 낱개 수량과 그 단위를, 아니면 포장 개수를 씁니다.
+            "quantity": cargo.unit_quantity if priced_by_units(cargo) else cargo.quantity,
+            "unit": (cargo.price_unit if priced_by_units(cargo)
+                     else PACKAGE_UNITS.get(cargo.package_type, cargo.package_type)),
             "package_type": PACKAGE_TYPES.get(cargo.package_type, cargo.package_type),
             "net_weight_kg": cargo.net_weight_kg,
             "gross_weight_kg": cargo.total_weight_kg,

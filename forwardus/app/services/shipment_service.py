@@ -17,15 +17,29 @@ MANUAL_TRANSITIONS = {
 }
 
 
-def get_or_404(shipment_id: str):
+def can_view(viewer, shipment) -> bool:
+    """마스터는 모든 Shipment를, 일반 회원은 자기가 만든 것만 봅니다."""
+
+    if viewer is None:
+        return False
+    return bool(viewer.is_master) or shipment.user_id == viewer.id
+
+
+def get_or_404(shipment_id: str, viewer=None):
     shipment = shipment_repository.get_by_shipment_id(shipment_id)
-    if shipment is None:
+    # 남의 Shipment는 있는지조차 알리지 않습니다. 없는 것과 똑같이 답합니다.
+    if shipment is None or not can_view(viewer, shipment):
         raise ServiceError("Shipment를 찾을 수 없습니다.", "SHIPMENT_NOT_FOUND", 404)
     return shipment
 
 
-def list_shipments(status: str | None = None):
-    return shipment_repository.list_shipments(status or None)
+def list_shipments(status: str | None = None, viewer=None):
+    """보는 사람이 볼 수 있는 Shipment만 돌려줍니다. 로그인 전이면 비어 있습니다."""
+
+    if viewer is None:
+        return []
+    return shipment_repository.list_shipments(
+        status or None, user_id=None if viewer.is_master else viewer.id)
 
 
 def cost_groups(shipment) -> list[dict]:

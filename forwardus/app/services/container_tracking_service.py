@@ -121,6 +121,8 @@ def track(query: str, *, bl_year: str = "", today: date | None = None) -> dict:
                     boxes = container_client.container_detail(cargo_no)
                     if boxes["success"]:
                         result["containers"] = boxes["data"] or []
+                    elif boxes["error_code"] != "API_NO_DATA":
+                        result["notes"].append(f"컨테이너내역: {boxes['message']}")
             elif not found["success"] and found["error_code"] != "API_NO_DATA":
                 result["notes"].append(f"화물통관 진행정보: {found['message']}")
 
@@ -129,9 +131,16 @@ def track(query: str, *, bl_year: str = "", today: date | None = None) -> dict:
         if boxes["success"] and boxes["data"]:
             result["containers"] = boxes["data"]
             result["available"] = True
+        elif not boxes["success"] and boxes["error_code"] != "API_NO_DATA":
+            note = f"컨테이너내역: {boxes['message']}"
+            if note not in result["notes"]:
+                result["notes"].append(note)
 
     if not result["available"] and not result["message"]:
         result["message"] = (
+            "조회가 완료되지 않아 관세청 기록 유무를 확인할 수 없습니다. "
+            "아래 안내를 확인해 주세요."
+        ) if result["notes"] else (
             f"{QUERY_KINDS.get(kind, '이 번호')}로 조회했지만 관세청에 기록이 없습니다. "
             "번호를 다시 확인해 주세요. 수출은 신고가 수리된 뒤에, "
             "수입은 적하목록이 제출된 뒤에 조회됩니다.")

@@ -78,6 +78,58 @@ PACKAGE_UNITS = {
     "flexible_bag": "BAG", "uld": "ULD", "bulk": "BLK",
 }
 
+# 가격 단위. 단가가 "무엇 하나당" 값인지입니다.
+#
+# 오퍼시트와 L/C는 대개 낱개(PCS)나 무게(KG)로 값을 매깁니다. 우리 품목 줄의
+# quantity는 포장 개수라, 이 칸 없이 단가를 계산하면 "100 CTN × 64.00"처럼
+# 오퍼시트(2,000 PCS × 3.20)와 다른 단가가 찍힙니다. 합계는 같아도 L/C와
+# 단가가 다르면 은행에서 서류 불일치로 돌아옵니다.
+#
+# 목록에 있는 것만 받습니다. AI나 사람이 적은 낯선 단위를 그대로 서류에
+# 찍지 않습니다. 모르는 단위면 사람에게 다시 묻습니다.
+PRICE_UNITS = {
+    "PCS": "낱개 (pieces)", "EA": "개 (each)", "SET": "세트", "PR": "켤레 (pair)",
+    "DZ": "다스 (12개)", "KG": "킬로그램", "G": "그램", "MT": "톤 (metric ton)",
+    "L": "리터", "M": "미터", "M2": "제곱미터", "M3": "세제곱미터",
+    "ROLL": "롤", "SHEET": "장", "BOX": "박스", "CTN": "카톤", "BTL": "병",
+}
+# 서류마다 같은 단위를 다르게 적습니다. 모두 위 이름 하나로 맞춥니다.
+PRICE_UNIT_ALIASES = {
+    "PC": "PCS", "PIECE": "PCS", "PIECES": "PCS", "PCE": "PCS",
+    "EACH": "EA", "SETS": "SET", "PAIR": "PR", "PAIRS": "PR", "PRS": "PR",
+    "DOZ": "DZ", "DOZEN": "DZ", "DOZENS": "DZ",
+    "KGS": "KG", "KILOGRAM": "KG", "KILOGRAMS": "KG", "GRAM": "G", "GRAMS": "G",
+    "TON": "MT", "TONS": "MT", "TONNE": "MT", "MTS": "MT",
+    "LTR": "L", "LITER": "L", "LITRE": "L", "LITERS": "L",
+    "MTR": "M", "METER": "M", "METRE": "M", "SQM": "M2", "CBM": "M3",
+    "ROLLS": "ROLL", "SHEETS": "SHEET", "BOXES": "BOX", "CARTON": "CTN", "CARTONS": "CTN",
+    "BOTTLE": "BTL", "BOTTLES": "BTL",
+    # 한글 서류(견적서)에 흔한 단위. 뜻이 하나로 정해지는 것만 둡니다.
+    # ("상자"는 박스인지 카톤인지 서류마다 달라 넣지 않았습니다. 사람에게 묻습니다)
+    "개": "PCS", "세트": "SET", "켤레": "PR", "다스": "DZ", "박스": "BOX", "병": "BTL",
+    "장": "SHEET", "롤": "ROLL", "킬로그램": "KG", "킬로": "KG", "그램": "G", "톤": "MT",
+    "리터": "L", "미터": "M",
+}
+MAX_UNIT_QUANTITY = 1_000_000_000
+
+
+def priced_by_units(cargo) -> bool:
+    """단가를 낱개(PCS·KG 등)로 매긴 품목인지. 아니면 포장 개수가 단가의 기준입니다.
+
+    저장된 Cargo와 초안의 임시 객체 모두 받습니다. 속성만 봅니다.
+    """
+
+    return (getattr(cargo, "unit_quantity", None) is not None
+            and bool(getattr(cargo, "price_unit", "")))
+
+
+def price_unit_of(value: Any) -> str:
+    """적힌 단위를 우리 목록의 이름으로. 모르는 단위면 빈 값입니다."""
+
+    code = str(value or "").strip().upper().rstrip(".")
+    code = PRICE_UNIT_ALIASES.get(code, code)
+    return code if code in PRICE_UNITS else ""
+
 
 def parse_number(
     value: Any,
@@ -175,6 +227,21 @@ def validate_dangerous_goods(payload: dict, *, strict: bool = True) -> dict:
             "packing_group": packing_group, "proper_shipping_name": psn, "dg_warning": ""}
 
 
+def validate_cargo_handling(payload: dict) -> dict:
+    """An empty value means unchecked; unspecified preserves a pending request."""
+    choices = {
+        "temperature_requirement": {"", "unspecified", "chilled", "frozen"},
+        "special_container_type": {"", "unspecified", "open_top", "flat_rack", "tank", "other"},
+    }
+    result = {}
+    for field, allowed in choices.items():
+        value = str(payload.get(field) or "").strip()
+        if value not in allowed:
+            raise ValidationError("화물의 보관 조건·특수 컨테이너 종류를 확인해주세요.", field)
+        result[field] = value
+    return result
+
+
 def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
     """Validate raw cargo dimensions and return typed values."""
 
@@ -184,43 +251,183 @@ def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
     if package_type not in PACKAGE_TYPES:
         raise ValidationError("포장 유형을 확인해주세요.", "package_type")
 
+    dangerous = validate_dangerous_goods(payload, strict=strict)
+    length = parse_number(payload.get("length_cm"), "가로(Length)", max_value=MAX_DIMENSION_CM, field="length_cm")
+    width = parse_number(payload.get("width_cm"), "세로(Width)", max_value=MAX_DIMENSION_CM, field="width_cm")
+    height = parse_number(payload.get("height_cm"), "높이(Height)", max_value=MAX_DIMENSION_CM, field="height_cm")
+    units = _validate_units(payload, strict=strict)
+    quantity = _package_quantity(payload, units, strict=strict)
+    weight = parse_number(
+        payload.get("weight_per_package_kg"),
+        "포장당 중량(Weight)",
+        max_value=MAX_WEIGHT_PER_PACKAGE_KG,
+        field="weight_per_package_kg",
+    )
+
     return {
-        **validate_dangerous_goods(payload, strict=strict),
-        "length_cm": parse_number(payload.get("length_cm"), "가로(Length)", max_value=MAX_DIMENSION_CM, field="length_cm"),
-        "width_cm": parse_number(payload.get("width_cm"), "세로(Width)", max_value=MAX_DIMENSION_CM, field="width_cm"),
-        "height_cm": parse_number(payload.get("height_cm"), "높이(Height)", max_value=MAX_DIMENSION_CM, field="height_cm"),
-        "quantity": parse_integer(payload.get("quantity"), "수량(Quantity)", max_value=MAX_QUANTITY, field="quantity"),
-        "weight_per_package_kg": parse_number(
-            payload.get("weight_per_package_kg"),
-            "포장당 중량(Weight)",
-            max_value=MAX_WEIGHT_PER_PACKAGE_KG,
-            field="weight_per_package_kg",
-        ),
+        **dangerous,
+        **validate_cargo_handling(payload),
+        "length_cm": length,
+        "width_cm": width,
+        "height_cm": height,
+        "quantity": quantity,
+        "weight_per_package_kg": weight,
         "package_type": package_type,
+        "unit_quantity": units["unit_quantity"],
+        "price_unit": units["price_unit"],
+        "units_per_package": units["units_per_package"],
+        "units_warning": units["units_warning"],
         # 품목별 단가·금액은 선택입니다. 둘 중 하나만 적어도 나머지를 채워 줍니다.
-        **_validate_money(payload),
+        **_validate_money(payload, quantity, units["unit_quantity"]),
     }
 
 
-def _validate_money(payload: dict) -> dict:
-    """단가와 금액. 한쪽만 있으면 수량으로 나머지를 구합니다."""
+BOX_FIELDS = ("length_cm", "width_cm", "height_cm", "weight_per_package_kg")
+
+
+def has_box(payload: dict) -> bool:
+    """상자 크기와 무게가 모두 적혀 있는지. 없으면 부피·중량을 계산할 수 없습니다."""
+
+    return isinstance(payload, dict) and not any(_blank(payload.get(key)) for key in BOX_FIELDS)
+
+
+def validate_commercial_line(payload: dict) -> dict:
+    """상자 크기·무게 없이, 송장에 필요한 것만 확인합니다.
+
+    오퍼시트에는 상자 크기가 거의 없습니다. 그래도 견적송장·상업송장은
+    품명·수량·단가·금액만 있으면 그릴 수 있습니다. 부피·중량은 비워 두고
+    운송 계획에서 크기를 적으면 채워집니다.
+
+    포장 개수도 모를 수 있습니다(오퍼시트에 "20 PCS/CTN"이 없을 때).
+    그러면 None이고, 지어내지 않습니다. 포장명세서에서 채웁니다.
+    수량 × 단가 = 금액 검사는 여기서도 똑같이 합니다.
+    """
+
+    if not isinstance(payload, dict):
+        raise ValidationError("화물 정보를 입력해주세요.", "cargo")
+    package_type = str(payload.get("package_type") or "carton")
+    if package_type not in PACKAGE_TYPES:
+        raise ValidationError("포장 유형을 확인해주세요.", "package_type")
+
+    units = _validate_units(payload, strict=True)
+    if _blank(payload.get("quantity")) and units["derived_quantity"] is None:
+        quantity = None
+    else:
+        quantity = _package_quantity(payload, units, strict=True)
+    return {
+        **validate_dangerous_goods(payload, strict=False),
+        **validate_cargo_handling(payload),
+        "package_type": package_type,
+        "quantity": quantity,
+        "unit_quantity": units["unit_quantity"],
+        "price_unit": units["price_unit"],
+        "units_per_package": units["units_per_package"],
+        "units_warning": units["units_warning"],
+        **_validate_money(payload, quantity or 0, units["unit_quantity"]),
+    }
+
+
+def _blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _validate_units(payload: dict, *, strict: bool) -> dict:
+    """낱개 수량 · 가격 단위 · 포장당 낱개 수.
+
+    셋 다 선택입니다. 안 적으면 예전처럼 포장 개수가 단가의 기준입니다.
+    적었으면 **단가는 낱개 수량 기준**이고, 포장 개수는 포장명세서에 씁니다.
+
+    포장당 낱개 수까지 적었으면 포장 개수를 계산합니다. 다만 정확히
+    나누어떨어질 때만입니다. 2,010개를 20개씩 담으면 100.5상자인데,
+    이걸 반올림해 101상자로 적으면 마지막 상자에 몇 개가 들었는지
+    서류가 거짓말을 하게 됩니다. 그럴 때는 멈추고 사람에게 묻습니다.
+    """
+
+    result = {"unit_quantity": None, "price_unit": "", "units_per_package": None,
+              "units_warning": "", "derived_quantity": None}
+    raw_quantity = payload.get("unit_quantity")
+    raw_unit = payload.get("price_unit")
+    raw_per = payload.get("units_per_package")
+    if _blank(raw_quantity) and _blank(raw_unit) and _blank(raw_per):
+        return result
+
+    unit_quantity = None if _blank(raw_quantity) else parse_number(
+        raw_quantity, "낱개 수량", max_value=MAX_UNIT_QUANTITY, field="unit_quantity")
+    price_unit = price_unit_of(raw_unit)
+    if not _blank(raw_unit) and not price_unit:
+        raise ValidationError(f"가격 단위 '{str(raw_unit).strip()[:20]}'을(를) 알 수 없습니다. "
+                              f"PCS · KG · SET 같은 단위로 적어 주세요.", "price_unit")
+    if unit_quantity is not None and not price_unit:
+        raise ValidationError("낱개 수량의 단위(PCS · KG · SET 등)를 적어 주세요.", "price_unit")
+    if price_unit and unit_quantity is None:
+        raise ValidationError(f"{price_unit} 기준 수량(낱개 수량)을 적어 주세요.", "unit_quantity")
+    per = None if _blank(raw_per) else parse_number(
+        raw_per, "포장당 낱개 수", max_value=MAX_UNIT_QUANTITY, field="units_per_package")
+
+    result.update(unit_quantity=unit_quantity, price_unit=price_unit, units_per_package=per)
+    if unit_quantity is not None and per:
+        ratio = unit_quantity / per
+        if abs(ratio - round(ratio)) > 1e-9 or round(ratio) < 1:
+            message = (f"낱개 {unit_quantity:,g} ÷ 포장당 {per:,g} = {ratio:,.2f}로 "
+                       f"나누어떨어지지 않습니다. 마지막 포장이 덜 찼다면 포장당 낱개 수를 "
+                       f"비우고 포장 개수를 직접 적어 주세요.")
+            if strict:
+                raise ValidationError(message, "units_per_package")
+            result["units_warning"] = message
+        else:
+            result["derived_quantity"] = int(round(ratio))
+    return result
+
+
+def _package_quantity(payload: dict, units: dict, *, strict: bool) -> int:
+    """포장 개수. 안 적었으면 낱개 ÷ 포장당 낱개로 구하고, 적었으면 그 계산과 맞는지 봅니다."""
+
+    derived = units["derived_quantity"]
+    raw = payload.get("quantity")
+    if _blank(raw) and derived is not None:
+        raw = derived
+    quantity = parse_integer(raw, "수량(Quantity)", max_value=MAX_QUANTITY, field="quantity")
+    if derived is not None and quantity != derived:
+        message = (f"포장 개수가 맞지 않습니다. 낱개 {units['unit_quantity']:,g} ÷ 포장당 "
+                   f"{units['units_per_package']:,g} = {derived:,}개인데 {quantity:,}개로 적혀 있습니다.")
+        if strict:
+            raise ValidationError(message, "quantity")
+        units["units_warning"] = message
+    return quantity
+
+
+def _validate_money(payload: dict, quantity: int, unit_quantity: float | None = None) -> dict:
+    """단가와 금액. 한쪽만 있으면 수량으로 나머지를 구합니다.
+
+    낱개 수량을 적었으면 그것이 단가의 기준이고, 아니면 포장 개수가 기준입니다.
+    낱개 기준일 때는 셋(수량·단가·금액)이 정확히 맞아야 합니다. 서류에 찍히는
+    단가가 L/C와 한 푼이라도 다르면 은행에서 돌아오기 때문입니다.
+    """
 
     def optional(value, label, field):
-        if value is None or (isinstance(value, str) and not value.strip()):
+        if _blank(value):
             return None
         return parse_number(value, label, max_value=MAX_INVOICE_VALUE, field=field)
 
     unit_price = optional(payload.get("unit_price"), "단가(Unit Price)", "unit_price")
     amount = optional(payload.get("amount"), "금액(Amount)", "amount")
-    try:
-        quantity = parse_integer(payload.get("quantity"), "수량(Quantity)",
-                                 max_value=MAX_QUANTITY, field="quantity")
-    except ValidationError:
-        quantity = 0
-    if amount is None and unit_price is not None and quantity:
-        amount = unit_price * quantity
-    elif unit_price is None and amount is not None and quantity:
-        unit_price = round(amount / quantity, 4)
+    by_units = unit_quantity is not None
+    basis = unit_quantity if by_units else quantity
+
+    if amount is None and unit_price is not None and basis:
+        amount = unit_price * basis
+    elif unit_price is None and amount is not None and basis:
+        unit_price = round(amount / basis, 4)
+        # 낱개 기준에서 나누어떨어지지 않는 단가(100 ÷ 3 = 33.3333)는 지어내지 않습니다.
+        # 33.3333 × 3 = 99.9999라 반올림하면 100처럼 보이지만, 송장에 찍힌 단가로
+        # 되곱하면 금액이 안 나옵니다. 정확히 되곱해질 때만 채우고, 아니면 비워 둡니다.
+        if by_units and abs(unit_price * basis - amount) > 1e-6:
+            unit_price = None
+    elif by_units and unit_price is not None and amount is not None:
+        if round(unit_price * basis, 2) != round(amount, 2):
+            raise ValidationError(
+                f"수량 × 단가가 금액과 맞지 않습니다. {basis:,g} × {unit_price:,g} = "
+                f"{unit_price * basis:,.2f} 인데 금액은 {amount:,.2f} 입니다.", "amount")
     # 금액은 줄 단위로 먼저 원 단위(소수 둘째 자리)까지 맞춥니다.
     # 그래야 송장에 적히는 품목 금액의 합과 총액이 어긋나지 않습니다.
     return {"unit_price": unit_price,

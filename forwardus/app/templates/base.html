@@ -32,7 +32,27 @@
           <a href="{{ url_for('planning.index') }}" class="{{ 'active' if request.endpoint == 'planning.index' }}">일정 역산</a>
           <a href="{{ url_for('tracking.container_lookup') }}" class="{{ 'active' if request.endpoint == 'tracking.container_lookup' }}">컨테이너 조회</a>
           <a href="{{ url_for('lookup.index') }}" class="{{ 'active' if nav_active == 'lookup' }}">관세청 조회</a>
-          <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active == 'dashboard' }}">Dashboard</a>
+          <span class="nav_auth_sep" aria-hidden="true"></span>
+          {% if current_user %}
+            {# Dashboard는 로그인한 사람의 이름 메뉴 안으로 옮겼습니다. #}
+            <div class="user_menu" data-user-menu>
+              <button type="button" class="nav_user {{ 'active' if nav_active == 'dashboard' }}"
+                      aria-haspopup="true" aria-expanded="false" data-user-menu-toggle>
+                {{ current_user.name or current_user.email }}님
+                {% if current_user.is_master %}<span class="badge master_badge">마스터</span>{% endif %}
+                <span class="caret" aria-hidden="true">▾</span>
+              </button>
+              <div class="user_menu_panel" data-user-menu-panel hidden>
+                <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active == 'dashboard' }}">{{ '전체 Dashboard' if current_user.is_master else '내 Dashboard' }}</a>
+                <form class="nav_logout" method="post" action="{{ url_for('auth.logout') }}">
+                  <button type="submit">로그아웃</button>
+                </form>
+              </div>
+            </div>
+          {% else %}
+            <a href="{{ url_for('auth.login', next=request.full_path.rstrip('?') if request.blueprint != 'auth' else None) }}" class="{{ 'active' if request.endpoint == 'auth.login' }}">로그인</a>
+            <a href="{{ url_for('auth.signup') }}" class="nav_signup {{ 'active' if request.endpoint == 'auth.signup' }}">회원가입</a>
+          {% endif %}
         </nav>
       </div>
     </header>

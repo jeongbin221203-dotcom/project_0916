@@ -526,3 +526,41 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 }
 .home_chips .chip_file::before { content: "📄 "; }
 .home_chips .chip_file:hover { border-color: var(--navy); background: #f1f5f9; }
+
+/* ----- 오퍼시트 올리기 (offer_sheet.js) ----- */
+.sr_only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.home_attach { display: inline-grid; place-items: center; flex: 0 0 auto; width: 38px; height: 38px;
+  border-radius: 50%; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 17px; }
+.home_attach:hover { border-color: #c7d7fd; background: var(--blue_soft); }
+.home_attach:focus-within { outline: 2px solid var(--blue); outline-offset: 2px; }
+.home_attach[aria-disabled="true"] { opacity: .45; cursor: default; }
+.home_center.talking .home_attach { width: 34px; height: 34px; font-size: 15px; }
+.home_box.dropping { outline: 2px dashed var(--blue); outline-offset: 4px; background: var(--blue_soft); }
+
+.offer_notice { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--blue_soft);
+  color: var(--blue_dark); font-size: 13.5px; }
+.offer_sent_row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.offer_sent { margin: 0; width: min(260px, 100%); }
+.offer_sent img { width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+.offer_sent figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.offer_box { max-width: 100%; }
+.offer_table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13.5px; }
+.offer_table th, .offer_table td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left;
+  vertical-align: top; }
+.offer_table thead th { font-size: 12px; color: var(--muted); background: var(--surface); }
+.offer_table tbody th { width: 30%; font-weight: 600; }
+.offer_table input, .offer_table select { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line);
+  border-radius: 8px; font: inherit; background: #fff; }
+.offer_table tr.st_check input, .offer_table tr.st_check select { border-color: #f1c27a; background: var(--amber_soft); }
+.offer_table tr.st_missing input, .offer_table tr.st_missing select { border-color: #f3b0b0; }
+.offer_table small { display: block; margin-top: 4px; }
+.offer_note { color: var(--red); font-size: 12px; }
+.offer_chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  white-space: nowrap; }
+.offer_chip.ok { background: var(--green_soft); color: var(--green); }
+.offer_chip.check { background: var(--amber_soft); color: var(--amber); }
+.offer_chip.missing { background: var(--red_soft); color: var(--red); }
+.offer_items_scroll { overflow-x: auto; }
+.offer_items { min-width: 760px; }
+.offer_items td:first-child { min-width: 160px; }

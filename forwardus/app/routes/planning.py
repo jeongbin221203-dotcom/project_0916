@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
+from app.routes.auth import current_user, login_required
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
 
@@ -17,11 +18,13 @@ def index():
 
 
 @planning_bp.get("/new")
+@login_required
 def new():
     return _wizard(standalone=False)
 
 
 @planning_bp.get("/new/solo")
+@login_required
 def new_solo():
     """같은 위저드를 단독으로. 머리말·푸터·상담 단추 없이 입력만 보입니다.
 
@@ -179,9 +182,11 @@ def api_reverse_schedule():
 
 
 @planning_bp.post("/api/shipments")
+@login_required
 def api_create_shipment():
     try:
-        shipment = planning_service.create_shipment(request.get_json(silent=True) or {})
+        shipment = planning_service.create_shipment(request.get_json(silent=True) or {},
+                                                    user_id=current_user().id)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     return jsonify({

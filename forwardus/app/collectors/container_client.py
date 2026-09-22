@@ -104,11 +104,11 @@ def cargo_progress(*, cargo_no: str = "", mbl_no: str = "", hbl_no: str = "",
 
     params = {}
     if cargo_no:
-        params["cargMtNo"] = cargo_no.strip().upper()
+        params["cargMtNo"] = normalize_container_no(cargo_no)
     if mbl_no:
-        params["mblNo"] = mbl_no.strip().upper()
+        params["mblNo"] = normalize_container_no(mbl_no)
     if hbl_no:
-        params["hblNo"] = hbl_no.strip().upper()
+        params["hblNo"] = normalize_container_no(hbl_no)
     if not params:
         return fail("VALIDATION_ERROR", "api", "화물관리번호 또는 B/L번호를 입력해주세요.")
     if (mbl_no or hbl_no):
@@ -199,7 +199,7 @@ CONTAINER_SIZE_NOTES = {
 def container_detail(cargo_no: str) -> dict:
     """화물관리번호에 딸린 컨테이너 번호·규격·봉인번호."""
 
-    number = (cargo_no or "").strip().upper()
+    number = normalize_container_no(cargo_no)
     if not number:
         return fail("VALIDATION_ERROR", "api", "화물관리번호를 입력해주세요.")
 
@@ -234,7 +234,7 @@ def export_performance(*, declaration_no: str = "", bl_no: str = "") -> dict:
     if declaration_no:
         params["expDclrNo"] = "".join(ch for ch in declaration_no if ch.isalnum())
     if bl_no:
-        params["blNo"] = bl_no.strip().upper()
+        params["blNo"] = normalize_container_no(bl_no)
     if not params:
         return fail("VALIDATION_ERROR", "api", "수출신고번호 또는 B/L번호를 입력해주세요.")
 

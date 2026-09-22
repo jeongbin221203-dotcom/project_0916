@@ -24,6 +24,20 @@ pytestmark = pytest.mark.slow
 HERE = Path(__file__).resolve().parent
 
 
+@pytest.fixture(autouse=True)
+def _restore_outbound(monkeypatch):
+    """스윕이 막아 둔 바깥 연결을 테스트가 끝나면 되돌립니다.
+
+    도구들은 block_outbound()로 httpx.request를 바꿔 끼우고 풀지 않습니다.
+    그대로 두면 뒤에 도는 실제 관세청 테스트가 전부 연결 실패로 떨어집니다.
+    원래 함수를 monkeypatch에 맡겨 두면 끝날 때 제자리로 돌아옵니다.
+    """
+
+    import httpx
+
+    monkeypatch.setattr(httpx, "request", httpx.request)
+
+
 def _load(name: str):
     spec = importlib.util.spec_from_file_location(f"_fuzz_{name}", HERE / f"_fuzz_{name}.py")
     module = importlib.util.module_from_spec(spec)

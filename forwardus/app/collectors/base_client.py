@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -46,6 +48,52 @@ def get_config(key: str, default: Any = None) -> Any:
     return getattr(Config, key, default)
 
 
+# --- 닿지 않는 기관을 매번 다시 기다리지 않습니다 ---------------------------------
+#
+# 관세청이 회선에서 막히면 한 번 부를 때마다 8초를 버립니다. HS 검색은 한 번에
+# 여덟 번을 부르므로 화면이 30초를 기다리다 끊겼습니다.
+#
+# 그래서 닿지 않은 기관은 잠시 부르지 않고 바로 "안 됩니다"로 답합니다.
+# 어느 기관을 왜 건너뛰는지 메시지에 적으므로 조용히 사라지지 않습니다.
+# 수집기마다 되돌아갈 길(내부 품목표·예시 자료)이 이미 있어서, 답이 빨라질 뿐
+# 틀려지지는 않습니다.
+#
+# 건너뛰는 것은 **닿지 않을 때**뿐입니다. 404나 500처럼 응답이 온 경우는
+# 기관이 살아 있다는 뜻이라 세지 않고, 바로 잊습니다.
+UNREACHABLE = ("API_TIMEOUT", "API_CONNECTION_ERROR")
+
+_outage_lock = threading.Lock()
+_unreachable_until: dict[str, float] = {}
+
+
+def _host(url: str) -> str:
+    return url.split("/")[2] if "://" in url else url
+
+
+def clear_outages() -> None:
+    """건너뛰기 기록을 모두 지웁니다. (테스트와 회선이 돌아왔을 때)"""
+
+    with _outage_lock:
+        _unreachable_until.clear()
+
+
+def _skip_seconds(host: str) -> float:
+    """이 기관을 앞으로 몇 초 더 건너뛰는지. 0이면 불러도 됩니다."""
+
+    with _outage_lock:
+        return max(0.0, _unreachable_until.get(host, 0.0) - time.monotonic())
+
+
+def _remember_reach(host: str, error_code: str | None) -> None:
+    with _outage_lock:
+        if error_code not in UNREACHABLE:
+            _unreachable_until.pop(host, None)     # 응답이 왔습니다. 살아 있습니다.
+            return
+        seconds = float(get_config("API_OUTAGE_SECONDS", 60))
+        if seconds > 0:
+            _unreachable_until[host] = time.monotonic() + seconds
+
+
 def request_text(method: str, url: str, **kwargs) -> dict:
     """Call an external API that answers with text (XML 등) and normalize failures."""
 
@@ -58,14 +106,24 @@ def request_text(method: str, url: str, **kwargs) -> dict:
 def _request(method: str, url: str, **kwargs):
     """Perform the call and map every failure mode to an error result."""
 
+    host = _host(url)
+    skipping = _skip_seconds(host)
+    if skipping:
+        return fail("API_CONNECTION_ERROR", "api",
+                    f"{host}에 닿지 않아 {int(skipping) + 1}초 동안 부르지 않습니다. "
+                    f"그동안은 가지고 있는 자료로 답합니다.")
+
     # 느린 외부 API(WITS 등)는 호출하는 쪽에서 더 긴 시간을 줄 수 있습니다.
     timeout = kwargs.pop("timeout", None) or get_config("API_TIMEOUT_SECONDS", 8)
     try:
         response = httpx.request(method, url, timeout=timeout, **kwargs)
     except httpx.TimeoutException:
+        _remember_reach(host, "API_TIMEOUT")
         return fail("API_TIMEOUT", "api")
     except httpx.HTTPError:
+        _remember_reach(host, "API_CONNECTION_ERROR")
         return fail("API_CONNECTION_ERROR", "api")
+    _remember_reach(host, None)
 
     if response.status_code in (401, 403):
         return fail("API_AUTH_FAILED", "api")

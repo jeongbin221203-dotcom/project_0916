@@ -42,9 +42,16 @@ def migrate_cargo_lines(database) -> None:
              "dg_class": "VARCHAR(5) NOT NULL DEFAULT ''",
              "packing_group": "VARCHAR(5) NOT NULL DEFAULT ''",
              "proper_shipping_name": "VARCHAR(200) NOT NULL DEFAULT ''",
+             # 보관 온도(냉장·냉동)와 특수 컨테이너(오픈탑·플랫랙·탱크) 요청
+             "temperature_requirement": "VARCHAR(20) NOT NULL DEFAULT ''",
+             "special_container_type": "VARCHAR(20) NOT NULL DEFAULT ''",
              # 품목별 금액도 나중에 더해졌습니다.
              "unit_price": "FLOAT",
-             "amount": "FLOAT"}
+             "amount": "FLOAT",
+             # 단가의 기준(낱개 수량 · 가격 단위 · 포장당 낱개 수)도 나중에 더해졌습니다.
+             "unit_quantity": "FLOAT",
+             "price_unit": "VARCHAR(10) NOT NULL DEFAULT ''",
+             "units_per_package": "FLOAT"}
     missing = {name: spec for name, spec in added.items() if name not in columns}
     if missing:
         with database.engine.begin() as connection:
@@ -115,6 +122,46 @@ def migrate_cost_sources(database) -> None:
             f"WHERE source = 'mock' AND code IN ({codes})"))
 
 
+def migrate_user_columns(database) -> None:
+    """마스터 표시 칸을 기존 users 표에 덧붙입니다."""
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("users")}
+    if "is_master" not in columns:
+        with database.engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE users ADD COLUMN is_master BOOLEAN NOT NULL DEFAULT 0"))
+
+
+def ensure_master_account(database, email: str, password: str) -> None:
+    """마스터 계정이 없으면 만듭니다.
+
+    같은 이메일로 먼저 가입한 일반 계정이 있으면 마스터로 올리고 비밀번호도
+    정해 둔 값으로 바꿉니다. 그대로 두면 먼저 가입한 사람이 마스터가 됩니다.
+    이미 마스터이면 비밀번호를 건드리지 않습니다.
+    """
+
+    from app.models import User
+
+    if not email or not password:
+        return
+    user = User.query.filter_by(email=email).first()
+    if user is None:
+        user = User(email=email, name="ForwardUs 마스터", is_master=True)
+        user.set_password(password)
+        database.session.add(user)
+    elif not user.is_master:
+        user.is_master = True
+        user.set_password(password)
+    else:
+        return
+    database.session.commit()
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     """Create and configure the Flask application."""
 
@@ -138,6 +185,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         migrate_shipment_columns(db)
         migrate_cost_sources(db)
         migrate_requirement_documents(db)
+        migrate_user_columns(db)
+        ensure_master_account(db, flask_app.config.get("MASTER_EMAIL", ""),
+                              flask_app.config.get("MASTER_PASSWORD", ""))
 
     @flask_app.get("/health")
     def health():
@@ -148,7 +198,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         # 고객상담 창은 모든 화면에 붙으므로 여기서 한 번만 준비합니다.
         from app.services import support_chat_service
 
+        from app.routes.auth import current_user
+
         return {"nav_active": request.blueprint or "", "static_url": static_url,
+                "current_user": current_user(),
                 "support_chat_intro": support_chat_service.intro(),
                 "support_icon": support_icon(),
                 "brand_logo": _pick_image("logo"),
