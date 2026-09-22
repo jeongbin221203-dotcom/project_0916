@@ -1264,6 +1264,8 @@ def create_shipment(payload: dict) -> Shipment:
             hs_code=optional_text(item.get("hs_code"), max_length=20) or hs_code,
             package_type=line["package_type"],
             is_dangerous=line["is_dangerous"],
+            temperature_requirement=line["temperature_requirement"],
+            special_container_type=line["special_container_type"],
             un_number=line["un_number"],
             dg_class=line["dg_class"],
             packing_group=line["packing_group"],

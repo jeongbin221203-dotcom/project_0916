@@ -34,6 +34,8 @@ class Cargo(db.Model):
     dg_class = db.Column(db.String(5), nullable=False, default="")
     packing_group = db.Column(db.String(5), nullable=False, default="")
     proper_shipping_name = db.Column(db.String(200), nullable=False, default="")
+    temperature_requirement = db.Column(db.String(20), nullable=False, default="", server_default="")
+    special_container_type = db.Column(db.String(20), nullable=False, default="", server_default="")
 
     total_cbm = db.Column(db.Float, nullable=False)
     total_weight_kg = db.Column(db.Float, nullable=False)
@@ -44,12 +46,22 @@ class Cargo(db.Model):
 
     shipment = db.relationship("Shipment", back_populates="cargos")
 
+    @property
+    def handling_summary(self) -> str:
+        temperature = {"chilled": "냉장", "frozen": "냉동", "unspecified": "냉동·냉장 (협의 필요)"}
+        equipment = {"open_top": "오픈탑", "flat_rack": "플랫랙", "tank": "탱크",
+                     "other": "기타 특수 장비", "unspecified": "특수 컨테이너 (협의 필요)"}
+        return " · ".join(value for value in [temperature.get(self.temperature_requirement),
+                                             equipment.get(self.special_container_type)] if value)
+
     def to_dict(self) -> dict:
         return {
             "product_description": self.product_description,
             "hs_code": self.hs_code,
             "package_type": self.package_type,
             "is_dangerous": self.is_dangerous,
+            "temperature_requirement": self.temperature_requirement,
+            "special_container_type": self.special_container_type,
             "un_number": self.un_number,
             "dg_class": self.dg_class,
             "packing_group": self.packing_group,

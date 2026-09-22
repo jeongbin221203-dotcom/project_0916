@@ -175,6 +175,21 @@ def validate_dangerous_goods(payload: dict, *, strict: bool = True) -> dict:
             "packing_group": packing_group, "proper_shipping_name": psn, "dg_warning": ""}
 
 
+def validate_cargo_handling(payload: dict) -> dict:
+    """An empty value means unchecked; unspecified preserves a pending request."""
+    choices = {
+        "temperature_requirement": {"", "unspecified", "chilled", "frozen"},
+        "special_container_type": {"", "unspecified", "open_top", "flat_rack", "tank", "other"},
+    }
+    result = {}
+    for field, allowed in choices.items():
+        value = str(payload.get(field) or "").strip()
+        if value not in allowed:
+            raise ValidationError("화물의 보관 조건·특수 컨테이너 종류를 확인해주세요.", field)
+        result[field] = value
+    return result
+
+
 def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
     """Validate raw cargo dimensions and return typed values."""
 
@@ -186,6 +201,7 @@ def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
 
     return {
         **validate_dangerous_goods(payload, strict=strict),
+        **validate_cargo_handling(payload),
         "length_cm": parse_number(payload.get("length_cm"), "가로(Length)", max_value=MAX_DIMENSION_CM, field="length_cm"),
         "width_cm": parse_number(payload.get("width_cm"), "세로(Width)", max_value=MAX_DIMENSION_CM, field="width_cm"),
         "height_cm": parse_number(payload.get("height_cm"), "높이(Height)", max_value=MAX_DIMENSION_CM, field="height_cm"),

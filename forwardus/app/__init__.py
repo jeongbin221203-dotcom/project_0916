@@ -42,6 +42,8 @@ def migrate_cargo_lines(database) -> None:
              "dg_class": "VARCHAR(5) NOT NULL DEFAULT ''",
              "packing_group": "VARCHAR(5) NOT NULL DEFAULT ''",
              "proper_shipping_name": "VARCHAR(200) NOT NULL DEFAULT ''",
+             "temperature_requirement": "VARCHAR(20) NOT NULL DEFAULT ''",
+             "special_container_type": "VARCHAR(20) NOT NULL DEFAULT ''",
              # 품목별 금액도 나중에 더해졌습니다.
              "unit_price": "FLOAT",
              "amount": "FLOAT"}
