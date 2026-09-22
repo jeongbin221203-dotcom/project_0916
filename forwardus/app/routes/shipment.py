@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from app.models.shipment import SHIPMENT_STATUSES, STATUS_LABELS
+from app.models.shipment import SHIPMENT_STATUSES
 from app.routes import load_shipment
-from app.routes.auth import current_user, login_required
+from app.routes.auth import login_required
 from app.services import ServiceError, shipment_service
 
 shipment_bp = Blueprint("shipment", __name__, url_prefix="/shipments")
@@ -15,24 +15,12 @@ shipment_bp = Blueprint("shipment", __name__, url_prefix="/shipments")
 @shipment_bp.get("")
 @login_required
 def index():
+    """예전 Shipments 목록. 목록은 Dashboard로 합쳤습니다. 옛 주소·즐겨찾기는 그리로 보냅니다."""
+
     status = request.args.get("status") or None
     if status not in SHIPMENT_STATUSES:
         status = None
-    return render_template(
-        "shipment/list.html",
-        shipments=shipment_service.list_shipments(status, viewer=current_user()),
-        owners=_owner_emails() if current_user().is_master else {},
-        status=status,
-        statuses=STATUS_LABELS,
-    )
-
-
-def _owner_emails() -> dict:
-    """마스터 화면에서 Shipment마다 누가 만들었는지 보여 줍니다."""
-
-    from app.models import User
-
-    return {user.id: user.email for user in User.query.all()}
+    return redirect(url_for("dashboard.index", status=status))
 
 
 @shipment_bp.get("/<shipment_id>")

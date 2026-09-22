@@ -198,6 +198,36 @@
     drawCalendar();
   }));
 
+  /* ----- 금액 칸의 통화 표기 -----
+     "금액" 대신 "금액 (USD)"처럼 지금 고른 통화를 라벨·자리표시·총액에 붙입니다.
+     통화 칸을 바꾸거나, 올린 서류에서 통화를 읽어 오면 곧바로 따라 바뀝니다. */
+  const totalBox = panel.querySelector("[data-doc-total]");
+  function currencyCode() {
+    return ((form.elements.currency && form.elements.currency.value) || "").trim().toUpperCase();
+  }
+  function moneyNumber(text) {
+    const value = Number(String(text || "").replace(/,/g, "").trim());
+    return Number.isFinite(value) ? value : null;
+  }
+  function applyCurrency() {
+    const code = currencyCode();
+    panel.querySelectorAll("[data-money-unit]").forEach((el) => { el.textContent = code ? ` (${code})` : ""; });
+    panel.querySelectorAll("[data-money-input]").forEach((input) => {
+      input.placeholder = [code, input.dataset.moneyExample].filter(Boolean).join(" ");
+    });
+    if (!totalBox) return;
+    const amounts = Array.from(itemsBox.querySelectorAll('[name="item_amount"]'))
+      .map((input) => moneyNumber(input.value)).filter((value) => value !== null && value > 0);
+    totalBox.hidden = !amounts.length;
+    const total = amounts.reduce((sum, value) => sum + value, 0);
+    totalBox.querySelector("[data-doc-total-value]").textContent =
+      total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (form.elements.currency) form.elements.currency.addEventListener("change", applyCurrency);
+  itemsBox.addEventListener("input", (event) => {
+    if (event.target.name === "item_amount") applyCurrency();
+  });
+
   /* ----- 품목 ----- */
   function addItem() {
     const row = itemTemplate.content.cloneNode(true).querySelector(".doc_item");
@@ -206,6 +236,7 @@
     addHsButton(row);
     row.addEventListener("input", () => { invalidateSchedule(); score(); });
     row.addEventListener("change", score);
+    applyCurrency();
     return row;
   }
 
@@ -278,6 +309,28 @@
       return item;
     });
   }
+
+  /* ----- 운송 계획으로 이어 쓰기 -----
+     여기서 적은 값(송하인·수하인·POL/POD·품목·중량·치수·Incoterms·통화·금액)을
+     "작성 중인 수출 건"으로 저장합니다. 운송 계획 화면이 열리면 이 값으로 칸이 미리 찹니다.
+     (work_draft.js · /api/work-draft. 바이어 주소·연락처는 이 탭에만 둡니다) */
+  function sharedValues() {
+    const fields = {};
+    form.querySelectorAll("[data-doc-input]").forEach((input) => {
+      if (input.closest("template") || input.name.startsWith("item_") || !input.name) return;
+      fields[input.name] = input.value.trim();
+    });
+    ["origin", "destination"].forEach((role) => {
+      const search = panel.querySelector(`[data-doc-place="${role}"] [data-place-search]`);
+      if (search && search.value.trim()) fields[`${role}_name`] = search.value.trim();
+    });
+    return { fields, items: itemValues() };
+  }
+  function syncWorkDraft(source = "document") {
+    if (window.ForwardusWorkDraft) window.ForwardusWorkDraft.save(sharedValues(), source);
+  }
+  form.addEventListener("input", () => syncWorkDraft());
+  form.addEventListener("change", () => syncWorkDraft());
 
   /* ----- 얼마나 찼는지 ----- */
   function score() {
@@ -532,6 +585,8 @@
     invalidateSchedule();
     drawCalendar();
     score();
+    applyCurrency();          // 읽어 온 통화가 금액 라벨에 바로 붙습니다.
+    syncWorkDraft("upload");  // 올린 서류·대화에서 읽은 값도 운송 계획으로 이어집니다.
   };
 
   addItem();

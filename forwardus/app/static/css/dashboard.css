@@ -8,3 +8,36 @@
 
 @media (max-width: 900px) { .kpi_grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 420px) { .kpi_grid { grid-template-columns: 1fr; } }
+
+/* ----- 권한별 Dashboard (master.html · personal.html) ----- */
+.kpi_grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpi_card.accent { border-color: #c7d7fd; background: var(--blue_soft); }
+a.kpi_card.link { color: inherit; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+a.kpi_card.link:hover { border-color: #c7d7fd; box-shadow: 0 0 0 1px #c7d7fd; }
+.dash_table_head { margin-bottom: 10px; }
+.dash_table_head h2 { margin: 0; }
+.dash_filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.dash_filters input[type=search] { flex: 1 1 220px; min-width: 0; }
+.dash_filters select { flex: 0 0 auto; width: auto; }
+/* 표가 넓으면 카드 안에서만 옆으로 넘깁니다. 화면 전체가 밀리지 않게. */
+.table_scroll { overflow-x: auto; }
+.dash_status { display: flex; gap: 6px; align-items: center; }
+.dash_status select { min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 13px; }
+.dash_list { list-style: none; margin: 0; padding: 0; }
+.dash_list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.dash_list li:first-child { border-top: 0; padding-top: 0; }
+.dash_list li > div { display: grid; gap: 3px; min-width: 0; }
+.dash_links { display: flex; gap: 10px; flex: 0 0 auto; font-size: 13px; white-space: nowrap; }
+.dash_analytics > summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; cursor: pointer; list-style: none; }
+.dash_analytics > summary::-webkit-details-marker { display: none; }
+.dash_analytics > summary h2 { margin: 0; }
+.dash_analytics > summary h2::before { content: "▸ "; color: var(--muted); }
+.dash_analytics[open] > summary { margin-bottom: 14px; }
+.dash_analytics[open] > summary h2::before { content: "▾ "; }
+@media (max-width: 900px) { .kpi_grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 번호·날짜·작성자가 두 줄로 쪼개지지 않게. 표가 넓으면 카드 안에서 옆으로 넘깁니다(.table_scroll).
+   견적명·Buyer만 길면 말줄임으로 자릅니다. (전체 글자는 title로) */
+.table_scroll .table th, .table_scroll .table td { white-space: nowrap; }
+.table_scroll .table .dash_clip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.dash_status select { min-width: 104px; }
+.dash_sub { display: block; color: var(--muted); font-size: 11.5px; }

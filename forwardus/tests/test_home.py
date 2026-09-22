@@ -11,7 +11,8 @@ from unittest.mock import patch
 from app.routes import home
 
 
-ACTIONS = ["consult", "planning", "documents"]
+# 서류 작성이 운송 계획보다 앞입니다. 서류에 적은 값이 운송 계획 칸을 미리 채웁니다.
+ACTIONS = ["consult", "documents", "planning"]
 
 
 def test_빠른_시작_세_단추가_순서대로_있다(client):
@@ -39,7 +40,7 @@ def test_단추_구성이_화면과_어긋나지_않는다(app):
 
 def test_서류_작성에는_칸_채우기_길이_따로_있다(app):
     with app.test_request_context():
-        documents = home.quick_actions()[2]
+        documents = home.quick_actions()[1]
 
     assert documents["key"] == "documents"
     assert documents["fill_label"]
@@ -82,8 +83,11 @@ def test_서류_작성_화면에_칸이_모두_모여_있다(client):
 def test_사이드바_서류_작성이_그_화면을_가리킨다(app, client):
     from flask import url_for
 
+    from app.routes import sidebar
+
+    item = next(row for row in sidebar.RAIL if row["key"] == "documents")
     with app.test_request_context():
-        assert url_for(home.RAIL_URLS["shipment"]) == "/documents/new"
+        assert url_for(item["endpoint"]) == "/documents/new"
     assert "/documents/new" in client.get("/").get_data(as_text=True)
 
 
@@ -105,10 +109,12 @@ def test_왼쪽_줄의_바로가기가_모두_열린다(app, client):
     html = client.get("/").get_data(as_text=True)
     assert "home_rail" in html
 
-    for item in home.RAIL:
+    from app.routes import sidebar
+
+    for item in sidebar.RAIL:
         assert item["label"] in html
         with app.test_request_context():
-            url = url_for(home.RAIL_URLS[item["key"]])
+            url = url_for(item["endpoint"])
         assert client.get(url).status_code == 200, item["key"]
 
 
@@ -257,7 +263,7 @@ def test_잠가도_위쪽_메뉴는_그대로_쓴다(app, client):
     nav = re.search(r'<nav class="main_nav".*?</nav>', html, re.S).group(0)
 
     assert "disabled" not in nav
-    for label in ("운송 계획", "Shipments", "컨테이너 조회",
+    for label in ("운송 계획", "Dashboard", "컨테이너 조회",
                   "관세청 조회"):
         assert label in nav
     # 일정 역산은 없앤 기능입니다. 메뉴에도 남기지 않습니다.

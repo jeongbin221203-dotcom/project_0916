@@ -21,11 +21,6 @@
   const input = form.elements.question;
   const resetButton = panel.querySelector("[data-support-reset]");
   const SOURCE = "support";
-  // 좁은 화면에서는 창이 본문을 거의 다 덮습니다. 거기서는 저절로 열지 않습니다.
-  const narrow = window.matchMedia("(max-width: 520px)").matches;
-  // 시작 화면에서는 가운데 적는 칸에서 바로 이야기할 수 있어 저절로 열지 않습니다.
-  // (FORWARDUS_HOME은 이 파일보다 늦게 정해지므로 화면에 있는 적는 칸으로 알아봅니다)
-  const onHome = Boolean(document.querySelector("[data-home-form]"));
 
   let busy = false;
   let lastMode = null;
@@ -166,8 +161,6 @@
     if (event.key === "Escape" && !panel.hidden) close();
   });
 
-  // 다른 화면에 들어오면 창을 저절로 열어 하던 대화를 이어 갑니다.
-  // 닫으면 그 화면에서만 닫히고, 다음 화면에서는 다시 열립니다.
-  // 화면에서 무엇을 적던 중일 수 있으니 적는 칸으로 커서를 가져오지는 않습니다.
-  if (!narrow && !onHome && !fab.disabled) open({ focus: false });
+  // 창은 저절로 열지 않습니다. 기본은 늘 닫힘이고, 오른쪽 아래 단추를 눌렀을 때만 열립니다.
+  // (예전에는 다른 화면에 들어오면 저절로 열려 화면 제목을 가렸습니다)
 })();
