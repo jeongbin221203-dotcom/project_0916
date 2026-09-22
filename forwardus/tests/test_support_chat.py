@@ -9,12 +9,16 @@ from app.collectors import ai_client
 
 
 def test_widget_appears_on_every_page(client):
-    """상담 버튼은 화면을 가리지 않고 어디서나 떠 있어야 합니다."""
+    """상담 버튼은 시작 화면을 포함해 어디서나 떠 있어야 합니다.
 
-    for path in ("/", "/planning/new", "/shipments"):
+    시작 화면에서 대화가 시작되면 그동안만 숨기는데, 그건 브라우저가 합니다.
+    """
+
+    for path in ("/", "/planning/new", "/shipments", "/lookup/"):
         html = client.get(path).get_data(as_text=True)
         assert "data-support-open" in html, path
         assert "<b>OpenAI</b>" in html, path
+        assert "js/support_chat.js" in html and "js/chat_store.js" in html, path
 
 
 def test_empty_and_overlong_questions_are_refused(app):

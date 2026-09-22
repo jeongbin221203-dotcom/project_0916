@@ -564,3 +564,7 @@ a.rail_item.active .rail_icon { background: var(--surface); }
 .offer_items_scroll { overflow-x: auto; }
 .offer_items { min-width: 760px; }
 .offer_items td:first-child { min-width: 160px; }
+
+/* 시작 화면에서 대화가 시작되면 고래 상담창을 숨깁니다. 같은 대화가 가운데에 떠 있습니다. */
+body.home_talking .support_fab,
+body.home_talking .support_panel { display: none !important; }

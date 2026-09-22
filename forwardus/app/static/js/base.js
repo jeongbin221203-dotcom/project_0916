@@ -160,16 +160,24 @@
     input.addEventListener("focus", open);
   });
 
-  /* ----- 새로고침·로고 클릭은 "처음부터 다시" ----- */
-  // 입력하던 내용은 탭 세션에 임시 저장됩니다(메뉴를 오가도 유지).
-  // 새로고침하거나 회사 로고를 누르면 그 내용을 지우고 첫 화면으로 돌아갑니다.
+  /* ----- 새로고침·홈 버튼은 "처음부터 다시" ----- */
+  // 입력하던 내용과 나누던 대화는 탭 세션에 임시 저장됩니다(메뉴를 오가도 유지).
+  // 새로고침하거나 홈 버튼(로고 · 왼쪽 줄의 홈 등)을 누르면 그 내용을 지우고
+  // 첫 화면으로 돌아갑니다. 대화가 남아 있으면 홈을 눌러도 대화 화면이 다시 떠서
+  // 첫 화면으로 못 돌아갑니다.
   const DRAFT_KEY = "forwardus:planning-draft";
+  const CHAT_PREFIX = "forwardus:chat:";
   const brand = document.querySelector(".brand");
   const homeUrl = brand ? brand.getAttribute("href") : "/";
 
   function clearDraft() {
     [window.sessionStorage, window.localStorage].forEach((store) => {
-      try { store.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
+      try {
+        store.removeItem(DRAFT_KEY);
+        // 시작 화면 탭과 고래 상담창이 나눠 쓰는 대화 (chat_store.js)
+        Object.keys(store).filter((key) => key.startsWith(CHAT_PREFIX))
+          .forEach((key) => store.removeItem(key));
+      } catch (error) { /* 무시 */ }
     });
   }
 
@@ -186,7 +194,9 @@
       return;
     }
   }
-  if (brand) brand.addEventListener("click", clearDraft);
+  document.addEventListener("click", (event) => {
+    if (event.target.closest && event.target.closest("[data-home-reset]")) clearDraft();
+  });
 
   document.querySelectorAll(".flash_stack .flash").forEach((el) => {
     setTimeout(() => el.classList.add("fade"), 6000);

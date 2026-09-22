@@ -7,7 +7,7 @@
       {# 단독으로 열면 위쪽 메뉴가 없습니다. 돌아갈 길을 여기서 냅니다.
          길 없는 화면에 가두면 새로고침밖에 할 것이 없습니다. #}
       {% if standalone %}
-        <a class="back_home" href="{{ url_for('home.index') }}">← ForwardUs 홈</a>
+        <a class="back_home" href="{{ url_for('home.index') }}" data-home-reset>← ForwardUs 홈</a>
       {% else %}
         <p class="eyebrow">Shipment Planning</p>
       {% endif %}
