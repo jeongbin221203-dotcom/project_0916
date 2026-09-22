@@ -76,6 +76,7 @@ p { margin: 0 0 10px; }
 .main_nav .nav_user { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 8px 12px; border-radius: 10px; color: var(--ink); font-weight: 800; font-size: 14px; white-space: nowrap; cursor: pointer; }
 .main_nav .nav_user:hover, .main_nav .nav_user.active, .main_nav .nav_user[aria-expanded="true"] { background: var(--blue_soft); color: var(--blue_dark); }
 .main_nav .nav_user .caret { font-size: 11px; }
+.master_badge { background: #fef3c7; color: #92400e; font-size: 11px; padding: 2px 7px; }
 .user_menu_panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 160px; display: grid; gap: 2px; padding: 6px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .user_menu_panel[hidden] { display: none; }
 .main_nav .user_menu_panel a { display: block; white-space: nowrap; }

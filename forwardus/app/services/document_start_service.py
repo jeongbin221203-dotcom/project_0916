@@ -184,7 +184,7 @@ def _invoice_value(items: list[dict]) -> float:
     return round(sum(amounts), 2)
 
 
-def create(payload: dict) -> dict:
+def create(payload: dict, user_id: int | None = None) -> dict:
     """채운 내용으로 Shipment를 만들고 서류까지 냅니다."""
 
     if not isinstance(payload, dict):
@@ -223,7 +223,7 @@ def create(payload: dict) -> dict:
         "schedule_id": _text(payload, "schedule_id", 80),
     }
 
-    shipment = planning_service.create_shipment(plan)
+    shipment = planning_service.create_shipment(plan, user_id=user_id)
     document_service.generate_documents(shipment)
     _apply_extras(shipment, payload)
 

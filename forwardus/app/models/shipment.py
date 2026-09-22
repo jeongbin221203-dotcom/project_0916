@@ -35,7 +35,8 @@ class Shipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     shipment_id = db.Column(db.String(20), nullable=False, unique=True, index=True)
     project_name = db.Column(db.String(200), nullable=False)
-    user_id = db.Column(db.Integer, nullable=True)
+    # 만든 회원. 비어 있으면 회원 기능 이전에 만든 것이라 마스터만 봅니다.
+    user_id = db.Column(db.Integer, nullable=True, index=True)
     buyer_id = db.Column(db.Integer, db.ForeignKey("buyers.id"), nullable=True)
 
     trade_type = db.Column(db.String(10), nullable=False, default="export")

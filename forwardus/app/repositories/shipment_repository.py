@@ -12,8 +12,12 @@ def get_by_shipment_id(shipment_id: str) -> Shipment | None:
     return Shipment.query.filter_by(shipment_id=shipment_id).first()
 
 
-def list_shipments(status: str | None = None) -> list[Shipment]:
+def list_shipments(status: str | None = None, user_id: int | None = None) -> list[Shipment]:
+    """user_id를 주면 그 회원의 것만, 주지 않으면 전부 돌려줍니다."""
+
     query = Shipment.query
+    if user_id is not None:
+        query = query.filter_by(user_id=user_id)
     if status:
         query = query.filter_by(status=status)
     return query.order_by(Shipment.created_at.desc()).all()

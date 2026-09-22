@@ -15,6 +15,8 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False, default="")
     # 비밀번호는 원문을 두지 않고 해시만 둡니다.
     password_hash = db.Column(db.String(255), nullable=False)
+    # 마스터 계정은 모든 사용자의 Shipment를 봅니다. 일반 회원은 자기 것만 봅니다.
+    is_master = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
 
     def set_password(self, password: str) -> None:

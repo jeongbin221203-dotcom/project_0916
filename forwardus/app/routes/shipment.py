@@ -6,22 +6,33 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.models.shipment import SHIPMENT_STATUSES, STATUS_LABELS
 from app.routes import load_shipment
+from app.routes.auth import current_user, login_required
 from app.services import ServiceError, shipment_service
 
 shipment_bp = Blueprint("shipment", __name__, url_prefix="/shipments")
 
 
 @shipment_bp.get("")
+@login_required
 def index():
     status = request.args.get("status") or None
     if status not in SHIPMENT_STATUSES:
         status = None
     return render_template(
         "shipment/list.html",
-        shipments=shipment_service.list_shipments(status),
+        shipments=shipment_service.list_shipments(status, viewer=current_user()),
+        owners=_owner_emails() if current_user().is_master else {},
         status=status,
         statuses=STATUS_LABELS,
     )
+
+
+def _owner_emails() -> dict:
+    """마스터 화면에서 Shipment마다 누가 만들었는지 보여 줍니다."""
+
+    from app.models import User
+
+    return {user.id: user.email for user in User.query.all()}
 
 
 @shipment_bp.get("/<shipment_id>")

@@ -121,6 +121,11 @@ class Config:
     # 발표나 시연 때만 .env에 HOME_LOCKED=1 을 넣어 잠그세요.
     HOME_LOCKED = os.getenv("HOME_LOCKED", "0") == "1"
 
+    # 모든 사용자의 Shipment를 보는 마스터 계정. 앱이 뜰 때 없으면 만듭니다.
+    # 비밀번호는 처음 만들 때만 씁니다. 운영에서는 .env에서 꼭 바꾸세요.
+    MASTER_EMAIL = os.getenv("MASTER_EMAIL", "forwardus@gmail.com").strip().lower()
+    MASTER_PASSWORD = os.getenv("MASTER_PASSWORD", "1234")
+
 
 class TestConfig(Config):
     """Configuration for automated tests (in-memory database)."""
