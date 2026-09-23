@@ -82,6 +82,7 @@
     panel.querySelectorAll("[data-doc-place]").forEach((box) => {
       box.querySelector("[data-place-search]").value = "";
       box.querySelector("[data-doc-input]").value = "";
+      placeCountry[box.dataset.docPlace] = "";
     });
   }
 
@@ -90,6 +91,9 @@
     let timer;
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); };
   }
+
+  // 고른 항구의 나라 이름. 견적명(도착국가_품목_날짜)에 씁니다.
+  const placeCountry = { origin: "", destination: "" };
 
   panel.querySelectorAll("[data-doc-place]").forEach((box) => {
     const role = box.dataset.docPlace;
@@ -106,21 +110,30 @@
       const rows = response.success ? response.data.slice(0, 8) : [];
       list.innerHTML = rows.length
         ? rows.map((row) => `<li><button type="button" data-code="${escapeHtml(row.code)}"`
-            + ` data-name="${escapeHtml(row.name)}">${escapeHtml(row.name)}`
+            + ` data-name="${escapeHtml(row.name)}" data-country="${escapeHtml(row.country || "")}">`
+            + `${escapeHtml(row.name)}`
             + ` <small>${escapeHtml(row.code)} · ${escapeHtml(row.country)}</small></button></li>`).join("")
         : `<li class="empty">찾지 못했습니다. 다른 이름으로 적어 보세요.</li>`;
       list.hidden = false;
     }, 250);
 
-    search.addEventListener("input", () => { hidden.value = ""; invalidateSchedule(); look(); });
+    search.addEventListener("input", () => {
+      hidden.value = "";
+      if (role === "destination") placeCountry.destination = "";
+      invalidateSchedule();
+      look();
+    });
     list.addEventListener("mousedown", (event) => {
       const button = event.target.closest("button[data-code]");
       if (!button) return;
       event.preventDefault();
       hidden.value = button.dataset.code;
       search.value = `${button.dataset.name} (${button.dataset.code})`;
+      // 견적명은 "미국_의류_20260923"처럼 나라 이름으로 짓습니다. 고를 때 받아 둡니다.
+      placeCountry[role] = button.dataset.country || "";
       list.hidden = true;
       invalidateSchedule();
+      suggestName();
       score();
     });
     search.addEventListener("blur", () => setTimeout(() => { list.hidden = true; }, 150));
@@ -494,6 +507,123 @@
     showRestoredNote(newest.savedAt);
   }
 
+  /* ----- Consignee ↔ Buyer 자동 보완 -----
+     실무에서 물건을 받는 곳과 대금을 내는 곳은 대개 같습니다. 같을 때 한쪽을
+     비워 두면 송장에 —가 찍히는데, 세관과 은행은 그 빈칸을 "다른 곳인데 안
+     적었다"로 읽습니다. 한쪽만 적혀 있으면 나머지를 채워 둡니다.
+
+     채워 넣은 값은 노란 표시(is_prefilled)를 달아 둡니다. 사람이 그 칸에 직접
+     적기 시작하면 표시가 지워지고, 적은 값이 그대로 남습니다.
+     (같은 규칙이 서버에도 있습니다 — processors/document_defaults.pair_parties) */
+  const SAME_AS_CONSIGNEE = "SAME AS CONSIGNEE";
+  const consigneeEl = form.elements.buyer_name;      // 상업송장 ④Consignee
+  const invoiceBuyerEl = form.elements.buyer;        // 상업송장 ⑨Buyer
+
+  // 사람이 적은 값인지, 우리가 채워 넣은 값인지 봅니다.
+  function isAuto(input) {
+    return !!input && input.dataset.autoFilled === input.value.trim();
+  }
+
+  function setAuto(input, value) {
+    input.value = value;
+    input.dataset.autoFilled = value;
+    // 알림을 먼저 보내고 표시를 답니다. markPrefilled는 다음 input 한 번에 표시를
+    // 지우므로, 순서를 바꾸면 우리가 보낸 알림에 표시가 바로 지워집니다.
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    markPrefilled(input);
+  }
+
+  function clearAuto(input) {
+    if (!isAuto(input)) return;
+    input.value = "";
+    delete input.dataset.autoFilled;
+    input.classList.remove("is_prefilled");
+  }
+
+  function pairParties() {
+    if (!consigneeEl || !invoiceBuyerEl) return;
+    const consignee = consigneeEl.value.trim();
+    const buyer = invoiceBuyerEl.value.trim();
+
+    // Buyer를 지웠는데 Consignee가 그걸 보고 채운 값이면 같이 걷어 냅니다.
+    // 그러지 않으면 지운 상호가 Consignee에 남고, 거기서 다시 Buyer가 채워집니다.
+    if (!buyer && isAuto(consigneeEl)) { clearAuto(consigneeEl); return; }
+
+    if (consignee && (!buyer || isAuto(invoiceBuyerEl))) {
+      // Consignee만 적혔습니다. Buyer 칸에 "SAME AS CONSIGNEE"라고 적어 둡니다.
+      if (buyer !== SAME_AS_CONSIGNEE) setAuto(invoiceBuyerEl, SAME_AS_CONSIGNEE);
+      return;
+    }
+    // Buyer만 적혔습니다. Consignee 칸에는 문구가 아니라 상호를 그대로 옮깁니다.
+    // 이 값은 대시보드 목록의 Buyer 이름으로도 저장돼, 문구가 들어가면 목록에서
+    // 어느 건인지 알 수 없게 됩니다. Buyer가 "SAME AS CONSIGNEE" 문구뿐이면
+    // 받는 곳을 모르는 상태라 그대로 비워 두고 필수 칸으로 다시 묻습니다.
+    if (!consignee && buyer && !isAuto(invoiceBuyerEl)
+        && buyer.toUpperCase() !== SAME_AS_CONSIGNEE) {
+      setAuto(consigneeEl, buyer.slice(0, 200));
+      return;
+    }
+    // Consignee를 지웠으면 그걸 보고 채운 Buyer 문구도 걷어 냅니다.
+    if (!consignee && isAuto(invoiceBuyerEl)) clearAuto(invoiceBuyerEl);
+  }
+
+  [consigneeEl, invoiceBuyerEl].forEach((input) => {
+    if (!input) return;
+    // 적는 동안에는 건드리지 않습니다. 칸을 벗어날 때 한 번만 봅니다.
+    input.addEventListener("blur", pairParties);
+    // 사람이 직접 적기 시작하면 "우리가 채운 값"이라는 표시를 뗍니다.
+    input.addEventListener("input", () => {
+      if (input.dataset.autoFilled && input.value.trim() !== input.dataset.autoFilled) {
+        delete input.dataset.autoFilled;
+      }
+    });
+  });
+
+  /* ----- 견적명 자동 제안 -----
+     대시보드 목록에서 이 건을 부르는 이름입니다. 비워 두면 서버가
+     "도착국가_대표품목_날짜"로 짓습니다. 무엇으로 저장될지 미리 보여 줍니다.
+     (이름 짓는 규칙은 서버 한 곳 — /documents/suggest-name) */
+  const nameEl = form.elements.project_name;
+  const nameStep = panel.querySelector("[data-doc-name-step]");
+  const nameHintEl = panel.querySelector("[data-doc-name-suggest]");
+  const nameValueEl = panel.querySelector("[data-doc-name-value]");
+  let suggestedName = "";
+
+  async function askName() {
+    if (!config.suggestNameUrl) return "";
+    const first = itemValues()[0] || {};
+    const response = await postJson(config.suggestNameUrl, {
+      destination_code: form.elements.destination_code ? form.elements.destination_code.value : "",
+      buyer_country: form.elements.buyer_country ? form.elements.buyer_country.value : "",
+      requested_departure_date: departEl.value,
+      // 나라 이름은 도착지를 고를 때 받아 둔 것을 씁니다. 코드만으로는 "미국"이 안 나옵니다.
+      destination_country_name: placeCountry.destination,
+      items: [{ product_description: first.product_description || "" }],
+    });
+    return response.success ? (response.data.project_name || "") : "";
+  }
+
+  const suggestName = debounce(async () => {
+    if (!nameEl || !nameHintEl) return;
+    suggestedName = await askName();
+    nameValueEl.textContent = suggestedName;
+    nameEl.placeholder = suggestedName || "예: 2026-10 멕시코 화장품 1차 오퍼";
+    // 적어 둔 이름이 있으면 제안을 내밀지 않습니다. 고른 이름이 맞습니다.
+    nameHintEl.hidden = !suggestedName || !!nameEl.value.trim();
+  }, 500);
+
+  panel.querySelector("[data-doc-name-use]")?.addEventListener("click", () => {
+    if (!suggestedName) return;
+    nameEl.value = suggestedName;
+    nameHintEl.hidden = true;
+    nameEl.dispatchEvent(new Event("input", { bubbles: true }));
+    nameEl.focus();
+  });
+
+  nameEl?.addEventListener("input", () => {
+    if (nameHintEl) nameHintEl.hidden = !suggestedName || !!nameEl.value.trim();
+  });
+
   /* ----- 얼마나 찼는지 ----- */
   function score() {
     let done = 0;
@@ -514,6 +644,14 @@
   }
   form.addEventListener("input", score);
   form.addEventListener("change", score);
+  // 도착지·품목·날짜가 바뀌면 지어 둘 견적명도 달라집니다.
+  form.addEventListener("change", (event) => {
+    if (!nameStep) return;
+    const name = event.target.name || "";
+    if (name === "project_name") return;
+    if (name === "item_product_description" || name === "buyer_country"
+        || name === "requested_departure_date" || name === "destination_code") suggestName();
+  });
 
   /* ----- 스케줄 ----- */
   // 항로나 화물, 날짜가 바뀌면 앞서 고른 스케줄은 더 이상 그 건의 것이 아닙니다.
@@ -650,6 +788,8 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     showError("");
+    // 칸에서 초점을 떼지 않고 바로 누른 경우까지 챙깁니다.
+    pairParties();
     const button = panel.querySelector("[data-doc-submit]");
     button.disabled = true;
     button.textContent = "만드는 중입니다…";
@@ -750,8 +890,10 @@
 
     invalidateSchedule();
     drawCalendar();
+    pairParties();            // 올린 B/L에 한쪽만 있어도 나머지가 채워집니다.
     score();
     applyCurrency();          // 읽어 온 통화가 금액 라벨에 바로 붙습니다.
+    suggestName();            // 읽어 온 도착지·품목으로 견적명을 다시 제안합니다.
     syncWorkDraft("upload");  // 올린 서류·대화에서 읽은 값도 운송 계획으로 이어집니다.
     saveLocal();
   };
@@ -761,6 +903,7 @@
   drawCalendar();
   showDocTab("doc");
   score();
+  suggestName();
 
   /* ----- B/L·Offer Sheet 올려서 칸 채우기 ----- */
   const uploadZone = document.querySelector("[data-doc-upload]");

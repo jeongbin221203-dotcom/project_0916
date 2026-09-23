@@ -568,6 +568,23 @@
   // 대화로 모은 초안도 "작성 중인 수출 건"에 저장해 운송 계획이 이어 씁니다. (work_draft.js)
   function syncWorkDraft(source) {
     if (pipe && pipe.draft && window.ForwardusWorkDraft) window.ForwardusWorkDraft.save(pipe.draft, source);
+    stashForDocForm();
+  }
+
+  // 파일에서 읽은 값 + 채팅으로 적어 주신 값을 합친 그대로, 서류 작성 화면이
+  // 집어 갈 수 있게 놓아 둡니다. 그 화면은 칸 이름이 곧 서식의 칸 이름이라
+  // 초안의 키를 그대로 꽂으면 됩니다. (doc_form.js FORWARDUS_DOC_FILL)
+  // 탭을 새로 열면 사라지는 것이 맞습니다 — 아직 확정이 아닙니다.
+  function stashForDocForm() {
+    if (!pipe || !pipe.draft) return;
+    const fields = { ...pipe.draft };
+    delete fields.items;
+    try {
+      window.sessionStorage.setItem("forwardus:doc-draft",
+        JSON.stringify({ fields, items: pipe.draft.items || [] }));
+    } catch (error) {
+      /* 저장 공간이 없으면 화면을 옮길 때 다시 적으셔야 합니다. */
+    }
   }
 
   async function startPipeline(extracted, kinds) {
@@ -607,7 +624,9 @@
     sendButton.disabled = true;
     const response = await postJson(pipelineUrl("merge"),
       // asked: 방금 물어본 목록. 사람이 번호로 답하면 서버가 이 순서로 읽습니다.
+      // awaiting: 바로 앞에서 견적명을 물었으면, 이 말은 그 답입니다.
       { draft: pipe.draft, kinds: pickedKinds(), message,
+        awaiting: pipe.awaiting_name ? "project_name" : "",
         asked: (pipe.missing || []).map((row) => row.key) }, 60000);
     sendButton.disabled = false;
     waiting.remove();
@@ -647,9 +666,20 @@
             <span><b>${escapeHtml(option.label)}</b><small>${escapeHtml(option.about)}</small></span>
           </label>`).join("")}</div>
         <p class="pick_need" data-pick-need></p>
+        <label class="pick_name">
+          <span><b>견적명 · 문서명</b>
+            <small>대시보드 목록에서 이 건을 부를 이름입니다. 서류에는 찍히지 않습니다.</small></span>
+          <input type="text" maxlength="200" data-pick-name
+                 value="${escapeHtml(pipe.project_name || "")}"
+                 placeholder="${escapeHtml(pipe.project_name_suggestion
+                   || "예: 2026-10 멕시코 화장품 1차 오퍼")}">
+          ${pipe.project_name_suggestion ? `<small class="pick_name_hint">비워 두면
+            <b>${escapeHtml(pipe.project_name_suggestion)}</b>(으)로 저장됩니다.
+            <button type="button" class="link_button" data-pick-name-use>이 이름 쓰기</button></small>` : ""}
+        </label>
         <div class="draft_actions">
           <button type="button" class="button primary" data-pick-make>선택한 서류 생성하기</button>
-          <a class="button" href="${escapeHtml(config.docFormUrl)}">서류 작성 화면에서 직접 편집</a>
+          <a class="button" href="${escapeHtml(config.docFormUrl)}" data-pick-edit>서류 작성 화면에서 직접 편집</a>
           <button type="button" class="link_button" data-pick-reset>올린 서류 없이 대화로 새로 만들기</button>
         </div>
       </div>`;
@@ -659,6 +689,21 @@
     card.querySelectorAll("input[data-pick-kind]").forEach((box) =>
       box.addEventListener("change", updatePickNeed));
     card.querySelector("[data-pick-make]").addEventListener("click", generatePipe);
+    // 넘어가기 직전에 지금 값으로 다시 놓아 둡니다. 방금 고친 견적명까지 따라갑니다.
+    card.querySelector("[data-pick-edit]").addEventListener("click", stashForDocForm);
+    // 적은 이름은 초안에 담아 둡니다. 대화가 이어져 카드를 다시 그려도 남습니다.
+    const nameInput = card.querySelector("[data-pick-name]");
+    nameInput.addEventListener("input", () => {
+      pipe.project_name = nameInput.value.trim();
+      pipe.draft.project_name = pipe.project_name;
+      // 운송 계획 화면이 이 이름으로 시작하도록 초안에 실어 둡니다. (work_draft.js가 잠깐 뒤 보냅니다)
+      syncWorkDraft("chat");
+    });
+    card.querySelector("[data-pick-name-use]")?.addEventListener("click", () => {
+      nameInput.value = pipe.project_name_suggestion || "";
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+      nameInput.focus();
+    });
     // 이 흐름을 끝냅니다. 이후 서류 작성 모드의 말은 예전처럼 대화로 서류를 만드는 창구로 갑니다.
     card.querySelector("[data-pick-reset]").addEventListener("click", () => {
       card.remove();
@@ -694,6 +739,8 @@
 
   async function generatePipe() {
     const kinds = pickedKinds();
+    // 안 적고 넘어가면 제안한 이름을 그대로 씁니다. 이름 없는 건이 목록에 쌓이지 않게.
+    pipe.draft.project_name = pipe.project_name || pipe.project_name_suggestion || "";
     const make = pipe.card.querySelector("[data-pick-make]");
     make.disabled = true;
     make.textContent = "만드는 중…";
@@ -711,6 +758,11 @@
       return;
     }
     pipe.kinds = kinds;
+    // 서버가 이름을 자동으로 붙였을 수 있습니다. 들고 있는 초안을 그 값으로 맞춥니다.
+    pipe.draft = data.draft || pipe.draft;
+    pipe.project_name = data.project_name || pipe.project_name;
+    pipe.awaiting_name = false;
+    syncWorkDraft("chat");
     say("bot", data.reply);
     showMade(data.documents);
     updatePickNeed();
@@ -734,8 +786,12 @@
 
   function openPreview(documents) {
     if (!window.ForwardusDocPreview) return;
-    window.ForwardusDocPreview.open(documents,
-      { previewUrl: config.previewUrl, pdfUrl: config.reviewPdfUrl });
+    window.ForwardusDocPreview.open(documents, {
+      previewUrl: config.previewUrl, pdfUrl: config.reviewPdfUrl,
+      // 내려받는 파일 이름에 씁니다. 여러 건을 받아도 어느 건인지 알아봅니다.
+      projectName: (pipe && (pipe.project_name || pipe.project_name_suggestion))
+        || (docDraft && docDraft.project_name) || "",
+    });
   }
 
   if (uploadInput && plusButton && attachTray) {

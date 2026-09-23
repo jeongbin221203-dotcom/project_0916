@@ -26,7 +26,7 @@ import re
 
 from app.collectors import ai_client
 from app.collectors.base_client import get_config
-from app.processors import bank_redaction
+from app.processors import bank_redaction, ocr
 from app.processors import lc_schedule as lc_schedule_module
 from app.services import ServiceError, document_start_service
 from app.services.intake_service import (INCOTERMS, PACKAGE_TYPES, _amount, _currencies,
@@ -39,6 +39,8 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_PDF_TEXT_PAGES = 5
 # 그림으로 보내는 장 수. B/L·Offer Sheet는 한두 장이고, 장마다 토큰이 듭니다.
 MAX_IMAGE_PAGES = 3
+# 글자가 이보다 적은 PDF는 스캔본으로 보고 OCR로 읽습니다. (머리글 몇 자만 글자인 스캔본이 있습니다)
+SCANNED_TEXT_CHARS = 40
 MAX_TEXT_CHARS = 12_000
 # 긴 변 기준. 이보다 크면 줄입니다. 글자는 이 정도면 충분히 읽힙니다.
 MAX_IMAGE_EDGE = 2000
@@ -266,14 +268,40 @@ def _png_bytes(image) -> bytes:
     return buffer.getvalue()
 
 
-def _protect(text: str, images: list) -> tuple[str, list[str], list[str]]:
-    """보낼 글자와 그림에서 은행 번호를 가립니다. (가린 글, 보낼 그림 data URL, 알림)"""
+OCR_LABEL = "[사진·스캔에서 OCR로 읽은 글자 — 틀린 글자가 있을 수 있으니 그림을 기준으로 보세요]"
+
+
+def ocr_text(text: str, images: list) -> str:
+    """사진·스캔 PDF의 글자를 Tesseract로 읽습니다. 글자가 있는 PDF는 읽지 않습니다.
+
+    AI에게 그림과 함께 넘기면 숫자·영문 오탈자가 줄어듭니다. OCR을 쓸 수 없으면 빈 글자입니다.
+    """
+
+    # 그림 속 번호를 칠할 수 없는 상태면(bank_redaction) 사진은 받지 않으므로 읽지도 않습니다.
+    if (not images or len(text.strip()) >= SCANNED_TEXT_CHARS or not ocr.available()
+            or not bank_redaction.ocr_available()):
+        return ""
+    pages = [ocr.read_text(image) for image in images]
+    return "\n\n".join(f"[{no}쪽]\n{page}" if len(pages) > 1 else page
+                       for no, page in enumerate(pages, 1) if page.strip())
+
+
+def _protect(text: str, images: list, ocr_found: str = "") -> tuple[str, list[str], list[str]]:
+    """보낼 글자와 그림에서 은행 번호를 가립니다. (가린 글, 보낼 그림 data URL, 알림)
+
+    OCR로 읽은 글자는 그림과 같은 기준(은행 줄이 아니어도 9자리 이상 번호는 모두)으로 가립니다.
+    그림에서 칠한 번호가 글자로 새어 나가면 안 됩니다.
+    """
 
     from PIL import Image
 
     notes: list[str] = []
     text, secrets = bank_redaction.redact(text)
     hidden = len(secrets)
+    if ocr_found.strip():
+        masked_ocr, ocr_secrets = bank_redaction.redact(ocr_found, everywhere=True)
+        hidden += len(ocr_secrets)
+        text = (text + "\n\n" if text.strip() else "") + OCR_LABEL + "\n" + masked_ocr
     urls: list[str] = []
     if images and bank_redaction.ocr_available():
         for image in images:
@@ -286,12 +314,12 @@ def _protect(text: str, images: list) -> tuple[str, list[str], list[str]]:
                 urls.append(_jpeg_data_url(clean.copy()))
     elif images and text.strip():
         # 칠할 도구가 없으면 그림은 보내지 않고, 가린 글자만 보냅니다.
-        notes.append("계좌번호를 가릴 도구(OCR)가 없어 서류 그림은 보내지 않고 글자만 읽었습니다. "
-                     "Shipper·Consignee가 바뀌어 들어가지 않았는지 확인해 주세요.")
+        notes.append("계좌번호를 가릴 도구(OCR · Tesseract)가 없어 서류 그림은 보내지 않고 글자만 "
+                     "읽었습니다. Shipper·Consignee가 바뀌어 들어가지 않았는지 확인해 주세요.")
     elif images:
-        raise ServiceError("사진·스캔 서류 속 계좌번호를 가리는 도구(OCR)가 설치되어 있지 않아 "
-                           "받을 수 없습니다. 글자가 있는 PDF로 올리거나 칸을 직접 채워 주세요.",
-                           "OCR_UNAVAILABLE")
+        raise ServiceError("사진·스캔 서류를 읽고 그 속 계좌번호를 가리는 OCR(Tesseract, 한글·영문)이 "
+                           "이 서버에 설치되어 있지 않아 받을 수 없습니다. 글자가 있는 PDF로 올리거나 "
+                           "칸을 직접 채워 주세요.", "OCR_UNAVAILABLE")
     if hidden:
         notes.append(f"계좌번호·SWIFT {hidden}개를 가린 뒤 AI에 보냈습니다. "
                      "은행 정보는 서류 작성 화면에서 직접 적어 주세요.")
@@ -607,7 +635,9 @@ def extract(filename: str, data: bytes) -> dict:
         raise ServiceError("AI 키(AI_API_KEY)가 없어 서류를 읽을 수 없습니다. "
                            "칸을 직접 채워 주세요.", "API_AUTH_FAILED")
     text, images = read_upload(filename, data)
-    text, images, protect_notes = _protect(text, images)
+    # 사진·스캔 PDF는 Tesseract로 글자를 먼저 읽어 그림과 함께 넘깁니다. (app/processors/ocr.py)
+    found = ocr_text(text, images)
+    text, images, protect_notes = _protect(text, images, found)
     raw = _scrub(_ask_ai(text, images))
     form = to_form(raw)
     notes = protect_notes + form.pop("notes")

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.processors.document_validator import validate_documents
-from app.services import ServiceError, document_service
+from app.services import document_service
 from app.validators import ValidationError
 
 
@@ -252,8 +252,60 @@ def test_edit_creates_warning_and_blocks_finalize(create_shipment):
         document_service.finalize_document(shipment, "shipping_instruction")
     # Unaffected documents can still be finalized.
     assert document_service.finalize_document(shipment, "commercial_invoice").status == "final"
-    with pytest.raises(ServiceError):
-        document_service.update_document(shipment, "commercial_invoice", {"remarks": "x"})
+
+
+def test_확정한_서류도_고칠_수_있고_고치면_확정이_풀린다(create_shipment):
+    """확정하면 잠기던 것을 열었습니다.
+
+    확정 뒤에 바이어가 주소 한 줄을 고쳐 달라고 하는 일이 잦습니다. 그때마다
+    서류를 새로 만들지 않아도 되게 합니다. 대신 고친 서류는 확정이 풀려
+    (generated) 다시 검증을 거쳐야 확정됩니다. 고친 내용이 다른 서류와
+    어긋난 채로 "확정"이라고 적혀 있는 편이 더 위험합니다.
+    """
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    document_service.validate_shipment_documents(shipment)
+    assert document_service.finalize_document(shipment, "commercial_invoice").status == "final"
+
+    document_service.update_document(shipment, "commercial_invoice", {"remarks": "주소 수정"})
+
+    document = document_service.get_document(shipment, "commercial_invoice")
+    assert document.data["remarks"] == "주소 수정"     # 고친 값이 그대로 들어갑니다.
+    assert document.status == "generated"              # 확정이 풀렸습니다.
+    with pytest.raises(ValidationError):
+        document_service.finalize_document(shipment, "commercial_invoice")
+
+    # 다시 검증하면 확정할 수 있습니다.
+    document_service.validate_shipment_documents(shipment)
+    assert document_service.finalize_document(shipment, "commercial_invoice").status == "final"
+
+
+def test_확정한_서류의_화면에도_수정_단추가_남는다(client, create_shipment):
+    """확정하면 화면에서 [수정]이 사라지던 것을 고쳤습니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    document_service.validate_shipment_documents(shipment)
+    document_service.finalize_document(shipment, "commercial_invoice")
+    url = f"/documents/{shipment.shipment_id}/commercial_invoice"
+
+    html = client.get(url).get_data(as_text=True)
+    assert "수정하기 (확정 해제)" in html
+    assert f"{url}?edit=1" in html
+
+    # 확정된 서류도 편집 모드로 열립니다. (예전에는 보기 모드로 돌아갔습니다)
+    editing = client.get(f"{url}?edit=1").get_data(as_text=True)
+    assert 'name="remarks"' in editing
+    assert "수정 완료 · 저장" in editing
+    assert "확정이 풀리고" in editing
+
+    # 저장하면 고친 값이 바로 반영되고 확정이 풀립니다. 다시 그리는 서류도 이 값을 씁니다.
+    client.post(url, data={"remarks": "바이어 요청으로 주소 수정"}, follow_redirects=True)
+    document = document_service.get_document(shipment, "commercial_invoice")
+    assert document.data["remarks"] == "바이어 요청으로 주소 수정"
+    assert document.status == "generated"
+    assert "바이어 요청으로 주소 수정" in client.get(url).get_data(as_text=True)
 
 
 @pytest.mark.parametrize("bad", ["abc", "-5", "nan", "1.5"])

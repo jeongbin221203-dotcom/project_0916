@@ -24,7 +24,7 @@ import json
 from datetime import date
 
 from app.collectors import ai_client, location_client
-from app.processors import bank_redaction
+from app.processors import bank_redaction, document_defaults
 from app.processors.cost_calculator import INCOTERMS_INFO
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
@@ -334,8 +334,8 @@ def _for_form(draft: dict) -> dict:
         if place:
             form[f"{role}_code"] = place["code"]
             form[f"{role}_name"] = f"{place['name']} ({place['code']})"
-    # 견적명은 서버가 다시 짓습니다. 화면에 칸이 없습니다.
-    form.pop("project_name", None)
+    # 견적명은 서류 작성 화면에 칸이 있습니다. 지어 둔 이름을 그대로 넘겨
+    # 자리표시가 아니라 채워진 값으로 보여 주고, 사람이 고쳐 쓸 수 있게 합니다.
     return {"fields": {key: value for key, value in form.items() if value},
             "items": draft["cargo_lines"]}
 
@@ -347,11 +347,19 @@ def _currencies() -> set:
 
 
 def _default_name(draft: dict, first_item: dict) -> str:
-    """'로스앤젤레스 치약' 같은 이름. 없으면 빈 값입니다."""
+    """`미국_치약_20261105`. 없으면 빈 값입니다.
 
-    where = (draft["destination"] or {}).get("name", "")
+    이름 모양은 서류 작성 화면과 같아야 합니다. 같은 건을 어디서 만들었느냐에
+    따라 목록의 이름 모양이 달라지면 대시보드에서 줄을 훑기 어렵습니다.
+    (processors/document_defaults.project_name)
+    """
+
+    place = draft["destination"] or {}
+    where = location_client.country_name(place.get("country_code", "")) or place.get("name", "")
     what = first_item.get("product_description", "")
-    return " ".join(part for part in (where, what) if part)[:200]
+    if not where and not what:
+        return ""
+    return document_defaults.project_name(where, what, draft.get("departure_date"))
 
 
 def _value_of(draft: dict, key: str) -> str:

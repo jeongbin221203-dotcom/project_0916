@@ -161,9 +161,10 @@
             <span class="muted small">{{ item.document.data.get('doc_no', '') }} · 수정 {{ item.document.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
             <div class="button_row">
               <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type) }}">보기</a>
-              {% if item.document.status != 'final' %}
-                <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type, edit=1) }}">수정</a>
-              {% endif %}
+              {# 확정한 서류도 고칠 수 있습니다. 저장하면 확정이 풀리고 검증 대기로 돌아갑니다. #}
+              <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type, edit=1) }}"
+                 title="{{ '확정이 풀리고 검증 대기 상태로 돌아갑니다' if item.document.status == 'final' else '' }}">
+                {{ '수정하기' if item.document.status == 'final' else '수정' }}</a>
             </div>
           {% else %}
             <span class="muted small">자동 작성 대기</span>
@@ -172,7 +173,9 @@
         </article>
       {% endfor %}
     </div>
-    <p class="muted small">Status: draft → generated → validated → final. 문서를 수정하면 다시 검증해야 확정할 수 있습니다.</p>
+    <p class="muted small">Status: draft → generated → validated → final.
+      확정(final)한 뒤에도 <b>수정하기</b>로 언제든 고칠 수 있고, 저장하면 확정이 풀려
+      다시 검증해야 확정됩니다.</p>
   </section>
 
   <section class="card" id="validation">

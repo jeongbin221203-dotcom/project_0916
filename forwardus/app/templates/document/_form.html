@@ -41,8 +41,8 @@
         <ul class="doc_place_list" data-place-list hidden></ul>
       </div>
     {% else %}
-      <input type="text" name="{{ name }}" maxlength="500" autocomplete="off" data-doc-input
-             placeholder="{{ field.placeholder or '' }}">
+      <input type="text" name="{{ name }}" maxlength="{{ field.maxlength or 500 }}"
+             autocomplete="off" data-doc-input placeholder="{{ field.placeholder or '' }}">
     {% endif %}
     {% if field.hint %}<small class="doc_hint">{{ field.hint }}</small>{% endif %}
   </label>
@@ -117,6 +117,20 @@
         <p class="doc_total" data-doc-total hidden>총액<span data-money-unit> (USD)</span>
           <b data-doc-total-value>0.00</b></p>
         <button type="button" class="link_button" data-doc-add-item>+ 품목 추가</button>
+      </section>
+
+      {# 서류를 내기 직전에 한 번. 서식의 칸이 아니라 대시보드에서 이 건을 부를 이름입니다. #}
+      <section class="doc_group doc_name_group" data-doc-name-step>
+        <h3><span aria-hidden="true">🏷</span> 견적명 · 문서명</h3>
+        <p class="doc_note">대시보드 서류 목록에서 <b>날짜·품목 말고 프로젝트 이름으로</b> 이 건을
+          찾기 위한 이름입니다. 서류에는 찍히지 않습니다.</p>
+        <div class="doc_grid">
+          {{ doc_field(checklist.name_field) }}
+        </div>
+        <p class="doc_name_suggest" data-doc-name-suggest hidden>
+          비워 두면 <b data-doc-name-value></b>(으)로 저장됩니다.
+          <button type="button" class="link_button" data-doc-name-use>이 이름 쓰기</button>
+        </p>
       </section>
 
       <div class="doc_actions">

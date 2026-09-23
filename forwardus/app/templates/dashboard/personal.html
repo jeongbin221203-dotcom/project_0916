@@ -24,11 +24,13 @@
     <section class="card">
       <h2>최근 작성한 서류</h2>
       {% if mine.documents %}
+        {# 대표 제목은 견적명입니다. 날짜·품목만으로는 여러 건을 구분할 수 없습니다. #}
         <ul class="dash_list">
           {% for doc in mine.documents %}
             <li>
               <div>
-                <b>{{ doc.title }}</b>
+                <b class="dash_clip" title="{{ doc.shipment.project_name }}">{{ doc.shipment.project_name }}</b>
+                <span class="muted small">{{ doc.title }}</span>
                 <span class="muted small"><span class="mono">{{ doc.shipment.shipment_id }}</span>
                   · {{ (doc.updated_at or doc.created_at).strftime('%Y-%m-%d') }}</span>
               </div>

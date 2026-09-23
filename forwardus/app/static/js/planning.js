@@ -1985,7 +1985,8 @@
     if (!shared) return;
     const local = loadDraft();
     if (local && (local.savedAt || 0) >= shared.savedAt) return;
-    // 서류에 없는 칸(견적명·위험물·고른 스케줄 전 단계 등)은 이 화면에서 적어 둔 것을 남깁니다.
+    // 서류에 없는 칸(위험물·고른 스케줄 전 단계 등)은 이 화면에서 적어 둔 것을 남깁니다.
+    // 견적명은 서류 작성 화면에서 적었으면 그대로 이어집니다. (SHARED_FIELDS)
     const merged = {
       ...(local || {}),
       ...shared,
