@@ -519,6 +519,17 @@ body.page_home .site_footer { display: none; }
 .pick_need.ok { background: var(--green_soft); color: #07694f; }
 .pick_need.warn { background: var(--amber_soft); color: #8a4f00; }
 .pick_need.bad { background: var(--red_soft); color: var(--red); }
+/* 견적명 — 서류를 만들기 직전에 한 번 묻습니다. (home.js renderPickCard) */
+.pick_name { display: block; margin-top: 12px; }
+.pick_name > span { display: block; margin-bottom: 5px; line-height: 1.45; }
+.pick_name b { font-size: 13.5px; }
+.pick_name small { display: block; color: var(--muted); font-size: 12px; }
+.pick_name input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px;
+  font: inherit; font-size: 13.5px; }
+.pick_name input:focus { border-color: var(--blue); outline: none; }
+.pick_name_hint { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.pick_name_hint b { font-size: 12px; color: var(--ink); }
+
 .pick_card .draft_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
 .pick_card [data-pick-make]:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -685,4 +696,10 @@ body.home_talking .support_panel { display: none !important; }
   font-size: 14px; color: var(--muted); }
 .doc_total[hidden] { display: none; }
 .doc_total b { color: var(--ink); font-size: 17px; font-variant-numeric: tabular-nums; }
+
+/* 견적명 — 서류를 만들기 직전에 묻는 칸. 서식의 칸이 아니라 대시보드의 이름입니다. */
+.doc_name_group { border-color: var(--blue); background: var(--blue_soft); }
+.doc_name_suggest { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+.doc_name_suggest[hidden] { display: none; }
+.doc_name_suggest b { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .dp_edit { scroll-behavior: auto; } }

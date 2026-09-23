@@ -165,6 +165,77 @@ def test_서류_작성_화면에_칸이_펼쳐져_있다(client):
         assert f'name="{name}"' in html, name
 
 
+# --- Consignee ↔ Buyer 자동 보완 ------------------------------------------------
+# 받는 곳과 대금 내는 곳이 같은데 한쪽을 비워 두면 송장에 —가 찍힙니다.
+# 세관과 은행은 그 빈칸을 "다른 곳인데 안 적었다"로 읽습니다.
+
+def test_Consignee만_적으면_Buyer에_SAME_AS_CONSIGNEE가_찍힌다(app, payload):
+    result = start.create({**payload, "buyer": ""})
+
+    invoice = document_service.get_document(_shipment(result), "commercial_invoice")
+    assert invoice.data["consignee"] == "ABC Beauty Inc."
+    assert invoice.data["buyer"] == "SAME AS CONSIGNEE"
+
+
+def test_Buyer만_적으면_Consignee에_그_상호가_들어간다(app, payload):
+    """Consignee 칸에 문구가 아니라 상호를 넣습니다.
+
+    이 값은 서류에만 찍히는 게 아니라 Shipment의 Buyer 이름으로 저장돼
+    대시보드 목록과 검색에 그대로 나옵니다. 목록에 "SAME AS BUYER"가 줄줄이
+    뜨면 어느 건인지 알 수 없습니다.
+    """
+
+    result = start.create({**payload, "buyer_name": "", "buyer": "ABC Trading Ltd."})
+
+    shipment = _shipment(result)
+    assert shipment.buyer.name == "ABC Trading Ltd."
+    invoice = document_service.get_document(shipment, "commercial_invoice")
+    assert invoice.data["consignee"] == "ABC Trading Ltd."
+    assert invoice.data["buyer"] == "ABC Trading Ltd."
+
+
+def test_둘_다_적으면_적은_대로_둔다(app, payload):
+    result = start.create(payload)
+
+    invoice = document_service.get_document(_shipment(result), "commercial_invoice")
+    assert invoice.data["consignee"] == "ABC Beauty Inc."
+    assert invoice.data["buyer"] == "ABC Trading Ltd."
+
+
+# --- 견적명 -----------------------------------------------------------------------
+
+def test_견적명을_적으면_그대로_저장한다(app, payload):
+    result = start.create({**payload, "project_name": "2026-10 멕시코 화장품 1차 오퍼"})
+
+    assert result["project_name"] == "2026-10 멕시코 화장품 1차 오퍼"
+    assert _shipment(result).project_name == "2026-10 멕시코 화장품 1차 오퍼"
+
+
+def test_견적명을_비우면_도착국가_품목_날짜로_지어_둔다(app, payload):
+    """대시보드 목록에서 날짜·품목 말고 이름으로 건을 구분할 수 있어야 합니다."""
+
+    result = start.create({**payload, "project_name": ""})
+
+    # FILLED은 US(로스앤젤레스)로 샴푸를 2026-11-05에 보냅니다.
+    assert result["project_name"] == "미국_샴푸_20261105"
+
+
+def test_견적명_제안은_저장되는_이름과_같다(app, client, payload):
+    """화면이 자리표시로 보여 주는 이름과 실제로 저장되는 이름이 달라지면 안 됩니다."""
+
+    response = client.post("/documents/suggest-name", json=payload)
+    suggested = response.get_json()["data"]["project_name"]
+
+    assert suggested == start.create({**payload, "project_name": ""})["project_name"]
+
+
+def test_서류_작성_화면에_견적명_칸이_있다(client):
+    html = client.get("/documents/new").get_data(as_text=True)
+
+    assert 'name="project_name"' in html
+    assert "data-doc-name-step" in html
+
+
 def _shipment(result: dict):
     from app.repositories import shipment_repository
 

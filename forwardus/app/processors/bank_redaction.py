@@ -10,9 +10,10 @@
       칠한 그림을 한 번 더 읽어 번호가 아직 보이면 그 줄 전체를 칠합니다.
       칠한 그림만 AI에게 보내고, 이용자에게도 그 그림을 보여 줍니다.
 
-      이 OCR은 한글을 읽지 못합니다("입금계좌" 같은 이름표를 못 봄). 그래서
+      OCR은 Tesseract(한글+영문, app/processors/ocr.py)를 먼저 쓰고, 없으면 RapidOCR를 씁니다.
+      Tesseract는 "입금계좌" 같은 한글 이름표도 읽지만, 사진은 잘못 읽을 수 있어
       그림에서는 은행이라는 말이 없어도 9자리 이상의 번호는 모두 지웁니다.
-      OCR이 설치되어 있지 않으면 그림을 받지 않습니다. 가리지 못한 그림을
+      OCR이 하나도 없으면 그림을 받지 않습니다. 가리지 못한 그림을
       보내는 것보다 받지 않는 것이 낫습니다.
 """
 
@@ -134,9 +135,12 @@ PAD_PIXELS = 4
 # 번호를 못 찾습니다. 품목 줄이 지워질 수 있지만, 번호가 새는 것보다 낫습니다.
 LOW_CONFIDENCE = 0.85
 UNSURE_DIGITS = 6
+# 낱말 자리를 아는 OCR(Tesseract)에서 헷갈린 숫자 낱말을 칠하는 기준. 계좌번호를 띄어 쓴
+# 조각(110 123 456789)도 4자리 이상이거나 은행 줄에 있습니다.
+UNSURE_WORD_DIGITS = 4
 
 
-def ocr_available() -> bool:
+def _rapidocr_available() -> bool:
     try:
         import rapidocr  # noqa: F401
     except ImportError:
@@ -144,9 +148,25 @@ def ocr_available() -> bool:
     return True
 
 
-def _read(image) -> list[tuple[list, str, float]]:
-    """(네 꼭짓점, 글자, 자신감) 목록. 위에서 아래, 왼쪽에서 오른쪽 순서입니다."""
+def ocr_available() -> bool:
+    """그림 속 번호를 찾을 OCR이 있는지. Tesseract가 먼저, 없으면 RapidOCR."""
 
+    from app.processors import ocr
+
+    return ocr.available() or _rapidocr_available()
+
+
+def _read(image) -> list[tuple[list, str, float]]:
+    """(네 꼭짓점, 글자, 자신감 0~1) 목록. 위에서 아래, 왼쪽에서 오른쪽 순서입니다."""
+
+    from app.processors import ocr
+
+    if ocr.available():
+        return ocr.read_lines(image)
+    return _read_rapidocr(image)
+
+
+def _read_rapidocr(image) -> list[tuple[list, str, float]]:
     global _engine
     import numpy
 
@@ -203,18 +223,35 @@ def redact_image(png: bytes) -> dict:
 
     image = Image.open(io.BytesIO(png)).convert("RGB")
     rows = _read(image)
-    joined = "\n".join(text for _, text, _ in rows)
+    joined = "\n".join(row[1] for row in rows)
     _, secrets = redact(joined, everywhere=True)
     originals = sorted(set(secrets.values()), key=len, reverse=True)
 
     draw = ImageDraw.Draw(image)
     unsure = 0
-    for quad, text, score in rows:
+    for row in rows:
+        quad, text, score = row[0], row[1], row[2]
+        # Tesseract는 낱말마다 자리와 자신감을 줍니다. (RapidOCR는 줄 단위뿐)
+        words = row[3] if len(row) > 3 else None
         if score < LOW_CONFIDENCE and len(_digits_of(text)) >= UNSURE_DIGITS:
-            draw.rectangle(_whole_box(quad), fill="black")
+            if words:
+                # 헷갈리게 읽은 숫자 낱말만 칠합니다. 줄 전체를 칠하면 품명·수량·단가까지 사라집니다.
+                # 3자리 이하(수량 500 등)는 은행 줄이 아니면 계좌번호 조각일 수 없어 남깁니다.
+                bank_line = bool(_BANK_WORDS.search(text))
+                for word_quad, word, word_score in words:
+                    digits = len(_digits_of(word))
+                    if word_score < LOW_CONFIDENCE and digits and (digits >= UNSURE_WORD_DIGITS or bank_line):
+                        draw.rectangle(_whole_box(word_quad), fill="black")
+            else:
+                draw.rectangle(_whole_box(quad), fill="black")
             unsure += 1
-            continue
         for original in originals:
+            # 번호가 한 낱말이면 그 낱말 자리를 그대로 칠합니다. 글자 폭 어림보다 정확합니다.
+            hits = [word_quad for word_quad, word, _ in (words or []) if original in word]
+            if hits:
+                for word_quad in hits:
+                    draw.rectangle(_whole_box(word_quad), fill="black")
+                continue
             start = text.find(original)
             while start >= 0:
                 draw.rectangle(_span_box(quad, text, start, start + len(original)), fill="black")
@@ -224,7 +261,8 @@ def redact_image(png: bytes) -> dict:
     if originals:
         needles = [_digits_of(original) for original in originals if len(_digits_of(original)) >= 6]
         codes = [original.replace(" ", "") for original in originals if not _digits_of(original)]
-        for quad, text, _ in _read(image):
+        for row in _read(image):
+            quad, text = row[0], row[1]
             flat = _digits_of(text)
             if any(needle[:6] in flat or needle[-6:] in flat for needle in needles) or \
                     any(code in text.replace(" ", "") for code in codes):

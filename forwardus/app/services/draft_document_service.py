@@ -19,6 +19,7 @@ from datetime import date
 from types import SimpleNamespace
 
 from app.collectors import location_client
+from app.processors import document_defaults
 from app.processors.cargo_calculator import calculate_cargo_lines
 from app.services import ServiceError, document_service
 from app.validators import ValidationError
@@ -217,6 +218,11 @@ def render(kind: str, draft: dict) -> dict:
     if not isinstance(draft, dict):
         raise ValidationError("입력을 읽지 못했습니다.", "draft")
 
+    # 상업송장 ②Consignee와 ⑨Buyer는 한쪽만 적혀 있으면 서로 메웁니다.
+    # 같은데 한쪽을 비워 두면 서류에 —가 찍히고, 세관·은행은 그 빈칸을
+    # "다른 곳인데 안 적었다"로 읽습니다. (processors/document_defaults)
+    draft = _pair_parties(draft)
+
     stand_in = _as_shipment(draft)
     # 서식마다 쓰는 칸이 달라도, 값은 한 벌에서 꺼냅니다.
     reference = document_service.build_reference(stand_in)
@@ -236,6 +242,16 @@ def render(kind: str, draft: dict) -> dict:
     return {"kind": kind, "title": FORMS[kind], "data": data,
             "columns": item_columns(kind), "undecided": undecided,
             "missing": _missing(kind, data)}
+
+
+def _pair_parties(draft: dict) -> dict:
+    """Consignee(buyer_name)와 Buyer(buyer)를 서로 메운 사본."""
+
+    consignee, buyer = document_defaults.pair_parties(draft.get("buyer_name"),
+                                                      draft.get("buyer"))
+    if not consignee and not buyer:
+        return draft
+    return {**draft, "buyer_name": consignee, "buyer": buyer}
 
 
 def _draft_numbers(draft: dict) -> dict:

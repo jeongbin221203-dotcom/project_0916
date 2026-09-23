@@ -21,6 +21,7 @@ from app.services import ServiceError
 
 SHARED_FIELDS = (
     "transport_mode", "sea_mode",
+    "project_name",                             # 견적명 — 대시보드에서 이 건을 부르는 이름
     "exporter_name", "exporter_address",        # 송하인(수출자, 우리 회사)
     "buyer_name", "buyer_country",              # 수하인 회사명·나라 (주소·연락처는 제외)
     "origin_code", "origin_name", "destination_code", "destination_name",   # POL / POD
@@ -136,9 +137,9 @@ def planning_prefill(viewer) -> dict:
     line_keys = ("product_description", "hs_code", "package_type", "quantity", "length_cm",
                  "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg", "amount")
     planning_fields = {key: first[key] for key in line_keys if first.get(key) and key != "amount"}
-    planning_fields.update({key: fields[key] for key in
-                            ("exporter_name", "exporter_address", "buyer_name", "buyer_country",
-                             "currency", "buyer_required_date") if fields.get(key)})
+    carried = ("project_name", "exporter_name", "exporter_address", "buyer_name",
+               "buyer_country", "currency", "buyer_required_date")
+    planning_fields.update({key: fields[key] for key in carried if fields.get(key)})
     if _total(items):
         planning_fields["invoice_value"] = _total(items)
     return {

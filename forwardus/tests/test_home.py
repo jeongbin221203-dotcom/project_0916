@@ -191,8 +191,9 @@ def test_적은_글로_서류_칸을_채운다(app, client):
     assert fields["destination_code"] == "USLAX"
     assert fields["incoterms"] == "FOB"
     assert fields["buyer_name"] == "ABC Beauty Inc."
-    # 견적명은 서버가 짓습니다. 화면에 칸이 없습니다.
-    assert "project_name" not in fields
+    # 견적명은 서버가 지어 칸에 넣어 줍니다. 서류 작성 화면에서 고쳐 쓸 수 있습니다.
+    # 모양은 도착국가_대표품목_날짜입니다. (processors/document_defaults)
+    assert fields["project_name"].startswith("미국_치약_")
     assert response.get_json()["data"]["form"]["items"][0]["product_description"] == "치약"
 
 

@@ -103,6 +103,10 @@ class Config:
     # OPEN_EXCHANGE_RATES_APP_ID: openexchangerates.org (시장 환율, 무료 월 1,000회)
     EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY", "")
     OPEN_EXCHANGE_RATES_APP_ID = os.getenv("OPEN_EXCHANGE_RATES_APP_ID", "")
+    # 사진·스캔 서류를 읽는 Tesseract OCR (app/processors/ocr.py). 비워 두면 흔한 설치 경로를 찾습니다.
+    # TESSERACT_CMD: tesseract.exe 경로 · TESSDATA_DIR: kor/eng.traineddata가 있는 폴더
+    TESSERACT_CMD = os.getenv("TESSERACT_CMD", "")
+    TESSDATA_DIR = os.getenv("TESSDATA_DIR", "")
     # OPENAI_API_KEY로 적어 두신 경우에도 받습니다. 둘 중 하나만 있으면 됩니다.
     AI_API_KEY = os.getenv("AI_API_KEY", "") or os.getenv("OPENAI_API_KEY", "")
     # HS 품목분류는 틀리면 관세포탈이 되는 자리라 더 나은 모형을 씁니다.

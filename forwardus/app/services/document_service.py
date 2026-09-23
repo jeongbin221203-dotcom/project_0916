@@ -559,9 +559,19 @@ def get_document(shipment, doc_type: str):
 
 
 def update_document(shipment, doc_type: str, form: dict):
+    """고친 내용을 저장합니다. 확정(final)한 뒤에도 고칠 수 있습니다.
+
+    예전에는 확정하면 잠갔습니다. 그런데 확정 뒤에 바이어가 주소 한 줄을
+    고쳐 달라고 하는 일이 잦았고, 그때마다 서류를 새로 만들어야 했습니다.
+    그래서 잠그는 대신 **확정을 풀고** 저장합니다. 고친 서류는 다시
+    검증(validated)을 거쳐야 확정할 수 있습니다. 고친 내용이 다른 서류와
+    어긋난 채로 "확정"이라고 적혀 있는 편이 더 위험합니다.
+
+    확정이 풀렸는지는 화면이 저장 전에 status를 보고 압니다.
+    (routes/document.update)
+    """
+
     document = get_document(shipment, doc_type)
-    if document.status == "final":
-        raise ServiceError("확정(final)된 문서는 수정할 수 없습니다.", "DOCUMENT_FINAL")
     data = clean_document_fields(form, document.data)
     # Edited content must be validated again.
     document_repository.upsert(shipment, doc_type, data, "generated", "manual")

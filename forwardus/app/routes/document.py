@@ -116,6 +116,21 @@ def extract():
     return jsonify({"success": True, "data": result})
 
 
+@document_bp.post("/suggest-name")
+def suggest_name():
+    """견적명 자동 제안. 화면이 자리표시로 보여 주고, 비우면 서버가 같은 이름을 씁니다.
+
+    이름 짓는 규칙을 화면에 두면 제안한 이름과 저장되는 이름이 어긋납니다.
+    규칙은 document_defaults.project_name 한 곳에만 둡니다.
+    """
+
+    payload = request.get_json(silent=True) or {}
+    items = payload.get("items")
+    name = document_start_service.suggest_project_name(
+        payload, items if isinstance(items, list) else [])
+    return jsonify({"success": True, "data": {"project_name": name}})
+
+
 @document_bp.post("/start")
 @login_required
 def start():
@@ -299,7 +314,9 @@ def view(shipment_id: str, doc_type: str):
         document=document,
         sections=document_service.document_sections(document),
         items=document_service.document_items(document),
-        edit=request.args.get("edit") == "1" and document.status != "final",
+        # 확정(final)한 뒤에도 [수정하기]로 편집 모드에 들어옵니다.
+        # 저장하면 확정이 풀리고 다시 검증을 거칩니다. (document_service.update_document)
+        edit=request.args.get("edit") == "1",
     )
 
 
@@ -307,8 +324,11 @@ def view(shipment_id: str, doc_type: str):
 def update(shipment_id: str, doc_type: str):
     shipment = load_shipment(shipment_id)
     try:
+        # 확정한 서류를 고쳤는지는 저장하기 전 status로 압니다. 저장하면 generated로 돌아갑니다.
+        was_final = document_service.get_document(shipment, doc_type).status == "final"
         document_service.update_document(shipment, doc_type, request.form.to_dict())
-        flash("문서를 저장했습니다. 변경 내용은 다시 검증해주세요.", "success")
+        flash("확정을 풀고 저장했습니다. 다시 검증하면 확정할 수 있습니다." if was_final
+              else "문서를 저장했습니다. 변경 내용은 다시 검증해주세요.", "success")
     except (ValidationError, ServiceError) as exc:
         flash(str(exc), "error")
         return redirect(url_for("document.view", shipment_id=shipment_id, doc_type=doc_type, edit=1))

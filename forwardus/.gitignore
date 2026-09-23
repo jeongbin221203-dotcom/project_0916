@@ -19,6 +19,9 @@ instance/requirement_uploads/
 # 바깥에서 받아 둔 참고자료 캐시 (app/collectors/file_cache.py)
 data/cache/
 
+# Tesseract OCR 언어 데이터 (python data/setup_tessdata.py 로 내려받습니다, 약 37MB)
+data/tessdata/
+
 # Local server logs
 /server.stderr.log
 /server.stdout.log
