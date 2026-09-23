@@ -286,16 +286,22 @@
     input.addEventListener("focus", open);
   });
 
-  /* ----- 새로고침·홈 버튼은 "처음부터 다시" ----- */
+  /* ----- 홈 버튼은 "처음부터 다시" ----- */
   // 입력하던 내용과 나누던 대화는 탭 세션에 임시 저장됩니다(메뉴를 오가도 유지).
-  // 새로고침하거나 홈 버튼(로고 · 왼쪽 줄의 홈 등)을 누르면 그 내용을 지우고
-  // 첫 화면으로 돌아갑니다. 대화가 남아 있으면 홈을 눌러도 대화 화면이 다시 떠서
-  // 첫 화면으로 못 돌아갑니다.
+  // 홈 버튼(로고 · 왼쪽 줄의 홈 등)을 누르면 그 내용을 지우고 첫 화면으로
+  // 돌아갑니다. 대화가 남아 있으면 홈을 눌러도 대화 화면이 다시 떠서 첫
+  // 화면으로 못 돌아갑니다.
+  //
+  // 새로고침(F5)은 건드리지 않습니다.
+  //
+  // 예전에는 새로고침도 "처음부터 다시"로 보고 초안을 지운 뒤 홈으로
+  // 보냈습니다. 그런데 새로고침은 화면이 이상할 때 사람이 가장 먼저 누르는
+  // 것입니다. 고쳐 보려고 누른 사람이 적던 것을 통째로 잃고 첫 화면에 서
+  // 있게 됩니다. planning.js가 beforeunload로 저장해 둔 초안까지 같은 키라
+  // 함께 지워졌습니다. 새로고침 뒤에는 보던 화면과 적던 값이 그대로 있어야
+  // 합니다.
   const DRAFT_KEY = "forwardus:planning-draft";
   const CHAT_PREFIX = "forwardus:chat:";
-  const brand = document.querySelector(".brand");
-  const homeUrl = brand ? brand.getAttribute("href") : "/";
-
   function clearDraft() {
     [window.sessionStorage, window.localStorage].forEach((store) => {
       try {
@@ -307,19 +313,6 @@
     });
   }
 
-  function isReload() {
-    const entry = (window.performance && window.performance.getEntriesByType)
-      ? window.performance.getEntriesByType("navigation")[0] : null;
-    return entry ? entry.type === "reload" : false;
-  }
-
-  if (isReload()) {
-    clearDraft();
-    if (window.location.pathname !== homeUrl) {
-      window.location.replace(homeUrl);
-      return;
-    }
-  }
   document.addEventListener("click", (event) => {
     if (event.target.closest && event.target.closest("[data-home-reset]")) clearDraft();
   });

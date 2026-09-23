@@ -164,6 +164,26 @@ def test_서류_작성_화면은_적던_내용을_다시_불러온다(app):
     assert "async function load()" in shared and "async function clear()" in shared
 
 
+def test_새로고침은_적던_값을_지우지도_홈으로_보내지도_않는다():
+    """F5는 화면이 이상할 때 사람이 가장 먼저 누르는 것입니다.
+
+    예전에는 새로고침을 "처음부터 다시"로 보고 초안을 지운 뒤 홈으로
+    보냈습니다. 고쳐 보려고 누른 사람이 적던 것을 통째로 잃었습니다.
+    planning.js가 beforeunload로 저장해 둔 초안도 같은 키라 함께 지워졌습니다.
+    """
+
+    js = (STATIC / "js/base.js").read_text(encoding="utf-8")
+    assert "isReload" not in js                 # 새로고침인지 따지지 않습니다.
+    assert "location.replace" not in js         # 홈으로 강제로 보내지 않습니다.
+
+    # 홈 버튼을 직접 누르는 "처음부터 다시"는 그대로 둡니다.
+    assert "data-home-reset" in js and "clearDraft()" in js
+
+    # planning.js가 저장해 둔 초안이 살아남아야 의미가 있습니다.
+    planning = (STATIC / "js/planning.js").read_text(encoding="utf-8")
+    assert 'window.addEventListener("beforeunload", saveDraft)' in planning
+
+
 def test_임시저장을_비우면_서버에서도_지워진다(app):
     browser = _member(app)
     browser.put("/api/work-draft", json=DOC_VALUES)
