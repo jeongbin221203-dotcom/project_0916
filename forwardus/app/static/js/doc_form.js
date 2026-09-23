@@ -1085,6 +1085,36 @@
     });
   }
 
+  /* ----- 이미 만든 건에서 가져오기 -----
+     같은 바이어에게 두 번째로 보내는 일이 흔합니다. 그때마다 주소·품목·조건을
+     처음부터 다시 적게 하면 오타가 납니다.
+
+     고르면 올린 서류와 같이 칸을 비우고 다시 채웁니다. 앞서 적어 둔 값이 섞이면
+     어느 건의 값인지 알 수 없습니다. 채우기만 하고 만들지는 않습니다. */
+  const sourcePick = document.querySelector("[data-doc-source]");
+  const sourceStatus = document.querySelector("[data-doc-source-status]");
+  if (sourcePick && config.sourceUrl) {
+    sourcePick.addEventListener("change", async () => {
+      const picked = sourcePick.value;
+      sourceStatus.textContent = "";
+      if (!picked) return;
+      const [kind, id] = picked.split(/:(.*)/s);
+      const label = sourcePick.options[sourcePick.selectedIndex].textContent.trim();
+      sourceStatus.textContent = "가져오는 중입니다…";
+      const response = await getJson(
+        config.sourceUrl.replace("__KIND__", encodeURIComponent(kind))
+                        .replace("__ID__", encodeURIComponent(id)));
+      if (!response.success) {
+        sourceStatus.textContent = response.message || "가져오지 못했습니다.";
+        sourcePick.value = "";
+        return;
+      }
+      clearForm();
+      window.FORWARDUS_DOC_FILL(response.data);
+      sourceStatus.textContent = `${label}에서 가져왔습니다. 노란 칸이 가져온 값입니다.`;
+    });
+  }
+
   // 화면을 떠나는 순간에는 기다리지 않고 바로 저장합니다.
   // (적자마자 홈으로 누르면 0.4초를 기다리던 마지막 입력이 사라집니다)
   window.addEventListener("pagehide", saveLocal);

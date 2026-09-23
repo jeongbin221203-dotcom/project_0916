@@ -481,6 +481,14 @@ body.page_home .site_footer { display: none; }
 .home_chips .chip_file:hover { border-color: var(--navy); background: #f1f5f9; }
 
 /* 서류 올려서 칸 채우기 (doc_upload.js). 시작 화면과 서류 작성 화면이 같이 씁니다. */
+/* 이미 만든 건에서 칸을 가져오는 줄. 올려서 채우기 바로 위에 둡니다.
+   둘 다 "칸을 미리 채우는" 같은 일이라 나란히 보이는 편이 낫습니다. */
+.doc_source_pick { width: min(920px, 100%); margin: 0 auto 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.doc_source_pick label { font-weight: 600; white-space: nowrap; }
+.doc_source_pick select { flex: 1 1 260px; min-width: 0; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; }
+
 .doc_upload_wrap { width: min(920px, 100%); margin: 0 auto 16px; }
 .doc_drop { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; align-items: center;
   padding: 16px 20px; border: 2px dashed #c7d7fd; border-radius: var(--radius);
