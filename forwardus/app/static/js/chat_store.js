@@ -109,6 +109,10 @@
 
     clear(source) {
       write(empty());
+      // 서버에 남긴 상담 기억(Entity)도 함께 지웁니다. 로그인 전이면 서버에 아무것도 없습니다.
+      try {
+        fetch("/api/chat-memory", { method: "DELETE", keepalive: true }).catch(() => {});
+      } catch (error) { /* 서버가 없어도 이 브라우저 대화는 비웁니다. */ }
       emit({ type: "clear", source });
     },
 
