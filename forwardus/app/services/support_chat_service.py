@@ -227,11 +227,13 @@ def _hide_bank(text: str) -> str:
     return bank_redaction.strip_bank_numbers(text)[0]
 
 
-def ask(question: str, history: list | None = None, *, brief: bool = False) -> dict:
+def ask(question: str, history: list | None = None, *, brief: bool = False,
+        memory: str = "") -> dict:
     """질문 하나에 답합니다. history는 [{role, content}] 형태입니다.
 
     brief는 오른쪽 아래 상담 창에서 옵니다. 그 창은 서식을 그리지 않아
     예전의 짧은 프롬프트로 답합니다.
+    memory는 지난 상담을 줄여 둔 글입니다. (chat_memory_service · 로그인한 회원만)
     """
 
     text = (question or "").strip()
@@ -250,6 +252,11 @@ def ask(question: str, history: list | None = None, *, brief: bool = False) -> d
 
     messages = [{"role": "system", "content": BRIEF_SYSTEM_PROMPT if brief else SYSTEM_PROMPT},
                 {"role": "system", "content": _incoterms_reference()}]
+    # 오래된 대화는 요약으로 들고 옵니다. 원문 전체를 보내면 토큰만 쓰고 답이 흐려집니다.
+    if memory.strip():
+        messages.append({"role": "system",
+                         "content": "지난 상담 요약입니다. 이어서 답하세요.\n"
+                                    + _hide_bank(memory)})
     for turn in (history or [])[-MAX_HISTORY:]:
         role = turn.get("role")
         content = _hide_bank(str(turn.get("content") or "").strip()[:MAX_QUESTION])

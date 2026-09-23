@@ -26,17 +26,21 @@ import re
 
 from app.collectors import ai_client
 from app.collectors.base_client import get_config
-from app.processors import bank_redaction
+from app.processors import bank_redaction, ocr
+from app.processors import lc_schedule as lc_schedule_module
 from app.services import ServiceError, document_start_service
 from app.services.intake_service import (INCOTERMS, PACKAGE_TYPES, _amount, _currencies,
                                          _date, _pick, _place)
-from app.validators.shipment_validator import optional_text
+from app.validators import ValidationError
+from app.validators.shipment_validator import optional_text, parse_date
 
 ALLOWED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".webp"}
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_PDF_TEXT_PAGES = 5
 # 그림으로 보내는 장 수. B/L·Offer Sheet는 한두 장이고, 장마다 토큰이 듭니다.
 MAX_IMAGE_PAGES = 3
+# 글자가 이보다 적은 PDF는 스캔본으로 보고 OCR로 읽습니다. (머리글 몇 자만 글자인 스캔본이 있습니다)
+SCANNED_TEXT_CHARS = 40
 MAX_TEXT_CHARS = 12_000
 # 긴 변 기준. 이보다 크면 줄입니다. 글자는 이 정도면 충분히 읽힙니다.
 MAX_IMAGE_EDGE = 2000
@@ -47,6 +51,7 @@ DOCUMENT_LABELS = {
     "bill_of_lading": "선하증권 (B/L)",
     "air_waybill": "항공화물운송장 (AWB)",
     "offer_sheet": "Offer Sheet",
+    "letter_of_credit": "신용장 (L/C)",
     "quotation": "견적서",
     "proforma_invoice": "Proforma Invoice",
     "commercial_invoice": "상업송장 (Commercial Invoice)",
@@ -97,6 +102,13 @@ EXTRACT_SCHEMA = _object({
     "container_no": _STR,
     "shipping_marks": _STR,
     "shipment_date": _STR,
+    # 신용장 조건. 여기 날짜로 안전한 선적예정일을 계산합니다. (processors/lc_schedule.py)
+    "lc_no": _STR,
+    "lc_latest_shipment_date": _STR,
+    "lc_expiry_date": _STR,
+    "lc_presentation_days": _NUM,
+    "lc_partial_shipment": {"type": ["string", "null"], "enum": ["allowed", "prohibited", None]},
+    "lc_transshipment": {"type": ["string", "null"], "enum": ["allowed", "prohibited", None]},
     "items": {"type": "array", "items": _object({
         "product_description": _STR,
         "hs_code": _STR,
@@ -140,6 +152,16 @@ Packing List 중 하나)의 그림과, 읽을 수 있으면 본문 글자를 받
   payment_terms    물품 대금의 결제 조건 (T/T 30 days, L/C at sight 같은 것).
                    B/L의 "FREIGHT PREPAID/COLLECT"는 운임 지급 조건이라 여기에 넣지 않습니다.
   shipment_date    선적(예정)일. B/L이면 On Board Date
+  lc_*             신용장(L/C)일 때만 채웁니다. SWIFT 전문이면 필드 번호가 붙어 있습니다.
+      lc_no                     20 Documentary credit number
+      lc_latest_shipment_date   44C Latest date of shipment (Shipment must be effected on or before)
+      lc_expiry_date            31D Date and place of expiry — 날짜만 (장소는 빼세요)
+      lc_presentation_days      48 Period for presentation — "within 15 days" 이면 15.
+                                "21 days after shipment date"처럼 적힌 날수만 숫자로. 없으면 null
+      lc_partial_shipment       43P Partial shipments — ALLOWED면 allowed, NOT ALLOWED/PROHIBITED면 prohibited
+      lc_transshipment          43T Transhipment — 같은 방식
+      44C가 없고 44D(Shipment period)만 있으면 그 기간의 마지막 날을 lc_latest_shipment_date에 적으세요.
+      상업송장·오퍼시트에 "Latest shipment date"만 적혀 있어도 그 날을 여기에 적습니다.
   items            품목 줄마다 하나. 합계 줄(TOTAL)은 품목이 아닙니다.
       package_count  포장 개수 (예: 500 CTNS -> 500)
       package_unit   서류에 찍힌 포장 단위 글자 그대로 (CTNS, PLTS…)
@@ -246,14 +268,40 @@ def _png_bytes(image) -> bytes:
     return buffer.getvalue()
 
 
-def _protect(text: str, images: list) -> tuple[str, list[str], list[str]]:
-    """보낼 글자와 그림에서 은행 번호를 가립니다. (가린 글, 보낼 그림 data URL, 알림)"""
+OCR_LABEL = "[사진·스캔에서 OCR로 읽은 글자 — 틀린 글자가 있을 수 있으니 그림을 기준으로 보세요]"
+
+
+def ocr_text(text: str, images: list) -> str:
+    """사진·스캔 PDF의 글자를 Tesseract로 읽습니다. 글자가 있는 PDF는 읽지 않습니다.
+
+    AI에게 그림과 함께 넘기면 숫자·영문 오탈자가 줄어듭니다. OCR을 쓸 수 없으면 빈 글자입니다.
+    """
+
+    # 그림 속 번호를 칠할 수 없는 상태면(bank_redaction) 사진은 받지 않으므로 읽지도 않습니다.
+    if (not images or len(text.strip()) >= SCANNED_TEXT_CHARS or not ocr.available()
+            or not bank_redaction.ocr_available()):
+        return ""
+    pages = [ocr.read_text(image) for image in images]
+    return "\n\n".join(f"[{no}쪽]\n{page}" if len(pages) > 1 else page
+                       for no, page in enumerate(pages, 1) if page.strip())
+
+
+def _protect(text: str, images: list, ocr_found: str = "") -> tuple[str, list[str], list[str]]:
+    """보낼 글자와 그림에서 은행 번호를 가립니다. (가린 글, 보낼 그림 data URL, 알림)
+
+    OCR로 읽은 글자는 그림과 같은 기준(은행 줄이 아니어도 9자리 이상 번호는 모두)으로 가립니다.
+    그림에서 칠한 번호가 글자로 새어 나가면 안 됩니다.
+    """
 
     from PIL import Image
 
     notes: list[str] = []
     text, secrets = bank_redaction.redact(text)
     hidden = len(secrets)
+    if ocr_found.strip():
+        masked_ocr, ocr_secrets = bank_redaction.redact(ocr_found, everywhere=True)
+        hidden += len(ocr_secrets)
+        text = (text + "\n\n" if text.strip() else "") + OCR_LABEL + "\n" + masked_ocr
     urls: list[str] = []
     if images and bank_redaction.ocr_available():
         for image in images:
@@ -266,12 +314,12 @@ def _protect(text: str, images: list) -> tuple[str, list[str], list[str]]:
                 urls.append(_jpeg_data_url(clean.copy()))
     elif images and text.strip():
         # 칠할 도구가 없으면 그림은 보내지 않고, 가린 글자만 보냅니다.
-        notes.append("계좌번호를 가릴 도구(OCR)가 없어 서류 그림은 보내지 않고 글자만 읽었습니다. "
-                     "Shipper·Consignee가 바뀌어 들어가지 않았는지 확인해 주세요.")
+        notes.append("계좌번호를 가릴 도구(OCR · Tesseract)가 없어 서류 그림은 보내지 않고 글자만 "
+                     "읽었습니다. Shipper·Consignee가 바뀌어 들어가지 않았는지 확인해 주세요.")
     elif images:
-        raise ServiceError("사진·스캔 서류 속 계좌번호를 가리는 도구(OCR)가 설치되어 있지 않아 "
-                           "받을 수 없습니다. 글자가 있는 PDF로 올리거나 칸을 직접 채워 주세요.",
-                           "OCR_UNAVAILABLE")
+        raise ServiceError("사진·스캔 서류를 읽고 그 속 계좌번호를 가리는 OCR(Tesseract, 한글·영문)이 "
+                           "이 서버에 설치되어 있지 않아 받을 수 없습니다. 글자가 있는 PDF로 올리거나 "
+                           "칸을 직접 채워 주세요.", "OCR_UNAVAILABLE")
     if hidden:
         notes.append(f"계좌번호·SWIFT {hidden}개를 가린 뒤 AI에 보냈습니다. "
                      "은행 정보는 서류 작성 화면에서 직접 적어 주세요.")
@@ -440,6 +488,7 @@ def to_form(raw: dict) -> dict:
     fields["currency"] = currency
 
     fields["requested_departure_date"] = _date(raw.get("shipment_date"), notes, "선적일")
+    fields["lc_no"] = _clean(raw.get("lc_no"), 100)
 
     for role, key in (("origin", "port_of_loading"), ("destination", "port_of_discharge")):
         place = _port(raw.get(key), mode, role, notes)
@@ -464,6 +513,62 @@ def to_form(raw: dict) -> dict:
 
     return {"fields": {key: value for key, value in fields.items() if value},
             "items": lines, "notes": notes}
+
+
+# --- 신용장 일정 ---------------------------------------------------------------------
+
+def _lc_date(value, label: str, notes: list):
+    """L/C 날짜. 지난 날도 그대로 읽습니다. (이미 늦었다는 것을 알려 줘야 합니다)"""
+
+    if not value:
+        return None
+    try:
+        return parse_date(value, label)
+    except ValidationError:
+        notes.append(f"{label}을(를) 날짜로 읽지 못했습니다. L/C 원문에서 확인해 주세요.")
+        return None
+
+
+def transit_range(origin_code: str, destination_code: str, mode: str) -> tuple[int, int] | None:
+    """구간 소요일(최소~최대). 항구·공항을 알 때만. 실제 스케줄은 운송 계획에서 고릅니다."""
+
+    if not origin_code or not destination_code:
+        return None
+    from app.services import planning_service
+
+    try:
+        summary = planning_service.transit_summary(origin_code, destination_code)
+    except Exception:                       # 거리 자료가 없으면 도착 예상만 건너뜁니다.
+        return None
+    leg = (summary.get("air") if mode == "AIR"
+           else (summary.get("sea") or {}).get("FCL"))
+    if not leg or leg.get("min") is None or leg.get("max") is None:
+        return None
+    return int(leg["min"]), int(leg["max"])
+
+
+def lc_plan(raw: dict, fields: dict, mode: str, notes: list) -> dict | None:
+    """읽은 L/C 조건으로 선적 마감·권하는 선적예정일·도착 예상을 냅니다. (계산은 우리 코드가 합니다)"""
+
+    from app.processors import lc_schedule
+
+    result = lc_schedule.plan(
+        transit_days=transit_range(fields.get("origin_code", ""),
+                                   fields.get("destination_code", ""), mode),
+        latest_shipment=_lc_date(raw.get("lc_latest_shipment_date"), "L/C 최종선적일", notes),
+        expiry=_lc_date(raw.get("lc_expiry_date"), "L/C 유효기일", notes),
+        presentation=raw.get("lc_presentation_days"),
+        transport_mode=mode)
+    if result is None:
+        return None
+    notes.extend(result["notes"])
+    for key, label, warn in (("lc_partial_shipment", "분할선적", "prohibited"),
+                             ("lc_transshipment", "환적", "prohibited")):
+        if raw.get(key) == warn:
+            notes.append(f"L/C가 {label}을(를) 금지합니다. 스케줄을 고를 때 확인하세요."
+                         if key == "lc_transshipment"
+                         else f"L/C가 {label}을(를) 금지합니다. 한 번에 모두 실어야 합니다.")
+    return result
 
 
 def _check_amounts(lines: list[dict], total, notes: list) -> None:
@@ -502,6 +607,9 @@ def _summary(raw: dict, form: dict) -> list[dict]:
         ("POD", fields.get("destination_name") or _clean(raw.get("port_of_discharge"), 80)),
         ("Vessel", " ".join(part for part in (_clean(raw.get("vessel_name"), 80),
                                               _clean(raw.get("voyage_no"), 40)) if part)),
+        ("L/C No.", fields.get("lc_no", "")),
+        ("L/C 최종선적일", _clean(raw.get("lc_latest_shipment_date"), 40)),
+        ("L/C 유효기일", _clean(raw.get("lc_expiry_date"), 40)),
         ("품목", f"{len(form['items'])}줄" if form["items"] else ""),
     ]
     return [{"label": label, "value": value} for label, value in rows if value]
@@ -527,16 +635,30 @@ def extract(filename: str, data: bytes) -> dict:
         raise ServiceError("AI 키(AI_API_KEY)가 없어 서류를 읽을 수 없습니다. "
                            "칸을 직접 채워 주세요.", "API_AUTH_FAILED")
     text, images = read_upload(filename, data)
-    text, images, protect_notes = _protect(text, images)
+    # 사진·스캔 PDF는 Tesseract로 글자를 먼저 읽어 그림과 함께 넘깁니다. (app/processors/ocr.py)
+    found = ocr_text(text, images)
+    text, images, protect_notes = _protect(text, images, found)
     raw = _scrub(_ask_ai(text, images))
     form = to_form(raw)
     notes = protect_notes + form.pop("notes")
+    # L/C 조건이 있으면 선적 마감을 계산해 선적예정일 칸을 채웁니다.
+    schedule = lc_plan(raw, form["fields"], form["fields"].get("transport_mode") or "SEA", notes)
+    if schedule:
+        form["fields"]["requested_departure_date"] = schedule["recommended_etd"].isoformat()
+        # 화면에 칸이 없는 값이라 따로 묶어 넘깁니다. 운송 계획이 스케줄을 고를 때 씁니다.
+        form["lc"] = {key: _clean(raw.get(key), 40) for key in
+                      ("lc_latest_shipment_date", "lc_expiry_date") if raw.get(key)}
+        if schedule["presentation_stated"]:
+            form["lc"]["lc_presentation_days"] = str(schedule["presentation_days"])
+        notes.insert(0, f"L/C 조건으로 선적예정일을 {schedule['recommended_etd'].isoformat()}로 "
+                        f"넣었습니다. 선적 마감은 {schedule['deadline'].isoformat()}입니다.")
     kind = raw.get("document_type") if raw.get("document_type") in DOCUMENT_LABELS else "other"
     return {
         "document_type": kind,
         "document_label": DOCUMENT_LABELS[kind],
         "form": form,
         "summary": _summary(raw, form),
+        "lc_schedule": lc_schedule_module.as_text(schedule),
         # 운송 모드는 늘 들어가고, 항구는 코드와 보이는 이름 두 칸이라 하나로 셉니다.
         "filled": (sum(1 for key in form["fields"]
                        if key != "transport_mode" and not key.endswith("_name"))

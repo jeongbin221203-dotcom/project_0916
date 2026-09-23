@@ -38,6 +38,12 @@ def _wizard(*, standalone: bool):
 
 @planning_bp.get("/api/locations")
 def api_locations():
+    # near=<코드>는 "그 곳과 같은 나라에서 고를 만한 곳"을 뜻합니다. (서류 화면의 ▼)
+    near = request.args.get("near", "").strip()
+    if near:
+        result = planning_service.related_locations(near, request.args.get("mode", "SEA"),
+                                                    request.args.get("role"))
+        return jsonify(result), (200 if result["success"] else 502)
     result = planning_service.search_locations(
         request.args.get("q", ""),
         request.args.get("mode", "SEA"),

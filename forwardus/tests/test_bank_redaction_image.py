@@ -14,7 +14,7 @@ import pytest
 from app.processors import bank_redaction
 
 pytestmark = pytest.mark.skipif(not bank_redaction.ocr_available(),
-                                reason="OCR(Tesseract)이 설치되지 않았습니다")
+                                reason="OCR(Tesseract·RapidOCR)이 설치되지 않았습니다")
 
 LINES = [
     "OFFER SHEET",
@@ -22,7 +22,7 @@ LINES = [
     "Hair Shampoo 500ml 2,100 PCS US$ 1.80 US$ 3,780.00",
     "TOTAL AMOUNT : USD 11,190.00",
     "Bank: Shinhan Bank, SWIFT SHBKKRSE, A/C 100-200-300400",
-    # 한글 이름표("입금계좌")는 못 읽을 수 있습니다. 번호만으로도 지워야 합니다.
+    # 이름표 없이 번호만 있어도 지워야 합니다. (RapidOCR는 한글 이름표를 못 읽습니다)
     "110-123-456789",
     "Validity: 2027-01-31",
 ]
@@ -45,7 +45,8 @@ def _text_of(png: bytes) -> str:
     from PIL import Image
 
     rows = bank_redaction._read(Image.open(io.BytesIO(png)))
-    return "\n".join(text for _, text, _ in rows)
+    # 줄마다 (자리, 글자, 자신감[, 낱말]). Tesseract는 낱말 목록이 더 붙습니다.
+    return "\n".join(row[1] for row in rows)
 
 
 @pytest.fixture(scope="module")

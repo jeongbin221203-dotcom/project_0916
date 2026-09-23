@@ -200,8 +200,16 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
         from app.routes.auth import current_user
 
+        from app.routes import sidebar
+
+        viewer = current_user()
+        try:
+            rail = sidebar.context(viewer)
+        except Exception:                    # 오류 화면을 그리다 사이드바 때문에 또 깨지지 않게
+            db.session.rollback()
+            rail = {"links": [], "recent": []}
         return {"nav_active": request.blueprint or "", "static_url": static_url,
-                "current_user": current_user(),
+                "current_user": viewer, "sidebar": rail,
                 "support_chat_intro": support_chat_service.intro(),
                 "support_icon": support_icon(),
                 "brand_logo": _pick_image("logo"),
@@ -257,6 +265,13 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         if _wants_json():
             return jsonify({"success": False, "error_code": "NOT_FOUND", "message": "요청한 리소스를 찾을 수 없습니다."}), 404
         return render_template("error.html", code=404, message="요청한 페이지를 찾을 수 없습니다."), 404
+
+    @flask_app.errorhandler(403)
+    def forbidden(_error):
+        message = "관리자(마스터) 계정만 쓸 수 있는 기능입니다."
+        if _wants_json():
+            return jsonify({"success": False, "error_code": "FORBIDDEN", "message": message}), 403
+        return render_template("error.html", code=403, message=message), 403
 
     @flask_app.errorhandler(500)
     def server_error(_error):

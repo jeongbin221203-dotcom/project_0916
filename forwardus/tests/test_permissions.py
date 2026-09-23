@@ -38,8 +38,10 @@ def test_master_can_log_in(app):
     response = browser.post("/auth/login", data={"email": "forwardus@gmail.com",
                                                  "password": "1234"})
     assert response.status_code == 302
-    html = browser.get("/shipments").get_data(as_text=True)
-    assert "마스터" in html and "모든 사용자의 Shipment" in html
+    html = browser.get("/dashboard").get_data(as_text=True)
+    assert "마스터" in html and "모든 사용자 Shipment" in html
+    # 예전 Shipments 목록 주소는 Dashboard로 보냅니다.
+    assert browser.get("/shipments").headers["Location"] == "/dashboard"
 
 
 def test_new_member_is_not_master(app):
@@ -67,12 +69,14 @@ def test_member_sees_only_own_shipments(app, create_shipment):
     theirs = _owned_by(create_shipment, "bob@example.com")
     legacy = create_shipment()  # 작성자 없음 → 마스터만
 
-    listing = alice.get("/shipments").get_data(as_text=True)
-    assert mine.shipment_id in listing
-    assert theirs.shipment_id not in listing and legacy.shipment_id not in listing
-
     dashboard = alice.get("/dashboard").get_data(as_text=True)
-    assert mine.shipment_id in dashboard and theirs.shipment_id not in dashboard
+    assert "<h1>내 Dashboard</h1>" in dashboard
+    assert mine.shipment_id in dashboard
+    assert theirs.shipment_id not in dashboard and legacy.shipment_id not in dashboard
+    # 검색해도 남의 것은 나오지 않습니다.
+    searched = alice.get(f"/dashboard?q={theirs.shipment_id}").get_data(as_text=True)
+    table = searched[searched.index("dash_table_head"):searched.index("dash_analytics")]
+    assert f"/shipments/{theirs.shipment_id}" not in table and "조건에 맞는 Shipment가 없습니다" in table
 
     home = alice.get("/").get_data(as_text=True)
     assert theirs.shipment_id not in home
@@ -102,10 +106,10 @@ def test_master_sees_everyone(client, app, create_shipment):
     alices = _owned_by(create_shipment, "alice@example.com")
     legacy = create_shipment()
 
-    listing = client.get("/shipments").get_data(as_text=True)
+    listing = client.get("/dashboard").get_data(as_text=True)
+    assert "전체 Dashboard" in listing
     assert alices.shipment_id in listing and legacy.shipment_id in listing
     assert "alice@example.com" in listing and "(작성자 없음)" in listing
-    assert "전체 Dashboard" in client.get("/dashboard").get_data(as_text=True)
     for page in SHIPMENT_PAGES:
         assert client.get(page.format(id=alices.shipment_id)).status_code == 200, page
 

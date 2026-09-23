@@ -147,23 +147,31 @@
     const file = event.target.closest("[data-home-file]");
     if (file) {
       flash(file);
-      // 빈 서식 파일은 아직 안 붙였습니다. 없는 것을 있는 척하지 않습니다.
-      say("bot", "빈 서식 PDF는 아직 준비 중입니다.\n\n"
-        + `지금은 **${file.textContent.replace("(PDF)", "")}**를 대화로 만들어 `
-        + "PDF로 받으실 수 있습니다. 아래에 적어 보내 주세요.");
-      input.value = file.textContent.replace("(PDF)", "").trim() + " 만들어줘";
-      resize();
-      input.focus();
+      // 값이 비어 있는 표준 서식 PDF를 바로 내려받습니다.
+      const link = document.createElement("a");
+      link.href = config.blankUrl.replace("__KIND__", encodeURIComponent(file.dataset.homeFile));
+      link.download = "";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      say("note", `**${file.textContent.replace("(PDF)", "").trim()}** 빈 서식을 내려받았습니다. `
+        + "값을 채운 서류가 필요하시면 아래에 적어 보내 주세요.");
       return;
     }
 
     const chip = event.target.closest("[data-home-chip]");
     if (!chip) return;
     flash(chip);
+    // 누르면 바로 보냅니다. 적는 칸에 넣어 두고 한 번 더 누르게 하지 않습니다.
     input.value = chip.textContent;
     resize();
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
+    if (sendButton.disabled) {           // 앞 질문에 답하는 중이면 넣어만 둡니다.
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      return;
+    }
+    stage.requestSubmit ? stage.requestSubmit()
+      : stage.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   });
 
   /* ----- 적은 글로 서류 초안 채우기 ----- */
@@ -545,6 +553,9 @@
      무엇이 필수이고 무엇이 빠졌는지는 서버(document_pipeline_service)가 정합니다.
      초안은 브라우저가 들고 다닙니다. 서버는 상태를 갖지 않습니다. */
   let pipe = null;
+  // 검토 창에서 견적명을 저장하면 받는 초안 번호. 같은 건을 다시 저장하면
+  // 새 줄이 아니라 이 줄을 고칩니다. 나중에 Shipment로 승격할 때도 씁니다.
+  let savedDraftId = null;
 
   const pipelineUrl = (step) => config.pipelineUrl.replace("__STEP__", step);
 
@@ -552,8 +563,33 @@
     // 새 서류를 올리면 앞의 고르기 칸은 치웁니다. 두 개가 남으면 어느 것이 지금 것인지 헷갈립니다.
     if (pipe && pipe.card) pipe.card.remove();
     pipe = { ...state, card: null, label };
+    savedDraftId = null;        // 새 건입니다. 앞 건의 초안을 덮어쓰지 않습니다.
+    syncWorkDraft("upload");
     say("bot", pipe.reply);
     renderPickCard();
+  }
+
+  // 대화로 모은 초안도 "작성 중인 수출 건"에 저장해 운송 계획이 이어 씁니다. (work_draft.js)
+  function syncWorkDraft(source) {
+    if (pipe && pipe.draft && window.ForwardusWorkDraft) window.ForwardusWorkDraft.save(pipe.draft, source);
+    stashForDocForm();
+  }
+
+  // 파일에서 읽은 값 + 채팅으로 적어 주신 값을 합친 그대로, 서류 작성 화면이
+  // 집어 갈 수 있게 놓아 둡니다. 그 화면은 칸 이름이 곧 서식의 칸 이름이라
+  // 초안의 키를 그대로 꽂으면 됩니다. (doc_form.js FORWARDUS_DOC_FILL)
+  // 탭을 새로 열면 사라지는 것이 맞습니다 — 아직 확정이 아닙니다.
+  function stashForDocForm() {
+    if (!pipe || !pipe.draft) return;
+    const fields = { ...pipe.draft };
+    delete fields.items;
+    try {
+      window.sessionStorage.setItem("forwardus:doc-draft",
+        // draftId: 그 화면에서 서류를 만들면 이 초안이 Shipment로 승격됩니다.
+        JSON.stringify({ fields, items: pipe.draft.items || [], draftId: savedDraftId }));
+    } catch (error) {
+      /* 저장 공간이 없으면 화면을 옮길 때 다시 적으셔야 합니다. */
+    }
   }
 
   async function startPipeline(extracted, kinds) {
@@ -593,12 +629,15 @@
     sendButton.disabled = true;
     const response = await postJson(pipelineUrl("merge"),
       // asked: 방금 물어본 목록. 사람이 번호로 답하면 서버가 이 순서로 읽습니다.
+      // awaiting: 바로 앞에서 견적명을 물었으면, 이 말은 그 답입니다.
       { draft: pipe.draft, kinds: pickedKinds(), message,
+        awaiting: pipe.awaiting_name ? "project_name" : "",
         asked: (pipe.missing || []).map((row) => row.key) }, 60000);
     sendButton.disabled = false;
     waiting.remove();
     if (!response.success) { say("bad", response.message); return; }
     Object.assign(pipe, response.data);
+    syncWorkDraft("chat");
     say("bot", pipe.reply);
     (pipe.notes || []).forEach((note) => say("bad", note));
     renderPickCard();
@@ -632,9 +671,20 @@
             <span><b>${escapeHtml(option.label)}</b><small>${escapeHtml(option.about)}</small></span>
           </label>`).join("")}</div>
         <p class="pick_need" data-pick-need></p>
+        <label class="pick_name">
+          <span><b>견적명 · 문서명</b>
+            <small>대시보드 목록에서 이 건을 부를 이름입니다. 서류에는 찍히지 않습니다.</small></span>
+          <input type="text" maxlength="200" data-pick-name
+                 value="${escapeHtml(pipe.project_name || "")}"
+                 placeholder="${escapeHtml(pipe.project_name_suggestion
+                   || "예: 2026-10 멕시코 화장품 1차 오퍼")}">
+          ${pipe.project_name_suggestion ? `<small class="pick_name_hint">비워 두면
+            <b>${escapeHtml(pipe.project_name_suggestion)}</b>(으)로 저장됩니다.
+            <button type="button" class="link_button" data-pick-name-use>이 이름 쓰기</button></small>` : ""}
+        </label>
         <div class="draft_actions">
           <button type="button" class="button primary" data-pick-make>선택한 서류 생성하기</button>
-          <a class="button" href="${escapeHtml(config.docFormUrl)}">서류 작성 화면에서 직접 편집</a>
+          <a class="button" href="${escapeHtml(config.docFormUrl)}" data-pick-edit>서류 작성 화면에서 직접 편집</a>
           <button type="button" class="link_button" data-pick-reset>올린 서류 없이 대화로 새로 만들기</button>
         </div>
       </div>`;
@@ -644,6 +694,21 @@
     card.querySelectorAll("input[data-pick-kind]").forEach((box) =>
       box.addEventListener("change", updatePickNeed));
     card.querySelector("[data-pick-make]").addEventListener("click", generatePipe);
+    // 넘어가기 직전에 지금 값으로 다시 놓아 둡니다. 방금 고친 견적명까지 따라갑니다.
+    card.querySelector("[data-pick-edit]").addEventListener("click", stashForDocForm);
+    // 적은 이름은 초안에 담아 둡니다. 대화가 이어져 카드를 다시 그려도 남습니다.
+    const nameInput = card.querySelector("[data-pick-name]");
+    nameInput.addEventListener("input", () => {
+      pipe.project_name = nameInput.value.trim();
+      pipe.draft.project_name = pipe.project_name;
+      // 운송 계획 화면이 이 이름으로 시작하도록 초안에 실어 둡니다. (work_draft.js가 잠깐 뒤 보냅니다)
+      syncWorkDraft("chat");
+    });
+    card.querySelector("[data-pick-name-use]")?.addEventListener("click", () => {
+      nameInput.value = pipe.project_name_suggestion || "";
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+      nameInput.focus();
+    });
     // 이 흐름을 끝냅니다. 이후 서류 작성 모드의 말은 예전처럼 대화로 서류를 만드는 창구로 갑니다.
     card.querySelector("[data-pick-reset]").addEventListener("click", () => {
       card.remove();
@@ -679,6 +744,8 @@
 
   async function generatePipe() {
     const kinds = pickedKinds();
+    // 안 적고 넘어가면 제안한 이름을 그대로 씁니다. 이름 없는 건이 목록에 쌓이지 않게.
+    pipe.draft.project_name = pipe.project_name || pipe.project_name_suggestion || "";
     const make = pipe.card.querySelector("[data-pick-make]");
     make.disabled = true;
     make.textContent = "만드는 중…";
@@ -696,6 +763,11 @@
       return;
     }
     pipe.kinds = kinds;
+    // 서버가 이름을 자동으로 붙였을 수 있습니다. 들고 있는 초안을 그 값으로 맞춥니다.
+    pipe.draft = data.draft || pipe.draft;
+    pipe.project_name = data.project_name || pipe.project_name;
+    pipe.awaiting_name = false;
+    syncWorkDraft("chat");
     say("bot", data.reply);
     showMade(data.documents);
     updatePickNeed();
@@ -717,10 +789,38 @@
     openReview();
   }
 
+  // 검토 창에서 견적명을 고치면 여기로 돌아옵니다. 대화·초안·서류 작성 화면이
+  // 모두 같은 이름을 쓰도록 들고 있는 값을 맞춰 둡니다.
+  function adoptQuoteTitle(saved) {
+    if (!saved || !saved.quote_title) return;
+    savedDraftId = saved.id || savedDraftId;
+    if (pipe) {
+      pipe.project_name = saved.quote_title;
+      pipe.awaiting_name = false;
+      if (pipe.draft) pipe.draft.project_name = saved.quote_title;
+      if (pipe.card) renderPickCard();
+      syncWorkDraft("chat");
+    } else if (docDraft) {
+      docDraft.project_name = saved.quote_title;
+    }
+  }
+
   function openPreview(documents) {
     if (!window.ForwardusDocPreview) return;
-    window.ForwardusDocPreview.open(documents,
-      { previewUrl: config.previewUrl, pdfUrl: config.reviewPdfUrl });
+    const draft = (pipe && pipe.draft) || docDraft || {};
+    window.ForwardusDocPreview.open(documents, {
+      previewUrl: config.previewUrl, pdfUrl: config.reviewPdfUrl,
+      // 견적명을 Shipment 없이 저장할 창구. 스케줄을 아직 안 골랐어도 남습니다.
+      saveDraftUrl: config.saveDraftUrl,
+      draftId: savedDraftId,
+      source: pipe ? (pipe.source || "chat") : "chat",
+      // 내려받는 파일 이름에 씁니다. 여러 건을 받아도 어느 건인지 알아봅니다.
+      projectName: (pipe && pipe.project_name) || draft.project_name || "",
+      suggestedName: (pipe && pipe.project_name_suggestion) || "",
+      // 나중에 스케줄을 골라 Shipment로 승격할 때 쓸 초안입니다.
+      getDraft: () => ({ ...draft, project_name: undefined }),
+      onSaved: adoptQuoteTitle,
+    });
   }
 
   if (uploadInput && plusButton && attachTray) {
@@ -969,80 +1069,7 @@
     else askSupport(text);
   });
 
-  /* ----- 왼쪽 사이드바: 아이콘 레일 ↔ 펼침 드로어 -----
-     기본은 접힘(아이콘만 있는 60px 레일)입니다. 맨 위 ☰를 누르면 드로어가 164px로
-     미끄러져 나오며 가운데를 밀지 않고 덮습니다. 상태는 isSidebarExpanded(boolean)로 두고
-     localStorage에 기억해 새로고침·화면 이동 뒤에도 그대로입니다.
-     (그리기 전에 index.html 머리의 짧은 스크립트가 같은 값을 먼저 붙입니다) */
-  const RAIL_KEY = "isSidebarExpanded";
-  const railToggle = document.querySelector("[data-rail-toggle]");
-  const railInner = document.querySelector(".rail_inner");
-  let isSidebarExpanded = document.documentElement.classList.contains("rail_expanded");
-
-  function setSidebarExpanded(expanded, { save = true } = {}) {
-    isSidebarExpanded = expanded;
-    document.documentElement.classList.toggle("rail_expanded", expanded);
-    if (railToggle) {
-      const label = expanded ? "사이드바 닫기" : "사이드바 열기";
-      railToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-      railToggle.setAttribute("aria-label", label);
-      railToggle.dataset.tip = label;
-    }
-    if (save) {
-      try {
-        window.localStorage.setItem(RAIL_KEY, expanded ? "true" : "false");
-      } catch (error) { /* 저장 공간을 못 쓰면 이 화면에서만 바뀝니다. */ }
-    }
-  }
-
-  // 드로어가 가운데 내용을 실제로 덮고 있는지. (넓은 화면에서는 가운데가 멀어 덮지 않습니다)
-  function drawerCovers(target) {
-    if (!railInner || !target) return false;
-    return railInner.getBoundingClientRect().right > target.getBoundingClientRect().left;
-  }
-
-  if (railToggle) {
-    setSidebarExpanded(isSidebarExpanded, { save: false });
-    railToggle.addEventListener("click", () => setSidebarExpanded(!isSidebarExpanded));
-    // 드로어가 내용을 덮고 있을 때만, 바깥을 누르면 닫습니다. 덮지 않으면 열어 둔 채 씁니다.
-    document.addEventListener("click", (event) => {
-      if (!isSidebarExpanded || railInner.contains(event.target)) return;
-      if (event.target.closest("[data-fx-modal], [data-hs-modal], [data-dp-modal]")) return;
-      if (drawerCovers(centerEl)) setSidebarExpanded(false);
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && isSidebarExpanded && drawerCovers(centerEl)
-          && !document.querySelector(".fx_modal:not([hidden]), .hs_modal:not([hidden]), .dp_modal:not([hidden])")) {
-        setSidebarExpanded(false);
-        railToggle.focus();
-      }
-    });
-  }
-
-  /* ----- 왼쪽 줄에서 옆으로 펼치는 것들 ----- */
-  // 내용이 있는 항목(최근 Shipment)은 좁은 줄에 넣을 수 없어 옆으로 펼칩니다.
-  // (환율은 옆으로 펼치지 않고 환율 센터 창을 엽니다. fx_center.js)
-  const flyouts = Array.from(document.querySelectorAll("[data-rail-flyout]"));
-
-  function setFlyout(box, open) {
-    box.querySelector(".rail_flyout").hidden = !open;
-    box.querySelector("button").setAttribute("aria-expanded", open ? "true" : "false");
-  }
-
-  flyouts.forEach((box) => {
-    box.querySelector("button").addEventListener("click", (event) => {
-      event.stopPropagation();
-      const opening = box.querySelector(".rail_flyout").hidden;
-      flyouts.forEach((other) => setFlyout(other, other === box && opening));
-    });
-  });
-  // 바깥을 누르거나 Esc를 누르면 닫습니다.
-  document.addEventListener("click", (event) => {
-    flyouts.forEach((box) => { if (!box.contains(event.target)) setFlyout(box, false); });
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") flyouts.forEach((box) => setFlyout(box, false));
-  });
+  // 왼쪽 사이드바(접힘·펼침, 최근 Shipment)는 모든 화면이 같이 씁니다. → sidebar.js
 
   /* ----- 나눈 대화 다시 그리기 -----
      다른 화면에 갔다 오거나 고래 상담창에서 말을 걸었어도 여기서 이어집니다. */

@@ -11,7 +11,8 @@ from unittest.mock import patch
 from app.routes import home
 
 
-ACTIONS = ["consult", "planning", "documents"]
+# 서류 작성이 운송 계획보다 앞입니다. 서류에 적은 값이 운송 계획 칸을 미리 채웁니다.
+ACTIONS = ["consult", "documents", "planning"]
 
 
 def test_빠른_시작_세_단추가_순서대로_있다(client):
@@ -39,7 +40,7 @@ def test_단추_구성이_화면과_어긋나지_않는다(app):
 
 def test_서류_작성에는_칸_채우기_길이_따로_있다(app):
     with app.test_request_context():
-        documents = home.quick_actions()[2]
+        documents = home.quick_actions()[1]
 
     assert documents["key"] == "documents"
     assert documents["fill_label"]
@@ -82,8 +83,11 @@ def test_서류_작성_화면에_칸이_모두_모여_있다(client):
 def test_사이드바_서류_작성이_그_화면을_가리킨다(app, client):
     from flask import url_for
 
+    from app.routes import sidebar
+
+    item = next(row for row in sidebar.RAIL if row["key"] == "documents")
     with app.test_request_context():
-        assert url_for(home.RAIL_URLS["shipment"]) == "/documents/new"
+        assert url_for(item["endpoint"]) == "/documents/new"
     assert "/documents/new" in client.get("/").get_data(as_text=True)
 
 
@@ -105,10 +109,12 @@ def test_왼쪽_줄의_바로가기가_모두_열린다(app, client):
     html = client.get("/").get_data(as_text=True)
     assert "home_rail" in html
 
-    for item in home.RAIL:
+    from app.routes import sidebar
+
+    for item in sidebar.RAIL:
         assert item["label"] in html
         with app.test_request_context():
-            url = url_for(home.RAIL_URLS[item["key"]])
+            url = url_for(item["endpoint"])
         assert client.get(url).status_code == 200, item["key"]
 
 
@@ -185,8 +191,9 @@ def test_적은_글로_서류_칸을_채운다(app, client):
     assert fields["destination_code"] == "USLAX"
     assert fields["incoterms"] == "FOB"
     assert fields["buyer_name"] == "ABC Beauty Inc."
-    # 견적명은 서버가 짓습니다. 화면에 칸이 없습니다.
-    assert "project_name" not in fields
+    # 견적명은 서버가 지어 칸에 넣어 줍니다. 서류 작성 화면에서 고쳐 쓸 수 있습니다.
+    # 모양은 도착국가_대표품목_날짜입니다. (processors/document_defaults)
+    assert fields["project_name"].startswith("미국_치약_")
     assert response.get_json()["data"]["form"]["items"][0]["product_description"] == "치약"
 
 
@@ -235,8 +242,9 @@ def test_잠그면_시작_화면의_단추가_모두_막힌다(app, client):
     assert all("disabled" in button for button in buttons)
     assert re.search(r"<textarea[^>]*disabled", html)
     assert re.search(r'class="home_send"[^>]*disabled', html, re.S)
-    # 왼쪽 줄은 a와 button이 섞여 있어 감싸는 자리에서 막습니다.
-    assert "inert" in html
+    # 왼쪽 사이드바는 막지 않습니다. 갈 길이 모두 거기 있어, 막으면 아무 데도 못 갑니다.
+    rail = re.search(r'<aside class="home_rail.*?</aside>', html, re.S).group(0)
+    assert "inert" not in rail and "disabled" not in rail
 
 
 def test_잠그면_스크립트를_아예_붙이지_않는다(app, client):
@@ -255,15 +263,17 @@ def test_잠가도_위쪽_메뉴는_그대로_쓴다(app, client):
 
     html = _locked(client)
     nav = re.search(r'<nav class="main_nav".*?</nav>', html, re.S).group(0)
+    rail = re.search(r'<aside class="home_rail.*?</aside>', html, re.S).group(0)
 
-    assert "disabled" not in nav
-    for label in ("운송 계획", "Shipments", "컨테이너 조회",
-                  "관세청 조회"):
-        assert label in nav
-    # 일정 역산은 없앤 기능입니다. 메뉴에도 남기지 않습니다.
-    assert "일정 역산" not in nav
+    assert "disabled" not in nav and "disabled" not in rail and "inert" not in rail
+    # 위쪽에는 로그인(또는 이름) 자리만 둡니다. 갈 길은 왼쪽 사이드바에 모았습니다.
+    assert "로그인" in nav or "로그아웃" in nav
+    for label in ("운송 계획", "서류 작성", "컨테이너 조회", "관세청 조회"):
+        assert label in rail, label
+    # 일정 역산은 없앤 기능입니다. 어디에도 남기지 않습니다.
+    assert "일정 역산" not in nav and "일정 역산" not in rail
     # 메뉴가 가리키는 화면도 실제로 열려야 합니다.
-    for url in re.findall(r'href="([^"]+)"', nav):
+    for url in re.findall(r'href="([^"]+)"', nav + rail):
         assert client.get(url).status_code == 200, url
 
 
@@ -285,3 +295,43 @@ def test_잠금을_풀면_원래대로_돌아온다(app, client):
     assert "is_locked" not in html
     assert "js/home.js" in html
     assert "disabled" not in html[html.find("home_tabs"):html.find("home_log")]
+
+
+def test_조회_메뉴는_사이드바에_있고_위쪽에는_없다(app, client):
+    """컨테이너 조회·관세청 조회는 왼쪽 사이드바로 옮겼습니다. 위쪽에는 이름 자리만 둡니다."""
+
+    import re
+
+    from app.routes import sidebar
+
+    html = client.get("/").get_data(as_text=True)
+    nav = re.search(r'<nav class="main_nav".*?</nav>', html, re.S).group(0)
+    rail = re.search(r'<aside class="home_rail.*?</aside>', html, re.S).group(0)
+
+    for label in ("컨테이너 조회", "관세청 조회"):
+        assert label in rail and label not in nav, label
+    # 운송 계획도 사이드바에서만 다닙니다.
+    assert "운송 계획" in rail and "운송 계획" not in nav
+
+    keys = [row["key"] for row in sidebar.RAIL]
+    assert keys == ["home", "planning", "documents", "dashboard", "container", "lookup"]
+    # 지금 보는 화면이 사이드바에 표시됩니다.
+    assert 'aria-current="page"' in re.search(
+        r'<aside class="home_rail.*?</aside>', client.get("/lookup/").get_data(as_text=True), re.S).group(0)
+
+
+def test_서류_작성은_한_스크롤로_이어지고_사이드바가_따라다닌다(client):
+    """네 갈래를 따로 누르지 않고 쭉 내려가며 채웁니다. 작은 사이드바가 자리를 알려 줍니다."""
+
+    import re
+
+    html = client.get("/documents/new").get_data(as_text=True)
+
+    # 네 갈래가 모두 한 화면에 이어져 있습니다. 숨겨 두지 않습니다.
+    sections = re.findall(r'id="doc_sec_(\w+)" data-doc-section="(\w+)"', html)
+    assert [key for key, _ in sections] == ["when", "plan", "doc", "origin"]
+    assert "data-doc-tab" not in html
+    # 따라다니는 사이드바가 각 갈래를 가리킵니다.
+    rail = html.split('class="doc_rail"')[1].split("</nav>")[0]
+    assert re.findall(r'href="#doc_sec_(\w+)"', rail) == ["when", "plan", "doc", "origin"]
+    assert re.findall(r'data-doc-nav="(\w+)"', rail) == ["when", "plan", "doc", "origin"]

@@ -19,6 +19,7 @@ from datetime import date
 from types import SimpleNamespace
 
 from app.collectors import location_client
+from app.processors import document_defaults
 from app.processors.cargo_calculator import calculate_cargo_lines
 from app.services import ServiceError, document_service
 from app.validators import ValidationError
@@ -217,6 +218,11 @@ def render(kind: str, draft: dict) -> dict:
     if not isinstance(draft, dict):
         raise ValidationError("입력을 읽지 못했습니다.", "draft")
 
+    # 상업송장 ②Consignee와 ⑨Buyer는 한쪽만 적혀 있으면 서로 메웁니다.
+    # 같은데 한쪽을 비워 두면 서류에 —가 찍히고, 세관·은행은 그 빈칸을
+    # "다른 곳인데 안 적었다"로 읽습니다. (processors/document_defaults)
+    draft = _pair_parties(draft)
+
     stand_in = _as_shipment(draft)
     # 서식마다 쓰는 칸이 달라도, 값은 한 벌에서 꺼냅니다.
     reference = document_service.build_reference(stand_in)
@@ -236,6 +242,16 @@ def render(kind: str, draft: dict) -> dict:
     return {"kind": kind, "title": FORMS[kind], "data": data,
             "columns": item_columns(kind), "undecided": undecided,
             "missing": _missing(kind, data)}
+
+
+def _pair_parties(draft: dict) -> dict:
+    """Consignee(buyer_name)와 Buyer(buyer)를 서로 메운 사본."""
+
+    consignee, buyer = document_defaults.pair_parties(draft.get("buyer_name"),
+                                                      draft.get("buyer"))
+    if not consignee and not buyer:
+        return draft
+    return {**draft, "buyer_name": consignee, "buyer": buyer}
 
 
 def _draft_numbers(draft: dict) -> dict:
@@ -410,6 +426,33 @@ def pdf_bytes(kind: str, draft: dict) -> bytes:
     rendered = render(kind, draft)
     page = document_form.draw_form(kind, rendered["data"], rendered["columns"])
     return document_form.as_pdf(page)
+
+
+# 빈 서식으로 내려받을 수 있는 서류. (칸만 있고 값은 비어 있습니다)
+BLANK_FORMS = ("commercial_invoice", "packing_list_std")
+BLANK_ROWS = 10
+
+
+def blank_pdf(kind: str) -> bytes:
+    """값을 채우지 않은 표준 서식 PDF. 머리글·칸·품목 표 틀만 그립니다.
+
+    손으로 적거나 거래처에 양식으로 보내는 데 씁니다. 초안 그림과 같은 코드로 그려서
+    화면의 미리보기·PDF와 모양이 같습니다.
+    """
+
+    from app.processors import document_form
+
+    if kind not in BLANK_FORMS:
+        raise ServiceError(f"빈 서식이 없는 서류입니다: {kind}", "UNKNOWN_FORM", 404)
+    data = {name: document_form.BLANK for name in fields_for(kind)}
+    data["items"] = [{} for _ in range(BLANK_ROWS)]
+    page = document_form.draw_form(kind, data, item_columns(kind),
+                                   note="ForwardUs 빈 서식 · 값을 채워 쓰세요")
+    return document_form.as_pdf(page)
+
+
+def blank_file_name(kind: str) -> str:
+    return file_name(kind).removesuffix(".pdf").removesuffix("_draft") + "_blank.pdf"
 
 
 def file_name(kind: str) -> str:

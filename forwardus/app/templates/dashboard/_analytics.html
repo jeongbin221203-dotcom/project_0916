@@ -1,18 +1,6 @@
-{% extends "base.html" %}
-{% from "_macros.html" import status_badge %}
-{% block title %}Dashboard{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ static_url('css/dashboard.css') }}">{% endblock %}
-{% block content %}
-  <div class="page_head">
-    <div>
-      <p class="eyebrow">운영·분석</p>
-      <h1>{{ '전체 Dashboard' if viewer.is_master else '내 Dashboard' }}</h1>
-      <p class="muted">{{ '마스터 계정 · 모든 사용자의 Shipment를 집계합니다.' if viewer.is_master
-                          else '내가 만든 Shipment만 집계합니다.' }}</p>
-      <p class="muted">취소·작성 중 Shipment는 제외합니다. 금액은 저장된 견적(Mock 요율 기반)으로 집계됩니다.</p>
-    </div>
-  </div>
-
+{# 비용·운송 분석. 보는 사람의 범위(마스터=전체, 회원=내 것)로 집계한 값입니다. (analytics_service) #}
+<details class="card dash_analytics"{{ " open" if open_analytics }}>
+  <summary><h2>비용·운송 분석</h2><span class="muted small">취소·작성 중 Shipment는 제외 · 금액은 저장된 견적 기준</span></summary>
   <section class="kpi_grid">
     <div class="kpi_card"><small>Total Shipment</small><b>{{ kpi.total_shipments }}</b></div>
     <div class="kpi_card"><small>Total Freight Cost</small><b>{{ kpi.total_freight_krw|won }}</b></div>
@@ -66,25 +54,4 @@
     </section>
   </div>
 
-  <section class="card">
-    <h2>Shipment History</h2>
-    {% if history %}
-      <table class="table">
-        <thead><tr><th>Shipment ID</th><th>생성일</th><th>Route</th><th>Buyer</th><th class="num">물류비</th><th>Transit</th><th>상태</th></tr></thead>
-        <tbody>
-          {% for s in history %}
-            <tr>
-              <td><a class="mono" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">{{ s.shipment_id }}</a></td>
-              <td>{{ s.created_at.strftime('%Y-%m-%d') }}</td>
-              <td>{{ s.origin_code }} → {{ s.destination_code }} <span class="muted small">{{ s.mode_label }}</span></td>
-              <td>{{ s.buyer.name if s.buyer else '-' }}</td>
-              <td class="num">{{ s.total_cost_krw|won }}</td>
-              <td>{{ s.transit_days }}일{% if s.delay_days > 0 %} <span class="badge warn">+{{ s.delay_days }}</span>{% endif %}</td>
-              <td>{{ status_badge(s.status, s.status_label) }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}<p class="muted">Shipment가 없습니다.</p>{% endif %}
-  </section>
-{% endblock %}
+</details>

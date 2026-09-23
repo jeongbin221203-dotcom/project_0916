@@ -21,6 +21,9 @@ data/cache/
 # Tesseract OCR 학습 자료(eng·kor). 내려받아 두는 것이라 올리지 않습니다. (bank_redaction.py)
 data/tessdata/
 
+# Tesseract OCR 언어 데이터 (python data/setup_tessdata.py 로 내려받습니다, 약 37MB)
+data/tessdata/
+
 # Local server logs
 /server.stderr.log
 /server.stdout.log

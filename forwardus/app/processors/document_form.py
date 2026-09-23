@@ -35,6 +35,8 @@ WHITE = (255, 255, 255)
 #   HINT    빈 칸. 어디서 채우면 되는지 빨간 글씨로 적습니다.
 MASKED = "\x00mask"
 HINT = "\x00hint:"
+# 빈 서식: 칸만 그리고 "—"도 찍지 않습니다. (손으로 적을 자리)
+BLANK = "\x00blank"
 HINT_COLOR = (200, 45, 45)
 MASK_FILL = (214, 220, 229)
 
@@ -247,6 +249,9 @@ def _cell(draw, box, label: str, value: str, fonts) -> None:
     draw.rectangle([x, y, x + w, y + h], outline=LINE, width=1)
     draw.text((x + 9, y + 7), label, font=fonts["label"], fill=LABEL)
 
+    # 두 값을 이어 붙이는 칸(Seller = 상호 + 주소)도 있어 들어 있는지로 봅니다.
+    if BLANK in str(value or "") and not str(value).replace(BLANK, "").strip():
+        return
     text = str(value or "").strip()
     if not text:
         draw.text((x + 9, y + 28), "—", font=fonts["body"], fill=MUTED)
@@ -322,8 +327,11 @@ def _table(draw, columns, items, top: int, width: int, fonts) -> int:
     return top
 
 
-def draw_form(kind: str, data: dict, columns: list[dict]) -> Image.Image:
-    """서식 한 장을 그립니다."""
+DRAFT_NOTE = "ForwardUs 초안 · 아직 확정된 서류가 아닙니다"
+
+
+def draw_form(kind: str, data: dict, columns: list[dict], note: str = DRAFT_NOTE) -> Image.Image:
+    """서식 한 장을 그립니다. note는 맨 아래 작은 글씨입니다. (초안 / 빈 서식)"""
 
     layout = LAYOUTS[kind]
     fonts = {"title": _font(30, bold=True), "label": _font(13),
@@ -343,7 +351,6 @@ def draw_form(kind: str, data: dict, columns: list[dict]) -> Image.Image:
     top = _rows(draw, layout.get("footer", []), top, width, data, fonts, height=76)
 
     # 내용 바로 아래에 답니다. 페이지 맨 밑에 두면 빈 자리를 잘라낼 수 없습니다.
-    note = "ForwardUs 초안 · 아직 확정된 서류가 아닙니다"
     draw.text((MARGIN, min(top + 16, PAGE[1] - 30)), note, font=fonts["small"], fill=MUTED)
     return page
 

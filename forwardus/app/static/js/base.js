@@ -253,6 +253,13 @@
       userToggle.setAttribute("aria-expanded", open ? "true" : "false");
     };
     userToggle.addEventListener("click", () => setUserMenu(userPanel.hidden));
+    // 커서를 올리면 바로 펼칩니다. 누르거나 키보드로 여는 길도 그대로 둡니다.
+    userMenu.addEventListener("pointerenter", (event) => {
+      if (event.pointerType === "mouse") setUserMenu(true);
+    });
+    userMenu.addEventListener("pointerleave", (event) => {
+      if (event.pointerType === "mouse" && !userMenu.contains(document.activeElement)) setUserMenu(false);
+    });
     document.addEventListener("click", (event) => {
       if (!userMenu.contains(event.target)) setUserMenu(false);
     });

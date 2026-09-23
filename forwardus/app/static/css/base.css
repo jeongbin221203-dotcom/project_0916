@@ -137,6 +137,7 @@ p { margin: 0 0 10px; }
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; background: #f1f5f9; color: #475569; }
 .badge.ok { background: var(--green_soft); color: #07694f; }
 .badge.warn { background: var(--amber_soft); color: #8a4f00; }
+.badge.bad { background: #fee2e2; color: #b91c1c; }
 .badge.muted_badge { background: #f1f5f9; color: #94a3b8; }
 .badge.source_mock { background: #fff1e6; color: #b45309; }
 .badge.source_api { background: var(--green_soft); color: #07694f; }
@@ -290,10 +291,10 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 
 .support_panel { position: fixed; right: 26px; bottom: 96px; z-index: 61;
   display: flex; flex-direction: column; width: 380px; max-width: calc(100vw - 32px);
-  height: 540px; max-height: calc(100vh - 140px);
+  height: 540px; max-height: min(calc(85vh / var(--ui_scale, 1)), calc(100vh / var(--ui_scale, 1) - 140px));
   border-radius: 20px; background: #fff; border: 1px solid var(--line);
   box-shadow: 0 26px 60px rgba(15,23,42,.24); overflow: hidden; }
-.support_head { display: flex; justify-content: space-between; align-items: center;
+.support_head { flex: none; display: flex; justify-content: space-between; align-items: center;
   padding: 16px 18px; background: var(--blue); color: #fff; }
 .support_head b { display: block; font-size: 15px; }
 .support_head small { display: block; margin-top: 2px; font-size: 12px; opacity: .85; }
@@ -316,7 +317,7 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .support_note { background: #f8fafc; color: #475569; font-size: 13px; }
 .support_note p { margin: 0; }
 
-.support_log { flex: 1; overflow-y: auto; padding: 16px; display: flex;
+.support_log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; display: flex;
   flex-direction: column; gap: 10px; background: #f8fafc; }
 .support_msg { max-width: 86%; padding: 11px 14px; border-radius: 14px;
   font-size: 13.5px; line-height: 1.7; word-break: break-word; }
@@ -325,13 +326,13 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .support_waiting { color: var(--muted); font-style: italic; }
 .support_offline { background: var(--amber_soft); border-color: #fcd34d; color: #8a4f00; }
 
-.support_chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; background: #f8fafc; }
+.support_chips { flex: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; background: #f8fafc; }
 .support_chips:empty { display: none; }
 .support_chip { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
   background: #fff; font-size: 12px; font-weight: 700; color: var(--blue_dark); cursor: pointer; }
 .support_chip:hover { border-color: var(--blue); background: var(--blue_soft); }
 
-.support_form { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.support_form { flex: none; display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .support_form .text_input { flex: 1; min-width: 0; }
 .support_form button { white-space: nowrap; }
 
@@ -381,19 +382,30 @@ body.hs_modal_open { overflow: hidden; }
   padding: 6vh 16px 16px; }
 .hs_modal[hidden] { display: none; }
 .hs_modal_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.45); }
+/* 창 높이는 화면의 85%까지. body에 zoom(--ui_scale)이 걸려 있어 vh를 배율로 나눠 씁니다.
+   제목·검색칸·거르기 줄은 위에 붙어 있고, 결과 목록(.ac_list)만 창 안에서 스크롤됩니다. */
 .hs_modal_box { position: relative; display: flex; flex-direction: column; gap: 12px;
-  width: min(760px, 100%); max-height: 88vh; padding: 20px 22px; overflow: hidden;
+  width: min(760px, 100%); max-height: calc(85vh / var(--ui_scale, 1)); padding: 20px 22px; overflow: hidden;
   border-radius: 20px; background: #fff; box-shadow: 0 30px 80px rgba(15,23,42,.35); }
-.hs_modal_head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.hs_modal_head { flex: none; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .hs_modal_head h2 { margin: 0; font-size: 18px; }
 .hs_modal_head small { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
 .hs_modal_close { flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 10px;
   background: var(--surface); font-size: 22px; line-height: 1; cursor: pointer; }
 .hs_modal_close:hover { background: var(--line); }
-.hs_modal_target { margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--blue_soft);
+.hs_modal_target { flex: none; margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--blue_soft);
   color: var(--blue_dark); font-size: 13px; font-weight: 700; }
-.hs_modal_body { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; }
-.hs_modal_body .ac_list { max-height: none; margin: 0; }
+.hs_modal_body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+/* 검색칸·도착국·칩 줄은 늘 보입니다(sticky). 스크롤되는 것은 그 아래 목록뿐입니다. */
+.hs_modal_body > .hs_input_row, .hs_modal_body > .hs_modal_row, .hs_modal_body > .field_hint {
+  flex: none; position: sticky; top: 0; z-index: 1; background: #fff; }
+.hs_modal_body .ac_list { flex: 1 1 auto; min-height: 0; max-height: none; margin: 0;
+  overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth;
+  scrollbar-gutter: stable; scrollbar-width: thin; }
+.hs_modal_body .ac_list::-webkit-scrollbar { width: 8px; }
+.hs_modal_body .ac_list::-webkit-scrollbar-thumb { border-radius: 999px; background: #cbd5e1; }
+.hs_modal_status { flex: none; }
+@media (prefers-reduced-motion: reduce) { .hs_modal_body .ac_list { scroll-behavior: auto; } }
 .hs_modal_row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .hs_modal_row .hs_country { width: auto; min-width: 190px; font-size: 13px; }
 .hs_modal_chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -405,7 +417,7 @@ body.hs_modal_open { overflow: hidden; }
 .hs_modal_status.warn { background: var(--amber_soft); color: #8a4f00; }
 @media (max-width: 520px) {
   .hs_modal { padding: 12px 8px; }
-  .hs_modal_box { padding: 16px; max-height: 94vh; }
+  .hs_modal_box { padding: 16px; max-height: calc(92vh / var(--ui_scale, 1)); }
   .hs_modal_row .hs_country { flex: 1 1 100%; }
 }
 

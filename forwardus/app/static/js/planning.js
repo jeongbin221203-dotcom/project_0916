@@ -34,6 +34,8 @@
     schedules: [],
     schedule_id: null,
     sort: "recommended",
+    // 올린 L/C에서 읽은 선적 마감 조건. (서류 작성에서 넘어옵니다 · work_draft.js)
+    lc: null,
   };
 
   // 예상 일정 조회를 묶어서 보내기 위한 타이머. (선언 순서 문제를 피해 위쪽에 둡니다)
@@ -93,6 +95,7 @@
       schedule_id: state.schedule_id,
       sort: state.sort,
       incoterms: incoterm ? incoterm.value : "",
+      lc: state.lc,
       country: (form.querySelector("[data-country-filter]") || {}).value || "",
       fields,
     };
@@ -577,6 +580,8 @@
       state[role] = item;
       form.querySelector(`[data-autocomplete=${role}] [data-ac-input]`).value = `${item.name} (${item.code})`;
     });
+    state.lc = draft.lc || null;
+    if (state.lc) showLcNote();
     setDgValues(mainDgBox, draft.cargo_dg);
     (draft.cargo_lines || []).forEach((line) => addCargoLine(line));
     if (draft.departure_date) {
@@ -1350,6 +1355,32 @@
     };
   }
 
+  /* ----- 신용장(L/C) 선적 마감 -----
+     L/C는 "이 날까지 배에 실어야" 대금을 받습니다. 마감을 넘겨 출항하는 배를 고르면
+     서류가 은행에서 거절됩니다. 마감은 서버가 계산합니다. (processors/lc_schedule.py) */
+  function showLcNote() {
+    if (!state.lc || document.querySelector(".lc_note")) return;
+    const lc = state.lc;
+    const note = document.createElement("div");
+    note.className = `flash lc_note ${lc.feasible ? "flash_success" : "flash_error"}`;
+    note.setAttribute("role", "status");
+    note.innerHTML = `📑 <b>L/C 선적 마감 ${escapeHtml(lc.deadline)}</b>`
+      + ` · 권장 선적일 ${escapeHtml(lc.recommended_etd)}`
+      + (lc.eta_from ? ` · 도착 예상 ${escapeHtml(lc.eta_from)}~${escapeHtml(lc.eta_to)}` : "")
+      + ` · 서류 제시 ${escapeHtml(lc.presentation_by)}까지`
+      + `<small>${escapeHtml((lc.notes || [])[0] || "")}</small>`;
+    form.prepend(note);
+  }
+
+  // 이 배로 실으면 L/C 마감을 지킬 수 있는지. (ETD = 선적일로 봅니다)
+  function lcBadge(etd) {
+    if (!state.lc || !state.lc.deadline || !etd) return "";
+    const left = Math.round((new Date(state.lc.deadline) - new Date(etd)) / 86400000);
+    if (left < 0) return `<span class="badge bad">L/C 마감 ${Math.abs(left)}일 초과</span>`;
+    if (left <= 2) return `<span class="badge warn">L/C 마감 ${left}일 전</span>`;
+    return `<span class="badge ok">L/C 마감 ${left}일 전</span>`;
+  }
+
   function renderSchedules() {
     if (!state.schedules.length) {
       scheduleList.innerHTML = `<p class="muted">조건에 맞는 스케줄이 없습니다.</p>`;
@@ -1378,7 +1409,7 @@
               <span class="muted small">${s.reliability ? `정시율 ${s.reliability}% · ` : ""}${escapeHtml(s.freight_basis)}${
                 s.transship_port ? ` · ${escapeHtml(s.transship_port)} 환적` : ""}${
                 s.cargo_cutoff ? ` · 화물 마감 ${escapeHtml(s.cargo_cutoff)}` : ""}</span>
-              ${deadline}
+              ${lcBadge(s.etd)}${deadline}
             </div>
           </div>
           <div class="schedule_price"><small>Freight <i>운임</i></small>
@@ -1933,7 +1964,54 @@
     syncNotifyParty();
   }
 
+  /* ----- 서류 작성에서 적은 값으로 미리 채우기 -----
+     서류 작성(직접 입력 · 올린 B/L·오퍼시트 · 대화)에서 적은 송하인·수하인·POL/POD·품목·
+     수량·중량·치수·Incoterms·통화·금액을 이 화면의 칸에 채웁니다. (/api/work-draft/planning)
+     이 화면에서 그 뒤에 고친 것이 있으면 그것이 더 새것이라 덮지 않습니다. */
+  const SOURCE_LABELS = { document: "서류 작성 화면", upload: "올린 서류", chat: "대화" };
+
+  function showPrefillNote(source) {
+    const note = document.createElement("div");
+    note.className = "flash flash_success prefill_note";
+    note.setAttribute("role", "status");
+    note.textContent = `📄 ${SOURCE_LABELS[source] || "서류 작성"}에서 적은 내용으로 출발·도착지, `
+      + "Incoterms, 화물 칸을 미리 채웠습니다. 맞는지 확인해 주세요.";
+    form.prepend(note);
+  }
+
+  async function adoptWorkDraft() {
+    if (!window.ForwardusWorkDraft) return;
+    const shared = await window.ForwardusWorkDraft.planningPrefill();
+    if (!shared) return;
+    const local = loadDraft();
+    if (local && (local.savedAt || 0) >= shared.savedAt) return;
+    // 서류에 없는 칸(위험물·고른 스케줄 전 단계 등)은 이 화면에서 적어 둔 것을 남깁니다.
+    // 견적명은 서류 작성 화면에서 적었으면 그대로 이어집니다. (SHARED_FIELDS)
+    const merged = {
+      ...(local || {}),
+      ...shared,
+      step: 1,
+      schedule_id: null,
+      transport_mode: shared.transport_mode || (local && local.transport_mode),
+      sea_mode: shared.sea_mode || (local && local.sea_mode),
+      departure_date: shared.departure_date || (local && local.departure_date) || null,
+      origin: shared.origin || (local && local.origin) || null,
+      destination: shared.destination || (local && local.destination) || null,
+      incoterms: shared.incoterms || (local && local.incoterms) || "",
+      fields: { ...((local && local.fields) || {}), ...shared.fields },
+      cargo_lines: shared.cargo_lines || [],
+    };
+    try {
+      draftStore.setItem(DRAFT_KEY, JSON.stringify(merged));
+    } catch (error) {
+      return;
+    }
+    showPrefillNote(shared.source);
+  }
+
   // 복원은 recalc·openStep까지 모두 선언된 뒤에 실행해야 합니다.
-  restoreDraft();
-  syncNotifyParty();
+  adoptWorkDraft().finally(() => {
+    restoreDraft();
+    syncNotifyParty();
+  });
 })();
