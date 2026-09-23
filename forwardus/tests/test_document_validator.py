@@ -27,6 +27,99 @@ def test_quantity_mismatch_matches_spec_example():
     assert finding["document"] == "shipping_instruction"
 
 
+LABELS = {"commercial_invoice": "상업송장", "packing_list": "패킹리스트",
+          "shipping_instruction": "선적지시서"}
+
+
+def _cross(documents, reference=None, fields=("quantity", "net_weight_kg")):
+    """서류끼리만 맞대어 봅니다. (기준값은 일부러 비워 둡니다)"""
+
+    shown = {doc_type: list(fields) for doc_type in documents}
+    return validate_documents(documents, reference or {}, LABELS, shown)
+
+
+def test_기준값이_없어도_서류끼리_다르면_잡는다():
+    """Shipment에 안 적은 칸은 기준값 대조에서 통째로 빠집니다.
+
+    그래도 상업송장과 패킹리스트의 순중량은 서로 같아야 합니다. 예전에는
+    서류마다 다른 값이 적혀 있어도 전부 통과였습니다.
+    """
+
+    result = _cross({"commercial_invoice": {"net_weight_kg": 900},
+                     "packing_list": {"net_weight_kg": 880}})
+    assert result["status"] == "warning"
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["kind"] == "cross"
+
+
+def test_한_서류만_다르면_나머지와_다르다고_알린다():
+    result = _cross({"commercial_invoice": {"quantity": 500},
+                     "packing_list": {"quantity": 500},
+                     "shipping_instruction": {"quantity": 480}})
+    finding = result["findings"][0]
+    assert finding["document"] == "shipping_instruction"
+    assert finding["message"] == "선적지시서의 Quantity가 나머지 서류와 일치하지 않습니다."
+    assert finding["actual"] == 480          # 이 서류에 적힌 값
+    assert finding["expected"] == 500        # 나머지 서류가 적은 값
+
+
+def test_두_서류가_다르면_둘을_맞대어_알린다():
+    """둘뿐이면 어느 쪽이 맞는지 알 수 없습니다. "나머지"가 없습니다."""
+
+    result = _cross({"commercial_invoice": {"quantity": 500},
+                     "packing_list": {"quantity": 480}})
+    assert result["findings"][0]["message"] == (
+        "상업송장과 패킹리스트의 Quantity가 일치하지 않습니다. 다시 확인해주세요.")
+
+
+def test_셋이_제각각이면_저마다_맞대어_알린다():
+    result = _cross({"commercial_invoice": {"net_weight_kg": 100},
+                     "packing_list": {"net_weight_kg": 200},
+                     "shipping_instruction": {"net_weight_kg": 300}})
+    assert [f["document"] for f in result["findings"]] == ["packing_list", "shipping_instruction"]
+    for finding in result["findings"]:
+        assert finding["message"].startswith("상업송장과 ")
+        assert finding["message"].endswith("일치하지 않습니다. 다시 확인해주세요.")
+
+
+def test_모든_서류가_같으면_통과한다():
+    result = _cross({"commercial_invoice": {"quantity": 500, "net_weight_kg": 900},
+                     "packing_list": {"quantity": 500, "net_weight_kg": 900},
+                     "shipping_instruction": {"quantity": 500, "net_weight_kg": 900}})
+    assert result["status"] == "passed"
+    assert result["findings"] == []
+
+
+def test_기준값이_이미_잡은_자리는_두_번_알리지_않는다():
+    """같은 자리를 두 줄로 알리면 고칠 곳이 둘인 줄 압니다."""
+
+    result = validate_documents(
+        {"commercial_invoice": {"quantity": 500},
+         "packing_list": {"quantity": 500},
+         "shipping_instruction": {"quantity": 480}},
+        {"quantity": 500}, LABELS, {d: ["quantity"] for d in LABELS})
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["kind"] != "cross"      # 기준값 쪽이 더 쓸모 있습니다.
+
+
+def test_조사를_얼버무리지_않는다():
+    """"Quantity이(가)"처럼 괄호로 미루지 않습니다. (processors/korean)"""
+
+    result = validate_documents({"commercial_invoice": {"quantity": 480}},
+                                {"quantity": 500}, LABELS, {"commercial_invoice": ["quantity"]})
+    message = result["findings"][0]["message"]
+    assert "이(가)" not in message
+    assert message == "상업송장의 Quantity가 Shipment 기준값과 다릅니다."
+
+
+def test_빈_칸은_서류끼리_맞대는_대상이_아니다():
+    """안 적은 것은 "다르다"가 아니라 "아직 안 적었다"입니다."""
+
+    result = _cross({"commercial_invoice": {"quantity": 500},
+                     "packing_list": {"quantity": ""}})
+    assert result["status"] == "passed"      # 기준값이 없으니 빈 칸도 지적하지 않습니다.
+
+
 def test_text_comparison_ignores_case_and_spacing():
     result = validate_documents({"ci": {"consignee": "abc  beauty inc."}}, {"consignee": "ABC Beauty Inc."})
     assert result["status"] == "passed"
