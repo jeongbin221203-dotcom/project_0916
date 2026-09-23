@@ -40,25 +40,20 @@
           {% endif %}
         </a>
         <button class="nav_toggle" type="button" aria-label="메뉴 열기" aria-expanded="false" data-nav-toggle>☰</button>
+        {# 위쪽 메뉴에는 이름(로그인) 자리만 둡니다. 운송 계획·컨테이너 조회·관세청 조회는
+           왼쪽 사이드바로 옮겼습니다(routes/sidebar.py). #}
         <nav class="main_nav" data-nav>
-          <a href="{{ url_for('planning.new') }}" class="{{ 'active' if nav_active == 'planning' }}">운송 계획</a>
-          {# 예전 Shipments 메뉴는 Dashboard로 합쳤습니다. 마스터는 전체, 회원은 내 것만 봅니다. #}
           {% if current_user %}
-            <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active in ('dashboard', 'shipment', 'assistant') or (nav_active == 'tracking' and request.endpoint != 'tracking.container_lookup') }}">Dashboard</a>
-          {% endif %}
-          <a href="{{ url_for('tracking.container_lookup') }}" class="{{ 'active' if request.endpoint == 'tracking.container_lookup' }}">컨테이너 조회</a>
-          <a href="{{ url_for('lookup.index') }}" class="{{ 'active' if nav_active == 'lookup' }}">관세청 조회</a>
-          <span class="nav_auth_sep" aria-hidden="true"></span>
-          {% if current_user %}
-            {# 이름 메뉴에는 로그아웃만 둡니다. Dashboard는 위쪽 메뉴와 사이드바에 있습니다. #}
+            {# 이름 메뉴: Dashboard와 로그아웃. 마스터는 모든 사람의 Dashboard를 봅니다. #}
             <div class="user_menu" data-user-menu>
-              <button type="button" class="nav_user"
+              <button type="button" class="nav_user {{ 'active' if nav_active in ('dashboard', 'shipment', 'assistant') or (nav_active == 'tracking' and request.endpoint != 'tracking.container_lookup') }}"
                       aria-haspopup="true" aria-expanded="false" data-user-menu-toggle>
                 {{ current_user.name or current_user.email }}님
                 {% if current_user.is_master %}<span class="badge master_badge">마스터</span>{% endif %}
                 <span class="caret" aria-hidden="true">▾</span>
               </button>
               <div class="user_menu_panel" data-user-menu-panel hidden>
+                <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active == 'dashboard' }}">{{ '전체 Dashboard' if current_user.is_master else '내 Dashboard' }}</a>
                 <form class="nav_logout" method="post" action="{{ url_for('auth.logout') }}">
                   <button type="submit">로그아웃</button>
                 </form>

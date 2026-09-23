@@ -10,6 +10,7 @@ pytest>=8
 hypothesis>=6.100
 # 업로드한 증빙 서류에서 글자를 읽는 데 씁니다.
 pdfplumber>=0.11
+pytesseract>=0.3.10
 python-docx>=1.1
 # 사진·스캔 서류를 읽는 Tesseract OCR. 프로그램(Tesseract 5, kor·eng 언어)은 따로 설치합니다.
 pytesseract>=0.3.10

@@ -112,7 +112,6 @@ html.rail_expanded .rail_inner [data-tip]:not(.rail_toggle)::after { display: no
 .rail_ship .mono { font-size: 12px; }
 
 /* 시작 화면을 잠갔을 때(HOME_LOCKED) 시작 화면의 사이드바도 막습니다. */
-.home_rail.is_locked { opacity: .5; filter: grayscale(.55); pointer-events: none; user-select: none; }
 
 /* 좁은 화면에서는 사이드바를 위에 가로로 눕힙니다. 세로로 두면 본문이 밀립니다. */
 @media (max-width: 860px) {
