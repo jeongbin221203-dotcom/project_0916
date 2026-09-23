@@ -10,7 +10,7 @@
   "use strict";
 
   const config = window.FORWARDUS_WORK_DRAFT;
-  const PRIVATE_KEY = "forwardus:work-private";
+  const PRIVATE_KEY = window.ForwardusStore.key("forwardus:work-private");
   const PRIVATE_FIELDS = ["buyer_address", "buyer_email", "notify_party", "attention",
                           "consignee_city_zip"];
   const DELAY_MS = 700;

@@ -426,7 +426,9 @@
        서버(/api/work-draft)  다른 기기·다른 탭에서도 이어 쓰는 값. 비공개 칸은 빼고 저장합니다.
 
      돌아왔을 때는 둘 중 나중에 저장된 것을 씁니다. */
-  const LOCAL_KEY = "forwardus:doc-form-draft";
+  const LOCAL_KEY = window.ForwardusStore.key("forwardus:doc-form-draft");
+  // 시작 화면에서 넘어온 초안. 같은 회원 것만 집습니다. (home.js에서 넣습니다)
+  const DOC_DRAFT_KEY = window.ForwardusStore.key("forwardus:doc-draft");
 
   function saveLocal() {
     const draft = { ...sharedValues(), savedAt: Date.now(), lc: { ...carried }, tab: currentTab };
@@ -549,9 +551,9 @@
     // 시작 화면에서 "적은 내용으로 칸 채우기"로 넘어온 경우가 가장 먼저입니다. (방금 고른 값)
     let stashed = null;
     try {
-      const raw = window.sessionStorage.getItem("forwardus:doc-draft");
+      const raw = window.sessionStorage.getItem(DOC_DRAFT_KEY);
       if (raw) {
-        window.sessionStorage.removeItem("forwardus:doc-draft");
+        window.sessionStorage.removeItem(DOC_DRAFT_KEY);
         stashed = JSON.parse(raw);
       }
     } catch (error) { /* 깨졌으면 없는 것으로 봅니다. */ }

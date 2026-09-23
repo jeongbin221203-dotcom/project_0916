@@ -65,7 +65,7 @@
   /* ----- 입력값 임시 저장: 다른 메뉴에 다녀와도 내용이 남습니다 ----- */
   // 탭을 새로 열면 빈 화면에서 시작하고, 메뉴를 오갈 때만 입력이 유지되도록
   // sessionStorage를 씁니다. (브라우저를 닫으면 사라집니다)
-  const DRAFT_KEY = "forwardus:planning-draft";
+  const DRAFT_KEY = window.ForwardusStore.key("forwardus:planning-draft");
   const draftStore = window.sessionStorage;
 
   const DRAFT_FIELDS = [

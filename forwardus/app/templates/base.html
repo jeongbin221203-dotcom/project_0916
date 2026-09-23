@@ -196,10 +196,16 @@
       };
     </script>
     {% endif %}
+    <script>
+      {# 브라우저에 남기는 값은 회원마다 따로 둡니다. 한 탭에서 A가 로그아웃하고
+         B가 로그인해도 A가 적은 바이어 주소·연락처가 B의 칸에 들어가면 안 됩니다.
+         standalone 화면(운송 계획 단독)도 planning.js가 초안을 남기므로 같이 씁니다. #}
+      window.FORWARDUS_SCOPE = {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }};
+    </script>
     {% if not standalone %}
     <script>
-      {# 대화는 회원마다 따로 둡니다. 한 탭에서 계정을 바꿔도 섞이지 않게. #}
-      window.FORWARDUS_CHAT = { scope: {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }} };
+      {# 대화도 같은 구분을 씁니다. #}
+      window.FORWARDUS_CHAT = { scope: window.FORWARDUS_SCOPE };
       {# 서류 작성에서 적은 값을 운송 계획이 이어 씁니다. 로그인한 회원만. (work_draft.js) #}
       {% if current_user %}
       window.FORWARDUS_WORK_DRAFT = { url: "{{ url_for('work_draft.show') }}",

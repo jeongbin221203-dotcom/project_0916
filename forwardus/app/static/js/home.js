@@ -11,6 +11,8 @@
   // 고래 상담창과 같은 대화를 나눠 씁니다. 다른 화면에 갔다 와도 이어집니다.
   const chat = window.ForwardusChat;
   const SOURCE = "home";
+  // 서류 작성 화면으로 넘기는 초안. 회원마다 따로 둡니다. (base.js ForwardusStore)
+  const DOC_DRAFT_KEY = window.ForwardusStore.key("forwardus:doc-draft");
 
   const input = stage.querySelector("[data-home-input]");
   const chipsBox = stage.querySelector("[data-home-chips]");
@@ -199,7 +201,7 @@
     // 서류 작성 화면이 집어 갈 수 있게 놓아 둡니다. 탭을 새로 열면
     // 사라지는 것이 맞습니다 — 확정은 그 화면에서 사람이 합니다.
     try {
-      window.sessionStorage.setItem("forwardus:doc-draft",
+      window.sessionStorage.setItem(DOC_DRAFT_KEY,
                                     JSON.stringify(response.data.form));
     } catch (error) {
       /* 저장 공간이 없으면 링크만 드립니다. */
@@ -584,7 +586,7 @@
     const fields = { ...pipe.draft };
     delete fields.items;
     try {
-      window.sessionStorage.setItem("forwardus:doc-draft",
+      window.sessionStorage.setItem(DOC_DRAFT_KEY,
         // draftId: 그 화면에서 서류를 만들면 이 초안이 Shipment로 승격됩니다.
         JSON.stringify({ fields, items: pipe.draft.items || [], draftId: savedDraftId }));
     } catch (error) {
@@ -902,7 +904,7 @@
         const fields = { ...docDraft };
         delete fields.items;
         delete fields.kind;
-        window.sessionStorage.setItem("forwardus:doc-draft",
+        window.sessionStorage.setItem(DOC_DRAFT_KEY,
           JSON.stringify({ fields, items: docDraft.items || [] }));
       } catch (error) {
         /* 저장 공간이 없으면 링크만 드립니다. */

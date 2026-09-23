@@ -15,7 +15,7 @@
   const MAX_BYTES = 10 * 1024 * 1024;
   // 그림을 읽는 AI 호출은 30초를 넘기기도 합니다. 서버는 90초에 끊습니다.
   const TIMEOUT_MS = 120000;
-  const DRAFT_KEY = "forwardus:doc-draft";
+  const DRAFT_KEY = window.ForwardusStore.key("forwardus:doc-draft");
 
   // 보내기 전에 걸러 냅니다. 서버도 같은 것을 다시 봅니다.
   function problem(file) {

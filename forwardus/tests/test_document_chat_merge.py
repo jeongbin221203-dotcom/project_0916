@@ -230,8 +230,12 @@ def test_대화창이_모은_값을_서류_작성_화면이_집어_간다(app):
     home = (STATIC / "js/home.js").read_text(encoding="utf-8")
     form = (STATIC / "js/doc_form.js").read_text(encoding="utf-8")
 
-    assert 'setItem("forwardus:doc-draft"' in home
-    assert 'getItem("forwardus:doc-draft")' in form
+    # 자리 이름은 회원마다 다릅니다(base.js ForwardusStore). 두 화면이 같은
+    # 접두사에서 같은 방법으로 만들어야 서로를 찾습니다.
+    assert 'ForwardusStore.key("forwardus:doc-draft")' in home
+    assert 'ForwardusStore.key("forwardus:doc-draft")' in form
+    assert "setItem(DOC_DRAFT_KEY," in home
+    assert "getItem(DOC_DRAFT_KEY)" in form
     # 채팅으로 값을 합칠 때마다, 그리고 그 화면으로 넘어가기 직전에 놓아 둡니다.
     assert home.count("stashForDocForm") >= 3
     # 견적명 답인지 아닌지를 서버가 알 수 있게 같이 보냅니다.
