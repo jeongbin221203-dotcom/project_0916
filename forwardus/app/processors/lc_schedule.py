@@ -63,6 +63,7 @@ def presentation_days(value) -> tuple[int, bool]:
 
 def plan(*, latest_shipment: date | None = None, expiry: date | None = None,
          presentation: int | None = None, transport_mode: str = "SEA",
+         transit_days: tuple[int, int] | None = None,
          today: date | None = None) -> dict | None:
     """L/C 날짜로 "언제까지 실어야 하고, 언제 실으면 안전한지"를 냅니다.
 
@@ -74,6 +75,7 @@ def plan(*, latest_shipment: date | None = None, expiry: date | None = None,
       recommended_etd     권하는 선적예정일 (마감일에서 여유를 뺀 날)
       cargo_ready_by      화물이 준비되어 있어야 하는 날 (통관·선적 마감 앞)
       presentation_by     서류를 은행에 내야 하는 날 (선적일 + 제시기간, 유효기일 이내)
+      eta_from / eta_to   권하는 선적일로 떠났을 때의 도착 예상 범위 (구간 소요일을 줬을 때만)
       days_left           오늘부터 마감까지 남은 날
       level / label       여유 등급 (late · tight · caution · ok)
       feasible            오늘 준비를 시작해도 마감을 지킬 수 있는가
@@ -135,7 +137,17 @@ def plan(*, latest_shipment: date | None = None, expiry: date | None = None,
     notes.append(f"선적 후 {days}일 안에, 늦어도 {presentation_by.isoformat()}까지 "
                  "은행에 서류를 내야 합니다.")
 
+    # 도착 예상. 구간 소요일(최소~최대)을 알면 권하는 선적일에 더해 봅니다.
+    eta_from = eta_to = None
+    if transit_days:
+        low, high = int(min(transit_days)), int(max(transit_days))
+        eta_from, eta_to = recommended + timedelta(days=low), recommended + timedelta(days=high)
+        notes.append(f"이 날 떠나면 도착은 {eta_from.isoformat()} ~ {eta_to.isoformat()}쯤입니다"
+                     f"(구간 소요 {low}~{high}일 기준). 실제 도착일은 스케줄을 골라야 정해집니다.")
+
     return {
+        "eta_from": eta_from,
+        "eta_to": eta_to,
         "deadline": deadline,
         "deadline_reason": reason,
         "latest_shipment": latest_shipment,
@@ -161,7 +173,7 @@ def as_text(result: dict | None) -> dict | None:
         return None
     out = dict(result)
     for key in ("deadline", "latest_shipment", "expiry", "recommended_etd", "cargo_ready_by",
-                "presentation_by"):
+                "presentation_by", "eta_from", "eta_to"):
         value = out.get(key)
         out[key] = value.isoformat() if isinstance(value, date) else ""
     return out

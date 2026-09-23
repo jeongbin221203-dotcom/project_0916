@@ -139,10 +139,14 @@ def _lc(fields: dict) -> dict | None:
         except ValidationError:
             return None
 
+    from app.services.document_extract_service import transit_range
+
+    mode = fields.get("transport_mode") or "SEA"
     return lc_schedule.as_text(lc_schedule.plan(
         latest_shipment=day("lc_latest_shipment_date"), expiry=day("lc_expiry_date"),
-        presentation=fields.get("lc_presentation_days"),
-        transport_mode=fields.get("transport_mode") or "SEA"))
+        presentation=fields.get("lc_presentation_days"), transport_mode=mode,
+        transit_days=transit_range(fields.get("origin_code", ""),
+                                   fields.get("destination_code", ""), mode)))
 
 
 def planning_prefill(viewer) -> dict:

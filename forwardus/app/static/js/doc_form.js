@@ -431,6 +431,38 @@
     });
   }
 
+  /* ----- 새 파일을 읽는 동안 ----- */
+  function clearForm() {
+    panel.querySelectorAll(".doc_restored").forEach((note) => note.remove());
+    form.reset();
+    itemsBox.innerHTML = "";
+    addItem();
+    Object.keys(carried).forEach((key) => { delete carried[key]; });
+    chosenSchedule = "";
+    forgetLocal();
+    if (window.ForwardusWorkDraft) window.ForwardusWorkDraft.clear();
+    applyMode(form.elements.transport_mode ? form.elements.transport_mode.value : "SEA");
+    applyCurrency();
+    invalidateSchedule();
+    score();
+  }
+
+  function showReading(file) {
+    hideReading();
+    const note = document.createElement("div");
+    note.className = "doc_reading";
+    note.setAttribute("role", "status");
+    note.innerHTML = `<span class="doc_reading_spin" aria-hidden="true"></span>
+      <span><b>${escapeHtml(file && file.name ? file.name : "올린 서류")}을(를) 읽고 있습니다…</b>
+      <small>그림으로 된 서류는 30초쯤 걸립니다. 앞서 적어 두신 내용은 지우고 이 파일 기준으로 채웁니다.</small></span>`;
+    panel.prepend(note);
+    note.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function hideReading() {
+    panel.querySelectorAll(".doc_reading").forEach((note) => note.remove());
+  }
+
   async function restoreDraft() {
     // 시작 화면에서 "적은 내용으로 칸 채우기"로 넘어온 경우가 가장 먼저입니다. (방금 고른 값)
     let stashed = null;
@@ -736,8 +768,15 @@
   if (uploadZone && window.ForwardusDocUpload && config.extractUrl) {
     window.ForwardusDocUpload.mount(uploadZone, {
       url: config.extractUrl,
-      onStart() { uploadResult.hidden = true; },
+      onStart(file) {
+        uploadResult.hidden = true;
+        // 새로 올린 파일이 기준입니다. 앞서 적어 둔 값이 섞이면 어느 서류의 값인지 알 수 없습니다.
+        clearForm();
+        showReading(file);
+      },
+      onError() { hideReading(); },
       onResult(data) {
+        hideReading();
         // 이 화면에서 바로 채웁니다. 만들기는 여전히 사람이 누릅니다.
         window.FORWARDUS_DOC_FILL(data.form);
         if (window.ForwardusHsModal) window.ForwardusHsModal.remember(data.hs_queries || []);

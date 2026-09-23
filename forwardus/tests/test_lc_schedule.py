@@ -116,6 +116,25 @@ def test_서류_제시일은_유효기일을_넘지_않는다(shipment, expiry, 
     assert result["recommended_etd"] <= result["deadline"]
 
 
+def test_구간_소요일을_알면_도착_예상도_낸다():
+    result = plan(latest_shipment=date(2026, 11, 20), expiry=date(2027, 1, 31), transit_days=(11, 14))
+
+    # 권장 선적일 11-17에 해상 11~14일
+    assert result["eta_from"] == date(2026, 11, 28) and result["eta_to"] == date(2026, 12, 1)
+    assert any("도착은" in note and "스케줄을 골라야" in note for note in result["notes"])
+    # 구간을 모르면 도착 예상은 비워 둡니다. 지어내지 않습니다.
+    assert plan(latest_shipment=date(2026, 11, 20))["eta_from"] is None
+
+
+def test_올린_L_C의_항구로_도착_예상까지_낸다(app, client):
+    data = _upload(client, _lc_raw())
+    schedule = data["lc_schedule"]
+
+    assert schedule["eta_from"] and schedule["eta_to"]          # 부산 → 로스앤젤레스
+    assert schedule["eta_from"] > schedule["recommended_etd"]
+    assert any("도착은" in note for note in data["notes"])
+
+
 def test_화면으로_보낼_때는_날짜를_글자로_바꾼다():
     text = lc_schedule.as_text(plan(latest_shipment=date(2026, 11, 20)))
 

@@ -78,7 +78,7 @@ def checklist() -> dict:
          "fields": [
              {"name": "exporter_name", "label": "수출자명", "required": True,
               "placeholder": "Forward Cosmetics Co., Ltd."},
-             {"name": "exporter_address", "label": "수출자 주소", "wide": True,
+             {"name": "exporter_address", "label": "수출자 주소", "required": True, "wide": True,
               "placeholder": "Seoul, Korea"},
          ]},
         {"key": "buyer", "tab": "doc", "label": "받는 쪽", "icon": "📮",
@@ -88,7 +88,7 @@ def checklist() -> dict:
               "placeholder": "ABC Beauty Inc."},
              {"name": "buyer_country", "label": "Buyer 국가", "placeholder": "US",
               "hint": "두 글자 국가 코드"},
-             {"name": "buyer_address", "label": "Buyer 주소", "wide": True,
+             {"name": "buyer_address", "label": "Buyer 주소", "required": True, "wide": True,
               "placeholder": "Los Angeles, CA"},
              {"name": "consignee_city_zip", "label": "도시 · 주 · 우편번호",
               "placeholder": "Los Angeles, CA 90001"},

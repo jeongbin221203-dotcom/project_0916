@@ -63,6 +63,8 @@
         <span>권장 선적일 <b>${escapeHtml(data.lc_schedule.recommended_etd)}</b> ·
           화물 준비 ${escapeHtml(data.lc_schedule.cargo_ready_by)}까지 ·
           서류 제시 ${escapeHtml(data.lc_schedule.presentation_by)}까지</span>
+        ${data.lc_schedule.eta_from ? `<span>도착 예상 <b>${escapeHtml(data.lc_schedule.eta_from)}
+          ~ ${escapeHtml(data.lc_schedule.eta_to)}</b> · 실제 도착일은 스케줄을 골라야 정해집니다</span>` : ""}
         <small>${escapeHtml(data.lc_schedule.deadline_reason === "latest_shipment"
           ? "L/C 최종선적일 기준입니다." : "유효기일에서 서류 제시기간을 뺀 날입니다.")}</small>
       </div>` : "";

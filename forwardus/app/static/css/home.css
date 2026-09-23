@@ -462,11 +462,18 @@ body.page_home .site_footer { display: none; }
   padding: 16px 20px; border: 2px dashed #c7d7fd; border-radius: var(--radius);
   background: var(--blue_soft); transition: border-color .12s, background .12s; }
 .doc_drop.is_over { border-color: var(--blue); background: #dbe7ff; }
-.doc_drop.is_busy { opacity: .75; }
+/* 읽는 중: 흐려 두기만 하면 멈춘 것처럼 보입니다. 테두리와 문구를 또렷하게 둡니다. */
+.doc_drop.is_busy { border-color: var(--blue); background: var(--blue_soft); }
+.doc_drop.is_busy .doc_drop_text { opacity: .6; }
 .doc_drop_icon { font-size: 26px; }
 .doc_drop_text b { display: block; font-size: 14px; }
 .doc_drop_text small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
-.doc_drop_status { grid-column: 1 / -1; margin: 4px 0 0; font-size: 13px; font-weight: 700; color: var(--blue_dark); }
+.doc_drop_status { grid-column: 1 / -1; margin: 6px 0 0; font-size: 14.5px; font-weight: 800; color: var(--blue_dark); }
+.doc_drop.is_busy .doc_drop_status::before {
+  content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+  border: 2px solid #c7d7fd; border-top-color: var(--blue); border-radius: 50%;
+  animation: doc_spin .8s linear infinite;
+}
 .doc_drop_status.ok { color: #07694f; }
 .doc_drop_status.bad { color: var(--red); }
 @media (max-width: 620px) {
@@ -697,3 +704,20 @@ body.home_talking .support_panel { display: none !important; }
 /* 적던 내용을 불러왔다는 알림 (doc_form.js) */
 .doc_restored { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
 .doc_restored .link_button { color: inherit; text-decoration: underline; }
+
+/* 새 파일을 읽는 동안 화면 맨 위에 크게 띄웁니다. (doc_form.js) */
+.doc_reading {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; padding: 14px 16px;
+  border: 1px solid #c7d7fd; border-radius: 14px; background: var(--blue_soft); color: var(--blue_dark);
+  font-size: 15px;
+}
+.doc_reading small { display: block; margin-top: 3px; font-size: 13px; font-weight: 600; opacity: .85; }
+.doc_reading_spin {
+  flex: 0 0 auto; width: 20px; height: 20px; margin-top: 2px;
+  border: 3px solid #c7d7fd; border-top-color: var(--blue); border-radius: 50%;
+  animation: doc_spin .8s linear infinite;
+}
+@keyframes doc_spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .doc_reading_spin, .doc_drop.is_busy .doc_drop_status::before { animation-duration: 2.4s; }
+}

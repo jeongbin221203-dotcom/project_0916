@@ -128,25 +128,27 @@ ENGLISH_NOTE = ("적으실 때 **영문으로** 적어 주세요. 적으신 글�
                 "상대국 세관·은행에서 받아 주지 않습니다.")
 
 # 서식마다 사람에게 물어볼 칸. 순서가 곧 물어보는 순서입니다.
+# 기본 정보(보내는 곳·받는 곳의 상호와 주소)는 모두 필수입니다. 주소가 없으면 송장·포장명세서의
+# Seller·Consignee 칸이 비어 나가고, 수입 통관에서 되돌아옵니다.
 ASK_FOR = {
     "packing_list_std": [
-        ("exporter_name", True), ("exporter_address", False),
-        ("buyer_name", True), ("buyer_address", False),
+        ("exporter_name", True), ("exporter_address", True),
+        ("buyer_name", True), ("buyer_address", True),
         ("origin_code", True), ("destination_code", True),
         ("invoice_no", False), ("buyer", False), ("other_references", False),
         ("signed_by", False),
     ],
     "commercial_invoice": [
-        ("exporter_name", True), ("exporter_address", False),
-        ("buyer_name", True), ("buyer_address", False),
+        ("exporter_name", True), ("exporter_address", True),
+        ("buyer_name", True), ("buyer_address", True),
         ("origin_code", True), ("destination_code", True),
         ("incoterms", True), ("currency", False),
         ("payment_terms", False), ("lc_no", False),
         ("shipping_marks", False), ("remarks", False), ("signed_by", False),
     ],
     "proforma_invoice": [
-        ("exporter_name", True), ("exporter_address", False),
-        ("buyer_name", True), ("buyer_address", False),
+        ("exporter_name", True), ("exporter_address", True),
+        ("buyer_name", True), ("buyer_address", True),
         ("origin_code", True), ("destination_code", True),
         ("incoterms", True), ("currency", False),
         ("validity_date", False), ("po_no", False),
@@ -154,7 +156,7 @@ ASK_FOR = {
         ("remarks", False), ("signed_by", False), ("accepted_by", False),
     ],
     "shipping_instruction": [
-        ("exporter_name", True), ("exporter_address", False),
+        ("exporter_name", True), ("exporter_address", True),
         ("buyer_name", True), ("buyer_address", True), ("notify_party", False),
         ("origin_code", True), ("destination_code", True),
         ("incoterms", False), ("shipping_marks", False), ("remarks", False),

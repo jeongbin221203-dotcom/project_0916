@@ -501,12 +501,32 @@ def _lc_date(value, label: str, notes: list):
         return None
 
 
-def lc_plan(raw: dict, mode: str, notes: list) -> dict | None:
-    """읽은 L/C 조건으로 선적 마감과 권하는 선적예정일을 냅니다. (계산은 우리 코드가 합니다)"""
+def transit_range(origin_code: str, destination_code: str, mode: str) -> tuple[int, int] | None:
+    """구간 소요일(최소~최대). 항구·공항을 알 때만. 실제 스케줄은 운송 계획에서 고릅니다."""
+
+    if not origin_code or not destination_code:
+        return None
+    from app.services import planning_service
+
+    try:
+        summary = planning_service.transit_summary(origin_code, destination_code)
+    except Exception:                       # 거리 자료가 없으면 도착 예상만 건너뜁니다.
+        return None
+    leg = (summary.get("air") if mode == "AIR"
+           else (summary.get("sea") or {}).get("FCL"))
+    if not leg or leg.get("min") is None or leg.get("max") is None:
+        return None
+    return int(leg["min"]), int(leg["max"])
+
+
+def lc_plan(raw: dict, fields: dict, mode: str, notes: list) -> dict | None:
+    """읽은 L/C 조건으로 선적 마감·권하는 선적예정일·도착 예상을 냅니다. (계산은 우리 코드가 합니다)"""
 
     from app.processors import lc_schedule
 
     result = lc_schedule.plan(
+        transit_days=transit_range(fields.get("origin_code", ""),
+                                   fields.get("destination_code", ""), mode),
         latest_shipment=_lc_date(raw.get("lc_latest_shipment_date"), "L/C 최종선적일", notes),
         expiry=_lc_date(raw.get("lc_expiry_date"), "L/C 유효기일", notes),
         presentation=raw.get("lc_presentation_days"),
@@ -592,7 +612,7 @@ def extract(filename: str, data: bytes) -> dict:
     form = to_form(raw)
     notes = protect_notes + form.pop("notes")
     # L/C 조건이 있으면 선적 마감을 계산해 선적예정일 칸을 채웁니다.
-    schedule = lc_plan(raw, form["fields"].get("transport_mode") or "SEA", notes)
+    schedule = lc_plan(raw, form["fields"], form["fields"].get("transport_mode") or "SEA", notes)
     if schedule:
         form["fields"]["requested_departure_date"] = schedule["recommended_etd"].isoformat()
         # 화면에 칸이 없는 값이라 따로 묶어 넘깁니다. 운송 계획이 스케줄을 고를 때 씁니다.

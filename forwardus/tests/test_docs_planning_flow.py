@@ -43,6 +43,36 @@ def test_예시_칩을_누르면_바로_보낸다(app):
     assert "sendButton.disabled" in chip
 
 
+def test_기본_정보는_모두_필수다(app, client):
+    """보내는 곳·받는 곳의 상호와 주소. 하나라도 비면 Seller·Consignee 칸이 비어 나갑니다."""
+
+    from app.services import agent_service, document_pipeline_service, document_start_service
+
+    basics = ("exporter_name", "exporter_address", "buyer_name", "buyer_address")
+
+    # 1) 서류 작성 화면의 칸에 * 표시
+    with app.test_request_context():
+        checklist = document_start_service.checklist()
+    fields = {field["name"]: field for group in checklist["groups"] for field in group["fields"]}
+    for name in basics:
+        assert fields[name].get("required") is True, name
+    html = client.get("/documents/new").get_data(as_text=True)
+    for name in basics:
+        block = html[html.index(f'data-doc-field="{name}"'):][:400]
+        assert "doc_must" in block, name
+
+    # 2) 대화로 만들 때 묻는 순서에서도 필수
+    for kind, rows in agent_service.ASK_FOR.items():
+        required = {name for name, must in rows if must}
+        for name in basics:
+            if any(name == row[0] for row in rows):
+                assert name in required, (kind, name)
+
+    # 3) 올린 서류로 만들 때의 필수 목록에도
+    for kind, keys in document_pipeline_service.REQUIRED_BY_KIND.items():
+        assert set(basics) <= set(keys), kind
+
+
 # --- 2. 서류 작성 → 운송 계획 ----------------------------------------------------------------
 
 DOC_VALUES = {
@@ -190,8 +220,10 @@ def test_상담_창은_저절로_열리지_않는다():
 def _five_items(app):
     items = [{"product_description": name, "amount": "10"}
              for name in ("LIPSTICK", "TONER", "CREAM", "MASK", "SERUM")]
-    form = {"fields": {"exporter_name": "A", "buyer_name": "B", "origin_code": "KRPUS",
-                       "destination_code": "USLAX"}, "items": items}
+    # 기본 정보(상호·주소)는 모두 채워 둡니다. 여기서 보려는 것은 품목별 패킹 정보입니다.
+    form = {"fields": {"exporter_name": "A", "exporter_address": "Seoul, Korea",
+                       "buyer_name": "B", "buyer_address": "1 Test Ave, LA",
+                       "origin_code": "KRPUS", "destination_code": "USLAX"}, "items": items}
     return pipeline.start({"form": form, "document_label": "문서", "kinds": ["packing_list_std"]})
 
 
@@ -224,8 +256,10 @@ def test_품목_번호를_붙인_답을_그_품목에_넣는다(app):
 
 
 def test_품목이_하나면_예전처럼_번호로_묻는다(app):
-    form = {"fields": {"exporter_name": "A", "buyer_name": "B", "origin_code": "KRPUS",
-                       "destination_code": "USLAX"}, "items": [{"product_description": "LIPSTICK"}]}
+    form = {"fields": {"exporter_name": "A", "exporter_address": "Seoul, Korea",
+                       "buyer_name": "B", "buyer_address": "1 Test Ave, LA",
+                       "origin_code": "KRPUS", "destination_code": "USLAX"},
+            "items": [{"product_description": "LIPSTICK"}]}
     reply = pipeline.start({"form": form, "kinds": ["packing_list_std"]})["reply"]
     assert "세부 패킹 데이터" not in reply and "누락되어 있습니다" in reply
 

@@ -1366,6 +1366,7 @@
     note.setAttribute("role", "status");
     note.innerHTML = `📑 <b>L/C 선적 마감 ${escapeHtml(lc.deadline)}</b>`
       + ` · 권장 선적일 ${escapeHtml(lc.recommended_etd)}`
+      + (lc.eta_from ? ` · 도착 예상 ${escapeHtml(lc.eta_from)}~${escapeHtml(lc.eta_to)}` : "")
       + ` · 서류 제시 ${escapeHtml(lc.presentation_by)}까지`
       + `<small>${escapeHtml((lc.notes || [])[0] || "")}</small>`;
     form.prepend(note);
