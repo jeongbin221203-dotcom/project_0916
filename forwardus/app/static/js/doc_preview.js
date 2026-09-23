@@ -7,7 +7,18 @@
    Shipment의 정식 서류가 모두 서버의 한 서식(document_form)에서 나옵니다. 여기서만
    다른 라이브러리로 그리면 같은 서류가 두 모양이 됩니다.
 
-   ForwardusDocPreview.open(documents, { previewUrl, pdfUrl, projectName })
+   견적명(quote_title)도 여기서 적습니다. 스케줄을 아직 안 골랐어도, 서류부터
+   먼저 썼어도 저장됩니다. Shipment가 없어도 남는 자리가 따로 있습니다.
+   (POST /documents/draft/save → document_draft_service)
+
+   ForwardusDocPreview.open(documents, {
+     previewUrl, pdfUrl,            미리보기·PDF 창구
+     saveDraftUrl,                  견적명·서류 값을 저장할 창구 (없으면 이름 칸을 숨깁니다)
+     projectName, suggestedName,    처음 채워 둘 이름과 (비었을 때) 지어 둔 이름
+     draftId,                       이미 저장해 둔 초안이면 그 번호
+     getDraft(),                    승격에 쓸 초안을 돌려주는 함수
+     onSaved(saved),                저장된 뒤 불립니다. {id, quote_title}
+   })
      documents: [{ kind, title, data, columns, fields, preview, missing, undecided }] */
 (function () {
   "use strict";
@@ -25,6 +36,10 @@
   const pdfButton = modal.querySelector("[data-dp-pdf]");
   const onePdfButton = modal.querySelector("[data-dp-pdf-one]");
   const printButton = modal.querySelector("[data-dp-print]");
+  const nameBox = modal.querySelector("[data-dp-name]");
+  const nameSaveButton = modal.querySelector("[data-dp-name-save]");
+  const nameNote = modal.querySelector("[data-dp-name-note]");
+  const nameWrap = modal.querySelector(".dp_name");
 
   // 길게 적는 칸은 여러 줄로 받습니다.
   const LONG = new Set(["exporter_address", "consignee_address", "remarks", "shipping_marks",
@@ -35,6 +50,10 @@
   let current = 0;
   let urls = {};
   let returnFocus = null;
+  // 저장해 둔 초안 번호. 한 번 저장하면 이후로는 같은 줄을 고칩니다.
+  let draftId = null;
+  // 서버에 마지막으로 저장된 이름. 같으면 다시 보내지 않습니다.
+  let savedName = "";
   // 다시 그려야 하는 서류. 다른 탭에서 같은 칸을 고치면 여기에 들어갑니다.
   const stale = new Set();
   let drawVersion = 0;
@@ -228,6 +247,70 @@
     button.textContent = before;
   }
 
+  /* ----- 견적명 -----
+     대시보드 목록에서 이 건을 부를 이름입니다. **Shipment가 없어도 저장됩니다.**
+     스케줄을 고르기 전이거나 서류부터 먼저 쓴 경우에도 남아야 하기 때문입니다.
+     서버는 이름만 온 요청도 받아 줍니다(서류 값은 비워 두면 덮지 않습니다). */
+
+  function currentName() {
+    return nameBox ? nameBox.value.trim() : "";
+  }
+
+  function nameStatus(message, kind = "") {
+    if (!nameNote) return;
+    nameNote.textContent = message;
+    nameNote.className = `dp_name_note ${kind}`.trim();
+  }
+
+  // 저장할 것: 이름 + 지금 검토 창에 있는 서류 값 + 승격에 쓸 초안.
+  function savePayload() {
+    return {
+      id: draftId,
+      quote_title: currentName(),
+      source: urls.source || "chat",
+      documents: docs.map((doc) => ({ kind: doc.kind, title: doc.title, data: doc.data })),
+      draft: typeof urls.getDraft === "function" ? (urls.getDraft() || {}) : {},
+    };
+  }
+
+  // force가 참이면 이름이 그대로여도 보냅니다. (PDF를 받기 직전에 서류 값까지 함께 남깁니다)
+  async function saveName(force = false) {
+    if (!nameBox || !urls.saveDraftUrl) return null;
+    const name = currentName();
+    if (!name) {
+      // 비워 두면 서버가 도착국가_품목_날짜로 지어 넣습니다. 빈 이름으로 저장하지는 않습니다.
+      if (urls.suggestedName) nameBox.value = urls.suggestedName;
+      if (!currentName()) { nameStatus("견적명을 적어 주세요.", "bad"); return null; }
+    }
+    if (!force && currentName() === savedName) return null;
+    nameStatus("저장하는 중…");
+    const response = await postJson(urls.saveDraftUrl, savePayload(), 20000);
+    if (!response.success) {
+      nameStatus(response.message || "견적명을 저장하지 못했습니다.", "bad");
+      return null;
+    }
+    draftId = response.data.id;
+    savedName = response.data.quote_title;
+    nameBox.value = savedName;
+    urls.projectName = savedName;          // 내려받는 파일 이름에도 바로 따라 붙습니다.
+    nameStatus(`대시보드에 "${savedName}"(으)로 저장했습니다.`, "ok");
+    if (typeof urls.onSaved === "function") urls.onSaved(response.data);
+    return response.data;
+  }
+
+  // 칸을 벗어날 때 한 번. 적는 동안에는 보내지 않습니다.
+  nameBox?.addEventListener("blur", () => { saveName(); });
+  nameBox?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    nameBox.blur();
+  });
+  nameBox?.addEventListener("input", () => {
+    if (currentName() !== savedName) nameStatus("고친 이름은 칸을 벗어나면 저장됩니다.");
+  });
+  nameSaveButton?.addEventListener("click", () =>
+    withBusy(nameSaveButton, "저장 중…", () => saveName(true)));
+
   // 내려받을 파일 이름. 견적명을 받아 두었으면 앞에 붙입니다.
   // ("미국_의류_20260923_commercial_invoice_draft.pdf")
   function fileName(base) {
@@ -250,6 +333,8 @@
   }
 
   pdfButton.addEventListener("click", () => withBusy(pdfButton, "PDF 만드는 중…", async () => {
+    // 받아 가는 서류와 대시보드에 남는 내용이 같아야 합니다. 먼저 저장합니다.
+    await saveName(true);
     const blob = await fetchPdf(docs);
     save(blob, fileName(docs.length === 1 ? `${docs[0].kind}_draft.pdf`
                                           : "trade_documents_draft.pdf"));
@@ -257,6 +342,7 @@
   }));
 
   onePdfButton.addEventListener("click", () => withBusy(onePdfButton, "만드는 중…", async () => {
+    await saveName(true);
     const doc = docs[current];
     save(await fetchPdf([doc]), fileName(`${doc.kind}_draft.pdf`));
     status(`${doc.title.split(" (")[0]}만 PDF로 내려받았습니다.`, "ok");
@@ -294,14 +380,32 @@
     current = 0;
     stale.clear();
     returnFocus = document.activeElement;
+    setUpName();
     modal.hidden = false;
     document.body.classList.add("hs_modal_open");
     show(0);
     tabsEl.querySelector("button")?.focus();
   }
 
+  // 이름 칸은 AI가 지은 이름으로 채워 두고, 사람이 그 자리에서 고칩니다.
+  // 저장할 창구가 없으면(초안을 남길 수 없는 화면) 칸 자체를 숨깁니다.
+  function setUpName() {
+    if (!nameBox || !nameWrap) return;
+    const usable = !!urls.saveDraftUrl;
+    nameWrap.hidden = !usable;
+    if (!usable) return;
+    draftId = urls.draftId || null;
+    savedName = draftId ? String(urls.projectName || "") : "";
+    nameBox.value = String(urls.projectName || urls.suggestedName || "");
+    nameStatus(savedName
+      ? `대시보드에 "${savedName}"(으)로 저장돼 있습니다. 고치면 바로 반영됩니다.`
+      : "대시보드 목록에 이 이름으로 표시됩니다. 칸을 벗어나거나 PDF를 받을 때 저장됩니다.");
+  }
+
   function close() {
     if (modal.hidden) return;
+    // 닫기 전에 고쳐 둔 이름을 남깁니다. 닫았다고 잃어버리면 다시 적어야 합니다.
+    if (nameBox && urls.saveDraftUrl && currentName() && currentName() !== savedName) saveName();
     modal.hidden = true;
     document.body.classList.remove("hs_modal_open");
     if (returnFocus && returnFocus.isConnected) returnFocus.focus();
@@ -323,5 +427,11 @@
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }, true);
 
-  window.ForwardusDocPreview = { open, close };
+  // quoteTitle(): 지금 칸에 적힌 이름. draftId(): 저장해 둔 초안 번호(없으면 null).
+  // 서류 작성 화면으로 넘기거나 Shipment로 승격할 때 씁니다.
+  window.ForwardusDocPreview = {
+    open, close, save: saveName,
+    quoteTitle: () => currentName(),
+    draftId: () => draftId,
+  };
 })();

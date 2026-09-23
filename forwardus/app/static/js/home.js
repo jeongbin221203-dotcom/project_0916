@@ -547,6 +547,9 @@
      무엇이 필수이고 무엇이 빠졌는지는 서버(document_pipeline_service)가 정합니다.
      초안은 브라우저가 들고 다닙니다. 서버는 상태를 갖지 않습니다. */
   let pipe = null;
+  // 검토 창에서 견적명을 저장하면 받는 초안 번호. 같은 건을 다시 저장하면
+  // 새 줄이 아니라 이 줄을 고칩니다. 나중에 Shipment로 승격할 때도 씁니다.
+  let savedDraftId = null;
 
   const pipelineUrl = (step) => config.pipelineUrl.replace("__STEP__", step);
 
@@ -554,6 +557,7 @@
     // 새 서류를 올리면 앞의 고르기 칸은 치웁니다. 두 개가 남으면 어느 것이 지금 것인지 헷갈립니다.
     if (pipe && pipe.card) pipe.card.remove();
     pipe = { ...state, card: null, label };
+    savedDraftId = null;        // 새 건입니다. 앞 건의 초안을 덮어쓰지 않습니다.
     syncWorkDraft("upload");
     say("bot", pipe.reply);
     renderPickCard();
@@ -575,7 +579,8 @@
     delete fields.items;
     try {
       window.sessionStorage.setItem("forwardus:doc-draft",
-        JSON.stringify({ fields, items: pipe.draft.items || [] }));
+        // draftId: 그 화면에서 서류를 만들면 이 초안이 Shipment로 승격됩니다.
+        JSON.stringify({ fields, items: pipe.draft.items || [], draftId: savedDraftId }));
     } catch (error) {
       /* 저장 공간이 없으면 화면을 옮길 때 다시 적으셔야 합니다. */
     }
@@ -778,13 +783,37 @@
     openReview();
   }
 
+  // 검토 창에서 견적명을 고치면 여기로 돌아옵니다. 대화·초안·서류 작성 화면이
+  // 모두 같은 이름을 쓰도록 들고 있는 값을 맞춰 둡니다.
+  function adoptQuoteTitle(saved) {
+    if (!saved || !saved.quote_title) return;
+    savedDraftId = saved.id || savedDraftId;
+    if (pipe) {
+      pipe.project_name = saved.quote_title;
+      pipe.awaiting_name = false;
+      if (pipe.draft) pipe.draft.project_name = saved.quote_title;
+      if (pipe.card) renderPickCard();
+      syncWorkDraft("chat");
+    } else if (docDraft) {
+      docDraft.project_name = saved.quote_title;
+    }
+  }
+
   function openPreview(documents) {
     if (!window.ForwardusDocPreview) return;
+    const draft = (pipe && pipe.draft) || docDraft || {};
     window.ForwardusDocPreview.open(documents, {
       previewUrl: config.previewUrl, pdfUrl: config.reviewPdfUrl,
+      // 견적명을 Shipment 없이 저장할 창구. 스케줄을 아직 안 골랐어도 남습니다.
+      saveDraftUrl: config.saveDraftUrl,
+      draftId: savedDraftId,
+      source: pipe ? (pipe.source || "chat") : "chat",
       // 내려받는 파일 이름에 씁니다. 여러 건을 받아도 어느 건인지 알아봅니다.
-      projectName: (pipe && (pipe.project_name || pipe.project_name_suggestion))
-        || (docDraft && docDraft.project_name) || "",
+      projectName: (pipe && pipe.project_name) || draft.project_name || "",
+      suggestedName: (pipe && pipe.project_name_suggestion) || "",
+      // 나중에 스케줄을 골라 Shipment로 승격할 때 쓸 초안입니다.
+      getDraft: () => ({ ...draft, project_name: undefined }),
+      onSaved: adoptQuoteTitle,
     });
   }
 

@@ -96,6 +96,20 @@
           <button type="button" class="dp_close" data-dp-close aria-label="닫기">×</button>
         </div>
       </header>
+      {# 견적명 — 대시보드 목록에서 이 건을 부를 이름.
+         스케줄을 아직 안 골랐어도 여기서 적으면 저장됩니다. (Shipment가 없어도 됩니다) #}
+      <div class="dp_name">
+        <label class="dp_name_field">
+          <span class="dp_name_label" aria-hidden="true">📝</span>
+          <input type="text" maxlength="200" data-dp-name
+                 aria-label="견적명 · 문서명"
+                 placeholder="예: 2026-10 멕시코 화장품 1차 수출 건">
+        </label>
+        <button type="button" class="button small" data-dp-name-save>저장</button>
+        <small class="dp_name_note" data-dp-name-note>대시보드 목록에 이 이름으로 표시됩니다.
+          칸을 벗어나거나 PDF를 받을 때 자동으로 저장됩니다.</small>
+      </div>
+
       <div class="dp_bar">
         <div class="dp_tabs" role="tablist" aria-label="서류" data-dp-tabs></div>
         <label class="dp_sync"><input type="checkbox" data-dp-sync checked>
@@ -126,6 +140,7 @@
       pipelineUrl: "{{ url_for('home.api_doc_pipeline', step='__STEP__') }}",
       previewUrl: "{{ url_for('document.draft_preview') }}",
       reviewPdfUrl: "{{ url_for('document.draft_review_pdf') }}",
+      saveDraftUrl: "{{ url_for('document.save_draft') }}",
       agentUrl: "{{ url_for('home.api_agent') }}",
       planningUrl: "{{ url_for('planning.new') }}",
       docFormUrl: "{{ url_for('document.new') }}",

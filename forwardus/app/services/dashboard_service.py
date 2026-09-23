@@ -35,6 +35,8 @@ ACTIVE_STATUSES = ("quoted", "booked", "departed", "in_transit", "arrived")
 MAX_QUERY = 100
 RECENT_DOCUMENTS = 6
 RECENT_SCHEDULES = 5
+# 확정 전 서류 초안. 목록이 길어지면 진행 중인 화물이 밀려납니다.
+RECENT_DRAFTS = 8
 
 
 class Forbidden(ServiceError):
@@ -170,7 +172,7 @@ def _cell(value) -> str:
 # --- 개인 ---------------------------------------------------------------------------
 
 def personal(viewer, shipments) -> dict:
-    """내 Shipment에 딸린 최근 서류와 일정·B/L 요약."""
+    """내 Shipment에 딸린 최근 서류와 일정·B/L 요약, 그리고 아직 확정 전인 초안."""
 
     documents = sorted((doc for s in shipments for doc in s.documents),
                        key=lambda doc: doc.updated_at or doc.created_at, reverse=True)
@@ -181,7 +183,42 @@ def personal(viewer, shipments) -> dict:
         latest = max(events, key=lambda event: event.event_time) if events else None
         schedules.append({"shipment": shipment, "latest_event": latest})
     return {"documents": documents[:RECENT_DOCUMENTS], "schedules": schedules,
-            "cards": status_cards(shipments)}
+            # 스케줄을 아직 안 고른 건. 사람이 지은 견적명으로 보여 줍니다.
+            "drafts": open_drafts(viewer), "cards": status_cards(shipments)}
+
+
+def open_drafts(viewer) -> list[dict]:
+    """확정 전(Shipment 없음) 서류 초안. 목록에 바로 그릴 모양으로 돌려줍니다.
+
+    Shipment가 없어 shipment_row로는 그릴 수 없습니다. 같은 표에 섞지 않고
+    "작성 중"으로 따로 세웁니다. 언제 끝났는지 모르는 건과 진행 중인 화물을
+    한 줄에 놓으면 상태 칸이 거짓말을 하게 됩니다.
+    """
+
+    from app.services import document_draft_service
+
+    rows = []
+    for record in document_draft_service.list_open(viewer)[:RECENT_DRAFTS]:
+        draft = record.draft or {}
+        rows.append({
+            "id": record.id,
+            "quote_title": record.quote_title,
+            "kinds": record.kinds,
+            "kind_count": len(record.kinds),
+            "route": _draft_route(draft),
+            "buyer": str(draft.get("buyer_name") or ""),
+            "updated_at": record.updated_at.strftime("%Y-%m-%d") if record.updated_at else "",
+            "source": record.source,
+        })
+    return rows
+
+
+def _draft_route(draft: dict) -> str:
+    """초안의 출발지 → 도착지. 아직 안 골랐으면 빈 문자열."""
+
+    origin = str(draft.get("origin_code") or "").strip()
+    destination = str(draft.get("destination_code") or "").strip()
+    return f"{origin} → {destination}" if origin and destination else ""
 
 
 # --- API 모양 ------------------------------------------------------------------------
