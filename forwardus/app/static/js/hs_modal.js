@@ -27,8 +27,17 @@
   const targetEl = modal.querySelector("[data-hs-target]");
   const statusEl = modal.querySelector("[data-hs-status]");
 
-  // 올린 서류·상담에서 알게 된 품명. 탭을 닫으면 사라지는 것이 맞습니다.
-  const STORE_KEY = "forwardus:hs-queries";
+  // 올린 서류·상담에서 알게 된 품명.
+  //
+  // 그 회원이 찾아본 기록이라 회원마다 따로 두고, 다시 로그인하면 그대로
+  // 있게 합니다. 그래서 탭과 함께 사라지는 sessionStorage가 아니라
+  // localStorage에 둡니다. 로그아웃해도 지우지 않습니다. (base.js ForwardusStore)
+  //
+  // 로그인하지 않은 손님은 그대로 sessionStorage입니다. 누구 것인지 가릴 수
+  // 없어서, 오래 남기면 다음에 이 컴퓨터를 쓰는 손님에게 넘어갑니다.
+  const STORE_KEY = window.ForwardusStore.key("forwardus:hs-queries");
+  const store = window.ForwardusStore.scope === "guest"
+    ? window.sessionStorage : window.localStorage;
   const MAX_REMEMBERED = 8;
 
   let target = null;
@@ -54,7 +63,7 @@
   /* ----- 기억해 둔 품명 ----- */
   function remembered() {
     try {
-      const rows = JSON.parse(window.sessionStorage.getItem(STORE_KEY) || "[]");
+      const rows = JSON.parse(store.getItem(STORE_KEY) || "[]");
       return Array.isArray(rows) ? rows.filter((row) => typeof row === "string") : [];
     } catch (error) {
       return [];
@@ -68,7 +77,7 @@
     if (!fresh.length) return;
     const merged = [...new Set([...fresh, ...remembered()])].slice(0, MAX_REMEMBERED);
     try {
-      window.sessionStorage.setItem(STORE_KEY, JSON.stringify(merged));
+      store.setItem(STORE_KEY, JSON.stringify(merged));
     } catch (error) {
       /* 저장 공간이 없으면 이번에만 씁니다. */
     }

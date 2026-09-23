@@ -10,7 +10,7 @@
   "use strict";
 
   const config = window.FORWARDUS_WORK_DRAFT;
-  const PRIVATE_KEY = "forwardus:work-private";
+  const PRIVATE_KEY = window.ForwardusStore.key("forwardus:work-private");
   const PRIVATE_FIELDS = ["buyer_address", "buyer_email", "notify_party", "attention",
                           "consignee_city_zip"];
   const DELAY_MS = 700;
@@ -42,6 +42,50 @@
     return copy;
   }
 
+  /* ----- 저장하지 못했을 때 알리기 -----
+     적는 일은 막지 않습니다. 다만 조용히 버리지는 않습니다.
+
+     예전에는 실패하면 null만 돌려주고 끝이었습니다. 세션이 만료된 채 계속
+     적으면 보내는 족족 401로 버려지는데 화면은 멀쩡해 보였습니다. 나중에
+     다른 화면에서 "적은 것이 없다"고 나와야 그제서야 압니다. */
+  let banner = null;
+
+  function hideBanner() {
+    if (banner) banner.hidden = true;
+  }
+
+  function showBanner(why) {
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.className = "draft_alert";
+      banner.setAttribute("role", "alert");
+      banner.innerHTML = '<div><b>임시저장하지 못했습니다.</b>'
+        + ' <span data-draft-why></span></div>'
+        + '<button type="button" data-draft-retry>다시 시도</button>';
+      banner.querySelector("[data-draft-retry]").addEventListener("click", () => {
+        hideBanner();
+        send();
+      });
+      document.body.appendChild(banner);
+    }
+    banner.querySelector("[data-draft-why]").textContent = why;
+    banner.hidden = false;
+  }
+
+  // 왜 안 됐는지를 사람 말로 옮깁니다. 서버가 이유를 적어 보냈으면 그것을 씁니다.
+  async function reason(response) {
+    if (response.status === 401) {
+      return "로그인이 풀렸습니다. 새 탭에서 로그인한 뒤 [다시 시도]를 누르세요.";
+    }
+    if (response.status === 403) return "이 건을 저장할 권한이 없습니다.";
+    if (response.status >= 500) return `서버가 응답하지 않습니다. (${response.status})`;
+    try {
+      const body = await response.json();
+      if (body && body.message) return body.message;
+    } catch (error) { /* 이유를 못 읽으면 아래 기본 문구로 갑니다. */ }
+    return `저장할 수 없는 값이 있습니다. (${response.status})`;
+  }
+
   async function send() {
     const body = pending;
     pending = null;
@@ -51,10 +95,24 @@
       const response = await fetch(config.url, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
-      return response.ok ? (await response.json()).data : null;
+      if (!response.ok) {
+        keepForRetry(body);
+        showBanner(await reason(response));
+        return null;
+      }
+      hideBanner();
+      return (await response.json()).data;
     } catch (error) {
-      return null;           // 저장이 안 돼도 적는 일은 막지 않습니다.
+      keepForRetry(body);
+      showBanner("인터넷 연결이 끊긴 것 같습니다.");
+      return null;
     }
+  }
+
+  // 실패한 내용을 되돌려 둡니다. [다시 시도]가 보낼 것이 있어야 합니다.
+  // 기다리는 동안 더 적었으면 그쪽이 최신이므로 덮지 않습니다.
+  function keepForRetry(body) {
+    if (pending === null) pending = body;
   }
 
   function save(payload, source = "document") {
@@ -116,6 +174,8 @@
     clearTimeout(timer);
     const blob = new Blob([JSON.stringify(pending)], { type: "application/json" });
     // sendBeacon은 POST만 됩니다. 같은 내용을 PUT으로 보내기 위해 keepalive fetch를 씁니다.
+    // 여기서는 실패해도 알릴 수 없습니다. 화면이 이미 사라지는 중이라 배너를
+    // 띄울 자리가 없습니다. 돌아와서 다시 적으면 그때 저장됩니다.
     fetch(config.url, { method: "PUT", body: blob, keepalive: true,
                         headers: { "Content-Type": "application/json" } }).catch(() => {});
     pending = null;
