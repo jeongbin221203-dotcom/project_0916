@@ -161,9 +161,10 @@
             <span class="muted small">{{ item.document.data.get('doc_no', '') }} · 수정 {{ item.document.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
             <div class="button_row">
               <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type) }}">보기</a>
-              {% if item.document.status != 'final' %}
-                <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type, edit=1) }}">수정</a>
-              {% endif %}
+              {# 확정한 서류도 고칠 수 있습니다. 저장하면 확정이 풀리고 검증 대기로 돌아갑니다. #}
+              <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type, edit=1) }}"
+                 title="{{ '확정이 풀리고 검증 대기 상태로 돌아갑니다' if item.document.status == 'final' else '' }}">
+                {{ '수정하기' if item.document.status == 'final' else '수정' }}</a>
             </div>
           {% else %}
             <span class="muted small">자동 작성 대기</span>
@@ -172,7 +173,9 @@
         </article>
       {% endfor %}
     </div>
-    <p class="muted small">Status: draft → generated → validated → final. 문서를 수정하면 다시 검증해야 확정할 수 있습니다.</p>
+    <p class="muted small">Status: draft → generated → validated → final.
+      확정(final)한 뒤에도 <b>수정하기</b>로 언제든 고칠 수 있고, 저장하면 확정이 풀려
+      다시 검증해야 확정됩니다.</p>
   </section>
 
   <section class="card" id="validation">
@@ -180,23 +183,29 @@
     {% if not validation %}
       <p class="muted">작성된 문서가 없습니다.</p>
     {% elif validation.status == 'passed' %}
-      <div class="alert ok">✓ 검사한 {{ validation.checked_documents|length }}개 문서의 {{ validation.checked_fields|join(', ') }} 값이 Shipment 기준값과 일치합니다.</div>
+      <div class="alert ok">✓ 검사한 {{ validation.checked_documents|length }}개 문서의 {{ validation.checked_fields|join(', ') }} 값이
+        서로 일치하고, Shipment 기준값과도 같습니다.</div>
     {% else %}
-      <div class="alert warn">{{ validation.findings|length }}건의 불일치가 있습니다. 기준값은 Shipment에 저장된 값입니다.</div>
+      <div class="alert warn">{{ validation.findings|length }}건을 확인해 주세요.</div>
       <table class="table">
-        <thead><tr><th>status</th><th>문서</th><th>field</th><th>expected</th><th>actual</th></tr></thead>
+        <thead><tr><th>문서</th><th>항목</th><th>확인할 내용</th><th>적힌 값</th><th>맞대어 본 값</th></tr></thead>
         <tbody>
           {% for f in validation.findings %}
             <tr>
-              <td><span class="badge warn">{{ f.status }}</span></td>
               <td><a href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=f.document, edit=1) }}">{{ f.document_label }}</a></td>
               <td>{{ f.field_label }}</td>
-              <td class="mono">{{ f.expected }}</td>
+              <td>
+                {{ f.message }}
+                <span class="badge muted_badge">{{ '서류끼리' if f.kind == 'cross' else '기준값' }}</span>
+              </td>
               <td class="mono">{{ f.actual if f.actual is not none else '(비어 있음)' }}</td>
+              <td class="mono">{{ f.expected if f.expected is not none else '—' }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
+      <p class="muted small">“기준값”은 Shipment에 저장된 값과 맞댄 것이고,
+        “서류끼리”는 서류들끼리 맞댄 것입니다. Shipment에 값이 없어도 서류끼리는 같아야 합니다.</p>
     {% endif %}
   </section>
 {% endblock %}

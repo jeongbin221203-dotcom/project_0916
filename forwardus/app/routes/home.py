@@ -7,7 +7,8 @@ import json
 from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
-from app.services import (ServiceError, agent_service, attachment_service,
+from app.routes.auth import current_user
+from app.services import (ServiceError, agent_service, attachment_service, chat_memory_service,
                           document_extract_service, document_pipeline_service,
                           intake_service, support_chat_service)
 from app.validators import ValidationError
@@ -110,6 +111,28 @@ def api_agent():
     return jsonify({"success": True, "data": result})
 
 
+@home_bp.get("/api/chat-memory")
+def api_chat_memory():
+    """이 회원의 지난 상담. 로그인 전이면 비어 있습니다. (Entity)"""
+
+    viewer = current_user()
+    rows = chat_memory_service.messages(viewer)
+    kept = chat_memory_service.context(viewer)
+    return jsonify({"success": True, "data": {
+        "summary": kept["summary"],
+        "messages": [{"role": row.role, "text": row.text, "source": row.source,
+                      "at": row.created_at.isoformat()} for row in rows],
+    }})
+
+
+@home_bp.delete("/api/chat-memory")
+def api_forget_chat():
+    """새 대화. 이 회원의 상담 기억을 지웁니다."""
+
+    chat_memory_service.forget(current_user())
+    return jsonify({"success": True})
+
+
 @home_bp.post("/api/doc-pipeline/<step>")
 def api_doc_pipeline(step: str):
     """올린 서류 → 빠진 정보 묻기 → 채팅으로 합치기 → 고른 서류 만들기.
@@ -164,11 +187,22 @@ def api_support_chat():
     """어느 화면에서나 열 수 있는 고객상담 창구."""
 
     payload = request.get_json(silent=True) or {}
+    question = payload.get("question", "")
+    # 로그인한 회원의 상담은 대화 전체를 DB에 남기고 이어 갑니다. (Entity)
+    # 로그인 전에는 남기지 않고, 브라우저가 들고 온 최근 대화만 씁니다.
+    viewer = current_user()
+    kept = chat_memory_service.context(viewer)
+    history = kept["history"] or payload.get("history") or []
     try:
-        result = support_chat_service.ask(payload.get("question", ""),
-                                          payload.get("history") or [],
-                                          brief=payload.get("style") == "brief")
+        result = support_chat_service.ask(question, history,
+                                          brief=payload.get("style") == "brief",
+                                          memory=kept["summary"])
     except ServiceError as error:
         return jsonify({"success": False, "message": str(error),
                         "error_code": error.error_code, "source": "api"}), error.status
+    if viewer is not None and result.get("success"):
+        source = "support" if payload.get("style") == "brief" else "consult"
+        chat_memory_service.remember(viewer, "user", question, source)
+        chat_memory_service.remember(viewer, "assistant", result["data"]["answer"], source)
+        chat_memory_service.summarize(viewer)
     return jsonify(result), (200 if result["success"] else 502)

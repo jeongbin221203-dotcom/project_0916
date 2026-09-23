@@ -15,7 +15,8 @@ Shipment를 만들고 서류까지 냅니다.
 
 from __future__ import annotations
 
-from app.collectors import exchange_client
+from app.collectors import exchange_client, location_client
+from app.processors import document_defaults
 from app.processors.cost_calculator import INCOTERMS_INFO
 from app.services import ServiceError, document_service, planning_service
 from app.validators import ValidationError
@@ -78,7 +79,7 @@ def checklist() -> dict:
          "fields": [
              {"name": "exporter_name", "label": "수출자명", "required": True,
               "placeholder": "Forward Cosmetics Co., Ltd."},
-             {"name": "exporter_address", "label": "수출자 주소", "wide": True,
+             {"name": "exporter_address", "label": "수출자 주소", "required": True, "wide": True,
               "placeholder": "Seoul, Korea"},
          ]},
         {"key": "buyer", "tab": "doc", "label": "받는 쪽", "icon": "📮",
@@ -88,7 +89,7 @@ def checklist() -> dict:
               "placeholder": "ABC Beauty Inc."},
              {"name": "buyer_country", "label": "Buyer 국가", "placeholder": "US",
               "hint": "두 글자 국가 코드"},
-             {"name": "buyer_address", "label": "Buyer 주소", "wide": True,
+             {"name": "buyer_address", "label": "Buyer 주소", "required": True, "wide": True,
               "placeholder": "Los Angeles, CA"},
              {"name": "consignee_city_zip", "label": "도시 · 주 · 우편번호",
               "placeholder": "Los Angeles, CA 90001"},
@@ -109,7 +110,9 @@ def checklist() -> dict:
               "placeholder": "T/T 30 days after B/L date"},
              {"name": "lc_no", "label": "L/C 번호와 날짜", "placeholder": "비워도 됩니다"},
              {"name": "buyer", "label": "Buyer (Consignee와 다를 때)",
-              "placeholder": "같으면 비워 두세요"},
+              "placeholder": document_defaults.SAME_AS_CONSIGNEE,
+              "hint": "Consignee와 같으면 비워 두세요. "
+                      f"{document_defaults.SAME_AS_CONSIGNEE}로 찍힙니다"},
              {"name": "other_references", "label": "기타 참조", "wide": True},
          ]},
         {"key": "extras", "tab": "doc", "label": "서류에만 쓰는 칸", "icon": "🏷",
@@ -126,9 +129,25 @@ def checklist() -> dict:
     ]
     item_fields = _item_fields(options)
     # 화면의 "채운 칸 / 전체"는 첫 품목의 필수 칸도 셉니다. 전체에서 빠뜨리면 9/8이 됩니다.
-    return {"groups": groups, "item_fields": item_fields,
+    return {"groups": groups, "item_fields": item_fields, "name_field": _name_field(),
             "required_count": _required_count(groups)
                               + sum(1 for field in item_fields if field.get("required"))}
+
+
+def _name_field() -> dict:
+    """견적명. 서류를 내기 직전에 한 번 묻습니다.
+
+    묶음(group)에 넣지 않고 따로 두는 이유는, 이 칸이 서식의 칸이 아니라
+    **대시보드에서 이 건을 부르는 이름**이기 때문입니다. 서류에는 찍히지
+    않습니다. 화면에서도 "서류 만들기" 바로 위에 따로 섭니다.
+    """
+
+    return {"name": "project_name", "label": "견적명 · 문서명", "wide": True,
+            # Shipment.project_name이 200자입니다. 칸에서부터 같은 길이로 막습니다.
+            "maxlength": 200,
+            "placeholder": "예: 2026-10 멕시코 화장품 1차 오퍼",
+            "hint": "대시보드 서류 목록에 이 이름으로 나옵니다. "
+                    "비우면 도착국가·대표 품목·날짜로 지어 드립니다"}
 
 
 def _item_fields(options: dict) -> list[dict]:
@@ -205,8 +224,12 @@ def create(payload: dict, user_id: int | None = None) -> dict:
     if len(items) > MAX_ITEMS:
         raise ValidationError(f"품목은 {MAX_ITEMS}개까지 넣을 수 있습니다.", "items")
 
-    buyer_name = _text(payload, "buyer_name", 200)
-    project_name = _text(payload, "project_name", 200) or _project_name(payload, items)
+    # Consignee와 Buyer는 한쪽만 적혀 있으면 서로 메웁니다.
+    # (서류에도, Shipment에도 같은 값이 들어가야 합니다)
+    buyer_name, invoice_buyer = document_defaults.pair_parties(
+        _text(payload, "buyer_name", 200), _text(payload, "buyer", 500))
+    payload = {**payload, "buyer": invoice_buyer}
+    project_name = _text(payload, "project_name", 200) or suggest_project_name(payload, items)
 
     plan = {
         "project_name": project_name,
@@ -245,12 +268,25 @@ def create(payload: dict, user_id: int | None = None) -> dict:
             "still_empty": _still_empty(shipment)}
 
 
-def _project_name(payload: dict, items: list[dict]) -> str:
-    """견적명을 따로 묻지 않습니다. 도착지와 첫 품명으로 지어 둡니다."""
+def suggest_project_name(payload: dict, items: list[dict] | None = None) -> str:
+    """대시보드에서 이 건을 부를 이름. `미국_의류_20260923`.
 
-    where = _text(payload, "destination_code", 10).upper()
-    what = str(items[0].get("product_description") or "").strip()
-    return " ".join(part for part in (where, what) if part)[:200] or "수출 건"
+    사람이 견적명을 안 적고 넘어갔을 때 씁니다. 화면도 같은 창구(/documents/
+    suggest-name)로 물어 자리표시에 보여 주므로, 제안한 이름과 저장되는
+    이름이 어긋나지 않습니다.
+    """
+
+    items = items if isinstance(items, list) else []
+    code = _text(payload, "destination_code", 10).upper()
+    # 화면이 도착지를 고를 때 받아 둔 나라 이름이 있으면 그것부터 씁니다.
+    where = _text(payload, "destination_country_name", 60)
+    if not where:
+        # 국가코드(항구 부호 앞 두 글자)로 한글 나라 이름을 찾습니다. 모르면 항구 부호를 그대로.
+        country = _text(payload, "buyer_country", 2).upper() or code[:2]
+        where = (location_client.country_name(country) if country else "") or code
+    what = str(items[0].get("product_description") or "").strip() if items else ""
+    day = _text(payload, "requested_departure_date", 20)
+    return document_defaults.project_name(where, what, day) or "수출 건"
 
 
 def _apply_extras(shipment, payload: dict) -> None:

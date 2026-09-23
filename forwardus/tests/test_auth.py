@@ -41,15 +41,18 @@ def test_nav_shows_login_and_signup_without_dashboard(client):
 
 
 def test_nav_has_dashboard_instead_of_shipments(client):
-    """위쪽 메뉴의 Shipments는 Dashboard 하나로 합쳤습니다. 이름 메뉴에는 로그아웃만 둡니다."""
+    """위쪽 메뉴에는 이름만 둡니다. Dashboard와 로그아웃은 그 이름 메뉴 안에 있습니다."""
 
     _signup(client)
     nav = _nav(client)
     assert "김무역님" in nav and "data-user-menu-toggle" in nav
-    assert ">Dashboard</a>" in nav and ">Shipments<" not in nav
+    assert ">Shipments<" not in nav
     assert nav.count('href="/dashboard"') == 1
+    # Dashboard는 로그아웃 위에, 같은 이름 메뉴 안에 있습니다.
     panel = nav.split("data-user-menu-panel", 1)[1]
-    assert "/auth/logout" in panel and 'href="/dashboard"' not in panel
+    assert 'href="/dashboard"' in panel and "/auth/logout" in panel
+    assert panel.index('href="/dashboard"') < panel.index("/auth/logout")
+    assert "내 Dashboard" in panel
 
 
 def test_dashboard_requires_login(client):

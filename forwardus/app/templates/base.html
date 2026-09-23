@@ -40,25 +40,20 @@
           {% endif %}
         </a>
         <button class="nav_toggle" type="button" aria-label="메뉴 열기" aria-expanded="false" data-nav-toggle>☰</button>
+        {# 위쪽 메뉴에는 이름(로그인) 자리만 둡니다. 운송 계획·컨테이너 조회·관세청 조회는
+           왼쪽 사이드바로 옮겼습니다(routes/sidebar.py). #}
         <nav class="main_nav" data-nav>
-          <a href="{{ url_for('planning.new') }}" class="{{ 'active' if nav_active == 'planning' }}">운송 계획</a>
-          {# 예전 Shipments 메뉴는 Dashboard로 합쳤습니다. 마스터는 전체, 회원은 내 것만 봅니다. #}
           {% if current_user %}
-            <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active in ('dashboard', 'shipment', 'assistant') or (nav_active == 'tracking' and request.endpoint != 'tracking.container_lookup') }}">Dashboard</a>
-          {% endif %}
-          <a href="{{ url_for('tracking.container_lookup') }}" class="{{ 'active' if request.endpoint == 'tracking.container_lookup' }}">컨테이너 조회</a>
-          <a href="{{ url_for('lookup.index') }}" class="{{ 'active' if nav_active == 'lookup' }}">관세청 조회</a>
-          <span class="nav_auth_sep" aria-hidden="true"></span>
-          {% if current_user %}
-            {# 이름 메뉴에는 로그아웃만 둡니다. Dashboard는 위쪽 메뉴와 사이드바에 있습니다. #}
+            {# 이름 메뉴: Dashboard와 로그아웃. 마스터는 모든 사람의 Dashboard를 봅니다. #}
             <div class="user_menu" data-user-menu>
-              <button type="button" class="nav_user"
+              <button type="button" class="nav_user {{ 'active' if nav_active in ('dashboard', 'shipment', 'assistant') or (nav_active == 'tracking' and request.endpoint != 'tracking.container_lookup') }}"
                       aria-haspopup="true" aria-expanded="false" data-user-menu-toggle>
                 {{ current_user.name or current_user.email }}님
                 {% if current_user.is_master %}<span class="badge master_badge">마스터</span>{% endif %}
                 <span class="caret" aria-hidden="true">▾</span>
               </button>
               <div class="user_menu_panel" data-user-menu-panel hidden>
+                <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active == 'dashboard' }}">{{ '전체 Dashboard' if current_user.is_master else '내 Dashboard' }}</a>
                 <form class="nav_logout" method="post" action="{{ url_for('auth.logout') }}">
                   <button type="submit">로그아웃</button>
                 </form>
@@ -201,10 +196,16 @@
       };
     </script>
     {% endif %}
+    <script>
+      {# 브라우저에 남기는 값은 회원마다 따로 둡니다. 한 탭에서 A가 로그아웃하고
+         B가 로그인해도 A가 적은 바이어 주소·연락처가 B의 칸에 들어가면 안 됩니다.
+         standalone 화면(운송 계획 단독)도 planning.js가 초안을 남기므로 같이 씁니다. #}
+      window.FORWARDUS_SCOPE = {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }};
+    </script>
     {% if not standalone %}
     <script>
-      {# 대화는 회원마다 따로 둡니다. 한 탭에서 계정을 바꿔도 섞이지 않게. #}
-      window.FORWARDUS_CHAT = { scope: {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }} };
+      {# 대화도 같은 구분을 씁니다. #}
+      window.FORWARDUS_CHAT = { scope: window.FORWARDUS_SCOPE };
       {# 서류 작성에서 적은 값을 운송 계획이 이어 씁니다. 로그인한 회원만. (work_draft.js) #}
       {% if current_user %}
       window.FORWARDUS_WORK_DRAFT = { url: "{{ url_for('work_draft.show') }}",

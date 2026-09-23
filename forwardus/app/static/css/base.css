@@ -103,6 +103,26 @@ p { margin: 0 0 10px; }
 .flash.fade { opacity: .55; }
 .flash_success { background: var(--green_soft); color: #07694f; }
 .flash_error { background: var(--amber_soft); color: #8a4f00; }
+/* 잘된 것도 잘못된 것도 아닌 알림. "확정한 서류는 그대로 두었습니다" 같은 것. */
+.flash_info { background: var(--blue_soft); color: var(--blue_dark); }
+
+/* 임시저장이 안 됐을 때만 뜹니다. (work_draft.js)
+   적는 일은 막지 않으므로 화면 구석에 두되, 스스로 사라지지는 않습니다.
+   조용히 없어지면 못 보고 지나칩니다. */
+.draft_alert {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60;
+  max-width: min(420px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 12px;
+  background: var(--amber_soft); color: #8a4f00;
+  box-shadow: var(--shadow); font-size: 14px; line-height: 1.5;
+}
+.draft_alert b { display: block; }
+.draft_alert button {
+  border: 1px solid #8a4f00; background: transparent; color: inherit;
+  padding: 6px 12px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.draft_alert button:hover { background: rgba(138, 79, 0, .1); }
 
 /* Cards & layout */
 .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; min-width: 0; }
@@ -137,6 +157,7 @@ p { margin: 0 0 10px; }
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; background: #f1f5f9; color: #475569; }
 .badge.ok { background: var(--green_soft); color: #07694f; }
 .badge.warn { background: var(--amber_soft); color: #8a4f00; }
+.badge.bad { background: #fee2e2; color: #b91c1c; }
 .badge.muted_badge { background: #f1f5f9; color: #94a3b8; }
 .badge.source_mock { background: #fff1e6; color: #b45309; }
 .badge.source_api { background: var(--green_soft); color: #07694f; }
@@ -378,7 +399,7 @@ body.standalone .page { padding-top: 28px; }
 /* HS CODE 간편 검색 창. 어느 화면에서나 [data-hs-open]으로 뜹니다. (hs_modal.js) */
 body.hs_modal_open { overflow: hidden; }
 .hs_modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center;
-  padding: calc(6vh / var(--ui_scale, 1)) 16px 16px; }
+  padding: 6vh 16px 16px; }
 .hs_modal[hidden] { display: none; }
 .hs_modal_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.45); }
 /* 창 높이는 화면의 85%까지. body에 zoom(--ui_scale)이 걸려 있어 vh를 배율로 나눠 씁니다.

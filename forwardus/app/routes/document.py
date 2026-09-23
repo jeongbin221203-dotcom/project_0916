@@ -9,9 +9,10 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
 
 from app.routes import error_response, load_shipment
 from app.routes.auth import current_user, login_required
-from app.services import (ServiceError, customs_filing_service, document_extract_service,
-                          document_service, document_start_service, draft_document_service,
-                          requirement_service, shipment_service)
+from app.services import (ServiceError, customs_filing_service, document_draft_service,
+                          document_extract_service, document_service, document_source_service,
+                          document_start_service, draft_document_service, requirement_service,
+                          shipment_service)
 from app.validators import ValidationError
 
 document_bp = Blueprint("document", __name__, url_prefix="/documents")
@@ -60,7 +61,24 @@ def new():
 
     return render_template("document/new.html",
                            checklist=document_start_service.checklist(),
+                           sources=document_source_service.list_sources(current_user()),
                            recent=shipment_service.list_shipments(viewer=current_user())[:3])
+
+
+@document_bp.get("/api/sources/<kind>/<source_id>")
+@login_required
+def source_values(kind: str, source_id: str):
+    """고른 건의 칸 값을 돌려줍니다. 화면이 서류 작성 칸을 채우는 데 씁니다.
+
+    목록은 화면을 그릴 때 함께 내려보내므로(new.html) 따로 부르지 않습니다.
+    값은 고른 뒤에만 필요해서 여기서 받습니다.
+    """
+
+    try:
+        return jsonify({"success": True,
+                        "data": document_source_service.load(current_user(), kind, source_id)})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
 
 
 @document_bp.post("/draft/preview")
@@ -116,16 +134,86 @@ def extract():
     return jsonify({"success": True, "data": result})
 
 
+@document_bp.post("/suggest-name")
+def suggest_name():
+    """견적명 자동 제안. 화면이 자리표시로 보여 주고, 비우면 서버가 같은 이름을 씁니다.
+
+    이름 짓는 규칙을 화면에 두면 제안한 이름과 저장되는 이름이 어긋납니다.
+    규칙은 document_defaults.project_name 한 곳에만 둡니다.
+    """
+
+    payload = request.get_json(silent=True) or {}
+    items = payload.get("items")
+    name = document_start_service.suggest_project_name(
+        payload, items if isinstance(items, list) else [])
+    return jsonify({"success": True, "data": {"project_name": name}})
+
+
+@document_bp.post("/draft/save")
+@login_required
+def save_draft():
+    """검토 창에서 적은 견적명과 서류 값을 저장합니다.
+
+    **Shipment를 만들지 않습니다.** 스케줄을 고르기 전에도, 서류부터 먼저
+    쓰더라도 사람이 지은 이름이 남아야 합니다. 대시보드는 이 줄을
+    "작성 중인 서류"로 보여 줍니다. (document_draft_service)
+    """
+
+    try:
+        data = document_draft_service.save(current_user(), request.get_json(silent=True) or {})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return jsonify({"success": True, "data": data})
+
+
+@document_bp.patch("/draft/<int:draft_id>/title")
+@login_required
+def rename_draft(draft_id: int):
+    """견적명만 고칩니다. 검토 창에서 이름 칸을 벗어날 때 부릅니다."""
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        data = document_draft_service.rename(current_user(), draft_id,
+                                             str(payload.get("quote_title") or ""))
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return jsonify({"success": True, "data": data})
+
+
+@document_bp.delete("/draft/<int:draft_id>")
+@login_required
+def delete_draft(draft_id: int):
+    try:
+        document_draft_service.delete(current_user(), draft_id)
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return jsonify({"success": True})
+
+
 @document_bp.post("/start")
 @login_required
 def start():
-    """시작 화면에서 채운 내용으로 Shipment와 서류를 한 번에 만듭니다."""
+    """시작 화면에서 채운 내용으로 Shipment와 서류를 한 번에 만듭니다.
 
+    draft_id가 함께 오면 그 초안을 승격합니다. 사람이 검토 창에서 지은
+    견적명을 그대로 가져오고, 만든 뒤 그 초안을 이 Shipment에 잇습니다.
+    """
+
+    viewer = current_user()
+    payload = request.get_json(silent=True) or {}
+    draft_id = payload.get("draft_id")
+    if draft_id and not str(payload.get("project_name") or "").strip():
+        # 화면이 이름을 따로 안 보냈으면 초안에 적어 둔 이름을 씁니다.
+        payload = {**payload,
+                   "project_name": document_draft_service.title_of(viewer, draft_id)}
     try:
-        result = document_start_service.create(request.get_json(silent=True) or {},
-                                               user_id=current_user().id)
+        result = document_start_service.create(payload, user_id=viewer.id)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
+    if draft_id:
+        document_draft_service.promote(viewer, draft_id,
+                                       shipment_service.get_or_404(result["shipment_id"],
+                                                                   viewer=viewer))
     result["url"] = url_for("document.center", shipment_id=result["shipment_id"])
     return jsonify({"success": True, "data": result})
 
@@ -265,9 +353,14 @@ def save_customs_filing(shipment_id: str):
 def generate(shipment_id: str):
     shipment = load_shipment(shipment_id)
     overwrite = request.form.get("overwrite") == "1"
+    # 확정한 서류는 다시 만들지 않습니다. 건너뛴 것을 이름으로 알려 줍니다.
+    locked = document_service.locked_documents(shipment)
     created = document_service.generate_documents(shipment, overwrite=overwrite)
     flash(f"{len(created)}개 문서를 Shipment 데이터로 작성했습니다."
           if created else "이미 모든 문서가 최신 서식으로 작성되어 있습니다.", "success")
+    if locked:
+        flash(f"확정한 서류는 그대로 두었습니다: {', '.join(locked)}. "
+              "새 내용으로 바꾸려면 그 서류를 열어 고치세요. (확정이 풀립니다)", "info")
     return redirect(url_for("document.center", shipment_id=shipment_id))
 
 
@@ -299,7 +392,9 @@ def view(shipment_id: str, doc_type: str):
         document=document,
         sections=document_service.document_sections(document),
         items=document_service.document_items(document),
-        edit=request.args.get("edit") == "1" and document.status != "final",
+        # 확정(final)한 뒤에도 [수정하기]로 편집 모드에 들어옵니다.
+        # 저장하면 확정이 풀리고 다시 검증을 거칩니다. (document_service.update_document)
+        edit=request.args.get("edit") == "1",
     )
 
 
@@ -307,8 +402,11 @@ def view(shipment_id: str, doc_type: str):
 def update(shipment_id: str, doc_type: str):
     shipment = load_shipment(shipment_id)
     try:
+        # 확정한 서류를 고쳤는지는 저장하기 전 status로 압니다. 저장하면 generated로 돌아갑니다.
+        was_final = document_service.get_document(shipment, doc_type).status == "final"
         document_service.update_document(shipment, doc_type, request.form.to_dict())
-        flash("문서를 저장했습니다. 변경 내용은 다시 검증해주세요.", "success")
+        flash("확정을 풀고 저장했습니다. 다시 검증하면 확정할 수 있습니다." if was_final
+              else "문서를 저장했습니다. 변경 내용은 다시 검증해주세요.", "success")
     except (ValidationError, ServiceError) as exc:
         flash(str(exc), "error")
         return redirect(url_for("document.view", shipment_id=shipment_id, doc_type=doc_type, edit=1))

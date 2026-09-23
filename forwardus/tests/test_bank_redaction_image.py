@@ -14,7 +14,7 @@ import pytest
 from app.processors import bank_redaction
 
 pytestmark = pytest.mark.skipif(not bank_redaction.ocr_available(),
-                                reason="Tesseract OCR이 설치되지 않았습니다")
+                                reason="OCR(Tesseract·RapidOCR)이 설치되지 않았습니다")
 
 LINES = [
     "OFFER SHEET",
@@ -22,7 +22,7 @@ LINES = [
     "Hair Shampoo 500ml 2,100 PCS US$ 1.80 US$ 3,780.00",
     "TOTAL AMOUNT : USD 11,190.00",
     "Bank: Shinhan Bank, SWIFT SHBKKRSE, A/C 100-200-300400",
-    # 한글 이름표("입금계좌")는 이 OCR이 못 읽습니다. 번호만으로도 지워야 합니다.
+    # 이름표 없이 번호만 있어도 지워야 합니다. (RapidOCR는 한글 이름표를 못 읽습니다)
     "110-123-456789",
     "Validity: 2027-01-31",
 ]
@@ -45,7 +45,8 @@ def _text_of(png: bytes) -> str:
     from PIL import Image
 
     rows = bank_redaction._read(Image.open(io.BytesIO(png)))
-    return "\n".join(text for _, text, _ in rows)
+    # 줄마다 (자리, 글자, 자신감[, 낱말]). Tesseract는 낱말 목록이 더 붙습니다.
+    return "\n".join(row[1] for row in rows)
 
 
 @pytest.fixture(scope="module")
@@ -77,7 +78,7 @@ def test_오퍼_번호와_날짜와_금액은_남는다(masked):
 
 
 def test_OCR이_잘못_읽은_숫자_줄은_통째로_지운다():
-    """칸을 넓게 띄운 줄은 OCR이 숫자를 잘못 읽기 쉽습니다("H 00 00 0 0 00" 같은 식).
+    """칸을 넓게 띄운 줄을 이 OCR은 "H 00 00 0 0 00"으로 읽습니다(자신감 0.69).
     그 줄에 계좌번호가 있어도 우리 규칙은 못 찾습니다. 그래서 줄째 지웁니다."""
 
     garbled = "Hair Shampoo 500ml   2,100 PCS   A/C 100-200-300400   US$ 3,780.00"

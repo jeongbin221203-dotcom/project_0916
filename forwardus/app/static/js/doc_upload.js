@@ -15,7 +15,7 @@
   const MAX_BYTES = 10 * 1024 * 1024;
   // 그림을 읽는 AI 호출은 30초를 넘기기도 합니다. 서버는 90초에 끊습니다.
   const TIMEOUT_MS = 120000;
-  const DRAFT_KEY = "forwardus:doc-draft";
+  const DRAFT_KEY = window.ForwardusStore.key("forwardus:doc-draft");
 
   // 보내기 전에 걸러 냅니다. 서버도 같은 것을 다시 봅니다.
   function problem(file) {
@@ -56,6 +56,19 @@
       ? `<p class="upload_missing"><b>아직 비어 있는 필수 칸 ${data.missing.length}개</b> · `
         + `${data.missing.map(escapeHtml).join(", ")}</p>`
       : `<p class="upload_missing ok">필수 칸이 모두 찼습니다. 스케줄만 고르면 됩니다.</p>`;
+    // 신용장(L/C)을 올렸으면 선적 마감을 먼저 크게 보여 줍니다. 날짜를 넘기면 대금을 못 받습니다.
+    const lc = data.lc_schedule ? `
+      <div class="upload_lc ${data.lc_schedule.feasible ? "" : "is_late"}">
+        <b>📑 L/C 선적 마감 ${escapeHtml(data.lc_schedule.deadline)}</b>
+        <span>권장 선적일 <b>${escapeHtml(data.lc_schedule.recommended_etd)}</b> ·
+          화물 준비 ${escapeHtml(data.lc_schedule.cargo_ready_by)}까지 ·
+          서류 제시 ${escapeHtml(data.lc_schedule.presentation_by)}까지</span>
+        ${data.lc_schedule.eta_from ? `<span>도착 예상 <b>${escapeHtml(data.lc_schedule.eta_from)}
+          ~ ${escapeHtml(data.lc_schedule.eta_to)}</b> · 실제 도착일은 스케줄을 골라야 정해집니다</span>` : ""}
+        <small>${escapeHtml(data.lc_schedule.deadline_reason === "latest_shipment"
+          ? "L/C 최종선적일 기준입니다." : "유효기일에서 서류 제시기간을 뺀 날입니다.")}</small>
+      </div>` : "";
+
     // HS부호가 없는 품목은 그 자리에서 찾을 수 있게 합니다.
     const hs = (data.hs_queries || []).length
       ? `<div class="upload_hs"><span>HS부호가 없는 품목</span>${data.hs_queries.map((query) =>
@@ -65,6 +78,7 @@
       <div class="upload_result">
         <p class="upload_title"><b>${escapeHtml(data.document_label || "서류")}</b>에서 칸 `
           + `${Number(data.filled || 0)}개를 읽었습니다.</p>
+        ${lc}
         ${summary ? `<dl class="upload_summary">${summary}</dl>` : ""}
         ${missing}${notes}${hs}
       </div>`;

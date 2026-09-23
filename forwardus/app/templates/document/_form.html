@@ -37,12 +37,15 @@
       <div class="doc_place" data-doc-place="{{ field.role }}">
         <input type="text" autocomplete="off" data-place-search
                placeholder="{{ field.placeholder or '' }}">
+        {# 서류에서 읽은 곳이 늘 맞지는 않습니다. ▼로 같은 나라의 다른 항구·공항을 고릅니다. #}
+        <button type="button" class="doc_place_more" data-place-more
+                aria-label="{{ field.label }} 후보 보기" aria-expanded="false">▼</button>
         <input type="hidden" name="{{ name }}" data-doc-input>
         <ul class="doc_place_list" data-place-list hidden></ul>
       </div>
     {% else %}
-      <input type="text" name="{{ name }}" maxlength="500" autocomplete="off" data-doc-input
-             placeholder="{{ field.placeholder or '' }}">
+      <input type="text" name="{{ name }}" maxlength="{{ field.maxlength or 500 }}"
+             autocomplete="off" data-doc-input placeholder="{{ field.placeholder or '' }}">
     {% endif %}
     {% if field.hint %}<small class="doc_hint">{{ field.hint }}</small>{% endif %}
   </label>
@@ -59,26 +62,31 @@
 {% endmacro %}
 
 <div class="doc_page" data-doc-panel>
-  {# 네 갈래를 오가는 줄. 순서는 사람이 실제로 정하는 순서입니다. #}
-  <div class="doc_nav" role="tablist" aria-label="무엇부터 채울까요">
-    <button type="button" role="tab" data-doc-nav="when">🗓 일정</button>
-    <button type="button" role="tab" data-doc-nav="plan">🚢 운송</button>
-    <button type="button" role="tab" data-doc-nav="doc" class="active">📄 서류</button>
-    <button type="button" role="tab" data-doc-nav="origin">🏅 원산지증명서</button>
-  </div>
-
+  {# 네 갈래(일정·운송·서류·원산지증명서)를 한 줄로 이어 놓고 쭉 내려가며 채웁니다.
+     왼쪽의 작은 사이드바가 따라다니며 지금 어디를 쓰고 있는지 보여 주고, 누르면 그 자리로 갑니다. #}
   <div class="doc_head">
     <div>
-      <h2 data-doc-title>서류에 필요한 것</h2>
-      <p class="muted small" data-doc-lead>상업송장과 포장명세서가 요구하는 칸입니다.
+      <h2>서류 작성</h2>
+      <p class="muted small">일정 → 운송 → 서류 → 원산지증명서 순서로 쭉 내려가며 채우면 됩니다.
         <i class="doc_must">*</i>는 없으면 서류가 안 나오고, 나머지는 비우면 서류에 <b>—</b>로 남습니다.</p>
     </div>
     <div class="doc_score"><b data-doc-done>0</b><span>/ {{ checklist.required_count + 1 }}</span></div>
   </div>
 
-  <form data-doc-form>
+  <div class="doc_layout">
+    <nav class="doc_rail" aria-label="서류 작성 차례">
+      <a class="doc_rail_item" href="#doc_sec_when" data-doc-nav="when"><span aria-hidden="true">🗓</span> 일정</a>
+      <a class="doc_rail_item" href="#doc_sec_plan" data-doc-nav="plan"><span aria-hidden="true">🚢</span> 운송</a>
+      <a class="doc_rail_item" href="#doc_sec_doc" data-doc-nav="doc"><span aria-hidden="true">📄</span> 서류</a>
+      <a class="doc_rail_item" href="#doc_sec_origin" data-doc-nav="origin"><span aria-hidden="true">🏅</span> 원산지증명서</a>
+    </nav>
+
+   <div class="doc_stream">
+    <form data-doc-form>
     {# ── 일정선택 ───────────────────────────────────────────── #}
-    <div data-doc-tab="when" hidden>
+    <div id="doc_sec_when" data-doc-section="when">
+      <h2 class="doc_sec_title"><span aria-hidden="true">🗓</span> 언제 보내나요</h2>
+      <p class="doc_sec_lead">고른 날짜로 스케줄을 찾고, 그 출항일이 상업송장에 인쇄됩니다.</p>
       <section class="doc_group">
         <h3><span aria-hidden="true">🗓</span> 예상 일정</h3>
         <p class="doc_note">날짜를 누를 때마다 <b>Seller 발송 예상일 → Buyer 요청 도착일</b> 순서로 지정됩니다.
@@ -93,19 +101,23 @@
     </div>
 
     {# ── 운송계획 ───────────────────────────────────────────── #}
-    <div data-doc-tab="plan" hidden>
+    <div id="doc_sec_plan" data-doc-section="plan">
+      <h2 class="doc_sec_title"><span aria-hidden="true">🚢</span> 어디서 어디로 보내나요</h2>
+      <p class="doc_sec_lead">출발지·도착지와 스케줄입니다. 선박명과 출항일이 여기서 정해집니다.</p>
       {% for group in checklist.groups if group.tab == 'plan' %}{{ group_card(group) }}{% endfor %}
       <section class="doc_group">
         <h3><span aria-hidden="true">🚢</span> 스케줄</h3>
         <p class="doc_note">출항일과 선박명이 상업송장에 인쇄됩니다. 실제 스케줄에서 고르세요.
-          품목과 날짜를 먼저 채워야 찾을 수 있습니다.</p>
-        <button type="button" class="button" data-doc-find-schedule>스케줄 찾기</button>
+          <b>날짜·출발지·도착지</b>를 채우면 맞는 일정이 저절로 뜹니다. 품목은 나중에 적어도 됩니다.</p>
+        <button type="button" class="button" data-doc-find-schedule>스케줄 다시 찾기</button>
         <div class="doc_schedules" data-doc-schedules></div>
       </section>
     </div>
 
     {# ── 서류작성 ───────────────────────────────────────────── #}
-    <div data-doc-tab="doc" hidden>
+    <div id="doc_sec_doc" data-doc-section="doc">
+      <h2 class="doc_sec_title"><span aria-hidden="true">📄</span> 서류에 필요한 것</h2>
+      <p class="doc_sec_lead">상업송장과 포장명세서가 요구하는 칸입니다.</p>
       {% for group in checklist.groups if group.tab == 'doc' %}{{ group_card(group) }}{% endfor %}
 
       <section class="doc_group">
@@ -119,6 +131,20 @@
         <button type="button" class="link_button" data-doc-add-item>+ 품목 추가</button>
       </section>
 
+      {# 서류를 내기 직전에 한 번. 서식의 칸이 아니라 대시보드에서 이 건을 부를 이름입니다. #}
+      <section class="doc_group doc_name_group" data-doc-name-step>
+        <h3><span aria-hidden="true">🏷</span> 견적명 · 문서명</h3>
+        <p class="doc_note">대시보드 서류 목록에서 <b>날짜·품목 말고 프로젝트 이름으로</b> 이 건을
+          찾기 위한 이름입니다. 서류에는 찍히지 않습니다.</p>
+        <div class="doc_grid">
+          {{ doc_field(checklist.name_field) }}
+        </div>
+        <p class="doc_name_suggest" data-doc-name-suggest hidden>
+          비워 두면 <b data-doc-name-value></b>(으)로 저장됩니다.
+          <button type="button" class="link_button" data-doc-name-use>이 이름 쓰기</button>
+        </p>
+      </section>
+
       <div class="doc_actions">
         <div class="doc_error" data-doc-error hidden></div>
         <button class="button primary large" type="submit" data-doc-submit>서류 만들기</button>
@@ -127,11 +153,13 @@
     </div>
   </form>
 
-  {# ── 원산지증명서 ─────────────────────────────────────────── #}
-  {# 이 건이 있어야 협정을 볼 수 있어 form 밖에 둡니다. #}
-  <div data-doc-tab="origin" hidden>
+    {# ── 원산지증명서 ─────────────────────────────────────────── #}
+    {# 이 건이 있어야 협정을 볼 수 있어 form 밖에 둡니다. #}
+    <div id="doc_sec_origin" data-doc-section="origin">
+      <h2 class="doc_sec_title"><span aria-hidden="true">🏅</span> 원산지증명서</h2>
+      <p class="doc_sec_lead">협정마다 서식과 발급 주체가 달라 대신 만들어 드릴 수 없습니다.
+        어디서 어떤 서식으로 받는지 알려 드리고, 받으신 PDF를 등록하면 이 건과 맞는지 봅니다.</p>
     <div class="doc_group" data-origin-empty>
-      <h3><span aria-hidden="true">🏅</span> 원산지증명서</h3>
       <p class="doc_note">이 서류는 <b>HS부호와 도착국</b>이 있어야 어느 협정을 쓸지 알 수 있습니다.
         먼저 서류를 만들거나, 이미 만든 건을 고르세요.</p>
       <div class="origin_pick">
@@ -148,6 +176,8 @@
       </div>
     </div>
     <div data-origin-body hidden></div>
+    </div>
+   </div>
   </div>
 </div>
 

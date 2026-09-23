@@ -156,18 +156,40 @@ def requirement_key_of(shipment, document_id: int) -> str:
     return _get_upload(shipment, document_id).requirement_key
 
 
+# 스캔 PDF를 OCR로 읽을 때 앞 몇 장만 봅니다. 증명서는 보통 한두 장이고, 장마다 몇 초 걸립니다.
+OCR_PDF_PAGES = 3
+# 글자가 이보다 적은 PDF는 스캔본으로 보고 OCR로 읽습니다.
+SCANNED_TEXT_CHARS = 40
+
+
 def extract_text(path: Path, suffix: str) -> str:
-    """서류에서 글자를 뽑습니다. 못 뽑으면 빈 글자를 돌려줍니다."""
+    """서류에서 글자를 뽑습니다. 못 뽑으면 빈 글자를 돌려줍니다.
+
+    사진(PNG·JPG)과 글자가 없는 스캔 PDF는 Tesseract OCR로 읽습니다. (app/processors/ocr.py)
+    """
+
+    from app.processors import ocr
 
     try:
         if suffix == ".txt":
             return path.read_text(encoding="utf-8", errors="replace")
+        if suffix in (".png", ".jpg", ".jpeg"):
+            from PIL import Image
+
+            with Image.open(path) as image:
+                image.load()
+                return ocr.read_text(image)
         if suffix == ".pdf":
             import pdfplumber
 
             with pdfplumber.open(path) as pdf:
                 # 증명서는 보통 한두 장입니다. 앞 5장이면 충분합니다.
-                return "\n".join((page.extract_text() or "") for page in pdf.pages[:5])
+                text = "\n".join((page.extract_text() or "") for page in pdf.pages[:5])
+                if len(text.strip()) < SCANNED_TEXT_CHARS and ocr.available():
+                    scanned = [ocr.read_text(page.to_image(resolution=200).original)
+                               for page in pdf.pages[:OCR_PDF_PAGES]]
+                    text = "\n\n".join(page for page in scanned if page.strip()) or text
+                return text
         if suffix == ".docx":
             import docx
 
@@ -176,6 +198,21 @@ def extract_text(path: Path, suffix: str) -> str:
         # 어떤 형식이든 읽기에 실패하면 "못 읽었다"로 넘깁니다. 화면에서 이유를 알려 줍니다.
         return ""
     return ""
+
+
+def _unreadable_message(suffix: str) -> str:
+    """글자를 못 읽었을 때의 안내. OCR이 없어서인지, 있는데도 못 읽었는지 나눠 말합니다."""
+
+    from app.processors import ocr
+
+    scanned = suffix in (".png", ".jpg", ".jpeg", ".pdf")
+    if scanned and not ocr.available():
+        return ("서류에서 글자를 읽지 못했습니다. 사진·스캔 서류를 읽는 OCR(Tesseract, 한글·영문)이 "
+                "이 서버에 설치되어 있지 않습니다. 글자가 있는 PDF로 올리거나 내용을 직접 확인해 주세요.")
+    if scanned:
+        return ("서류에서 글자를 읽지 못했습니다. 사진이 흐리거나 기울어져 있을 수 있습니다. "
+                "밝은 곳에서 정면으로 다시 찍거나, 글자가 있는 PDF로 올려 주세요.")
+    return "서류에서 글자를 읽지 못했습니다. 파일이 비어 있거나 손상되었을 수 있습니다."
 
 
 def shipment_context(shipment) -> dict:
@@ -218,11 +255,7 @@ def analyze(shipment, document_id: int) -> RequirementDocument:
     text = extract_text(path, suffix)
     if not text.strip():
         document.review_status = "failed"
-        document.review_summary = (
-            "서류에서 글자를 읽지 못했습니다. 사진으로만 된 서류는 아직 읽지 못합니다. "
-            "PDF로 다시 내려받아 올리거나, 내용을 직접 확인해 주세요."
-            if suffix in (".png", ".jpg", ".jpeg") else
-            "서류에서 글자를 읽지 못했습니다. 스캔 이미지만 들어 있는 PDF일 수 있습니다.")
+        document.review_summary = _unreadable_message(suffix)
         document.review_findings = []
         document.reviewed_at = datetime.now(timezone.utc)
         shipment_repository.commit()

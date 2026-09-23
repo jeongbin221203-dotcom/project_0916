@@ -11,6 +11,7 @@ hypothesis>=6.100
 # 업로드한 증빙 서류에서 글자를 읽는 데 씁니다.
 pdfplumber>=0.11
 python-docx>=1.1
-# 사진·스캔 서류의 계좌번호를 AI에 보내기 전에 가리는 OCR. (app/processors/bank_redaction.py)
-# Tesseract 프로그램은 따로 설치합니다. Windows: UB-Mannheim 설치본, Linux: apt install tesseract-ocr
+# 사진·스캔 서류를 읽는 Tesseract OCR. 프로그램(Tesseract 5, kor·eng 언어)은 따로 설치합니다.
 pytesseract>=0.3.10
+# 서류 서식을 그리고(document_form) 계좌 정보를 가리는 데 씁니다. pdfplumber·pytesseract도 이걸 씁니다.
+Pillow>=10.0

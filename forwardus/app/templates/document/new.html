@@ -21,6 +21,29 @@
     </div>
   </div>
 
+  {# 칸을 미리 채우는 두 가지 방법. 둘 다 "채우기만" 하고 만들지는 않습니다. #}
+  {% if sources %}
+    {# 같은 바이어에게 두 번째로 보내는 일이 흔합니다. 그때마다 주소·품목을
+       처음부터 다시 적게 하면 오타가 납니다. #}
+    <div class="doc_source_pick">
+      <label for="doc_source">이미 만든 건에서 가져오기</label>
+      <select id="doc_source" data-doc-source>
+        <option value="">고르지 않음</option>
+        {% for group, label in [('draft', '작성 중'), ('shipment', '지난 건')] %}
+          {% set rows = sources | selectattr('kind', 'equalto', group) | list %}
+          {% if rows %}
+            <optgroup label="{{ label }}">
+              {% for row in rows %}
+                <option value="{{ row.kind }}:{{ row.id }}">{{ row.title }} · {{ row.note }}</option>
+              {% endfor %}
+            </optgroup>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <span class="muted small" data-doc-source-status role="status"></span>
+    </div>
+  {% endif %}
+
   {# 받아 둔 B/L·Offer Sheet가 있으면 올려서 칸을 채웁니다. 채운 뒤 확인은 아래 칸에서 합니다. #}
   <div class="doc_upload_wrap">
     <div data-doc-upload></div>
@@ -36,6 +59,8 @@
       schedulesUrl: "{{ url_for('planning.api_schedules') }}",
       startUrl: "{{ url_for('document.start') }}",
       extractUrl: "{{ url_for('document.extract') }}",
+      suggestNameUrl: "{{ url_for('document.suggest_name') }}",
+      sourceUrl: "{{ url_for('document.source_values', kind='__KIND__', source_id='__ID__') }}",
       originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}"
     };
   </script>

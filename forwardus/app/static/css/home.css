@@ -13,7 +13,8 @@
   padding: clamp(36px, 8vh, 88px) 16px 72px;
   text-align: center;
 }
-.home_center { width: min(720px, 100%); margin-inline: auto; }
+/* 대화창은 예전(720px)보다 1.2배 넓게 둡니다. */
+.home_center { width: min(864px, 100%); margin-inline: auto; }
 
 /* ----- 이름 (그대로 둡니다) ----- */
 .home_brand { display: inline-flex; align-items: center; gap: 12px; }
@@ -22,12 +23,12 @@
 /* 전체 로고를 올리면 그것만 크게 보여 줍니다. */
 .home_logo { display: block; width: auto; max-width: min(420px, 100%);
   max-height: 88px; margin: 0 auto; object-fit: contain; }
-.home_tagline { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
 
-/* ----- 빠른 시작 셋 (적는 칸 바로 위) ----- */
+/* ----- 빠른 시작 셋 (적는 칸 바로 위) -----
+   로고와 이 줄 사이를 2cm쯤 띄웁니다. 로고가 대화창에 붙어 보이지 않게 합니다. */
 .home_actions {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-  margin: 0 0 12px;
+  margin: 64px 0 12px;
 }
 .home_actions button {
   padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px;
@@ -41,15 +42,15 @@
 /* ----- 적는 칸 -----
    예전보다 3/4 높이로 줄였습니다. (2줄 + 아래 단추 줄) 칸이 크면 답을 읽을 자리가 좁아집니다. */
 .home_box {
-  padding: 16px 20px 12px; border: 1px solid var(--line); border-radius: 24px;
+  padding: 19px 24px 14px; border: 1px solid var(--line); border-radius: 26px;
   background: var(--white); box-shadow: var(--shadow); text-align: left;
   transition: border-color .15s, box-shadow .15s;
 }
 .home_box:focus-within { border-color: #a9c4fd; box-shadow: 0 10px 34px rgba(43, 102, 246, .13); }
 .home_box textarea {
-  display: block; width: 100%; min-height: 60px; max-height: 260px;
+  display: block; width: 100%; min-height: 72px; max-height: 312px;
   border: 0; outline: none; background: none; resize: none;
-  font-size: 17px; line-height: 1.65;
+  font-size: 18px; line-height: 1.65;
 }
 .home_box textarea::placeholder { color: #94a3b8; }
 /* 칩 줄이 상자 모서리를 넘지 않게 안쪽으로 조금 들입니다.
@@ -134,14 +135,26 @@
    가운데 폭(720px)보다 넓어야 칸이 두 줄로 들어갑니다. */
 /* 서류 작성 화면(/documents/new). 칸이 두 줄로 들어가려면 넓어야 합니다. */
 .doc_page { width: min(920px, 100%); margin: 0 auto; text-align: left; }
-.doc_nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.doc_nav button {
-  padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--white); color: var(--muted);
-  font-size: 13.5px; font-weight: 700; white-space: nowrap;
+/* 한 줄로 이어진 네 갈래와, 따라다니는 작은 사이드바 */
+.doc_layout { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 22px; align-items: start; }
+.doc_rail { position: sticky; top: 84px; display: grid; gap: 4px; }
+.doc_rail_item { display: flex; align-items: center; gap: 7px; padding: 9px 11px; border-radius: 11px;
+  border: 1px solid transparent; color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none; }
+.doc_rail_item:hover { background: #f1f5f9; color: var(--ink); text-decoration: none; }
+.doc_rail_item.active { border-color: var(--navy); background: var(--navy); color: #fff; }
+.doc_stream { min-width: 0; }
+.doc_sec_title { margin: 0 0 2px; font-size: 19px; scroll-margin-top: 90px; }
+.doc_sec_lead { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+[data-doc-section] { scroll-margin-top: 90px; padding-bottom: 26px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+[data-doc-section]:last-child { border-bottom: 0; }
+@media (max-width: 860px) {
+  /* 좁은 화면에서는 위쪽에 가로로 붙어 따라옵니다. */
+  .doc_layout { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .doc_rail { position: sticky; top: 56px; z-index: 20; grid-auto-flow: column; justify-content: start;
+    gap: 6px; overflow-x: auto; padding: 6px; margin: 0 -6px; background: rgba(255,255,255,.94);
+    backdrop-filter: blur(6px); border-radius: 12px; }
+  .doc_rail_item { white-space: nowrap; }
 }
-.doc_nav button:hover { border-color: #c7d7fd; color: var(--ink); }
-.doc_nav button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
 
 .doc_head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .doc_head h2 { margin: 0 0 4px; }
@@ -176,6 +189,14 @@
 
 /* 출발지·도착지 찾기 */
 .doc_place { position: relative; }
+/* ▼ 칸 안 오른쪽 끝. 누르면 같은 나라의 다른 항구·공항이 펼쳐집니다. */
+.doc_place_more { position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 11px; line-height: 1; }
+.doc_place_more:hover { background: #eef2f7; color: var(--ink); }
+.doc_place_more:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.doc_place input[data-place-search] { padding-right: 38px; }
+.doc_place_list button.picked { background: var(--blue_soft); color: var(--blue_dark); font-weight: 800; }
 .doc_place_list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px);
   max-height: 260px; overflow-y: auto; margin: 0; padding: 6px; list-style: none;
   border: 1px solid var(--line); border-radius: 13px; background: var(--white); box-shadow: var(--shadow); }
@@ -193,10 +214,13 @@
 
 /* 스케줄 */
 .doc_schedules { display: grid; gap: 8px; margin-top: 12px; }
-.doc_schedule { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line);
-  border-radius: 13px; background: var(--white); cursor: pointer; font-size: 13px; }
+/* 고르는 동그라미는 글 위가 아니라 오른쪽 끝, 세로 가운데에 둡니다. */
+.doc_schedule { display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--white);
+  cursor: pointer; font-size: 13px; }
 .doc_schedule:has(input:checked) { border-color: var(--blue); background: var(--blue_soft); }
-.doc_schedule input { margin-bottom: 4px; accent-color: var(--blue); }
+.doc_schedule_info { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.doc_schedule input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: var(--blue); }
 .doc_schedule b { font-size: 14px; }
 
 .doc_actions { display: grid; gap: 12px; margin-top: 18px; justify-items: center; }
@@ -457,16 +481,31 @@ body.page_home .site_footer { display: none; }
 .home_chips .chip_file:hover { border-color: var(--navy); background: #f1f5f9; }
 
 /* 서류 올려서 칸 채우기 (doc_upload.js). 시작 화면과 서류 작성 화면이 같이 씁니다. */
+/* 이미 만든 건에서 칸을 가져오는 줄. 올려서 채우기 바로 위에 둡니다.
+   둘 다 "칸을 미리 채우는" 같은 일이라 나란히 보이는 편이 낫습니다. */
+.doc_source_pick { width: min(920px, 100%); margin: 0 auto 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.doc_source_pick label { font-weight: 600; white-space: nowrap; }
+.doc_source_pick select { flex: 1 1 260px; min-width: 0; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; }
+
 .doc_upload_wrap { width: min(920px, 100%); margin: 0 auto 16px; }
 .doc_drop { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; align-items: center;
   padding: 16px 20px; border: 2px dashed #c7d7fd; border-radius: var(--radius);
   background: var(--blue_soft); transition: border-color .12s, background .12s; }
 .doc_drop.is_over { border-color: var(--blue); background: #dbe7ff; }
-.doc_drop.is_busy { opacity: .75; }
+/* 읽는 중: 흐려 두기만 하면 멈춘 것처럼 보입니다. 테두리와 문구를 또렷하게 둡니다. */
+.doc_drop.is_busy { border-color: var(--blue); background: var(--blue_soft); }
+.doc_drop.is_busy .doc_drop_text { opacity: .6; }
 .doc_drop_icon { font-size: 26px; }
 .doc_drop_text b { display: block; font-size: 14px; }
 .doc_drop_text small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
-.doc_drop_status { grid-column: 1 / -1; margin: 4px 0 0; font-size: 13px; font-weight: 700; color: var(--blue_dark); }
+.doc_drop_status { grid-column: 1 / -1; margin: 6px 0 0; font-size: 14.5px; font-weight: 800; color: var(--blue_dark); }
+.doc_drop.is_busy .doc_drop_status::before {
+  content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+  border: 2px solid #c7d7fd; border-top-color: var(--blue); border-radius: 50%;
+  animation: doc_spin .8s linear infinite;
+}
 .doc_drop_status.ok { color: #07694f; }
 .doc_drop_status.bad { color: var(--red); }
 @media (max-width: 620px) {
@@ -519,6 +558,17 @@ body.page_home .site_footer { display: none; }
 .pick_need.ok { background: var(--green_soft); color: #07694f; }
 .pick_need.warn { background: var(--amber_soft); color: #8a4f00; }
 .pick_need.bad { background: var(--red_soft); color: var(--red); }
+/* 견적명 — 서류를 만들기 직전에 한 번 묻습니다. (home.js renderPickCard) */
+.pick_name { display: block; margin-top: 12px; }
+.pick_name > span { display: block; margin-bottom: 5px; line-height: 1.45; }
+.pick_name b { font-size: 13.5px; }
+.pick_name small { display: block; color: var(--muted); font-size: 12px; }
+.pick_name input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px;
+  font: inherit; font-size: 13.5px; }
+.pick_name input:focus { border-color: var(--blue); outline: none; }
+.pick_name_hint { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.pick_name_hint b { font-size: 12px; color: var(--ink); }
+
 .pick_card .draft_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
 .pick_card [data-pick-make]:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -528,6 +578,22 @@ body.page_home .site_footer { display: none; }
 .made_doc figcaption { margin-top: 5px; font-size: 12px; font-weight: 700; text-align: center; }
 
 /* ----- 서류 미리보기 & 검토 창 (doc_preview.js) ----- */
+/* 견적명 — 제목 바로 아래. 대시보드에서 이 건을 부를 이름입니다. */
+.dp_name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--blue_soft); }
+.dp_name[hidden] { display: none; }
+.dp_name_field { display: flex; align-items: center; gap: 6px; flex: 1 1 280px;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.dp_name_field:focus-within { border-color: var(--blue); }
+.dp_name_label { font-size: 14px; line-height: 1; }
+.dp_name_field input { flex: 1; min-width: 0; border: 0; padding: 2px 0;
+  font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); background: none; }
+.dp_name_field input:focus { outline: none; }
+.dp_name_note { flex: 1 1 100%; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.dp_name_note.ok { color: #07694f; }
+.dp_name_note.bad { color: var(--red); }
+
+
 .dp_modal { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; padding: 3vh 16px; }
 .dp_modal[hidden] { display: none; }
 .dp_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.5); }
@@ -685,4 +751,46 @@ body.home_talking .support_panel { display: none !important; }
   font-size: 14px; color: var(--muted); }
 .doc_total[hidden] { display: none; }
 .doc_total b { color: var(--ink); font-size: 17px; font-variant-numeric: tabular-nums; }
+
+/* 견적명 — 서류를 만들기 직전에 묻는 칸. 서식의 칸이 아니라 대시보드의 이름입니다. */
+.doc_name_group { border-color: var(--blue); background: var(--blue_soft); }
+.doc_name_suggest { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+.doc_name_suggest[hidden] { display: none; }
+.doc_name_suggest b { color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .dp_edit { scroll-behavior: auto; } }
+
+/* 올린 신용장(L/C)의 선적 마감 (doc_upload.js) */
+.upload_lc { display: grid; gap: 4px; margin: 10px 0; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid #c7d7fd; background: var(--blue_soft); color: var(--blue_dark); font-size: 13px; }
+.upload_lc.is_late { border-color: #fecaca; background: #fee2e2; color: #b91c1c; }
+.upload_lc > b { font-size: 15px; }
+.upload_lc small { opacity: .85; }
+
+/* 적던 내용을 불러왔다는 알림 (doc_form.js) */
+.doc_restored { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.doc_restored .link_button { color: inherit; text-decoration: underline; }
+
+/* 새 파일을 읽는 동안 화면 맨 위에 크게 띄웁니다. (doc_form.js) */
+.doc_reading {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; padding: 14px 16px;
+  border: 1px solid #c7d7fd; border-radius: 14px; background: var(--blue_soft); color: var(--blue_dark);
+  font-size: 15px;
+}
+.doc_reading small { display: block; margin-top: 3px; font-size: 13px; font-weight: 600; opacity: .85; }
+.doc_reading_spin {
+  flex: 0 0 auto; width: 20px; height: 20px; margin-top: 2px;
+  border: 3px solid #c7d7fd; border-top-color: var(--blue); border-radius: 50%;
+  animation: doc_spin .8s linear infinite;
+}
+@keyframes doc_spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .doc_reading_spin, .doc_drop.is_busy .doc_drop_status::before { animation-duration: 2.4s; }
+}
+
+/* 못 채운 칸은 빨갛게 알려 줍니다. (doc_form.js가 is_invalid를 붙입니다) */
+.doc_field.is_invalid .doc_label, .doc_group.is_invalid > h3 { color: var(--red); }
+.doc_field.is_invalid input, .doc_field.is_invalid select, .doc_field.is_invalid .doc_place input[data-place-search] {
+  border-color: var(--red); background: #fff6f6; }
+.doc_group.is_invalid, .doc_item.is_invalid { border-color: var(--red); box-shadow: 0 0 0 2px rgba(217,59,59,.16); }
+.doc_field.is_invalid::after { content: "채워 주세요"; justify-self: start; margin-top: 3px; padding: 0 7px;
+  border-radius: 999px; background: var(--red_soft); color: var(--red); font-size: 11px; font-weight: 800; }

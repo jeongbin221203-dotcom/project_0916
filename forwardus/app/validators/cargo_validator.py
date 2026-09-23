@@ -265,18 +265,13 @@ def validate_cargo_input(payload: dict, *, strict: bool = True) -> dict:
     )
 
     return {
-        **validate_dangerous_goods(payload, strict=strict),
+        **dangerous,
         **validate_cargo_handling(payload),
-        "length_cm": parse_number(payload.get("length_cm"), "가로(Length)", max_value=MAX_DIMENSION_CM, field="length_cm"),
-        "width_cm": parse_number(payload.get("width_cm"), "세로(Width)", max_value=MAX_DIMENSION_CM, field="width_cm"),
-        "height_cm": parse_number(payload.get("height_cm"), "높이(Height)", max_value=MAX_DIMENSION_CM, field="height_cm"),
-        "quantity": parse_integer(payload.get("quantity"), "수량(Quantity)", max_value=MAX_QUANTITY, field="quantity"),
-        "weight_per_package_kg": parse_number(
-            payload.get("weight_per_package_kg"),
-            "포장당 중량(Weight)",
-            max_value=MAX_WEIGHT_PER_PACKAGE_KG,
-            field="weight_per_package_kg",
-        ),
+        "length_cm": length,
+        "width_cm": width,
+        "height_cm": height,
+        "quantity": quantity,
+        "weight_per_package_kg": weight,
         "package_type": package_type,
         "unit_quantity": units["unit_quantity"],
         "price_unit": units["price_unit"],

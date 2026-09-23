@@ -1490,3 +1490,53 @@ def test_air_incoterms_warn_once_then_let_the_user_through(app):
         assert validate_trade_terms(terms, "SEA")["incoterms_warning"] == ""
         # 항공에 맞는 조건도 경고가 없습니다.
         assert validate_trade_terms({**terms, "incoterms": "FCA"}, "AIR")["incoterms_warning"] == ""
+
+
+def test_schedules_without_cargo_show_dates_but_no_freight(app):
+    """서류 화면은 날짜·출발지·도착지만으로 일정을 봅니다. 운임은 화물을 적어야 냅니다."""
+
+    with app.app_context():
+        result = planning_service.search_schedules({
+            "project_name": "스케줄 조회", "transport_mode": "SEA", "sea_mode": "FCL",
+            "origin_code": "KRPUS", "destination_code": "ITSPE",
+            "requested_departure_date": "2026-11-05"})
+
+    assert result["cargo_known"] is False
+    assert result["items"], "일정은 나와야 합니다"
+    for item in result["items"]:
+        assert item["etd"] and item["eta"] and item["transit_days"]
+        # 자리표시 화물로 낸 운임은 내보내지 않습니다.
+        assert item["freight_usd"] is None and not item["freight_basis"]
+    assert "운임" in result["note"]
+
+
+def test_schedules_with_cargo_still_price_the_freight(app, shipment_payload):
+    """화물을 적으면 예전처럼 운임까지 계산합니다."""
+
+    with app.app_context():
+        result = planning_service.search_schedules(shipment_payload)
+
+    assert result["cargo_known"] is True
+    assert result["items"][0]["freight_usd"]
+
+
+def test_related_locations_lists_the_same_country_with_the_chosen_one_first(app):
+    """서류에서 읽은 항구가 아니면 ▼로 같은 나라의 다른 항구를 고릅니다."""
+
+    with app.app_context():
+        result = planning_service.related_locations("ITSPE", "SEA", "destination")
+        codes = [row["code"] for row in result["data"]]
+        assert codes[0] == "ITSPE" and len(codes) > 1
+        assert all(row["country_code"] == "IT" for row in result["data"])
+
+        # 출발지는 한국 항구만 봅니다.
+        origin = planning_service.related_locations("KRPUS", "SEA", "origin")
+        assert all(row["country_code"] == "KR" for row in origin["data"])
+        assert origin["data"][0]["code"] == "KRPUS"
+
+        # 공항도 같은 방식입니다.
+        air = planning_service.related_locations("ICN", "AIR", "origin")
+        assert air["data"][0]["code"] == "ICN" and all(row["kind"] == "airport" for row in air["data"])
+
+        # 모르는 코드면 기본 목록으로 돌려줍니다. (빈 화면을 주지 않습니다)
+        assert planning_service.related_locations("ZZZZZ", "SEA", "destination")["data"]

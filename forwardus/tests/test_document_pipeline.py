@@ -441,3 +441,48 @@ def test_대화로_만든_초안도_검토_창에서_쓸_칸을_함께_보낸다
 
     documents = body["data"]["documents"]
     assert documents and all(doc["fields"] and "data" in doc for doc in documents)
+
+
+# --- Consignee ↔ Buyer 자동 보완 ------------------------------------------------
+
+def test_Consignee만_있으면_송장_Buyer에_SAME_AS_CONSIGNEE가_찍힌다(app):
+    draft = _complete()
+
+    invoice = pipe.review_document("commercial_invoice", drafts.as_text(draft))
+
+    assert invoice["data"]["consignee"] == "SAMPLE BEAUTY INC."
+    assert invoice["data"]["buyer"] == "SAME AS CONSIGNEE"
+
+
+def test_Buyer만_적어도_바이어_상호가_빠졌다고_묻지_않는다(app):
+    """올린 서류에 Buyer 칸만 있는 경우입니다.
+
+    받는 곳과 대금 내는 곳은 대개 같습니다. 한쪽만 적혀 있는데 "상호가
+    빠졌다"고 되물으면, 이미 적어 낸 것을 한 번 더 적으라는 말이 됩니다.
+    """
+
+    state = pipe.start({"form": _form(buyer_name="", buyer="SAMPLE BEAUTY INC.")})
+
+    assert state["draft"]["buyer_name"] == "SAMPLE BEAUTY INC."
+    assert "buyer_name" not in {row["key"] for row in state["missing"]}
+
+
+# --- 견적명 -----------------------------------------------------------------------
+
+def test_견적명을_지어_제안한다(app):
+    """대시보드에서 이 건을 부를 이름. 서류 작성 화면과 같은 모양이어야 합니다."""
+
+    state = pipe.start({"form": _form(), "document_label": "견적서"})
+
+    assert re.fullmatch(r"미국_LIPSTICK_\d{8}", state["project_name_suggestion"])
+    assert state["project_name"] == ""      # 아직 사람이 적지 않았습니다.
+
+
+def test_적어_둔_견적명은_대화가_이어져도_남는다(app):
+    state = pipe.start({"form": _form(), "document_label": "견적서"})
+    draft = {**state["draft"], "project_name": "2026-10 멕시코 화장품 1차 오퍼"}
+
+    after = pipe.merge({"draft": draft, "kinds": state["kinds"], "message": "인코텀즈: FOB"})
+
+    assert after["project_name"] == "2026-10 멕시코 화장품 1차 오퍼"
+    assert after["draft"]["project_name"] == "2026-10 멕시코 화장품 1차 오퍼"

@@ -526,6 +526,10 @@ def generate_documents(shipment, doc_types: list[str] | None = None, *, overwrit
 
     서식이 바뀐 문서는 새 서식으로 다시 만들되, 사람이 직접 적어 둔 값은
     새 서식에도 있는 칸이면 그대로 살립니다.
+
+    확정(final)한 서류는 건드리지 않고 건너뜁니다. 건너뛴 서류는 돌려주는
+    목록에 들어가지 않으므로, 화면에서 몇 건이 그대로 남았는지 알리려면
+    locked_documents()를 함께 보세요.
     """
 
     reference = build_reference(shipment)
@@ -533,7 +537,16 @@ def generate_documents(shipment, doc_types: list[str] | None = None, *, overwrit
     for doc_type in doc_types or list(DOCUMENT_TYPES):
         _require_document_type(doc_type)
         existing = document_repository.get(shipment, doc_type)
-        stale = existing is not None and is_outdated(existing)
+        # 확정(final)한 서류는 다시 만들지 않습니다.
+        #
+        # 확정이 풀리는 일은 사람이 그 서류를 직접 고칠 때만 일어나야 합니다
+        # (update_document). 서식이 바뀌었다고, 또는 "다시 작성"을 눌렀다고
+        # 조용히 풀리면 사용자는 확정해 둔 줄 알고 있는데 내용이 달라져
+        # 있습니다. 확정한 서류를 새 서식으로 옮기고 싶으면 그 서류를 열어
+        # 고치면 됩니다. 그때 확정이 풀리고, 다시 검증해 확정합니다.
+        if existing is not None and existing.status == "final":
+            continue
+        stale = is_outdated(existing) if existing is not None else False
         if existing and not overwrite and not stale:
             continue
 
@@ -549,6 +562,18 @@ def generate_documents(shipment, doc_types: list[str] | None = None, *, overwrit
     return generated
 
 
+def locked_documents(shipment) -> list[str]:
+    """다시 만들기에서 건너뛸 서류(확정된 것)의 이름.
+
+    generate_documents가 조용히 건너뛰면 사용자는 "왜 이 서류만 안 바뀌지"를
+    알 수 없습니다. 화면에서 이름을 대 주려고 따로 셉니다.
+    """
+
+    return [DOCUMENT_TYPES[doc.doc_type]
+            for doc in document_repository.list_for_shipment(shipment)
+            if doc.status == "final" and doc.doc_type in DOCUMENT_TYPES]
+
+
 def get_document(shipment, doc_type: str):
     _require_document_type(doc_type)
     document = document_repository.get(shipment, doc_type)
@@ -559,9 +584,19 @@ def get_document(shipment, doc_type: str):
 
 
 def update_document(shipment, doc_type: str, form: dict):
+    """고친 내용을 저장합니다. 확정(final)한 뒤에도 고칠 수 있습니다.
+
+    예전에는 확정하면 잠갔습니다. 그런데 확정 뒤에 바이어가 주소 한 줄을
+    고쳐 달라고 하는 일이 잦았고, 그때마다 서류를 새로 만들어야 했습니다.
+    그래서 잠그는 대신 **확정을 풀고** 저장합니다. 고친 서류는 다시
+    검증(validated)을 거쳐야 확정할 수 있습니다. 고친 내용이 다른 서류와
+    어긋난 채로 "확정"이라고 적혀 있는 편이 더 위험합니다.
+
+    확정이 풀렸는지는 화면이 저장 전에 status를 보고 압니다.
+    (routes/document.update)
+    """
+
     document = get_document(shipment, doc_type)
-    if document.status == "final":
-        raise ServiceError("확정(final)된 문서는 수정할 수 없습니다.", "DOCUMENT_FINAL")
     data = clean_document_fields(form, document.data)
     # Edited content must be validated again.
     document_repository.upsert(shipment, doc_type, data, "generated", "manual")
