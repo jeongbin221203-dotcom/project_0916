@@ -75,6 +75,37 @@
     </section>
   </div>
 
+  {# 스케줄을 아직 안 고른 건. Shipment가 없어 위 표에는 안 나옵니다.
+     검토 창에서 적은 견적명으로 여기에 섭니다. #}
+  {% if mine.drafts %}
+    <section class="card">
+      <div class="row_between dash_table_head">
+        <h2>작성 중인 서류 <span class="muted small">{{ mine.drafts|length }}건</span></h2>
+        <span class="muted small">스케줄을 고르면 Shipment가 되어 아래 표로 옮겨 갑니다.</span>
+      </div>
+      <div class="table_scroll">
+        <table class="table">
+          <thead><tr><th>견적명</th><th>서류</th><th>Route</th><th>Buyer</th>
+                     <th>수정</th><th></th></tr></thead>
+          <tbody>
+            {% for d in mine.drafts %}
+              <tr>
+                <td class="dash_clip" title="{{ d.quote_title }}"><b>{{ d.quote_title }}</b></td>
+                <td class="small">{{ d.kind_count }}종</td>
+                <td>{{ d.route or '—' }}</td>
+                <td class="dash_clip" title="{{ d.buyer }}">{{ d.buyer or '—' }}</td>
+                <td>{{ d.updated_at }}</td>
+                <td><span class="badge muted_badge">작성 중</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted small">서류 초안은 <a href="{{ url_for('home.index') }}">시작 화면</a>의
+        검토 창에서 이어 고칠 수 있습니다.</p>
+    </section>
+  {% endif %}
+
   <section class="card">
     <div class="row_between dash_table_head">
       <h2>내 Shipments <span class="muted small">{{ shipments|length }}건</span></h2>

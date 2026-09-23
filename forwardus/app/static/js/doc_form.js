@@ -22,6 +22,9 @@
 
   let chosenSchedule = "";
   let madeShipment = "";
+  // 대화창 검토 창에서 견적명을 붙여 저장해 둔 초안. 여기서 서류를 만들면
+  // 그 초안이 이 Shipment로 승격됩니다. (document_draft_service.promote)
+  let carriedDraftId = null;
 
   /* ----- 탭마다 보여 줄 것 ----- */
   const ABOUT = {
@@ -487,6 +490,8 @@
       }
     } catch (error) { /* 깨졌으면 없는 것으로 봅니다. */ }
     if (stashed) {
+      // 대화창에서 이름 붙여 저장해 둔 초안이면, 여기서 만든 Shipment에 이어 붙입니다.
+      carriedDraftId = stashed.draftId || null;
       window.FORWARDUS_DOC_FILL(stashed);
       saveLocal();
       return;
@@ -666,7 +671,8 @@
     // cargo.items로 받고 견적명을 요구합니다. 견적명은 조회에 쓰이지 않고,
     // 저장되는 이름은 서버가 도착지와 품명으로 따로 짓습니다.
     const payload = {
-      ...planPayload(), project_name: "스케줄 조회", cargo: { items: itemValues() },
+      ...planPayload(), draft_id: undefined,
+      project_name: "스케줄 조회", cargo: { items: itemValues() },
     };
     scheduleBox.innerHTML = `<p class="muted small">찾는 중입니다…</p>`;
     const response = await postJson(config.schedulesUrl, payload);
@@ -771,7 +777,8 @@
 
   /* ----- 보내기 ----- */
   function planPayload() {
-    const payload = { items: itemValues(), schedule_id: chosenSchedule };
+    const payload = { items: itemValues(), schedule_id: chosenSchedule,
+                      draft_id: carriedDraftId };
     form.querySelectorAll("[data-doc-input]").forEach((input) => {
       if (input.closest(".doc_item") || input.closest("template")) return;
       payload[input.name] = input.value.trim();

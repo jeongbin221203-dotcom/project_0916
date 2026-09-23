@@ -22,7 +22,6 @@
 /* 전체 로고를 올리면 그것만 크게 보여 줍니다. */
 .home_logo { display: block; width: auto; max-width: min(420px, 100%);
   max-height: 88px; margin: 0 auto; object-fit: contain; }
-.home_tagline { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
 
 /* ----- 빠른 시작 셋 (적는 칸 바로 위) ----- */
 .home_actions {
@@ -546,6 +545,22 @@ body.page_home .site_footer { display: none; }
 .made_doc figcaption { margin-top: 5px; font-size: 12px; font-weight: 700; text-align: center; }
 
 /* ----- 서류 미리보기 & 검토 창 (doc_preview.js) ----- */
+/* 견적명 — 제목 바로 아래. 대시보드에서 이 건을 부를 이름입니다. */
+.dp_name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--blue_soft); }
+.dp_name[hidden] { display: none; }
+.dp_name_field { display: flex; align-items: center; gap: 6px; flex: 1 1 280px;
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.dp_name_field:focus-within { border-color: var(--blue); }
+.dp_name_label { font-size: 14px; line-height: 1; }
+.dp_name_field input { flex: 1; min-width: 0; border: 0; padding: 2px 0;
+  font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); background: none; }
+.dp_name_field input:focus { outline: none; }
+.dp_name_note { flex: 1 1 100%; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.dp_name_note.ok { color: #07694f; }
+.dp_name_note.bad { color: var(--red); }
+
+
 .dp_modal { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; padding: 3vh 16px; }
 .dp_modal[hidden] { display: none; }
 .dp_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.5); }
