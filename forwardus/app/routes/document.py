@@ -335,9 +335,14 @@ def save_customs_filing(shipment_id: str):
 def generate(shipment_id: str):
     shipment = load_shipment(shipment_id)
     overwrite = request.form.get("overwrite") == "1"
+    # 확정한 서류는 다시 만들지 않습니다. 건너뛴 것을 이름으로 알려 줍니다.
+    locked = document_service.locked_documents(shipment)
     created = document_service.generate_documents(shipment, overwrite=overwrite)
     flash(f"{len(created)}개 문서를 Shipment 데이터로 작성했습니다."
           if created else "이미 모든 문서가 최신 서식으로 작성되어 있습니다.", "success")
+    if locked:
+        flash(f"확정한 서류는 그대로 두었습니다: {', '.join(locked)}. "
+              "새 내용으로 바꾸려면 그 서류를 열어 고치세요. (확정이 풀립니다)", "info")
     return redirect(url_for("document.center", shipment_id=shipment_id))
 
 

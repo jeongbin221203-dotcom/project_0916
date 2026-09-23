@@ -281,6 +281,59 @@ def test_확정한_서류도_고칠_수_있고_고치면_확정이_풀린다(cre
     assert document_service.finalize_document(shipment, "commercial_invoice").status == "final"
 
 
+def test_확정한_서류는_다시_만들기로_풀리지_않는다(create_shipment):
+    """확정을 푸는 일은 사람이 그 서류를 고칠 때만 일어나야 합니다.
+
+    고쳐서 풀리는 것(update_document)은 사용자가 방금 한 일이라 알고
+    있습니다. 그런데 "다시 작성"이나 서식 변경으로도 풀리면, 사용자는
+    확정해 둔 줄 알고 있는데 내용이 달라져 있습니다. 그쪽은 막습니다.
+    """
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    document_service.validate_shipment_documents(shipment)
+    document_service.finalize_document(shipment, "commercial_invoice")
+
+    invoice = document_service.get_document(shipment, "commercial_invoice")
+    # 예전 서식으로 만들어진 확정 문서를 흉내 냅니다. (칸 구성이 지금과 다름)
+    invoice.data = {"doc_no": "CI-확정본"}
+    document_service.shipment_repository.commit()
+    assert document_service.is_outdated(invoice) is True
+
+    # 서식이 달라도 확정한 서류는 다시 만들지 않습니다.
+    rebuilt = document_service.generate_documents(shipment)
+    assert "commercial_invoice" not in [doc.doc_type for doc in rebuilt]
+
+    # 덮어쓰기를 켜도 마찬가지입니다. (확정 안 한 나머지는 다시 만듭니다)
+    forced = document_service.generate_documents(shipment, overwrite=True)
+    assert "commercial_invoice" not in [doc.doc_type for doc in forced]
+    assert forced, "확정하지 않은 서류는 덮어쓰기로 다시 만들어져야 합니다."
+
+    kept = document_service.get_document(shipment, "commercial_invoice")
+    assert kept.status == "final"               # 확정이 그대로입니다.
+    assert kept.data == {"doc_no": "CI-확정본"}  # 내용도 그대로입니다.
+
+    # 건너뛴 것을 화면에서 이름으로 알릴 수 있어야 합니다.
+    assert document_service.DOCUMENT_TYPES["commercial_invoice"] in \
+        document_service.locked_documents(shipment)
+
+
+def test_확정한_서류를_건너뛰었다고_화면이_알려_준다(client, create_shipment):
+    """조용히 건너뛰면 "왜 이 서류만 안 바뀌지"를 알 수 없습니다."""
+
+    shipment = create_shipment()
+    document_service.generate_documents(shipment)
+    document_service.validate_shipment_documents(shipment)
+    document_service.finalize_document(shipment, "commercial_invoice")
+
+    response = client.post(f"/documents/{shipment.shipment_id}/generate",
+                           follow_redirects=True)
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "확정한 서류는 그대로 두었습니다" in body
+    assert document_service.DOCUMENT_TYPES["commercial_invoice"] in body
+
+
 def test_확정한_서류의_화면에도_수정_단추가_남는다(client, create_shipment):
     """확정하면 화면에서 [수정]이 사라지던 것을 고쳤습니다."""
 
