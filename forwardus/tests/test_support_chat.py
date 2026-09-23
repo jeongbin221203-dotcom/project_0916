@@ -17,7 +17,7 @@ def test_widget_appears_on_every_page(client):
     for path in ("/", "/planning/new", "/dashboard", "/lookup/"):
         html = client.get(path).get_data(as_text=True)
         assert "data-support-open" in html, path
-        assert "<b>OpenAI</b>" in html, path
+        assert "<b>AI 포포링</b>" in html, path
         assert "js/support_chat.js" in html and "js/chat_store.js" in html, path
 
 

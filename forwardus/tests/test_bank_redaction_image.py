@@ -11,10 +11,24 @@ import io
 
 import pytest
 
-from app.processors import bank_redaction
+from app.processors import bank_redaction, ocr
 
-pytestmark = pytest.mark.skipif(not bank_redaction.ocr_available(),
-                                reason="OCR(Tesseract·RapidOCR)이 설치되지 않았습니다")
+
+def _ocr_ready() -> bool:
+    """이 시험을 돌릴 수 있는 OCR이 있는지.
+
+    한글 이름표("입금계좌")를 읽어야 하고, 영문 오퍼 번호도 틀리지 않아야 합니다.
+    Tesseract는 한글 데이터(kor)가 있어야 그 둘이 됩니다. 영어만 깔린 곳에서는
+    "DS01227"을 "HM"으로 읽는 일이 있어, 실패가 아니라 건너뜁니다.
+    """
+
+    if ocr.available():
+        return bool(ocr.status().get("korean"))
+    return bank_redaction.ocr_available()        # RapidOCR만 있는 경우
+
+
+pytestmark = pytest.mark.skipif(not _ocr_ready(),
+                                reason="한글까지 읽는 OCR이 없습니다. python data/setup_tessdata.py")
 
 LINES = [
     "OFFER SHEET",

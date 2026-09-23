@@ -127,7 +127,8 @@
 
 /* 좁은 화면에서는 사이드바가 위에 가로로 눕습니다. (shell.css) 가운데만 맞춥니다. */
 @media (max-width: 860px) {
-  .home_stage { width: 100%; background: var(--surface); padding-top: 40px; }
+  /* 배경은 화면 전체 그라데이션(base.css html)이 맡습니다. 여기서 색을 깔면 덮습니다. */
+  .home_stage { width: 100%; padding-top: 40px; }
   .home_box textarea { min-height: 56px; font-size: 16px; }
 }
 

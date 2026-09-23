@@ -162,7 +162,9 @@ def test_OCR이_없으면_설치가_필요하다고_알린다(monkeypatch):
 
 # --- 실제 Tesseract ---------------------------------------------------------------------
 
-real = pytest.mark.skipif(not ocr.available(), reason="Tesseract(kor·eng)가 설치되지 않았습니다")
+# 한글 데이터(kor.traineddata)까지 있어야 도는 시험입니다. 영어만 깔린 곳에서는 건너뜁니다.
+real = pytest.mark.skipif(not ocr.status()["korean"],
+                          reason="Tesseract 한글 데이터(kor)가 없습니다. python data/setup_tessdata.py")
 
 
 @real
