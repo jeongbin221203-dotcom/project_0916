@@ -14,8 +14,6 @@
   const itemsBox = panel.querySelector("[data-doc-items]");
   const itemTemplate = document.querySelector("[data-doc-item-template]");
   const doneEl = panel.querySelector("[data-doc-done]");
-  const titleEl = panel.querySelector("[data-doc-title]");
-  const leadEl = panel.querySelector("[data-doc-lead]");
   const errorEl = panel.querySelector("[data-doc-error]");
   const resultEl = panel.querySelector("[data-doc-result]");
   const scheduleBox = panel.querySelector("[data-doc-schedules]");
@@ -23,40 +21,74 @@
   let chosenSchedule = "";
   let madeShipment = "";
 
-  /* ----- 탭마다 보여 줄 것 ----- */
-  const ABOUT = {
-    when: ["언제 보내나요",
-      "고른 날짜로 스케줄을 찾고, 그 출항일이 상업송장에 인쇄됩니다."],
-    plan: ["어디서 어디로 보내나요",
-      "출발지·도착지와 스케줄입니다. 선박명과 출항일이 여기서 정해집니다."],
-    doc: ["서류에 필요한 것",
-      '상업송장과 포장명세서가 요구하는 칸입니다. <i class="doc_must">*</i>는 없으면 서류가 '
-      + "안 나오고, 나머지는 비우면 서류에 <b>—</b>로 남습니다."],
-    origin: ["원산지증명서",
-      "협정마다 서식과 발급 주체가 달라 대신 만들어 드릴 수 없습니다. "
-      + "어디서 어떤 서식으로 받는지 알려 드리고, 받으신 PDF를 등록하면 이 건과 맞는지 봅니다."],
-  };
+  /* ----- 차례대로 내려가며 채웁니다 -----
+     네 갈래를 한 줄로 이어 놓고, 왼쪽 작은 사이드바가 지금 자리를 따라다닙니다.
+     누르면 그 자리로 부드럽게 내려가고, 스크롤하면 표시가 저절로 옮겨 갑니다. */
+  const sections = Array.from(panel.querySelectorAll("[data-doc-section]"));
+  const railItems = Array.from(panel.querySelectorAll("[data-doc-nav]"));
+  let originOpened = false;
 
-  function showDocTab(key) {
-    panel.querySelectorAll("[data-doc-tab]").forEach((box) => {
-      box.hidden = box.dataset.docTab !== key;
+  function markRail(key) {
+    railItems.forEach((item) => {
+      const on = item.dataset.docNav === key;
+      item.classList.toggle("active", on);
+      if (on) item.setAttribute("aria-current", "true");
+      else item.removeAttribute("aria-current");
     });
-    panel.querySelectorAll("[data-doc-nav]").forEach((button) => {
-      const on = button.dataset.docNav === key;
-      button.classList.toggle("active", on);
-      button.setAttribute("aria-selected", on ? "true" : "false");
-    });
-    const about = ABOUT[key] || ABOUT.doc;
-    titleEl.textContent = about[0];
-    leadEl.innerHTML = about[1];
-    // form은 서류/일정/운송에서만 씁니다. 원산지는 이 건이 있어야 해서 밖에 있습니다.
-    form.hidden = key === "origin";
-    if (key === "origin") openOrigin();
   }
 
-  panel.querySelectorAll("[data-doc-nav]").forEach((button) => {
-    button.addEventListener("click", () => showDocTab(button.dataset.docNav));
+  function goToSection(key) {
+    const section = panel.querySelector(`[data-doc-section="${key}"]`);
+    if (!section) return;
+    if (key === "origin") openOriginOnce();
+    markRail(key);
+    // 위쪽 고정 머리말에 가리지 않도록 조금 띄워 멈춥니다.
+    const top = section.getBoundingClientRect().top + window.scrollY - 84;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }
+
+  function openOriginOnce() {
+    if (originOpened) return;
+    originOpened = true;
+    openOrigin();
+  }
+
+  railItems.forEach((item) => {
+    item.addEventListener("click", (event) => {
+      event.preventDefault();
+      goToSection(item.dataset.docNav);
+    });
   });
+
+  // 지금 보고 있는 갈래를 사이드바에 표시합니다. 화면 위쪽 기준선을 지난 마지막 갈래가 "지금"입니다.
+  // 맨 아래까지 내리면 마지막 갈래(원산지증명서)로 둡니다. 마지막 칸이 짧아 기준선에 닿지 않기 때문입니다.
+  if (sections.length) {
+    markRail("when");
+    let spyQueued = false;
+    const updateSpy = () => {
+      spyQueued = false;
+      // 갈래의 머리말이 기준선(위에서 120px)을 지난 것 중 마지막이 "지금 쓰는 곳"입니다.
+      const doc = document.documentElement;
+      // 더 내려갈 곳이 없으면 마지막 갈래입니다. 마지막 칸은 짧아서 기준선까지 올라오지 못합니다.
+      // (문서 전체 높이로 봅니다. body 높이로 재면 중간인데도 끝으로 잘못 봅니다)
+      const atBottom = Math.ceil(window.scrollY + window.innerHeight) >= doc.scrollHeight - 2;
+      let current = atBottom ? sections[sections.length - 1] : sections[0];
+      if (!atBottom) sections.forEach((section) => {
+        if (section.getBoundingClientRect().top <= 120) current = section;
+      });
+      const key = current.dataset.docSection;
+      markRail(key);
+      if (key === "origin") openOriginOnce();
+    };
+    // 스크롤이 움직이는 동안 매 프레임 한 번만 다시 잽니다. (타이머로 미루면 표시가 늦게 따라옵니다)
+    const queueSpy = () => {
+      if (spyQueued) return;
+      spyQueued = true;
+      requestAnimationFrame(updateSpy);
+    };
+    window.addEventListener("scroll", queueSpy, { passive: true });
+    window.addEventListener("resize", queueSpy);
+  }
 
   /* ----- 고르는 칸 (해상/항공, FCL/LCL) ----- */
   panel.querySelectorAll("[data-doc-choice]").forEach((group) => {
@@ -93,21 +125,48 @@
     const search = box.querySelector("[data-place-search]");
     const hidden = box.querySelector("[data-doc-input]");
     const list = box.querySelector("[data-place-list]");
+    const more = box.querySelector("[data-place-more]");
+
+    function showRows(rows, emptyText) {
+      list.innerHTML = rows.length
+        ? rows.map((row) => `<li><button type="button" data-code="${escapeHtml(row.code)}"`
+            + ` data-name="${escapeHtml(row.name)}"${row.code === hidden.value ? ' class="picked"' : ""}>`
+            + `${escapeHtml(row.name)}`
+            + ` <small>${escapeHtml(row.code)} · ${escapeHtml(row.country)}</small></button></li>`).join("")
+        : `<li class="empty">${escapeHtml(emptyText)}</li>`;
+      list.hidden = false;
+      if (more) more.setAttribute("aria-expanded", "true");
+    }
+
+    function hideList() {
+      list.hidden = true;
+      if (more) more.setAttribute("aria-expanded", "false");
+    }
 
     const look = debounce(async () => {
       const query = search.value.trim();
-      if (!query) { list.hidden = true; return; }
+      if (!query) { hideList(); return; }
       const mode = form.elements.transport_mode ? form.elements.transport_mode.value : "SEA";
       const params = new URLSearchParams({ q: query, mode, role });
       const response = await getJson(`${config.locationsUrl}?${params}`);
-      const rows = response.success ? response.data.slice(0, 8) : [];
-      list.innerHTML = rows.length
-        ? rows.map((row) => `<li><button type="button" data-code="${escapeHtml(row.code)}"`
-            + ` data-name="${escapeHtml(row.name)}">${escapeHtml(row.name)}`
-            + ` <small>${escapeHtml(row.code)} · ${escapeHtml(row.country)}</small></button></li>`).join("")
-        : `<li class="empty">찾지 못했습니다. 다른 이름으로 적어 보세요.</li>`;
-      list.hidden = false;
+      showRows(response.success ? response.data.slice(0, 8) : [], "찾지 못했습니다. 다른 이름으로 적어 보세요.");
     }, 250);
+
+    // ▼ 고른 곳과 같은 나라의 항구·공항을 관련도 순서로 펼칩니다. (고른 것이 맨 위)
+    if (more) {
+      more.addEventListener("click", async () => {
+        if (!list.hidden) { hideList(); return; }
+        const mode = form.elements.transport_mode ? form.elements.transport_mode.value : "SEA";
+        const params = new URLSearchParams({ mode, role });
+        if (hidden.value) params.set("near", hidden.value);
+        else params.set("q", search.value.trim());
+        list.innerHTML = `<li class="empty">찾는 중입니다…</li>`;
+        list.hidden = false;
+        const response = await getJson(`${config.locationsUrl}?${params}`);
+        showRows(response.success ? response.data.slice(0, 12) : [],
+                 "고를 수 있는 곳을 찾지 못했습니다. 이름으로 적어 보세요.");
+      });
+    }
 
     search.addEventListener("input", () => { hidden.value = ""; invalidateSchedule(); look(); });
     list.addEventListener("mousedown", (event) => {
@@ -116,11 +175,18 @@
       event.preventDefault();
       hidden.value = button.dataset.code;
       search.value = `${button.dataset.name} (${button.dataset.code})`;
-      list.hidden = true;
+      hideList();
       invalidateSchedule();
+      findSchedulesSoon();
       score();
     });
-    search.addEventListener("blur", () => setTimeout(() => { list.hidden = true; }, 150));
+    // ▼로 펼친 목록은 칸 밖을 눌렀을 때만 닫습니다. (칸을 떠나도 목록은 볼 수 있어야 합니다)
+    search.addEventListener("blur", () => setTimeout(() => {
+      if (!box.contains(document.activeElement)) hideList();
+    }, 150));
+    document.addEventListener("click", (event) => {
+      if (!box.contains(event.target)) hideList();
+    });
   });
 
   /* ----- 일정 달력 -----
@@ -358,10 +424,20 @@
   function invalidateSchedule() {
     if (!chosenSchedule) return;
     chosenSchedule = "";
-    scheduleBox.innerHTML = `<p class="muted small">내용이 바뀌었습니다. 스케줄을 다시 찾아 주세요.</p>`;
+    scheduleBox.innerHTML = `<p class="muted small">내용이 바뀌었습니다. 스케줄을 다시 찾는 중입니다…</p>`;
+    findSchedulesSoon();
   }
 
-  panel.querySelector("[data-doc-find-schedule]").addEventListener("click", async () => {
+  // 날짜·출발지·도착지가 모두 차면 저절로 찾습니다. 화물 치수는 없어도 일정은 나옵니다.
+  function routeReady() {
+    const f = form.elements;
+    return Boolean(f.requested_departure_date && f.requested_departure_date.value
+      && f.origin_code && f.origin_code.value && f.destination_code && f.destination_code.value);
+  }
+
+  const findSchedulesSoon = debounce(() => { if (routeReady() && !chosenSchedule) findSchedules(); }, 400);
+
+  async function findSchedules() {
     // 스케줄 조회는 운송 계획 화면과 같은 창구를 씁니다. 그쪽은 품목을
     // cargo.items로 받고 견적명을 요구합니다. 견적명은 조회에 쓰이지 않고,
     // 저장되는 이름은 서버가 도착지와 품명으로 따로 짓습니다.
@@ -381,15 +457,20 @@
     }
     scheduleBox.innerHTML = items.map((item) => `
       <label class="doc_schedule">
+        <span class="doc_schedule_info">
+          <b>${escapeHtml(item.carrier || "-")}${item.vessel ? " · " + escapeHtml(item.vessel) : ""}</b>
+          <span>ETD ${escapeHtml(item.etd)} → ETA ${escapeHtml(item.eta)} · ${item.transit_days}일</span>
+          <small class="muted">${item.source === "api" ? "실제 스케줄" : "예시 스케줄 (API 키가 없어 추정치입니다)"}</small>
+        </span>
         <input type="radio" name="schedule_pick" value="${escapeHtml(item.schedule_id)}">
-        <b>${escapeHtml(item.carrier || "-")}${item.vessel ? " · " + escapeHtml(item.vessel) : ""}</b>
-        <span>ETD ${escapeHtml(item.etd)} → ETA ${escapeHtml(item.eta)} · ${item.transit_days}일</span>
-        <small class="muted">${item.source === "api" ? "실제 스케줄" : "예시 스케줄 (API 키가 없어 추정치입니다)"}</small>
       </label>`).join("");
     scheduleBox.querySelectorAll("input[name=schedule_pick]").forEach((radio) => {
       radio.addEventListener("change", () => { chosenSchedule = radio.value; score(); });
     });
-  });
+  }
+
+  panel.querySelector("[data-doc-find-schedule]").addEventListener("click", findSchedules);
+  form.addEventListener("change", findSchedulesSoon);
 
   /* ----- 원산지증명서 ----- */
   const originEmpty = panel.querySelector("[data-origin-empty]");
@@ -397,7 +478,7 @@
   const originPick = panel.querySelector("[data-origin-pick]");
 
   panel.querySelector("[data-origin-goto-doc]")?.addEventListener("click", () => {
-    showDocTab("doc");
+    goToSection("doc");
   });
   originPick?.addEventListener("change", () => {
     if (originPick.value) loadOrigin(originPick.value);
@@ -479,11 +560,73 @@
     return payload;
   }
 
-  function showError(message) {
+  /* ----- 못 채운 칸 알려 주기 -----
+     서버가 "무엇이 비었는지"(field)를 함께 돌려줍니다. 그 칸을 빨갛게 칠하고 그 자리로 올라갑니다.
+     칸을 채우기 시작하면 표시는 곧바로 지웁니다. */
+  function clearInvalid() {
+    panel.querySelectorAll(".is_invalid").forEach((el) => el.classList.remove("is_invalid"));
+  }
+
+  // 서버가 쓰는 이름과 화면의 칸을 잇습니다. 화면에 같은 이름의 칸이 없는 것만 적습니다.
+  const FIELD_FALLBACK = {
+    items: "[data-doc-items]", amount: "[data-doc-items]",
+    schedule_id: "[data-doc-schedules]", payload: "[data-doc-items]",
+  };
+
+  function fieldBox(field) {
+    if (!field) return null;
+    const input = form.querySelector(`[name="${field}"]:not([type=hidden])`)
+      || form.querySelector(`[name="${field}"]`);
+    if (input) {
+      return input.closest(".doc_field, .doc_place, .doc_group, .doc_item") || input;
+    }
+    const spot = panel.querySelector(`[data-doc-field="${field}"]`)
+      || (FIELD_FALLBACK[field] && panel.querySelector(FIELD_FALLBACK[field]));
+    return spot ? (spot.closest(".doc_group") || spot) : null;
+  }
+
+  // 아직 비어 있는 필수 칸을 모두 빨갛게 칠합니다. 한 번에 어디를 채워야 하는지 보입니다.
+  function markEmptyRequired() {
+    let first = null;
+    form.querySelectorAll(".doc_field").forEach((box) => {
+      if (!box.querySelector(".doc_must")) return;
+      const input = box.querySelector("[data-doc-input]");
+      if (!input || input.value.trim()) return;
+      box.classList.add("is_invalid");
+      if (!first) first = box;
+    });
+    return first;
+  }
+
+  function showError(message, field) {
+    clearInvalid();
     errorEl.textContent = message;
     errorEl.hidden = !message;
-    if (message) errorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!message) return;
+    const target = fieldBox(field) || markEmptyRequired();
+    if (target) {
+      target.classList.add("is_invalid");
+      markEmptyRequired();
+      const top = target.getBoundingClientRect().top + window.scrollY - 140;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      const input = target.matches("input, select, textarea")
+        ? target : target.querySelector("input, select, textarea, button");
+      if (input) setTimeout(() => input.focus({ preventScroll: true }), 350);
+    } else {
+      errorEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
+
+  // 다시 적기 시작하면 빨간 표시를 지웁니다. 고친 칸이 계속 빨갛게 남으면 헷갈립니다.
+  form.addEventListener("input", (event) => {
+    const box = event.target.closest(".is_invalid");
+    if (box) box.classList.remove("is_invalid");
+    if (!form.querySelector(".is_invalid")) { errorEl.hidden = true; }
+  });
+  form.addEventListener("change", (event) => {
+    const box = event.target.closest(".is_invalid");
+    if (box) box.classList.remove("is_invalid");
+  });
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -497,7 +640,7 @@
     button.textContent = "서류 만들기";
 
     if (!response.success) {
-      showError(response.message);
+      showError(response.message, response.field);
       return;
     }
     madeShipment = response.data.shipment_id;
@@ -524,7 +667,7 @@
       </div>`;
     resultEl.hidden = false;
     resultEl.querySelector("[data-go-origin]").addEventListener("click", () => {
-      showDocTab("origin");
+      goToSection("origin");
     });
     resultEl.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -592,7 +735,7 @@
   addItem();
   applyMode("SEA");
   drawCalendar();
-  showDocTab("doc");
+  markRail("when");
   score();
 
   /* ----- B/L·Offer Sheet 올려서 칸 채우기 ----- */
@@ -610,7 +753,6 @@
           + `<p class="muted small">노란 칸이 서류에서 읽어 온 값입니다. 맞는지 보고 고친 뒤
              <b>서류 만들기</b>를 눌러 주세요.</p>`;
         uploadResult.hidden = false;
-        showDocTab("doc");
         uploadResult.scrollIntoView({ behavior: "smooth", block: "start" });
       },
     });

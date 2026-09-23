@@ -13,7 +13,8 @@
   padding: clamp(36px, 8vh, 88px) 16px 72px;
   text-align: center;
 }
-.home_center { width: min(720px, 100%); margin-inline: auto; }
+/* 대화창은 예전(720px)보다 1.2배 넓게 둡니다. */
+.home_center { width: min(864px, 100%); margin-inline: auto; }
 
 /* ----- 이름 (그대로 둡니다) ----- */
 .home_brand { display: inline-flex; align-items: center; gap: 12px; }
@@ -22,12 +23,12 @@
 /* 전체 로고를 올리면 그것만 크게 보여 줍니다. */
 .home_logo { display: block; width: auto; max-width: min(420px, 100%);
   max-height: 88px; margin: 0 auto; object-fit: contain; }
-.home_tagline { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
 
-/* ----- 빠른 시작 셋 (적는 칸 바로 위) ----- */
+/* ----- 빠른 시작 셋 (적는 칸 바로 위) -----
+   로고와 이 줄 사이를 2cm쯤 띄웁니다. 로고가 대화창에 붙어 보이지 않게 합니다. */
 .home_actions {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-  margin: 0 0 12px;
+  margin: 64px 0 12px;
 }
 .home_actions button {
   padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px;
@@ -41,15 +42,15 @@
 /* ----- 적는 칸 -----
    예전보다 3/4 높이로 줄였습니다. (2줄 + 아래 단추 줄) 칸이 크면 답을 읽을 자리가 좁아집니다. */
 .home_box {
-  padding: 16px 20px 12px; border: 1px solid var(--line); border-radius: 24px;
+  padding: 19px 24px 14px; border: 1px solid var(--line); border-radius: 26px;
   background: var(--white); box-shadow: var(--shadow); text-align: left;
   transition: border-color .15s, box-shadow .15s;
 }
 .home_box:focus-within { border-color: #a9c4fd; box-shadow: 0 10px 34px rgba(43, 102, 246, .13); }
 .home_box textarea {
-  display: block; width: 100%; min-height: 60px; max-height: 260px;
+  display: block; width: 100%; min-height: 72px; max-height: 312px;
   border: 0; outline: none; background: none; resize: none;
-  font-size: 17px; line-height: 1.65;
+  font-size: 18px; line-height: 1.65;
 }
 .home_box textarea::placeholder { color: #94a3b8; }
 /* 칩 줄이 상자 모서리를 넘지 않게 안쪽으로 조금 들입니다.
@@ -134,14 +135,26 @@
    가운데 폭(720px)보다 넓어야 칸이 두 줄로 들어갑니다. */
 /* 서류 작성 화면(/documents/new). 칸이 두 줄로 들어가려면 넓어야 합니다. */
 .doc_page { width: min(920px, 100%); margin: 0 auto; text-align: left; }
-.doc_nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.doc_nav button {
-  padding: 9px 16px; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--white); color: var(--muted);
-  font-size: 13.5px; font-weight: 700; white-space: nowrap;
+/* 한 줄로 이어진 네 갈래와, 따라다니는 작은 사이드바 */
+.doc_layout { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 22px; align-items: start; }
+.doc_rail { position: sticky; top: 84px; display: grid; gap: 4px; }
+.doc_rail_item { display: flex; align-items: center; gap: 7px; padding: 9px 11px; border-radius: 11px;
+  border: 1px solid transparent; color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none; }
+.doc_rail_item:hover { background: #f1f5f9; color: var(--ink); text-decoration: none; }
+.doc_rail_item.active { border-color: var(--navy); background: var(--navy); color: #fff; }
+.doc_stream { min-width: 0; }
+.doc_sec_title { margin: 0 0 2px; font-size: 19px; scroll-margin-top: 90px; }
+.doc_sec_lead { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+[data-doc-section] { scroll-margin-top: 90px; padding-bottom: 26px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+[data-doc-section]:last-child { border-bottom: 0; }
+@media (max-width: 860px) {
+  /* 좁은 화면에서는 위쪽에 가로로 붙어 따라옵니다. */
+  .doc_layout { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .doc_rail { position: sticky; top: 56px; z-index: 20; grid-auto-flow: column; justify-content: start;
+    gap: 6px; overflow-x: auto; padding: 6px; margin: 0 -6px; background: rgba(255,255,255,.94);
+    backdrop-filter: blur(6px); border-radius: 12px; }
+  .doc_rail_item { white-space: nowrap; }
 }
-.doc_nav button:hover { border-color: #c7d7fd; color: var(--ink); }
-.doc_nav button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
 
 .doc_head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .doc_head h2 { margin: 0 0 4px; }
@@ -176,6 +189,14 @@
 
 /* 출발지·도착지 찾기 */
 .doc_place { position: relative; }
+/* ▼ 칸 안 오른쪽 끝. 누르면 같은 나라의 다른 항구·공항이 펼쳐집니다. */
+.doc_place_more { position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 11px; line-height: 1; }
+.doc_place_more:hover { background: #eef2f7; color: var(--ink); }
+.doc_place_more:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.doc_place input[data-place-search] { padding-right: 38px; }
+.doc_place_list button.picked { background: var(--blue_soft); color: var(--blue_dark); font-weight: 800; }
 .doc_place_list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px);
   max-height: 260px; overflow-y: auto; margin: 0; padding: 6px; list-style: none;
   border: 1px solid var(--line); border-radius: 13px; background: var(--white); box-shadow: var(--shadow); }
@@ -193,10 +214,13 @@
 
 /* 스케줄 */
 .doc_schedules { display: grid; gap: 8px; margin-top: 12px; }
-.doc_schedule { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line);
-  border-radius: 13px; background: var(--white); cursor: pointer; font-size: 13px; }
+/* 고르는 동그라미는 글 위가 아니라 오른쪽 끝, 세로 가운데에 둡니다. */
+.doc_schedule { display: flex; align-items: center; gap: 14px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--white);
+  cursor: pointer; font-size: 13px; }
 .doc_schedule:has(input:checked) { border-color: var(--blue); background: var(--blue_soft); }
-.doc_schedule input { margin-bottom: 4px; accent-color: var(--blue); }
+.doc_schedule_info { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.doc_schedule input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: var(--blue); }
 .doc_schedule b { font-size: 14px; }
 
 .doc_actions { display: grid; gap: 12px; margin-top: 18px; justify-items: center; }
@@ -686,3 +710,11 @@ body.home_talking .support_panel { display: none !important; }
 .doc_total[hidden] { display: none; }
 .doc_total b { color: var(--ink); font-size: 17px; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .dp_edit { scroll-behavior: auto; } }
+
+/* 못 채운 칸은 빨갛게 알려 줍니다. (doc_form.js가 is_invalid를 붙입니다) */
+.doc_field.is_invalid .doc_label, .doc_group.is_invalid > h3 { color: var(--red); }
+.doc_field.is_invalid input, .doc_field.is_invalid select, .doc_field.is_invalid .doc_place input[data-place-search] {
+  border-color: var(--red); background: #fff6f6; }
+.doc_group.is_invalid, .doc_item.is_invalid { border-color: var(--red); box-shadow: 0 0 0 2px rgba(217,59,59,.16); }
+.doc_field.is_invalid::after { content: "채워 주세요"; justify-self: start; margin-top: 3px; padding: 0 7px;
+  border-radius: 999px; background: var(--red_soft); color: var(--red); font-size: 11px; font-weight: 800; }

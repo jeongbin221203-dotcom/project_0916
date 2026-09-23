@@ -20,15 +20,21 @@ RAIL = [
     {"key": "dashboard", "icon": "📊", "tone": "violet", "label": "Dashboard", "endpoint": "dashboard.index",
      "note": "내 Shipment 현황 (마스터는 전체)",
      "blueprints": ("dashboard", "shipment", "tracking", "assistant")},
+    # 위쪽 메뉴에 있던 조회 두 가지를 이리로 옮겼습니다. 조회는 어느 화면에서나 자주 씁니다.
+    {"key": "container", "icon": "🔎", "tone": "blue", "label": "컨테이너 조회",
+     "endpoint": "tracking.container_lookup",
+     "note": "컨테이너 번호로 화물 위치를 봅니다", "blueprints": ()},
+    {"key": "lookup", "icon": "🏛", "tone": "green", "label": "관세청 조회", "endpoint": "lookup.index",
+     "note": "HS부호·관세율·수출입 통계를 관세청 자료로 찾습니다", "blueprints": ("lookup",)},
 ]
 RECENT_COUNT = 3
 
 
 def active_key() -> str:
     blueprint = request.blueprint or ""
-    # 컨테이너 조회는 tracking 안에 있지만 Shipment 화면이 아닙니다. 위쪽 메뉴에서 다룹니다.
+    # 컨테이너 조회는 tracking 안에 있지만 Shipment 화면이 아닙니다. 사이드바에서는 따로 봅니다.
     if request.endpoint == "tracking.container_lookup":
-        return ""
+        return "container"
     return next((item["key"] for item in RAIL if blueprint in item["blueprints"]), "")
 
 

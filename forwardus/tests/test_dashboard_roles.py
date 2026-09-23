@@ -190,7 +190,8 @@ def test_관리자_API는_회원에게_403_로그인_전에는_401(client, anon_
 
 @pytest.mark.parametrize("path, active", [
     ("/", "홈"), ("/planning/new", "운송 계획"), ("/documents/new", "서류 작성"),
-    ("/dashboard", "Dashboard"), ("/lookup/", None), ("/tracking/container", None)])
+    ("/dashboard", "Dashboard"), ("/lookup/", "관세청 조회"),
+    ("/tracking/container", "컨테이너 조회")])
 def test_사이드바는_어느_화면에나_같은_자리에_있다(client, path, active):
     html = client.get(path).get_data(as_text=True)
 
@@ -200,7 +201,7 @@ def test_사이드바는_어느_화면에나_같은_자리에_있다(client, pat
     assert "js/sidebar.js" in html and "css/shell.css" in html
     # 접힘/펼침은 그리기 전에 저장된 값으로 붙입니다. 화면을 옮겨도 그대로입니다.
     assert html.index("isSidebarExpanded") < html.index("<body")
-    for name in ("홈", "운송 계획", "서류 작성", "Dashboard", "환율"):
+    for name in ("홈", "운송 계획", "서류 작성", "Dashboard", "컨테이너 조회", "관세청 조회", "환율"):
         assert f'data-tip="{name}"' in html, (path, name)
     current = _active_rail(html)
     if active:

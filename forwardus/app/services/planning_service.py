@@ -103,6 +103,26 @@ def search_locations(query: str, transport_mode: str, role: str | None = None, c
     return result
 
 
+def related_locations(code: str, transport_mode: str, role: str | None = None) -> dict:
+    """고른 곳과 같은 나라의 항구·공항을, 관련도 높은 순서로 돌려줍니다.
+
+    서류에서 읽은 항구가 늘 맞지는 않습니다(같은 나라에 항구가 여럿입니다).
+    그래서 ▼를 누르면 그 나라의 다른 곳을 바로 고를 수 있게 합니다.
+    고른 곳이 맨 앞에 오고, 나머지는 물동량·항만 등급 순서 그대로입니다.
+    """
+
+    info = location_client.find_location(code)
+    if not info:
+        return search_locations("", transport_mode, role)
+    result = search_locations("", transport_mode, role, country=info.get("country_code"))
+    if not result["success"]:
+        return result
+    rows = [item for item in result["data"] if item["code"] != info["code"]]
+    chosen = next((item for item in result["data"] if item["code"] == info["code"]), info)
+    result["data"] = [chosen, *rows]
+    return result
+
+
 def list_countries(transport_mode: str, role: str | None = None) -> dict:
     """Destination country list, with Korea's main trading partners ranked first."""
 
@@ -741,12 +761,32 @@ def _sort_schedules(items: list[dict], sort_by: str) -> list[dict]:
     ))
 
 
+# 화물을 아직 적지 않았을 때 쓰는 자리표시 값. 출항 일정만 보여 주고 운임은 내지 않습니다.
+# (운임은 부피·무게로 정해지므로, 화물 없이 계산하면 틀린 값을 보여 주게 됩니다)
+PLACEHOLDER_METRICS = {
+    "container_quantity": 1, "container_type": "20FT",
+    "billable_revenue_ton": 1.0, "chargeable_weight_kg": 1000.0,
+    "total_cbm": 0.0, "total_weight_kg": 0.0,
+}
+NO_CARGO_NOTE = ("화물 정보를 아직 적지 않아 출항 일정만 보여 드립니다. "
+                 "운임은 품목의 크기·무게를 적어야 계산할 수 있습니다.")
+
+
 def search_schedules(payload: dict) -> dict:
-    """Validate route and cargo, then return sorted schedules with deadline checks."""
+    """Validate route and cargo, then return sorted schedules with deadline checks.
+
+    화물을 아직 적지 않았어도 날짜·출발지·도착지만 있으면 일정을 보여 줍니다.
+    그때는 운임을 비우고 그렇다고 알려 줍니다. (서류 작성 화면이 이렇게 부릅니다)
+    """
 
     route = validate_route(payload)
     origin, destination = _resolve_locations(route, payload)
-    metrics = cargo_metrics(payload)
+    try:
+        metrics = cargo_metrics(payload)
+        cargo_known = True
+    except ValidationError:
+        metrics = dict(PLACEHOLDER_METRICS)
+        cargo_known = False
     buyer_required_date = parse_date(payload.get("buyer_required_date"), "Buyer 요청일", required=False,
                                      field="buyer_required_date")
 
@@ -766,15 +806,24 @@ def search_schedules(payload: dict) -> dict:
         deadline = check_buyer_deadline(date.fromisoformat(item["eta"]), buyer_required_date, route["transport_mode"])
         if deadline:
             item["deadline"] = {**deadline, "latest_eta": deadline["latest_eta"].isoformat()}
+        if not cargo_known:
+            # 자리표시 화물로 낸 운임은 내보내지 않습니다. 없는 값을 있는 것처럼 보이면 안 됩니다.
+            item["freight_usd"] = None
+            item["freight_basis"] = ""
+            item["freight_source"] = ""
 
     sort_by = payload.get("sort") if payload.get("sort") in SORT_OPTIONS else "recommended"
+    note = result.get("note", "")
+    if not cargo_known:
+        note = f"{note} {NO_CARGO_NOTE}".strip()
     return {
         "items": _sort_schedules(items, sort_by),
         "sort": sort_by,
         "source": result["source"],
         # 실데이터인지 예시인지, 예시라면 무엇이 없어서인지 화면에 그대로 적습니다.
-        "note": result.get("note", ""),
+        "note": note,
         "metrics": metrics,
+        "cargo_known": cargo_known,
     }
 
 
