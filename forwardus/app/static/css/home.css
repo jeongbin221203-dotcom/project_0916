@@ -686,3 +686,14 @@ body.home_talking .support_panel { display: none !important; }
 .doc_total[hidden] { display: none; }
 .doc_total b { color: var(--ink); font-size: 17px; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .dp_edit { scroll-behavior: auto; } }
+
+/* 올린 신용장(L/C)의 선적 마감 (doc_upload.js) */
+.upload_lc { display: grid; gap: 4px; margin: 10px 0; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid #c7d7fd; background: var(--blue_soft); color: var(--blue_dark); font-size: 13px; }
+.upload_lc.is_late { border-color: #fecaca; background: #fee2e2; color: #b91c1c; }
+.upload_lc > b { font-size: 15px; }
+.upload_lc small { opacity: .85; }
+
+/* 적던 내용을 불러왔다는 알림 (doc_form.js) */
+.doc_restored { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.doc_restored .link_button { color: inherit; text-decoration: underline; }

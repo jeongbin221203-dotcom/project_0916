@@ -37,7 +37,10 @@
       + "어디서 어떤 서식으로 받는지 알려 드리고, 받으신 PDF를 등록하면 이 건과 맞는지 봅니다."],
   };
 
+  let currentTab = "doc";
+
   function showDocTab(key) {
+    currentTab = key;
     panel.querySelectorAll("[data-doc-tab]").forEach((box) => {
       box.hidden = box.dataset.docTab !== key;
     });
@@ -314,8 +317,12 @@
      여기서 적은 값(송하인·수하인·POL/POD·품목·중량·치수·Incoterms·통화·금액)을
      "작성 중인 수출 건"으로 저장합니다. 운송 계획 화면이 열리면 이 값으로 칸이 미리 찹니다.
      (work_draft.js · /api/work-draft. 바이어 주소·연락처는 이 탭에만 둡니다) */
+  // 화면에 칸이 없지만 운송 계획으로 넘겨야 하는 값. (올린 L/C에서 읽은 선적 마감 조건)
+  const carried = {};
+  const CARRIED_KEYS = ["lc_latest_shipment_date", "lc_expiry_date", "lc_presentation_days"];
+
   function sharedValues() {
-    const fields = {};
+    const fields = { ...carried };
     form.querySelectorAll("[data-doc-input]").forEach((input) => {
       if (input.closest("template") || input.name.startsWith("item_") || !input.name) return;
       fields[input.name] = input.value.trim();
@@ -329,8 +336,131 @@
   function syncWorkDraft(source = "document") {
     if (window.ForwardusWorkDraft) window.ForwardusWorkDraft.save(sharedValues(), source);
   }
-  form.addEventListener("input", () => syncWorkDraft());
-  form.addEventListener("change", () => syncWorkDraft());
+
+  /* ----- 임시저장 · 불러오기 -----
+     다른 화면에 다녀와도 적던 내용이 남아 있어야 합니다. 두 곳에 둡니다.
+
+       이 탭(sessionStorage)  바이어 주소·연락처까지 그대로. 탭을 닫으면 사라집니다.
+       서버(/api/work-draft)  다른 기기·다른 탭에서도 이어 쓰는 값. 비공개 칸은 빼고 저장합니다.
+
+     돌아왔을 때는 둘 중 나중에 저장된 것을 씁니다. */
+  const LOCAL_KEY = "forwardus:doc-form-draft";
+
+  function saveLocal() {
+    const draft = { ...sharedValues(), savedAt: Date.now(), lc: { ...carried }, tab: currentTab };
+    try {
+      window.sessionStorage.setItem(LOCAL_KEY, JSON.stringify(draft));
+    } catch (error) { /* 저장 공간을 못 쓰면 서버 쪽만 남습니다. */ }
+  }
+
+  function readLocal() {
+    try {
+      const draft = JSON.parse(window.sessionStorage.getItem(LOCAL_KEY) || "null");
+      return draft && draft.savedAt ? draft : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function forgetLocal() {
+    try {
+      window.sessionStorage.removeItem(LOCAL_KEY);
+    } catch (error) { /* 무시 */ }
+  }
+
+  const saveSoon = debounce(() => { syncWorkDraft(); saveLocal(); }, 400);
+  form.addEventListener("input", saveSoon);
+  form.addEventListener("change", saveSoon);
+
+  // 값을 조용히 되돌립니다. (노란 표시를 붙이지 않습니다. 사람이 직접 적은 값이니까요)
+  function applyDraft(draft) {
+    const fields = draft.fields || {};
+    // 운송 모드를 먼저 고릅니다. 나중에 누르면 적어 둔 출발·도착지가 지워집니다.
+    ["transport_mode", "sea_mode"].forEach((name) => {
+      const input = form.elements[name];
+      if (!input || !fields[name] || input.value === fields[name]) return;
+      const button = input.closest("[data-doc-choice]")
+        .querySelector(`button[data-value="${fields[name]}"]`);
+      if (button) button.click();
+    });
+    // 출발지·도착지의 "보이는 이름"은 칸이 아니라 검색 칸에 넣습니다. (아래에서 따로)
+    const SHOWN_PLACES = ["origin_name", "destination_name"];
+    Object.entries(fields).forEach(([name, value]) => {
+      if (!value || SHOWN_PLACES.includes(name) || ["transport_mode", "sea_mode"].includes(name)) return;
+      const input = form.elements[name];
+      if (input && !input.closest("[data-doc-choice]")) input.value = value;
+    });
+    ["origin", "destination"].forEach((role) => {
+      const shown = fields[`${role}_name`];
+      const box = panel.querySelector(`[data-doc-place="${role}"]`);
+      if (shown && box) box.querySelector("[data-place-search]").value = shown;
+    });
+    Object.assign(carried, draft.lc || {});
+    const items = draft.items || [];
+    if (items.length) {
+      itemsBox.innerHTML = "";
+      items.forEach((item) => {
+        const row = addItem();
+        row.querySelectorAll("[data-doc-input]").forEach((input) => {
+          const key = input.name.replace(/^item_/, "");
+          if (item[key]) input.value = item[key];
+        });
+      });
+    }
+    applyCurrency();
+    invalidateSchedule();
+    drawCalendar();
+    score();
+  }
+
+  function showRestoredNote(savedAt) {
+    const note = document.createElement("div");
+    note.className = "flash flash_success doc_restored";
+    note.setAttribute("role", "status");
+    const when = savedAt
+      ? new Date(savedAt).toLocaleString("ko-KR", { month: "long", day: "numeric",
+                                                   hour: "2-digit", minute: "2-digit" })
+      : "";
+    note.innerHTML = `📝 적던 내용을 불러왔습니다.${when ? ` <b>${escapeHtml(when)}</b> 저장분입니다.` : ""}`
+      + ` <button type="button" class="link_button" data-doc-clear>비우고 새로 시작</button>`;
+    panel.prepend(note);
+    note.querySelector("[data-doc-clear]").addEventListener("click", async () => {
+      forgetLocal();
+      if (window.ForwardusWorkDraft) await window.ForwardusWorkDraft.clear();
+      window.location.reload();
+    });
+  }
+
+  async function restoreDraft() {
+    // 시작 화면에서 "적은 내용으로 칸 채우기"로 넘어온 경우가 가장 먼저입니다. (방금 고른 값)
+    let stashed = null;
+    try {
+      const raw = window.sessionStorage.getItem("forwardus:doc-draft");
+      if (raw) {
+        window.sessionStorage.removeItem("forwardus:doc-draft");
+        stashed = JSON.parse(raw);
+      }
+    } catch (error) { /* 깨졌으면 없는 것으로 봅니다. */ }
+    if (stashed) {
+      window.FORWARDUS_DOC_FILL(stashed);
+      saveLocal();
+      return;
+    }
+
+    const local = readLocal();
+    let server = null;
+    if (window.ForwardusWorkDraft) server = await window.ForwardusWorkDraft.load();
+    // 나중에 저장된 것을 씁니다. (서버는 다른 탭·기기에서 적었을 수 있습니다)
+    const newest = !local ? server
+      : (!server || (server.updated_ms || 0) <= local.savedAt ? local
+        : { ...server, savedAt: server.updated_ms, lc: local.lc, tab: local.tab,
+            fields: { ...local.fields, ...server.fields },
+            items: (server.items && server.items.length) ? server.items : local.items });
+    if (!newest || (!Object.keys(newest.fields || {}).length && !(newest.items || []).length)) return;
+    applyDraft(newest);
+    if (newest.tab) showDocTab(newest.tab);
+    showRestoredNote(newest.savedAt);
+  }
 
   /* ----- 얼마나 찼는지 ----- */
   function score() {
@@ -541,6 +671,10 @@
   // 않습니다. 맞는지 보고 누르는 것은 사람이 합니다.
   window.FORWARDUS_DOC_FILL = function fill(draft) {
     const fields = draft.fields || {};
+    // 올린 L/C에서 읽은 선적 마감 조건. 화면에 칸은 없지만 운송 계획으로 넘깁니다.
+    CARRIED_KEYS.forEach((key) => {
+      if (draft.lc && draft.lc[key]) carried[key] = String(draft.lc[key]);
+    });
 
     Object.entries(fields).forEach(([name, value]) => {
       if (name.endsWith("_name") && form.elements[`${name.replace("_name", "_code")}`]) return;
@@ -587,6 +721,7 @@
     score();
     applyCurrency();          // 읽어 온 통화가 금액 라벨에 바로 붙습니다.
     syncWorkDraft("upload");  // 올린 서류·대화에서 읽은 값도 운송 계획으로 이어집니다.
+    saveLocal();
   };
 
   addItem();
@@ -616,15 +751,13 @@
     });
   }
 
-  // 시작 화면에서 "적은 내용으로 칸 채우기"를 누르고 넘어온 경우.
-  // 한 번만 집어 가고 지웁니다. 새로고침 때마다 되살아나면 방금 고친 값을 덮습니다.
-  try {
-    const stashed = window.sessionStorage.getItem("forwardus:doc-draft");
-    if (stashed) {
-      window.sessionStorage.removeItem("forwardus:doc-draft");
-      window.FORWARDUS_DOC_FILL(JSON.parse(stashed));
-    }
-  } catch (error) {
-    /* 저장 공간이 없거나 내용이 깨졌으면 빈 칸으로 시작합니다. */
-  }
+  // 화면을 떠나는 순간에는 기다리지 않고 바로 저장합니다.
+  // (적자마자 홈으로 누르면 0.4초를 기다리던 마지막 입력이 사라집니다)
+  window.addEventListener("pagehide", saveLocal);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") saveLocal();
+  });
+
+  // 적던 내용 되살리기. 칸·품목·달력이 모두 준비된 뒤에 부릅니다.
+  restoreDraft();
 })();

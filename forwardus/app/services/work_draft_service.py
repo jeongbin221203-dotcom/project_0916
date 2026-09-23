@@ -25,6 +25,8 @@ SHARED_FIELDS = (
     "buyer_name", "buyer_country",              # 수하인 회사명·나라 (주소·연락처는 제외)
     "origin_code", "origin_name", "destination_code", "destination_name",   # POL / POD
     "incoterms", "currency", "requested_departure_date", "buyer_required_date",
+    # 신용장 조건. 운송 계획에서 "이 배로 실으면 L/C 마감을 넘는지" 보는 데 씁니다.
+    "lc_no", "lc_latest_shipment_date", "lc_expiry_date", "lc_presentation_days",
 )
 ITEM_FIELDS = ("product_description", "hs_code", "package_type", "quantity", "length_cm",
                "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg",
@@ -124,6 +126,25 @@ def _total(items: list[dict]) -> str:
     return f"{total:.2f}".rstrip("0").rstrip(".") if total else ""
 
 
+def _lc(fields: dict) -> dict | None:
+    """저장해 둔 L/C 날짜로 선적 마감을 다시 계산합니다. (날짜는 오늘 기준으로 바뀝니다)"""
+
+    from app.processors import lc_schedule
+    from app.validators import ValidationError
+    from app.validators.shipment_validator import parse_date
+
+    def day(key):
+        try:
+            return parse_date(fields[key], key) if fields.get(key) else None
+        except ValidationError:
+            return None
+
+    return lc_schedule.as_text(lc_schedule.plan(
+        latest_shipment=day("lc_latest_shipment_date"), expiry=day("lc_expiry_date"),
+        presentation=fields.get("lc_presentation_days"),
+        transport_mode=fields.get("transport_mode") or "SEA"))
+
+
 def planning_prefill(viewer) -> dict:
     """운송 계획 임시저장(planning.js saveDraft)과 같은 모양. 저장된 것이 없으면 빈 dict."""
 
@@ -152,6 +173,7 @@ def planning_prefill(viewer) -> dict:
         "origin": _location(fields.get("origin_code"), fields.get("origin_name")),
         "destination": _location(fields.get("destination_code"), fields.get("destination_name")),
         "incoterms": fields.get("incoterms") or "",
+        "lc": _lc(fields),
         "fields": planning_fields,
         "cargo_lines": [{key: row[key] for key in line_keys if row.get(key)} for row in items[1:]],
     }

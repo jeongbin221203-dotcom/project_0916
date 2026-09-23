@@ -137,6 +137,7 @@ p { margin: 0 0 10px; }
 .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; background: #f1f5f9; color: #475569; }
 .badge.ok { background: var(--green_soft); color: #07694f; }
 .badge.warn { background: var(--amber_soft); color: #8a4f00; }
+.badge.bad { background: #fee2e2; color: #b91c1c; }
 .badge.muted_badge { background: #f1f5f9; color: #94a3b8; }
 .badge.source_mock { background: #fff1e6; color: #b45309; }
 .badge.source_api { background: var(--green_soft); color: #07694f; }

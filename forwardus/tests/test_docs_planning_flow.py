@@ -32,6 +32,17 @@ def test_서류_작성_탭이_운송_계획보다_앞이다(app):
     assert labels == ["무역 상담", "서류 작성", "운송 계획"]
 
 
+def test_예시_칩을_누르면_바로_보낸다(app):
+    """적는 칸에 넣어 두고 한 번 더 누르게 하지 않습니다. (예: "상업송장만 작성해줘")"""
+
+    js = (STATIC / "js/home.js").read_text(encoding="utf-8")
+    chip = js[js.index('const chip = event.target.closest("[data-home-chip]")'):]
+    chip = chip[:chip.index("});")]
+    assert "requestSubmit" in chip
+    # 앞 질문에 답하는 중이면 넣어만 둡니다. (두 번 보내지 않게)
+    assert "sendButton.disabled" in chip
+
+
 # --- 2. 서류 작성 → 운송 계획 ----------------------------------------------------------------
 
 DOC_VALUES = {
@@ -108,6 +119,29 @@ def test_화면이_서로_이어진다(client):
     assert "planningPrefill()" in planning_js and "adoptWorkDraft().finally" in planning_js
     home_js = (STATIC / "js/home.js").read_text(encoding="utf-8")
     assert 'syncWorkDraft("chat")' in home_js and 'syncWorkDraft("upload")' in home_js
+
+
+def test_서류_작성_화면은_적던_내용을_다시_불러온다(app):
+    """다른 화면에 다녀와도 적던 값이 남아 있어야 합니다. (이 탭 저장분 + 서버 저장분)"""
+
+    js = (STATIC / "js/doc_form.js").read_text(encoding="utf-8")
+    assert "forwardus:doc-form-draft" in js          # 이 탭에 두는 자리
+    assert "function restoreDraft" in js and "restoreDraft();" in js
+    assert "ForwardusWorkDraft.load()" in js         # 서버 저장분
+    assert 'window.addEventListener("pagehide", saveLocal)' in js   # 나가기 직전 저장
+    assert "data-doc-clear" in js                    # 비우고 새로 시작
+    shared = (STATIC / "js/work_draft.js").read_text(encoding="utf-8")
+    assert "async function load()" in shared and "async function clear()" in shared
+
+
+def test_임시저장을_비우면_서버에서도_지워진다(app):
+    browser = _member(app)
+    browser.put("/api/work-draft", json=DOC_VALUES)
+    assert browser.get("/api/work-draft").get_json()["data"]["fields"]
+
+    assert browser.delete("/api/work-draft").status_code == 200
+    assert browser.get("/api/work-draft").get_json()["data"] == {}
+    assert browser.get("/api/work-draft/planning").get_json()["data"] == {}
 
 
 # --- 3. 빈 서식 PDF ---------------------------------------------------------------------

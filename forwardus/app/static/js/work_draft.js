@@ -72,6 +72,31 @@
     return send();
   }
 
+  // 서버에 저장해 둔 값. 이 탭에만 둔 비공개 칸(바이어 주소·연락처)을 얹어 돌려줍니다.
+  async function load() {
+    if (!config) return null;
+    await flush();
+    const response = await window.Forwardus.getJson(config.url, 10000);
+    if (!response.success || !response.data || !response.data.updated_ms) return null;
+    const draft = response.data;
+    draft.fields = { ...draft.fields, ...readPrivate() };
+    return draft;
+  }
+
+  // 임시저장 비우기. 서버와 이 탭에 둔 것을 모두 지웁니다.
+  async function clear() {
+    try {
+      window.sessionStorage.removeItem(PRIVATE_KEY);
+    } catch (error) { /* 무시 */ }
+    if (!config) return;
+    clearTimeout(timer);
+    pending = null;
+    timer = null;
+    try {
+      await fetch(config.url, { method: "DELETE" });
+    } catch (error) { /* 서버가 안 되면 이 탭 것만 지웁니다. */ }
+  }
+
   async function planningPrefill() {
     if (!config) return null;
     await flush();
@@ -97,5 +122,5 @@
     timer = null;
   });
 
-  window.ForwardusWorkDraft = { save, flush, planningPrefill, PRIVATE_FIELDS };
+  window.ForwardusWorkDraft = { save, flush, load, clear, planningPrefill, PRIVATE_FIELDS };
 })();

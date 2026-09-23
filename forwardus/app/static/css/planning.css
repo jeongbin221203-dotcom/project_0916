@@ -456,3 +456,7 @@ html.modal_open, html.modal_open body { overflow: hidden; }
 
 /* 운송 계획 화면 맨 위: 서류 작성에서 칸을 채웠다는 알림 (planning.js) */
 .prefill_note { margin-bottom: 14px; }
+
+/* 신용장(L/C) 선적 마감 안내 (planning.js) */
+.lc_note { display: block; margin-bottom: 14px; }
+.lc_note small { display: block; margin-top: 4px; font-weight: 600; opacity: .85; }

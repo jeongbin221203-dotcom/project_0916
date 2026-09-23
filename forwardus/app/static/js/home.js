@@ -162,10 +162,16 @@
     const chip = event.target.closest("[data-home-chip]");
     if (!chip) return;
     flash(chip);
+    // 누르면 바로 보냅니다. 적는 칸에 넣어 두고 한 번 더 누르게 하지 않습니다.
     input.value = chip.textContent;
     resize();
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
+    if (sendButton.disabled) {           // 앞 질문에 답하는 중이면 넣어만 둡니다.
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      return;
+    }
+    stage.requestSubmit ? stage.requestSubmit()
+      : stage.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   });
 
   /* ----- 적은 글로 서류 초안 채우기 ----- */
