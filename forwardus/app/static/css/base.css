@@ -457,3 +457,12 @@ body.hs_modal_open { overflow: hidden; }
 .cargo_tip_popup b { color: #fff; }
 .cargo_tip_popup p { margin: 7px 0 0; }
 .hs_modal .ac_list li[data-index] { padding: 3px; }
+
+/* 답 아래의 관련 링크 (answer_links.py가 고르고, home.js·support_chat.js가 그립니다) */
+.answer_links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0;
+  padding-top: 8px; border-top: 1px solid var(--line); }
+.answer_links > span { color: var(--muted); font-size: 12px; font-weight: 800; margin-right: 2px; }
+.answer_link { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  color: var(--blue_dark); font-size: 12.5px; font-weight: 700; text-decoration: none; }
+.answer_link:hover { border-color: var(--blue); background: var(--blue_soft); text-decoration: none; }
+.answer_link.is_outside { color: #475569; }

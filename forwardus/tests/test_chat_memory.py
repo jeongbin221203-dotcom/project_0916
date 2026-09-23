@@ -164,3 +164,61 @@ def test_State에는_바이어_연락처를_두지_않는다(app, field):
                                          "items": []})
 
     assert "비밀 값" not in str(WorkDraft.query.one().data)
+
+
+# --- 대화에 적은 화물 정보 담아 두기 (State) ---------------------------------------------
+
+CARGO_TALK = ("부산에서 로스앤젤레스로 화장품 500박스 보냅니다. "
+              "한 박스 40x30x25cm에 12kg이고 FOB, USD 결제입니다.")
+
+
+def test_대화에_적은_화물_정보를_담아_둔다(app):
+    from app.services import chat_capture_service
+
+    browser = _member(app)
+    response = _ask(browser, CARGO_TALK)
+    captured = response.get_json()["data"].get("captured") or []
+
+    assert "출발지" in captured and "수량" in captured
+    fields = browser.get("/api/work-draft/planning").get_json()["data"]["fields"]
+    assert fields["quantity"] == "500" and fields["length_cm"] == "40"
+    assert fields["weight_per_package_kg"] == "12" and fields["currency"] == "USD"
+    # 항구는 코드로 바꿔 둡니다. 화면이 그대로 씁니다.
+    data = browser.get("/api/work-draft").get_json()["data"]["fields"]
+    assert data["origin_code"] == "KRPUS" and data["destination_code"] == "USLAX"
+    assert data["incoterms"] == "FOB"
+    assert chat_capture_service.read("안녕하세요") == {}
+
+
+def test_이미_담아_둔_값은_대화가_덮지_않는다(app):
+    browser = _member(app)
+    browser.put("/api/work-draft", json={"source": "document", "items": [],
+                                         "fields": {"origin_code": "KRINC", "incoterms": "CIF"}})
+
+    _ask(browser, CARGO_TALK)
+
+    fields = browser.get("/api/work-draft").get_json()["data"]["fields"]
+    assert fields["origin_code"] == "KRINC" and fields["incoterms"] == "CIF"   # 화면에서 적은 값 유지
+    assert fields["destination_code"] == "USLAX"                               # 비어 있던 칸만 채움
+
+
+def test_로그인_전에는_담지_않는다(app, anon_client):
+    from app.models import WorkDraft
+
+    with patch.object(support_chat_service.ai_client, "available", return_value=True), \
+         patch.object(support_chat_service.ai_client, "chat", return_value=ANSWER):
+        response = anon_client.post("/api/support-chat", json={"question": CARGO_TALK})
+
+    assert response.status_code == 200
+    assert "captured" not in response.get_json()["data"]
+    assert WorkDraft.query.count() == 0
+
+
+def test_담아_둔_값에는_대화_원문이_없다(app):
+    from app.models import WorkDraft
+
+    browser = _member(app)
+    _ask(browser, CARGO_TALK)
+
+    saved = str(WorkDraft.query.one().data)
+    assert "보냅니다" not in saved and "결제입니다" not in saved

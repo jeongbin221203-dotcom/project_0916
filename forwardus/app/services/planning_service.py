@@ -9,6 +9,7 @@ from app.collectors import (customs_client, exchange_client, location_client, sc
                             tariff_client)
 from app.collectors.base_client import load_mock
 from app.models import Cargo, Shipment
+from app.processors import sea_mode_advisor
 from app.processors.cargo_calculator import calculate_cargo_lines, calculate_cargo_metrics
 from app.processors.cost_calculator import INCOTERMS_FLOW_STEPS, INCOTERMS_INFO, calculate_logistics_cost
 from app.processors import dangerous_goods, fta_guide, korean
@@ -725,9 +726,14 @@ def calculate_cargo(payload: dict) -> dict:
     """
 
     if isinstance(payload, dict) and (payload.get("cargo") or payload.get("items")):
-        return calculate_cargo_lines(cargo_items(
+        metrics = calculate_cargo_lines(cargo_items(
             payload if payload.get("cargo") else {"cargo": payload.get("items")}), strict=False)
-    return calculate_cargo_metrics(payload, strict=False)
+    else:
+        metrics = calculate_cargo_metrics(payload, strict=False)
+    # 이 짐이면 LCL인지 FCL인지. 기준은 processors/sea_mode_advisor에 한 곳에만 둡니다.
+    metrics["sea_mode_advice"] = sea_mode_advisor.recommend(
+        metrics.get("total_cbm"), metrics.get("total_weight_kg"))
+    return metrics
 
 
 # 실데이터는 예시 데이터와 달리 비어 있는 칸이 있습니다. 항공사 시간표에는

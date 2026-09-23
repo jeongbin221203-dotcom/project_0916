@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from app.collectors import ai_client
-from app.processors import bank_redaction, export_requirements
+from app.processors import answer_links, bank_redaction, export_requirements
 from app.services import ServiceError
 
 MAX_QUESTION = 2_000
@@ -284,6 +284,8 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     if used:
         data["sources"] = list(dict.fromkeys(used))
         data["basis"] = _basis(result.get("tools_used") or [])
+    # 답에 맞는 화면·기관 링크. 주소는 우리 표에서만 꺼냅니다. (AI가 만들지 않습니다)
+    data["links"] = answer_links.pick(text, data["answer"])
     return {"success": True, "source": "api", "data": data}
 
 

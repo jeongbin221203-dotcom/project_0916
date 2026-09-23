@@ -8,7 +8,8 @@ from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
 from app.routes.auth import current_user
-from app.services import (ServiceError, agent_service, attachment_service, chat_memory_service,
+from app.services import (ServiceError, agent_service, attachment_service, chat_capture_service,
+                          chat_memory_service,
                           document_extract_service, document_pipeline_service,
                           intake_service, support_chat_service)
 from app.validators import ValidationError
@@ -205,4 +206,9 @@ def api_support_chat():
         chat_memory_service.remember(viewer, "user", question, source)
         chat_memory_service.remember(viewer, "assistant", result["data"]["answer"], source)
         chat_memory_service.summarize(viewer)
+        # 대화에 적은 화물 정보(출발·도착지·품목·수량·치수·무게 등)를 담아 둡니다. (State)
+        # 서류 작성·운송 계획 화면이 이 값으로 칸을 미리 채웁니다.
+        kept_fields = chat_capture_service.capture(viewer, question)
+        if kept_fields:
+            result["data"]["captured"] = kept_fields
     return jsonify(result), (200 if result["success"] else 502)

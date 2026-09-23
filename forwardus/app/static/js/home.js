@@ -391,7 +391,32 @@
       });
       row.appendChild(note);
     }
+    appendLinks(row, response.data.links);
+    // 대화에 적은 화물 정보를 담아 두었으면 한 줄 알립니다. 어디에 쓰이는지까지.
+    if ((response.data.captured || []).length) {
+      const note = document.createElement("p");
+      note.className = "answer_kept";
+      note.textContent = `📌 ${response.data.captured.join(" · ")}을(를) 담아 두었습니다. `
+        + "서류 작성·운송 계획 화면에서 그대로 씁니다.";
+      row.appendChild(note);
+    }
     rememberHsQueries(answer);
+  }
+
+  /* ----- 답 아래의 관련 링크 -----
+     화면(서류 작성·관세청 조회…)과 기관 창구(식약처·검역본부…)를 함께 답니다.
+     주소는 서버가 들고 있는 표에서만 옵니다. AI가 만든 주소는 쓰지 않습니다. */
+  function appendLinks(row, links) {
+    if (!row || !(links || []).length) return;
+    const box = document.createElement("p");
+    box.className = "answer_links";
+    box.innerHTML = `<span>관련 자료</span>` + links.map((link) => {
+      const outside = /^https?:/.test(link.url);
+      const attrs = outside ? ` target="_blank" rel="noopener"` : "";
+      return `<a class="answer_link${outside ? " is_outside" : ""}" href="${escapeHtml(link.url)}"${attrs}`
+        + ` title="${escapeHtml(link.note || "")}">${escapeHtml(link.label)}${outside ? " ↗" : ""}</a>`;
+    }).join("");
+    row.appendChild(box);
   }
 
   /* ----- HS CODE 간편 검색 -----
