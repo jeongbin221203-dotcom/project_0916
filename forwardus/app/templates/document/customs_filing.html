@@ -148,7 +148,32 @@
       <h2>그대로 보내기</h2>
       <button type="button" class="button ghost" data-copy-filing>복사</button>
     </div>
-    <p class="muted">메일이나 메신저에 붙여 넣으면 됩니다.</p>
+    <p class="muted">메일이나 메신저에 붙여 넣으면 됩니다.
+      바이어에게 보낼 때는 아래에서 언어를 고르면 그 나라 말로 옮겨 드립니다.</p>
+
+    {# 번역. 숫자·금액·HS CODE는 그대로 두고 말만 옮깁니다. 계좌번호는 가린 채 보냅니다. #}
+    <div class="filing_translate">
+      <label class="filing_lang">
+        <span class="field_label">번역할 언어</span>
+        <select data-translate-language {{ 'disabled' if not translate_ready }}>
+          <option value="">원문 (한국어)</option>
+          {% for language in languages if language.code != 'ko' %}
+            <option value="{{ language.code }}">{{ language.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="button" class="button primary" data-translate-run
+              {{ 'disabled' if not translate_ready }}>번역하기</button>
+      <button type="button" class="link_button" data-translate-original hidden>원문 보기</button>
+      <p class="filing_translate_note muted small" data-translate-note>
+        {% if translate_ready %}
+          금액·수량·HS CODE·날짜는 바꾸지 않고 말만 옮깁니다. 보내기 전에 한 번 읽어 보세요.
+        {% else %}
+          번역은 AI 키(AI_API_KEY)가 있어야 씁니다. .env에 키를 넣으면 바로 됩니다.
+        {% endif %}
+      </p>
+    </div>
+
     <pre class="filing_text" data-filing-text>{{ sheet_text }}</pre>
   </section>
 
@@ -176,6 +201,50 @@
       }
       button.disabled = false;
     });
+
+    // 번역. 원문은 그대로 두고 화면의 글만 바꿉니다. "원문 보기"로 되돌립니다.
+    (() => {
+      const box = document.querySelector("[data-filing-text]");
+      const select = document.querySelector("[data-translate-language]");
+      const run = document.querySelector("[data-translate-run]");
+      const back = document.querySelector("[data-translate-original]");
+      const note = document.querySelector("[data-translate-note]");
+      if (!box || !select || !run) return;
+
+      const original = box.textContent;
+      const url = "{{ url_for('document.api_translate_filing', shipment_id=shipment.shipment_id) }}";
+
+      function showOriginal() {
+        box.textContent = original;
+        box.removeAttribute("lang");
+        back.hidden = true;
+        select.value = "";
+        note.textContent = "원문(한국어)을 보고 있습니다.";
+      }
+
+      async function translate() {
+        const code = select.value;
+        if (!code) { showOriginal(); return; }
+        run.disabled = true;
+        const label = run.textContent;
+        run.textContent = "옮기는 중…";
+        note.textContent = "옮기는 중입니다. 글이 길면 십여 초 걸립니다.";
+        const answer = await window.Forwardus.postJson(url, { text: original, language: code }, 90000);
+        run.disabled = false;
+        run.textContent = label;
+        if (!answer.success) {
+          note.textContent = answer.message || "옮기지 못했습니다. 잠시 후 다시 눌러 주세요.";
+          return;
+        }
+        box.textContent = answer.data.text;
+        box.setAttribute("lang", answer.data.code);
+        back.hidden = false;
+        note.textContent = `${answer.data.language}로 옮겼습니다. 숫자·금액은 원문 그대로인지 확인해 주세요.`;
+      }
+
+      run.addEventListener("click", translate);
+      back.addEventListener("click", showOriginal);
+    })();
 
     document.querySelector("[data-copy-filing]")?.addEventListener("click", async (event) => {
       const text = document.querySelector("[data-filing-text]").textContent;

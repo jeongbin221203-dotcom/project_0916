@@ -10,6 +10,7 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
 from app.routes import error_response, load_shipment
 from app.routes.auth import current_user, login_required
 from app.services import (ServiceError, customs_filing_service, document_draft_service,
+                          translate_service,
                           document_extract_service, document_service, document_start_service,
                           draft_document_service, requirement_service, shipment_service)
 from app.validators import ValidationError
@@ -304,6 +305,8 @@ def customs_filing(shipment_id: str):
         shipment=shipment,
         sheet=sheet,
         sheet_text=customs_filing_service.as_text(sheet),
+        languages=translate_service.LANGUAGES,
+        translate_ready=translate_service.available(),
         missing_summary=customs_filing_service.describe_missing(sheet),
         refund=customs_filing_service.refund_estimate(shipment),
     )
@@ -316,6 +319,20 @@ def api_clearance_code(shipment_id: str):
     load_shipment(shipment_id)
     result = customs_filing_service.lookup_clearance_code(request.args.get("business_no", ""))
     return jsonify(result), (200 if result["success"] else 502)
+
+
+@document_bp.post("/<shipment_id>/customs-filing/translate")
+def api_translate_filing(shipment_id: str):
+    """그대로 보내기 글을 바이어의 언어로 옮깁니다. 저장하지 않습니다."""
+
+    load_shipment(shipment_id)
+    payload = request.get_json(silent=True) or {}
+    try:
+        data = translate_service.translate(str(payload.get("text") or ""),
+                                           str(payload.get("language") or ""))
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
+    return jsonify({"success": True, "data": data})
 
 
 @document_bp.post("/<shipment_id>/customs-filing")

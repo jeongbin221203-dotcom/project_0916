@@ -93,6 +93,12 @@
 .filing_form { margin-top: 16px; }
 .filing_text { margin: 0; padding: 16px; border-radius: 14px; background: #0f172a; color: #e2e8f0;
   font-size: 12.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
+/* 번역할 언어 고르기 */
+.filing_translate { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 0 0 12px; }
+.filing_lang { display: grid; gap: 6px; min-width: 220px; }
+.filing_lang select { min-height: 42px; }
+.filing_translate_note { flex: 1 1 100%; margin: 0; }
+
 .table_scroll { overflow-x: auto; }
 
 /* 수출요건 확인 */

@@ -207,6 +207,12 @@
       {% endif %}
     </script>
     {% endif %}
+    {% if not standalone %}
+    <script>
+      {# 대화는 회원마다 따로 둡니다. 한 탭에서 계정을 바꿔도 섞이지 않게. #}
+      window.FORWARDUS_CHAT = { scope: {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }} };
+    </script>
+    {% endif %}
     <script src="{{ static_url('js/base.js') }}"></script>
     {# 운송 계획 화면도 이 파일의 HS 검색을 씁니다. standalone이어도 붙입니다. #}
     <script src="{{ static_url('js/hs_search.js') }}"></script>

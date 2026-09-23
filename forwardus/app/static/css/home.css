@@ -170,6 +170,19 @@
 .doc_group { padding: 20px 22px; margin-bottom: 14px; border: 1px solid var(--line);
   border-radius: var(--radius); background: var(--white); }
 .doc_group h3 { margin: 0 0 4px; font-size: 15px; }
+/* 접을 수 있는 칸(예상 일정 달력). 접어도 제목 줄에 고른 값이 남습니다. */
+.doc_fold > summary { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center;
+  cursor: pointer; list-style: none; }
+.doc_fold > summary::-webkit-details-marker { display: none; }
+.doc_fold > summary h3 { margin: 0; }
+.doc_fold > summary .cal_legend { margin: 0; }
+/* 오른쪽 끝의 접기·펴기 표시. 접히면 아래(▾), 펴지면 위(▴)를 봅니다. */
+.doc_fold_mark { margin-left: auto; display: grid; place-items: center; width: 34px; height: 34px;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--surface);
+  color: var(--muted); font-size: 13px; line-height: 1; transition: transform .15s, background .15s; }
+.doc_fold > summary:hover .doc_fold_mark { background: var(--blue_soft); color: var(--blue_dark); }
+.doc_fold[open] .doc_fold_mark { transform: rotate(180deg); }
+.doc_fold[open] > summary { margin-bottom: 8px; }
 .doc_note { margin: 0 0 16px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
 
 .doc_grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
