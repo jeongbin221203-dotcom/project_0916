@@ -9,7 +9,8 @@
 (function () {
   "use strict";
 
-  const config = window.FORWARDUS_HOME;
+  // 환율 창은 사이드바와 함께 모든 화면에 붙습니다. 주소는 base.html이 FORWARDUS_FX로 넘깁니다.
+  const config = window.FORWARDUS_FX || window.FORWARDUS_HOME;
   const modal = document.querySelector("[data-fx-modal]");
   const openers = document.querySelectorAll("[data-fx-open]");
   if (!config || !config.fxBoardUrl || !modal || !openers.length) return;

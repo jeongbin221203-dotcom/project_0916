@@ -147,9 +147,11 @@ def _item_fields(options: dict) -> list[dict]:
         {"name": "weight_per_package_kg", "label": "한 포장 무게(kg)", "kind": "number",
          "required": True},
         {"name": "net_weight_kg", "label": "순중량(kg)", "kind": "number"},
-        {"name": "unit_price", "label": "단가", "kind": "number"},
-        {"name": "amount", "label": "금액", "kind": "number", "required": True,
-         "hint": "품목마다 적으면 합계가 송장 금액이 됩니다"},
+        # money: 라벨·자리표시에 고른 통화가 붙습니다. ("금액 (USD)") doc_form.js
+        {"name": "unit_price", "label": "단가", "kind": "number", "money": True,
+         "placeholder": "12.50"},
+        {"name": "amount", "label": "금액", "kind": "number", "required": True, "money": True,
+         "placeholder": "6250.00", "hint": "품목마다 적으면 합계가 송장 금액이 됩니다"},
     ]
 
 

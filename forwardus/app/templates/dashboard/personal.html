@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block title %}내 Dashboard{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/dashboard.css') }}">{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Personal My Dashboard</p>
+      <h1>내 Dashboard</h1>
+      <p class="muted">내가 만든 Shipment만 보입니다.</p>
+    </div>
+    <a class="button primary" href="{{ url_for('planning.new') }}">새 운송 계획</a>
+  </div>
+
+  <section class="kpi_grid four" aria-label="내 화물 현황">
+    {% for card in mine.cards %}
+      <a class="kpi_card link" href="{{ url_for('dashboard.index', status=card.statuses[0]) }}"
+         title="{{ card.note }}"><small>{{ card.label }}</small><b>{{ card.count }}</b>
+        <span class="muted small">{{ card.note }}</span></a>
+    {% endfor %}
+  </section>
+
+  <div class="grid two">
+    <section class="card">
+      <h2>최근 작성한 서류</h2>
+      {% if mine.documents %}
+        <ul class="dash_list">
+          {% for doc in mine.documents %}
+            <li>
+              <div>
+                <b>{{ doc.title }}</b>
+                <span class="muted small"><span class="mono">{{ doc.shipment.shipment_id }}</span>
+                  · {{ (doc.updated_at or doc.created_at).strftime('%Y-%m-%d') }}</span>
+              </div>
+              <span class="dash_links">
+                <a href="{{ url_for('document.view', shipment_id=doc.shipment.shipment_id, doc_type=doc.doc_type) }}">보기</a>
+                <a href="{{ url_for('document.view', shipment_id=doc.shipment.shipment_id, doc_type=doc.doc_type, print=1) }}"
+                   title="인쇄 창에서 'PDF로 저장'을 고르세요">⬇ PDF 저장</a>
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">아직 작성한 서류가 없습니다. <a href="{{ url_for('document.new') }}">서류 작성 →</a></p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>최근 일정 · B/L 추적</h2>
+      {% if mine.schedules %}
+        <ul class="dash_list">
+          {% for row in mine.schedules %}
+            {% set s = row.shipment %}
+            <li>
+              <div>
+                <b><a class="mono" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">{{ s.shipment_id }}</a></b>
+                {{ status_badge(s.status, s.status_label) }}
+                <span class="muted small">{{ s.origin_code }} → {{ s.destination_code }} · ETD {{ s.etd|d }} · ETA {{ s.eta|d }}</span>
+                <span class="muted small">
+                  B/L {{ s.bl_no or '미발급' }}
+                  {% if row.latest_event %} · 최근: {{ row.latest_event.label }} {{ row.latest_event.event_time.strftime('%m-%d') }}{% endif %}
+                </span>
+              </div>
+              <span class="dash_links">
+                <a href="{{ url_for('tracking.detail', shipment_id=s.shipment_id) }}">추적</a>
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">진행 중인 화물이 없습니다.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="row_between dash_table_head">
+      <h2>내 Shipments <span class="muted small">{{ shipments|length }}건</span></h2>
+    </div>
+    {% include "dashboard/_filters.html" %}
+    {% if shipments %}
+      <div class="table_scroll">
+        <table class="table">
+          <thead><tr><th>Shipment ID</th><th>견적명</th><th>Route</th><th>Buyer</th><th>ETD</th><th>ETA</th><th>상태</th></tr></thead>
+          <tbody>
+            {% for s in shipments %}
+              <tr>
+                <td><a class="mono" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">{{ s.shipment_id }}</a></td>
+                <td class="dash_clip" title="{{ s.project_name }}">{{ s.project_name }}</td>
+                <td>{{ s.origin_code }} → {{ s.destination_code }} <span class="muted small">{{ s.mode_label }}</span></td>
+                <td class="dash_clip" title="{{ s.buyer.name if s.buyer else '' }}">{{ s.buyer.name if s.buyer else '-' }}</td>
+                <td>{{ s.etd|d }}</td>
+                <td>{{ s.eta|d }}{% if s.delay_days > 0 %} <span class="badge warn">+{{ s.delay_days }}일</span>{% endif %}</td>
+                <td>{{ status_badge(s.status, s.status_label) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif filters.q or filters.status %}
+      <p class="muted">조건에 맞는 Shipment가 없습니다.</p>
+    {% else %}
+      <div class="empty_state">
+        <p class="muted">운송 계획에서 스케줄을 선택하면 Shipment가 생성됩니다.</p>
+        <a class="button primary" href="{{ url_for('planning.new') }}">새 운송 계획 시작</a>
+      </div>
+    {% endif %}
+  </section>
+
+  {% include "dashboard/_analytics.html" %}
+{% endblock %}

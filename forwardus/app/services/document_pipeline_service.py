@@ -229,12 +229,81 @@ ANSWER_EXAMPLES = {
 }
 
 
-def ask_message(rows: list[dict], intro: str = "업로드해주신 서류에서") -> str:
+# 패킹리스트의 중량·포장 수·치수. 품목이 여러 개이면 품목마다 따로 받아야 해서 한 덩어리로 묻습니다.
+PACKING_KEYS = ("items.weight", "items.dims", "items.quantity")
+
+
+def packing_gaps(draft: dict) -> list[dict]:
+    """품목마다 비어 있는 패킹 정보. [{"no": 1, "name": "LIPSTICK", "missing": ["총중량", …]}]"""
+
+    gaps = []
+    for no, row in enumerate(_items(draft), 1):
+        missing_labels = []
+        if not _has(row.get("net_weight_kg")):
+            missing_labels.append("순중량")
+        if not _has(row.get("weight_per_package_kg")):
+            missing_labels.append("총중량")
+        if not all(_has(row.get(name)) for name in DIMS):
+            missing_labels.append("박스 규격")
+        if not _has(row.get("quantity")):
+            missing_labels.append("박스 수")
+        # 순중량만 빠진 줄은 서류가 막히지 않으므로 묻는 대상에서 뺍니다.
+        if missing_labels and missing_labels != ["순중량"]:
+            gaps.append({"no": no, "name": row.get("product_description") or "(품명 없음)",
+                         "missing": missing_labels})
+    return gaps
+
+
+def _uses_packing_block(rows: list[dict], draft: dict | None) -> bool:
+    return (draft is not None and len(_items(draft)) >= 2
+            and any(row["key"] in PACKING_KEYS for row in rows) and bool(packing_gaps(draft)))
+
+
+def order_rows(rows: list[dict], draft: dict | None) -> list[dict]:
+    """묻는 순서. 패킹 덩어리를 쓰면 패킹 칸은 맨 뒤로 보냅니다. (번호를 맞추려고)"""
+
+    if not _uses_packing_block(rows, draft):
+        return rows
+    rank = {key: index for index, key in enumerate(PACKING_KEYS)}
+    return ([row for row in rows if row["key"] not in rank]
+            + sorted((row for row in rows if row["key"] in rank), key=lambda row: rank[row["key"]]))
+
+
+def _packing_block(draft: dict, intro: str, start_no: int) -> list[str]:
+    gaps = packing_gaps(draft)
+    count = len(gaps)
+    lines = [f"{intro} 품목 {count}종의 세부 패킹 데이터가 확인되지 않습니다. "
+             "정확한 패킹리스트 생성을 위해 아래 정보를 채팅창에 적어주세요!",
+             f"{start_no}. 품목 {count}개의 각각의 순중량(Net Weight) 및 총중량(Gross Weight)",
+             f"{start_no + 1}. 포장 박스 규격(가로 x 세로 x 높이 cm) 및 총 박스(Carton) 수", "",
+             "품목별로 비어 있는 것:"]
+    lines += [f"- {gap['no']}번 {gap['name']}: {', '.join(gap['missing'])}" for gap in gaps[:MAX_ITEMS]]
+    lines += ["", "품목 번호를 앞에 붙여 한 줄씩 적어 주시면 그 품목에 넣습니다. 예:", ""]
+    lines += [f"> {gap['no']}번 품목: 순중량 6.5kg, 총중량 8kg, 40x30x25cm, 500박스"
+              for gap in gaps[:2]]
+    return lines
+
+
+def ask_message(rows: list[dict], intro: str = "업로드해주신 서류에서",
+                draft: dict | None = None) -> str:
     """빠진 것을 번호로 짚어 묻는 말. 20년 차 사수가 옆에서 알려 주는 말투로.
 
     intro는 문장 머리입니다. ("업로드해주신 오퍼시트에서", "다만 아직")
     사람은 같은 번호를 붙여 답하면 됩니다. merge가 번호를 이 목록 순서로 읽습니다.
+    draft를 주면, 품목이 여러 개이고 패킹 정보(중량·박스 수·규격)가 빠졌을 때
+    품목 수를 짚어 따로 묻습니다. 품목마다 값이 달라 "3. 8kg"처럼은 답할 수 없습니다.
     """
+
+    if _uses_packing_block(rows, draft):
+        other = [row for row in order_rows(rows, draft) if row["key"] not in PACKING_KEYS]
+        lines = []
+        if other:
+            lines = [f"{intro} 아래 {len(other)}가지 정보가 누락되어 있습니다. 번호에 맞춰 "
+                     "채팅창에 편하게 입력해 주시면 바로 서류에 반영해 드릴게요!", ""]
+            lines += [f"{no}. **{row['label']}** — {row['hint']}" for no, row in enumerate(other, 1)]
+            lines.append("")
+        lines += _packing_block(draft, "또한" if other else intro, len(other) + 1)
+        return "\n".join(lines)
 
     if not rows:
         return ("필수 정보가 모두 확인됐습니다. 아래에서 **만들 서류를 고르고** "
@@ -274,7 +343,7 @@ def _clean_draft(raw) -> dict:
 
 
 def _state(draft: dict, kinds: list[str], reply: str, **extra) -> dict:
-    rows = missing(draft, kinds)
+    rows = order_rows(missing(draft, kinds), draft)
     return {"stage": "need_info" if rows else "ready", "reply": reply, "draft": draft,
             "kinds": kinds, "options": KIND_OPTIONS, "missing": rows,
             # 화면이 체크를 바꿀 때마다 서버에 묻지 않고 거를 수 있게 모두 보냅니다.
@@ -292,7 +361,7 @@ def start(payload: dict) -> dict:
     kinds = requested or list(DEFAULT_KINDS)
     label = _clean(payload.get("document_label"), 80) or "서류"
     rows = missing(draft, kinds)
-    reply = ask_message(rows, f"업로드해주신 {label}에서")
+    reply = ask_message(rows, f"업로드해주신 {label}에서", draft)
     if requested:
         # "인보이스 써줘"처럼 서류를 짚어 말했으면 그 서류 기준으로 봤다고 먼저 알립니다.
         titles = ", ".join(_title(kind) for kind in kinds)
@@ -407,6 +476,70 @@ def _rule_read(message: str, draft: dict) -> dict:
     return found
 
 
+# "1번 품목: …" / "품목 2 - …" / "#3 …" — 품목 번호를 앞에 붙인 패킹 답
+ITEM_LINE = re.compile(r"^\s*(?:(?:품목|item)\s*#?\s*(\d{1,2})|#?(\d{1,2})\s*번(?:\s*품목)?)"
+                       r"\s*[:：\-–)]?\s*(.+?)\s*$", re.I)
+_WEIGHT = r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|톤|ton|t|g)?"
+_NET = re.compile(r"(?:순\s*중량|net\s*(?:weight|wt)?|n\.\s*w\.?)\s*[:=]?\s*" + _WEIGHT, re.I)
+_GROSS = re.compile(r"(?:총\s*중량|gross\s*(?:weight|wt)?|g\.\s*w\.?)\s*[:=]?\s*"
+                    r"(박스당|상자당|포장당|per\s*(?:box|carton|ctn|pkg))?\s*" + _WEIGHT, re.I)
+_PER_PACKAGE = re.compile(r"(?:박스당|상자당|포장당|한\s*(?:박스|상자|포장)|per\s*(?:box|carton|ctn|pkg))"
+                          r"\s*(?:무게)?\s*[:=]?\s*" + _WEIGHT, re.I)
+_CARTONS = re.compile(r"(\d[\d,]*)\s*(박스|상자|boxes|box|ctns|ctn|cartons|carton|c/t|pkgs|pkg|packages)"
+                      r"(?![a-z])", re.I)
+
+
+def _kg(number: str, unit: str | None) -> str:
+    value = float(number.replace(",", ""))
+    unit = (unit or "kg").lower()
+    if unit in ("톤", "ton", "t"):
+        value *= 1000
+    elif unit == "g":
+        value /= 1000
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def _packing_read(message: str, draft: dict, found: dict) -> None:
+    """품목 번호를 붙여 적은 패킹 값(순중량·총중량·박스 규격·박스 수)을 그 품목에 넣습니다.
+
+    총중량은 그 품목 줄 전체의 무게로 봅니다. ("박스당 8kg"처럼 적으면 한 박스 무게)
+    줄 전체 무게는 합칠 때 박스 수로 나눠 한 박스 무게로 바꿉니다. (_apply_item)
+    """
+
+    count = len(_items(draft))
+    for line in message.splitlines():
+        match = ITEM_LINE.match(line)
+        if not match:
+            continue
+        no = int(match.group(1) or match.group(2))
+        text = match.group(3)
+        if not 1 <= no <= max(count, 1):
+            continue
+        values: dict = {}
+        dims = DIMS_PATTERN.search(text)
+        if dims:
+            values.update(dict(zip(DIMS, dims.groups())))
+            text = text[:dims.start()] + " " + text[dims.end():]
+        net = _NET.search(text)
+        if net:
+            values["net_weight_kg"] = _kg(net.group(1), net.group(2))
+        gross = _GROSS.search(text)
+        if gross:
+            key = "weight_per_package_kg" if gross.group(1) else "gross_weight_kg"
+            values[key] = _kg(gross.group(2), gross.group(3))
+        per_package = _PER_PACKAGE.search(text)
+        if per_package and "weight_per_package_kg" not in values:
+            values["weight_per_package_kg"] = _kg(per_package.group(1), per_package.group(2))
+        cartons = _CARTONS.search(text)
+        if cartons:
+            values["quantity"] = cartons.group(1).replace(",", "")
+            values["package_unit"] = "CTN" if cartons.group(2) in ("박스", "상자") else cartons.group(2)
+        if values:
+            found["items"].setdefault(no, {}).update(values)
+            # 번호 답 읽기(_numbered_read)가 "3번 …"을 묻는 말의 3번으로 또 읽지 않게 표시합니다.
+            found.setdefault("_packing_lines", set()).add(line)
+
+
 NUMBERED_LINE = re.compile(r"^\s*(\d{1,2})\s*(?:[.)]|번\s*[.)]?)\s*(.+?)\s*$")
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
@@ -434,7 +567,10 @@ def _numbered_read(message: str, draft: dict, order: list[str], found: dict,
 
     rows = [{"key": key} for key in order]
     items = _items(draft)
+    consumed = found.get("_packing_lines") or set()
     for line in message.splitlines():
+        if line in consumed:
+            continue
         match = NUMBERED_LINE.match(line)
         if not match or re.match(r"^[^:：]{1,20}[:：]", match.group(2)):
             continue
@@ -651,6 +787,8 @@ def merge(payload: dict) -> dict:
     notes: list[str] = []
 
     found = _rule_read(message, draft)
+    # "1번 품목: 순중량 …" 꼴. 규칙으로 읽은 품목 값이라 AI보다 먼저입니다.
+    _packing_read(message, draft, found)
     _numbered_read(message, draft, _asked_keys(payload.get("asked"), draft, kinds), found, notes)
     # 규칙으로 못 읽은 것만 AI에게 맡깁니다. 규칙으로 읽은 값이 우선입니다.
     ai = _ai_read(message, draft)
@@ -667,7 +805,8 @@ def merge(payload: dict) -> dict:
     labels = []
     for key in applied:
         label = (REQUIRED.get(key) or {}).get("label") or {
-            "notify_party": "통지처(Notify Party)", "payment_terms": "결제 조건"}.get(key, "")
+            "notify_party": "통지처(Notify Party)", "payment_terms": "결제 조건",
+            "items.net_weight_kg": "순중량"}.get(key, "")
         if label and label not in labels:
             labels.append(label)
 
@@ -677,7 +816,7 @@ def merge(payload: dict) -> dict:
                 "**칸 이름: 값** 꼴로 한 줄씩 적어 주시면 정확하게 반영됩니다.")
     else:
         head = f"받았습니다. **{', '.join(labels)}**을(를) 반영했습니다."
-    reply = head + "\n\n" + ask_message(rows, "다만 아직")
+    reply = head + "\n\n" + ask_message(rows, "다만 아직", draft)
     return _state(draft, kinds, reply, notes=notes, applied=labels)
 
 
@@ -704,7 +843,7 @@ def generate(payload: dict) -> dict:
     rows = missing(draft, kinds)
     if rows:
         # 강행하지 않습니다. 빈 칸이 찍힌 송장은 세관·은행에서 되돌아옵니다.
-        return _state(draft, kinds, ask_message(rows, "고르신 서류를 만들기 전에 확인해 보니"))
+        return _state(draft, kinds, ask_message(rows, "고르신 서류를 만들기 전에 확인해 보니", draft))
 
     try:
         documents = [review_document(kind, _render_draft(draft)) for kind in kinds]
@@ -727,11 +866,22 @@ def review_document(kind: str, draft: dict) -> dict:
     대화로 만든 초안(agent_service)도 같은 창에서 검토하므로 여기 한 곳에 둡니다.
     """
 
+    from app.processors.document_form import MONEY_KEYS
+
     result = drafts.render(kind, draft)
     data = drafts.as_text(result["data"])
+    # 금액 칸 머리에 통화를 붙입니다. ("Amount (USD)") 통화를 모르면 그대로 둡니다.
+    currency = str(draft.get("currency") or "").strip().upper()[:3]
+
+    def money(key: str, label: str) -> str:
+        return f"{label} ({currency})" if currency and key in MONEY_KEYS else label
+
     return {
-        "kind": kind, "title": result["title"], "data": data, "columns": result["columns"],
-        "fields": [{"key": name, "label": _label(kind, name)} for name in drafts.fields_for(kind)],
+        "kind": kind, "title": result["title"], "data": data, "currency": currency,
+        "columns": [{**column, "label": money(column["key"], column["label"])}
+                    for column in result["columns"]],
+        "fields": [{"key": name, "label": money(name, _label(kind, name))}
+                   for name in drafts.fields_for(kind)],
         "missing": result["missing"], "undecided": result["undecided"],
         "preview": drafts.preview_data(kind, data),
     }
