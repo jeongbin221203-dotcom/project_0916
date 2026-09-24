@@ -176,9 +176,12 @@
 .doc_fold > summary h3 { margin: 0; }
 .doc_fold > summary .cal_legend { margin: 0; }
 /* 오른쪽 끝의 접기·펴기 표시. 접히면 아래(▾), 펴지면 위(▴)를 봅니다. */
-.doc_fold_mark { margin-left: auto; display: grid; place-items: center; width: 34px; height: 34px;
+/* 화살표는 크게. 작으면 눌러서 펴는 자리인 줄 모르고 지나갑니다.
+   ▾ 글자는 위아래 여백이 넓어, 글자 크기를 키운 만큼 동그라미도 같이 키웁니다. */
+.doc_fold_mark { margin-left: auto; display: grid; place-items: center; width: 48px; height: 48px;
   border: 1px solid var(--line); border-radius: 50%; background: var(--surface);
-  color: var(--muted); font-size: 13px; line-height: 1; transition: transform .15s, background .15s; }
+  color: var(--muted); font-size: 52px; line-height: 0.62;
+  transition: transform .15s, background .15s; }
 .doc_fold > summary:hover .doc_fold_mark { background: var(--blue_soft); color: var(--blue_dark); }
 .doc_fold[open] .doc_fold_mark { transform: rotate(180deg); }
 .doc_fold[open] > summary { margin-bottom: 8px; }
