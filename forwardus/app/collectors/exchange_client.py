@@ -1,8 +1,19 @@
 """환율 제공자.
 
-관세청 UNI-PASS "관세환율정보조회" API를 우선 사용하고, 키가 없거나 호출이
-실패하면 data/mock/exchange_rates.json 값을 씁니다. 관세환율은 수출입 신고
+관세청 UNI-PASS "관세환율정보조회"를 먼저 씁니다. 관세환율은 수출입 신고
 가격 산정에 쓰는 고시 환율이라 통관·과세 계산에 적합합니다.
+
+관세청이 막혔을 때 곧장 예시 환율로 내려가지 않습니다. 예시 환율(USD 1,380 ·
+통화 4개)로 견적이 나가면 그 숫자가 맞는지 화면만 봐서는 알 수 없기 때문입니다.
+차례는 이렇습니다.
+
+    1. 관세청 고시 관세환율
+    2. 시장 환율 (Open Exchange Rates) — 고시환율은 아니지만 실제 값
+    3. 저장해 둔 지난 실환율 — 서버를 다시 켜도 남아 있습니다
+    4. 예시 고정 환율 — 여기까지 와야만 씁니다
+
+1·2로 받아 낸 값은 파일로 남겨 두었다가 3에서 씁니다.
+무엇으로 환산했는지는 rate_basis()가 한 줄로 알려 줍니다.
 """
 
 from __future__ import annotations
@@ -12,6 +23,7 @@ import xml.etree.ElementTree as ET
 from datetime import date
 from time import monotonic
 
+from app.collectors import file_cache
 from app.collectors.base_client import fail, get_config, load_mock, ok, request_text
 
 UNIPASS_FX_URL = "https://unipass.customs.go.kr:38010/ext/rest/trifFxrtInfoQry/retrieveTrifFxrtInfo"
@@ -183,8 +195,6 @@ STORED_MAX_DAYS = 30
 def _save_last_good(rates: dict, applied_date: str, origin: str) -> None:
     """받아 낸 환율을 파일로 남깁니다. 실패해도 조회를 멈추지 않습니다."""
 
-    from app.collectors import file_cache
-
     file_cache.write(LAST_GOOD_FILE, {
         "krw_per_unit": {code: value for code, value in rates.items() if value},
         "applied_date": applied_date,
@@ -195,8 +205,6 @@ def _save_last_good(rates: dict, applied_date: str, origin: str) -> None:
 
 def _last_good() -> dict | None:
     """저장해 둔 환율. 없거나 너무 오래됐으면 None."""
-
-    from app.collectors import file_cache
 
     found = file_cache.read(LAST_GOOD_FILE)
     if not found:
@@ -226,8 +234,6 @@ def _from_open_exchange_rates() -> dict | None:
     if not app_id:
         return None
 
-    from app.collectors import file_cache
-
     result = request_text("GET", "https://openexchangerates.org/api/latest.json",
                           timeout=15, params={"app_id": app_id})
     body = None
@@ -246,14 +252,13 @@ def _from_open_exchange_rates() -> dict | None:
         return None
 
     # per_usd[code] = 1달러당 그 통화 몇 단위. 원화 환산은 KRW ÷ 그 값입니다.
-    rates = {"KRW": 1.0}
+    # 기준이 달러이므로 1달러는 곧 KRW 값 그대로입니다. (응답이 USD를 적어 주든 말든)
+    rates = {"KRW": 1.0, "USD": float(krw)}
     for code, value in per_usd.items():
         code = code.upper()
-        if code == "KRW" or not value or not is_currency_code(code):
+        if code in ("KRW", "USD") or not value or not is_currency_code(code):
             continue
         rates[code] = krw / value
-    if "USD" not in rates:
-        return None
     stamp = body.get("timestamp")
     applied = (date.fromtimestamp(int(stamp)).isoformat() if stamp else date.today().isoformat())
     return {**ok(rates, "market"), "applied_date": applied}

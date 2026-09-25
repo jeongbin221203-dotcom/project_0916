@@ -25,8 +25,17 @@ def _clean(monkeypatch):
 
 
 def _keys(monkeypatch, **values):
-    real = fx.get_config
-    monkeypatch.setattr(fx, "get_config", lambda name, default=None: values.get(name, real(name, default)))
+    """키를 있는 셈·없는 셈 칩니다.
+
+    fx_board_client뿐 아니라 exchange_client도 함께 막습니다. 환율은 이제
+    시세표가 실패하면 exchange_client가 스스로 시장 환율을 부르기 때문에,
+    한쪽만 막으면 테스트가 진짜 인터넷을 타게 됩니다.
+    """
+
+    for module in (fx, exchange_client):
+        real = module.get_config
+        monkeypatch.setattr(module, "get_config",
+                            lambda name, default=None, _real=real: values.get(name, _real(name, default)))
 
 
 def _ok(body) -> dict:
@@ -146,6 +155,30 @@ def test_둘_다_안_되면_관세환율이나_고정_환율로_버티고_그렇
     assert result["source"] == "mock" and result["data"]["source"] == "mock"
     assert "실제 거래에 쓰지 마세요" in result["data"]["note"]
     assert any(row["code"] == "USD" for row in result["data"]["rows"])
+
+
+def test_저장해_둔_환율이_있으면_예시로_내려가지_않는다(app, monkeypatch):
+    """바깥이 다 막혀도, 지난번에 받아 낸 실환율이 있으면 그것을 씁니다.
+
+    예시 고정 환율(USD 1,380)로 시세표를 그리면 화면만 봐서는 그것이 지어낸
+    값인지 알 수 없습니다. 실제로 받았던 값이 훨씬 낫습니다.
+    """
+
+    _keys(monkeypatch, EXCHANGE_API_KEY="", OPEN_EXCHANGE_RATES_APP_ID="")
+    monkeypatch.setattr(exchange_client, "fetch_unipass_rates",
+                        lambda: {"success": False, "error_code": "API_TIMEOUT", "source": "api", "message": "x"})
+    file_cache.write(exchange_client.LAST_GOOD_FILE, {
+        "krw_per_unit": {"USD": 1355.61, "JPY": 8.63},
+        "applied_date": "2026-09-24", "origin": "market", "saved_date": "2026-09-24"})
+
+    with app.app_context():
+        result = fx.board()
+
+    assert result["source"] == "api"                      # 지어낸 값이 아닙니다
+    assert result["data"]["source"] == "stored"
+    assert "지난번에 받아 둔 환율" in result["data"]["note"]
+    usd = next(row for row in result["data"]["rows"] if row["code"] == "USD")
+    assert usd["deal"] == pytest.approx(1355.61)          # 예시 1,380이 아닙니다
 
 
 def test_시세표_창구(client, monkeypatch):
