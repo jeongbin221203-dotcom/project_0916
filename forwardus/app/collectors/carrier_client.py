@@ -23,6 +23,7 @@ import re
 import xml.etree.ElementTree as ET
 from datetime import date, datetime
 
+from app.collectors import snapshot
 from app.collectors.base_client import fail, get_config, ok, request_text
 
 UNIPASS_BASE = "https://unipass.customs.go.kr:38010/ext/rest/{svc}/{op}"
@@ -125,9 +126,12 @@ def search_shipping_companies(name: str) -> dict:
     svc, op = SHIP_LIST
     result = request_text("GET", UNIPASS_BASE.format(svc=svc, op=op),
                           params={"crkyCn": key, "shipCoNm": query}, timeout=20)
+    # 선사 등록부는 거의 바뀌지 않습니다. 관세청이 막혔을 때 지난번에 받아 둔
+    # 것으로 답합니다. (지어낸 값이 아니라 실제로 받았던 값입니다)
     if not result["success"]:
-        return result
-    return ok(_parse_ship_rows(result["data"], "shipCoLstQryRsltVo"), "api")
+        return snapshot.recall(f"ships_{query}", "registry") or result
+    return snapshot.remember(f"ships_{query}",
+                             ok(_parse_ship_rows(result["data"], "shipCoLstQryRsltVo"), "api"))
 
 
 def shipping_company(code: str) -> dict:

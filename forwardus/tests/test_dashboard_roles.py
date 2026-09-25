@@ -190,7 +190,8 @@ def test_관리자_API는_회원에게_403_로그인_전에는_401(client, anon_
 
 @pytest.mark.parametrize("path, active", [
     ("/", "홈"), ("/planning/new", "운송 예상 견적"), ("/documents/new", "수출 서류 작성"),
-    ("/dashboard", "Dashboard"), ("/lookup/", "관세청 조회"),
+    # Dashboard는 사이드바에 없습니다. 그래서 그 화면에서는 켜진 항목이 없습니다.
+    ("/dashboard", ""), ("/lookup/", "관세청 조회"),
     ("/tracking/container", "컨테이너 조회")])
 def test_사이드바는_어느_화면에나_같은_자리에_있다(client, path, active):
     html = client.get(path).get_data(as_text=True)
@@ -201,10 +202,10 @@ def test_사이드바는_어느_화면에나_같은_자리에_있다(client, pat
     assert "js/sidebar.js" in html and "css/shell.css" in html
     # 접힘/펼침은 그리기 전에 저장된 값으로 붙입니다. 화면을 옮겨도 그대로입니다.
     assert html.index("isSidebarExpanded") < html.index("<body")
-    # 이 브라우저는 마스터입니다. Dashboard는 마스터에게만 보입니다. (아래 테스트에서 확인)
-    for name in ("홈", "수출 서류 작성", "운송 예상 견적", "Dashboard", "컨테이너 조회",
-                 "관세청 조회", "환율"):
+    # 매일 쓰는 길만 둡니다. Dashboard는 사이드바에 없고 이름 메뉴로 들어갑니다.
+    for name in ("홈", "수출 서류 작성", "운송 예상 견적", "컨테이너 조회", "관세청 조회", "환율"):
         assert f'data-tip="{name}"' in html, (path, name)
+    assert 'data-tip="Dashboard"' not in html, path
     current = _active_rail(html)
     if active:
         assert f'data-tip="{active}"' in current and 'aria-current="page"' in current, path
@@ -217,16 +218,22 @@ def test_회원도_Dashboard로_갈_수_있고_보이는_범위만_다르다(app
 
     길은 둘 다 열어 둡니다. 감추는 것은 길이 아니라 **남의 자료**입니다.
     (내 건만 보이는 것은 위의 권한 테스트가 지킵니다)
+
+    사이드바에서는 뺐습니다(2026-09-25). 그래도 들어가는 길은 남아 있어야 합니다.
+    오른쪽 위 이름 메뉴가 그 길입니다.
     """
 
     member, _, _ = two_members
     html = member.get("/").get_data(as_text=True)
-    assert 'data-tip="Dashboard"' in html and 'href="/dashboard"' in html
+    assert 'href="/dashboard"' in html            # 사이드바가 아니라 이름 메뉴에
     assert "내 Dashboard" in html                 # 회원에게는 "내"
     assert member.get("/dashboard").status_code == 200
 
     master_html = client.get("/").get_data(as_text=True)
+    assert 'href="/dashboard"' in master_html
     assert "전체 Dashboard" in master_html        # 마스터에게는 "전체"
+    # 마스터는 모든 회원의 Shipment를 봅니다. (2026-09-25 사용자 확인)
+    assert client.get("/dashboard").status_code == 200
 
 
 def test_환율_창은_어느_화면에서나_열린다(client):

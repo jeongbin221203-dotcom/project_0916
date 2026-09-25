@@ -314,8 +314,12 @@ def test_조회_메뉴는_사이드바에_있고_위쪽에는_없다(app, client
     assert "운송 예상 견적" in rail and "운송 예상 견적" not in nav
 
     # 순서: 홈 → 수출 서류 작성 → 운송 예상 견적 → 조회들. 서류를 만들다가 운임을 봅니다.
+    # Dashboard는 사이드바에 없습니다. 이름 메뉴와 [최근] 안에서 들어갑니다.
     keys = [row["key"] for row in sidebar.RAIL]
-    assert keys == ["home", "documents", "planning", "dashboard", "container", "lookup"]
+    assert keys == ["home", "documents", "planning", "container", "lookup"]
+    assert "dashboard" not in keys
+    # 길이 사라진 것은 아닙니다. 이름 메뉴에 그대로 있습니다.
+    assert 'href="/dashboard"' in nav
     # 지금 보는 화면이 사이드바에 표시됩니다.
     assert 'aria-current="page"' in re.search(
         r'<aside class="home_rail.*?</aside>', client.get("/lookup/").get_data(as_text=True), re.S).group(0)

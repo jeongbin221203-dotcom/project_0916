@@ -16,6 +16,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from datetime import date
 
+from app.collectors import snapshot
 from app.collectors.base_client import fail, get_config, ok, request_text
 
 BASE = "https://unipass.customs.go.kr:38010/ext/rest/{svc}/{op}"
@@ -173,8 +174,10 @@ def export_requirement_laws(hs_code: str, direction: str = EXPORT) -> dict:
                           params={"serviceKey": key, "hsSgn": digits,
                                   "imexTpcd": direction if direction in (EXPORT, IMPORT) else EXPORT,
                                   "pageNo": "1", "numOfRows": "50"})
+    snap = f"laws_{digits}_{direction}"
     if not result["success"]:
-        return result
+        # 걸리는 법령은 법이 바뀔 때만 바뀝니다. 지난번에 받아 둔 것으로 답합니다.
+        return snapshot.recall(snap, "law") or result
     try:
         root = ET.fromstring(result["data"])
     except ET.ParseError:
@@ -201,7 +204,7 @@ def export_requirement_laws(hs_code: str, direction: str = EXPORT) -> dict:
         "end_date": "",
     } for row in root.iter("item")]
     rows = [row for row in rows if row["law_name"] or row["agency"]]
-    return ok(rows, "api")
+    return snapshot.remember(snap, ok(rows, "api"))
 
 
 # --- 2. 통관고유부호: 사업자등록번호로 찾습니다 ---------------------------------
@@ -376,7 +379,8 @@ def search_airlines(name: str) -> dict:
 
     result = _call("airline_list", {"flcoNm": query}, "항공사 목록")
     if not result["success"]:
-        return result
+        # 항공사 등록부는 거의 바뀌지 않습니다. 지난번에 받아 둔 것으로 답합니다.
+        return snapshot.recall(f"airlines_{query}", "registry") or result
     root = result["data"]
 
     rows = [{
@@ -386,7 +390,8 @@ def search_airlines(name: str) -> dict:
         "representative": _text(row, "rppnNm"),
     } for row in _rows(root, "flcoLstQryRsltVo", "flcoLstQryVo")]
     rows = [row for row in rows if row["code"]]
-    return ok(rows, "api") if rows else _empty(root, "항공사 목록")
+    return (snapshot.remember(f"airlines_{query}", ok(rows, "api")) if rows
+            else _empty(root, "항공사 목록"))
 
 
 def airline(code: str) -> dict:
@@ -429,7 +434,7 @@ def search_forwarders(name: str) -> dict:
 
     result = _call("forwarder_list", {"frwrNm": query}, "화물운송주선업자 목록")
     if not result["success"]:
-        return result
+        return snapshot.recall(f"forwarders_{query}", "registry") or result
     root = result["data"]
 
     rows = [{
@@ -439,7 +444,8 @@ def search_forwarders(name: str) -> dict:
         "representative": _text(row, "rppnNm"),
     } for row in _rows(root, "frwrLstQryRsltVo", "frwrLstQryVo")]
     rows = [row for row in rows if row["code"]]
-    return ok(rows, "api") if rows else _empty(root, "화물운송주선업자 목록")
+    return (snapshot.remember(f"forwarders_{query}", ok(rows, "api")) if rows
+            else _empty(root, "화물운송주선업자 목록"))
 
 
 def forwarder(code: str) -> dict:

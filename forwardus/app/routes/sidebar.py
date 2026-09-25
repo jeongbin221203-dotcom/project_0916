@@ -17,11 +17,6 @@ RAIL = [
      "note": "상업송장·포장명세서를 Shipment 데이터로 자동 작성합니다", "blueprints": ("document",)},
     {"key": "planning", "icon": "📦", "tone": "blue", "label": "운송 예상 견적", "endpoint": "planning.new",
      "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다", "blueprints": ("planning",)},
-    # Shipment 상세·추적·AI 도우미 화면은 Dashboard 아래에 있습니다.
-    # 회원은 자기가 만든 건만, 마스터는 전체를 봅니다. (권한은 dashboard_service가 가립니다)
-    {"key": "dashboard", "icon": "📊", "tone": "violet", "label": "Dashboard", "endpoint": "dashboard.index",
-     "note": "내 Shipment 현황 (마스터는 전체)",
-     "blueprints": ("dashboard", "shipment", "tracking", "assistant")},
     # 위쪽 메뉴에 있던 조회 두 가지를 이리로 옮겼습니다. 조회는 어느 화면에서나 자주 씁니다.
     {"key": "container", "icon": "🔎", "tone": "blue", "label": "컨테이너 조회",
      "endpoint": "tracking.container_lookup",
@@ -29,6 +24,18 @@ RAIL = [
     {"key": "lookup", "icon": "🏛", "tone": "green", "label": "관세청 조회", "endpoint": "lookup.index",
      "note": "HS부호·관세율·수출입 통계를 관세청 자료로 찾습니다", "blueprints": ("lookup",)},
 ]
+
+# Dashboard는 사이드바에 두지 않습니다. (2026-09-25 사용자 결정)
+#
+# 없앤 것이 아니라 자리를 옮긴 것입니다. 들어가는 길이 이미 둘 있습니다.
+#   - 오른쪽 위 이름 메뉴 → "내 Dashboard" (마스터는 "전체 Dashboard")
+#   - 사이드바 [🧾 최근] 을 열면 나오는 "Dashboard →"
+# 사이드바는 매일 쓰는 길(홈·서류·견적·조회)만 둡니다.
+#
+# 화면과 주소(dashboard.index)는 그대로 살아 있습니다. 아래 목록은 "지금 어느
+# 화면인가"를 가릴 때도 쓰이는데, Shipment 상세·추적·AI 도우미는 사이드바에
+# 표시할 항목이 없으므로 active_key()가 빈 값을 돌려주면 됩니다.
+# (오른쪽 위 메뉴의 표시는 nav_active = request.blueprint 로 따로 정해집니다)
 RECENT_COUNT = 3
 
 

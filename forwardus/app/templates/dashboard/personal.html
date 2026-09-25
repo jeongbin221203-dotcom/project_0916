@@ -106,10 +106,12 @@
     </section>
   {% endif %}
 
-  <section class="card">
-    <div class="row_between dash_table_head">
+  {# 마스터 화면과 같은 방식으로 접었다 펼 수 있게 합니다. 목록이 길면 아래
+     '비용·운송 분석'까지 한참 굴려야 했습니다. 기본은 펼침(open)입니다. #}
+  <details class="card dash_fold" open>
+    <summary class="row_between dash_table_head">
       <h2>내 Shipments <span class="muted small">{{ shipments|length }}건</span></h2>
-    </div>
+    </summary>
     {% include "dashboard/_filters.html" %}
     {% if shipments %}
       <div class="table_scroll">
@@ -138,7 +140,7 @@
         <a class="button primary" href="{{ url_for('planning.new') }}">운송 예상 견적 시작</a>
       </div>
     {% endif %}
-  </section>
+  </details>
 
   {% include "dashboard/_analytics.html" %}
 {% endblock %}
