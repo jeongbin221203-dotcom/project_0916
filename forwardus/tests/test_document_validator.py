@@ -113,11 +113,42 @@ def test_조사를_얼버무리지_않는다():
 
 
 def test_빈_칸은_서류끼리_맞대는_대상이_아니다():
-    """안 적은 것은 "다르다"가 아니라 "아직 안 적었다"입니다."""
+    """안 적은 것은 "다르다"가 아니라 "아직 안 적었다"입니다.
+
+    맞대기(cross)로는 지적하지 않습니다. 다만 꼭 있어야 하는 칸이면 따로
+    "비어 있습니다"로 알립니다(kind="missing"). 둘은 다른 문제입니다.
+    """
 
     result = _cross({"commercial_invoice": {"quantity": 500},
                      "packing_list": {"quantity": ""}})
-    assert result["status"] == "passed"      # 기준값이 없으니 빈 칸도 지적하지 않습니다.
+    assert not [f for f in result["findings"] if f["kind"] == "cross"]
+
+
+def test_꼭_있어야_하는_칸이_비면_알려_준다():
+    """순중량이 빈 포장명세서가 "검증 통과"로 나온 적이 있습니다. (2026-09-26)
+
+    기준값 대조는 기준값이 있을 때만 돌고, 맞대기는 양쪽이 다 비면 "같다"로
+    지나갑니다. 그 사이로 빠져나갔습니다. 수입국이 순중량을 요구하면 그
+    자리에서 막힙니다.
+    """
+
+    result = _cross({"packing_list": {"net_weight_kg": "", "quantity": 100}})
+    missing = [f for f in result["findings"] if f["kind"] == "missing"]
+    assert [f["field"] for f in missing] == ["net_weight_kg"]
+    assert "비어 있습니다" in missing[0]["message"]
+
+
+def test_아직_모를_수_있는_칸은_비어도_그냥_둔다():
+    """부킹 전에는 컨테이너 번호가 없는 것이 정상입니다.
+
+    늘 떠 있는 경고는 아무도 안 봅니다.
+    """
+
+    result = _cross({"packing_list": {"container_no": "", "net_weight_kg": 100,
+                                      "quantity": 1, "consignee": "A",
+                                      "product_description": "B",
+                                      "gross_weight_kg": 120}})
+    assert not [f for f in result["findings"] if f["kind"] == "missing"]
 
 
 def test_text_comparison_ignores_case_and_spacing():

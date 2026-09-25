@@ -52,6 +52,9 @@ REVIEW_PROMPT = """입력 상품과 관세청이 반환한 HSK 후보의 품목 
 high: 입력의 용도·형태·재질과 구체적으로 일치함. medium: 가능성이 있으나 핵심 정보 확인 필요.
 low: 다른 종류/용도/재질이거나 물건과 그 제조기계·부품·의료기구를 혼동한 후보.
 unknown: 판단할 근거 부족. '기타'는 상위 분류의 범위까지 고려하되 모르면 unknown으로 둔다.
+unknown과 low를 헷갈리지 마라. reason에 '관련이 없다'·'다른 품목이다'라고 쓸 수 있으면
+그것은 이미 판단한 것이므로 low다. unknown은 이 후보가 맞는지 아닌지조차 말할 수 없을 때만 쓴다.
+후보 대부분이 unknown으로 나오면 화면이 '미확인'으로 가득 차 순위가 쓸모없어진다.
 입력에 없는 원료·식품/의약품 승인·전원·용도 등을 가정하지 않는다. 가설의 reason도 사실로 취급하지 않는다.
 후보 품명이 특정 원료·성분·구조(예: 과실주스, 인삼, 부분품)를 요구하는데 입력에 그 정보가 없으면 high가 아니라 medium이다.
 후보 품명이 '기타'·'부분품'이면 상위 호의 범위를 생각하고, 완제품을 부분품 세번으로 보지 않는다.
@@ -73,7 +76,12 @@ def _ask(name, prompt, payload, schema, max_tokens=1800):
         return fail("API_AUTH_FAILED", "api", "OpenAI 키가 없어 일반 검색을 사용합니다.")
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     fingerprint = hashlib.sha256(get_config("AI_API_KEY", "").encode()).hexdigest()
-    cache_key = (name, encoded, ai_client.model_name(get_config("AI_HS_MODEL", "")), fingerprint)
+    # 프롬프트도 열쇠에 넣습니다.
+    # 넣지 않으면 프롬프트를 고쳐도 10분 동안 옛 답이 그대로 나옵니다. 실제로
+    # low/unknown 판단 기준을 고쳤는데 화면이 안 바뀌어 한참 헤맸습니다.
+    prompt_mark = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
+    cache_key = (name, encoded, ai_client.model_name(get_config("AI_HS_MODEL", "")),
+                 fingerprint, prompt_mark)
     with _cache_lock:
         cache = current_app.extensions.setdefault("hs_ai_cache", {})
         hit = cache.get(cache_key)
@@ -119,6 +127,26 @@ def analyze(query: str) -> dict:
             "hypotheses": hypotheses[:6], "missing_details": _strings(data.get("missing_details"), 3)}
 
 
+# "관련이 없다"고 쓴 답을 unknown으로 두지 않습니다.
+#
+# 프롬프트에 low와 unknown의 경계를 적어도 모형이 자꾸 어겼습니다.
+# "입력 상품과 관련이 없으며, 호르몬 관련 품목이다"라고 써 놓고 unknown을 골랐습니다.
+# 그건 이미 판단한 것이므로 low입니다.
+#
+# 이 차이가 화면에서 중요합니다. 정렬이 high→medium→unknown→low 순이라,
+# unknown으로 두면 **무관한 후보가 제대로 판단한 후보보다 위에 옵니다.**
+# 그리고 "미확인"이 잔뜩 뜨면 순위 자체를 안 믿게 됩니다.
+NO_RELATION = ("관련이 없", "관련 없", "무관", "다른 품목", "해당하지 않", "아니다", "아님")
+
+
+def _settle(match: str, reason: str) -> str:
+    """모형이 고른 등급을 이유와 맞춰 봅니다. 어긋나면 이유 쪽을 믿습니다."""
+
+    if match == "unknown" and any(word in reason for word in NO_RELATION):
+        return "low"
+    return match
+
+
 def review(query: str, analysis: dict, rows: list[dict]) -> dict:
     allowed = {re.sub(r"\D", "", row["code"]) for row in rows}
     payload = {"product": query[:200], "interpretation": analysis.get("summary", ""),
@@ -136,7 +164,8 @@ def review(query: str, analysis: dict, rows: list[dict]) -> dict:
             continue
         code = re.sub(r"\D", "", str(row.get("code", "")))
         if code in allowed and code not in assessments and row.get("match") in ("high", "medium", "low", "unknown"):
-            assessments[code] = {"match": row["match"], "reason": str(row.get("reason", ""))[:300],
+            reason = str(row.get("reason", ""))[:300]
+            assessments[code] = {"match": _settle(row["match"], reason), "reason": reason,
                                  "missing_details": _strings(row.get("missing_details"), 2)}
     return {"available": bool(assessments), "assessments": assessments,
             "message": "" if assessments else "AI 적합도 평가를 확인할 수 없습니다."}

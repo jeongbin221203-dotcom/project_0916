@@ -165,7 +165,12 @@
 .doc_score b { font-size: 20px; color: var(--blue); }
 .doc_score span { margin-left: 3px; color: var(--muted); font-size: 13px; }
 
-.doc_must { color: var(--red); font-style: normal; margin-left: 2px; }
+/* 꼭 채워야 하는 칸 표시.
+   빨강은 서류 센터의 [필수] 배지와 **같은 값**을 씁니다(#dc2626). 같은 뜻인데
+   화면마다 다른 빨강을 쓰면 같은 것인지 알 수 없습니다.
+   별표 하나는 작아서 지나치기 쉬워, 조금 키우고 굵게 둡니다. */
+.doc_must { color: #dc2626; font-style: normal; font-weight: 900;
+  margin-left: 3px; font-size: 1.15em; line-height: 1; }
 
 .doc_group { padding: 20px 22px; margin-bottom: 14px; border: 1px solid var(--line);
   border-radius: var(--radius); background: var(--white); }
@@ -836,7 +841,7 @@ body.home_talking .support_panel { display: none !important; }
 /* "필수"는 정상 상태입니다. 빨강은 잘못된 것에만 씁니다.
    색과 모양을 document.css의 .doc_role_required와 똑같이 맞춥니다.
    같은 뜻인데 화면마다 다르게 보이면 같은 것인지 알 수 없습니다. */
-.rq_tag.must { background: #fef3c7; color: #92400e; }
+.rq_tag.must { background: #dc2626; color: #fff; }
 .rq_tag.ai { background: #ede9fe; color: #6d28d9; }
 .rq_tag.done { background: #dcfce7; color: #15803d; }
 .rq_why { margin: 6px 0 0; color: var(--ink); font-size: 13px; line-height: 1.65; }

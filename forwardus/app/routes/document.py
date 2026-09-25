@@ -495,7 +495,12 @@ def validate(shipment_id: str):
     if result["status"] == "passed":
         flash("모든 문서의 주요 필드가 일치합니다.", "success")
     else:
-        flash(f"{len(result['findings'])}건의 불일치가 발견되었습니다.", "error")
+        # 몇 건인지만 알리면 무엇을 고쳐야 하는지 찾아 내려가야 합니다.
+        # 한 건이면 그 내용을 바로 적고, 여러 건이면 첫 건을 적고 나머지 수를 붙입니다.
+        findings = result["findings"]
+        first = findings[0].get("message", "")
+        more = f" (그 밖에 {len(findings) - 1}건 더)" if len(findings) > 1 else ""
+        flash(f"확인이 필요합니다 — {first}{more}", "error")
     return redirect(url_for("document.center", shipment_id=shipment_id) + "#validation")
 
 

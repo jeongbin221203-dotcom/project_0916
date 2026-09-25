@@ -233,7 +233,23 @@
     const trigger = event.target.closest("[data-hs-open]");
     if (!trigger || modal.contains(trigger)) return;
     event.preventDefault();
-    open({ query: trigger.dataset.hsQuery || "", country: trigger.dataset.hsCountry || "" });
+    // data-hs-fill="#선택자" 를 주면 고른 후보를 그 칸에 바로 넣습니다.
+    // 단추만으로는 함수를 넘길 수 없어, 선택자로 받아 여기서 target을 만듭니다.
+    // (이게 없으면 "클립보드에 복사"로 떨어져, 찾아 놓고 손으로 옮겨 적어야 합니다)
+    const fill = trigger.dataset.hsFill
+      ? document.querySelector(trigger.dataset.hsFill) : null;
+    const target = fill ? {
+      label: trigger.dataset.hsFillLabel || "HS부호 칸",
+      apply(code) {
+        fill.value = code;
+        fill.dispatchEvent(new Event("input", { bubbles: true }));
+        fill.dispatchEvent(new Event("change", { bubbles: true }));
+        fill.focus();
+      },
+    } : null;
+    open({ query: trigger.dataset.hsQuery || "",
+           country: trigger.dataset.hsCountry || "",
+           target });
   });
 
   window.ForwardusHsModal = { open, close, remember, remembered };

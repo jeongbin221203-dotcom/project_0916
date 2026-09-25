@@ -225,6 +225,59 @@ def _cross_findings(documents, labels, form_fields, reported) -> list[dict]:
     return findings
 
 
+# 비어 있으면 서류가 제 구실을 못 하는 칸. 서류 종류마다 다릅니다.
+#
+# 왜 따로 두나
+#   위의 기준값 대조는 **기준값이 있을 때만** 돕니다. Shipment에 순중량을 안
+#   적었으면 그 칸은 검사에서 통째로 빠지고, 서류끼리 맞대기도 양쪽이 다 비어
+#   있으면 "같다"로 지나갑니다. 그래서 순중량이 빈 포장명세서가 "검증 통과"로
+#   나왔습니다. 수입국 세관이 순중량을 요구하면 그 자리에서 막힙니다.
+#
+# 여기에 넣지 않은 것
+#   컨테이너 번호·주문번호·연락받을 사람처럼 **아직 모를 수 있는** 칸은 넣지
+#   않습니다. 부킹 전에는 컨테이너 번호가 없는 것이 정상인데 그것을 빨갛게
+#   띄우면, 늘 떠 있는 경고가 되어 아무도 안 봅니다.
+REQUIRED_BLANKS = {
+    "packing_list": ("net_weight_kg", "gross_weight_kg", "quantity",
+                     "consignee", "product_description"),
+    "commercial_invoice": ("invoice_value", "currency", "quantity", "incoterms",
+                           "consignee", "product_description"),
+}
+
+
+def _missing_findings(documents, labels, form_fields, reported) -> list[dict]:
+    """꼭 있어야 하는데 비어 있는 칸. "없다"와 "다르다"는 다른 문제입니다."""
+
+    findings = []
+    for doc_type, fields in REQUIRED_BLANKS.items():
+        data = documents.get(doc_type)
+        if not data:
+            continue
+        shown = form_fields.get(doc_type)
+        for field in fields:
+            if field not in data or (shown is not None and field not in shown):
+                continue
+            if (doc_type, field) in reported:
+                continue
+            if _normalize(data[field], field) != "":
+                continue
+            label = VALIDATION_FIELDS.get(field, field)
+            name = labels.get(doc_type, doc_type)
+            findings.append({
+                "status": "warning",
+                "kind": "missing",
+                "field": field,
+                "field_label": label,
+                "document": doc_type,
+                "document_label": name,
+                "expected": None,
+                "actual": None,
+                "message": f"{name}에 {label}{particle(label, '이')} 비어 있습니다. "
+                           "이 칸이 비면 통관에서 되돌아올 수 있습니다.",
+            })
+    return findings
+
+
 def validate_documents(documents: dict[str, dict], reference: dict,
                        labels: dict[str, str] | None = None,
                        form_fields: dict[str, list] | None = None) -> dict:
@@ -287,6 +340,7 @@ def validate_documents(documents: dict[str, dict], reference: dict,
     # 기준값이 없어 위에서 건너뛴 칸도 서류끼리는 같아야 합니다.
     reported = {(row["document"], row["field"]) for row in findings}
     findings.extend(_cross_findings(documents, labels, form_fields, reported))
+    findings.extend(_missing_findings(documents, labels, form_fields, reported))
 
     return {
         "status": "warning" if findings else "passed",

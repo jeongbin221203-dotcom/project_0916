@@ -36,8 +36,16 @@
                  placeholder="예: 7117190000 (10자리) 또는 711719 (6자리)"
                  aria-describedby="hs_help_{{ row.line_no }}">
           <button class="button" type="submit">저장</button>
+          {# 도착국을 함께 넘깁니다. 없으면 "도착국 관세 비교 안 함"으로 열려,
+             어느 후보가 관세에 유리한지 볼 수가 없습니다. 이 건은 도착국이
+             정해져 있으니 그대로 씁니다.
+             data-hs-fill 은 고른 후보를 넣을 칸입니다. 없으면 클립보드로
+             떨어져 손으로 옮겨 적어야 합니다. #}
           <button class="button ghost" type="button" data-hs-open
-                  data-hs-query="{{ row.product_description }}">🔎 모르겠어요 · 찾아보기</button>
+                  data-hs-query="{{ row.product_description }}"
+                  data-hs-country="{{ shipment.destination_country or shipment.destination_code[:2] }}"
+                  data-hs-fill="#hs_{{ row.line_no }}"
+                  data-hs-fill-label="품목 {{ row.line_no }} HS부호 칸">🔎 모르겠어요 · 찾아보기</button>
           <p class="muted small hs_set_help" id="hs_help_{{ row.line_no }}">
             6자리는 나라마다 같고, 10자리(HSK)는 한국 신고용입니다.
             품목분류를 잘못 적으면 관세포탈이 될 수 있어, 확실하지 않으면

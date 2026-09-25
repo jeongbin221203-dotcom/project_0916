@@ -76,11 +76,18 @@
       {% include "_sidebar.html" %}
       <div class="app_stage">
     {% endif %}
+    {# 같은 알림이 두 번 쌓이면 한 번만 보여 줍니다.
+       검증 단추를 두 번 누르면 "1건의 불일치가 발견되었습니다."가 나란히 두 줄
+       떴습니다. 같은 말이 두 번 있으면 두 가지 일이 일어난 줄 알게 됩니다. #}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="flash_stack" role="status">
+          {% set shown = [] %}
           {% for category, message in messages %}
-            <div class="flash flash_{{ category }}">{{ message }}</div>
+            {% if (category, message) not in shown %}
+              {% set _ = shown.append((category, message)) %}
+              <div class="flash flash_{{ category }}">{{ message }}</div>
+            {% endif %}
           {% endfor %}
         </div>
       {% endif %}

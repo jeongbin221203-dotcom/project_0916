@@ -179,7 +179,9 @@ DOCUMENT_ITEM_FIELDS = {
 }
 
 # 서식에 인쇄된 고정 문구
-PACKING_LIST_NOTE = ("NOTE: When referring to this shipment be sure to give order # and shipping date. "
+# "NOTE:" 라는 말머리는 여기 적지 않습니다. 화면(view.html)과 PDF가 각자 붙입니다.
+# 여기에도 적어 두었더니 화면에 "NOTE: NOTE: When referring…"으로 두 번 나왔습니다.
+PACKING_LIST_NOTE = ("When referring to this shipment be sure to give order # and shipping date. "
                      "품명·수량·포장 수는 상업송장과 일치시켜 주세요.")
 
 # 실제 서식처럼 칸을 묶어 보여줍니다. cols는 그 줄에 나란히 놓을 칸 수이고,
