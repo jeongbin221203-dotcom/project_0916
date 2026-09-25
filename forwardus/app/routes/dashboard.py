@@ -36,6 +36,15 @@ def _filters() -> dict:
             "q": request.args.get("q", ""), "owner": request.args.get("owner", "")}
 
 
+def _number(name: str, default: int) -> int:
+    """주소에서 숫자 하나를 읽습니다. 사람이 주소를 고쳐 넣어도 터지지 않아야 합니다."""
+
+    try:
+        return int(request.args.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 @dashboard_bp.get("")
 def index():
     viewer = current_user()
@@ -45,7 +54,12 @@ def index():
     common = {"viewer": viewer, "shipments": shipments, "filters": filters,
               "statuses": STATUS_LABELS, **analytics_service.build_dashboard(viewer)}
     if viewer.is_admin:
-        return render_template("dashboard/master.html", owners=owners,
+        # 표만 쪽으로 나눕니다. 위의 통계 칸과 CSV는 거른 목록 전체를 그대로 씁니다.
+        page = dashboard_service.paginate(
+            shipments, _number("page", 1), _number("size", dashboard_service.PAGE_SIZE))
+        return render_template("dashboard/master.html", owners=owners, page=page,
+                               sizes=dashboard_service.PAGE_SIZES,
+                               default_size=dashboard_service.PAGE_SIZE,
                                stats=dashboard_service.platform_stats(viewer), **common)
     mine = dashboard_service.search(viewer)          # 요약 칸은 거르기 전 내 전체로 셉니다
     return render_template("dashboard/personal.html",
