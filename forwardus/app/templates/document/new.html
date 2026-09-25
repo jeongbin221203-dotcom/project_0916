@@ -4,6 +4,14 @@
   <link rel="stylesheet" href="{{ static_url('css/home.css') }}">
 {% endblock %}
 {% block content %}
+  {# Shipment에서 넘어왔으면 돌아갈 길을 화면 맨 위에 둡니다. 칸을 다 채우고
+     아래까지 내려간 뒤에야 "어떻게 돌아가지?"를 떠올리기 때문입니다. #}
+  {% if back %}
+    <p class="doc_back">
+      <a href="{{ back.url }}">← {{ back.shipment_id }} 로 돌아가기</a>
+      <span class="muted small">{{ back.project_name }}</span>
+    </p>
+  {% endif %}
   <div class="page_head">
     <div>
       <p class="eyebrow">Trade Documents</p>

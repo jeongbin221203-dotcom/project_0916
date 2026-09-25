@@ -887,3 +887,9 @@ body.home_talking .support_panel { display: none !important; }
 .home_kept_text small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
 .home_kept_buttons { display: flex; gap: 8px; }
 .home_kept_buttons .button { padding: 7px 14px; font-size: 13px; }
+
+/* Shipment에서 서류 작성으로 넘어왔을 때 돌아가는 줄.
+   화면 맨 위, 제목보다 앞에 둡니다. 칸을 다 채우고 나서야 "어떻게 돌아가지?"를
+   떠올리는데, 그때 위로 올리는 것이 아래를 뒤지는 것보다 빠릅니다. */
+.doc_back { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.doc_back a { font-weight: 600; }

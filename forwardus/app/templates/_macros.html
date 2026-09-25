@@ -14,15 +14,21 @@
 {%- endmacro %}
 
 {% macro shipment_tabs(shipment, active) -%}
+  {# 차례: 서류·통관 → 요약 → Tracking → AI Assistant → 서류 작성 (2026-09-26 사용자 결정)
+     건을 열면 대부분 "무슨 서류가 필요한가"를 먼저 봅니다. 요약은 이미 위쪽
+     머리글(건번호·구간·상태)에 핵심이 나와 있습니다.
+     서류 작성은 이 화면을 떠나는 길이라 맨 끝에 둡니다. #}
   <nav class="sub_tabs" aria-label="Shipment 메뉴">
-    <a href="{{ url_for('shipment.detail', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'detail' }}">요약</a>
     <a href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'document' }}">서류·통관</a>
-    {# 이 건의 값(바이어·품목·조건)을 그대로 들고 서류 작성 화면으로 갑니다.
-       같은 내용을 두 번 적지 않게 doc_form.js가 ?source= 를 읽어 칸을 채웁니다. #}
-    <a href="{{ url_for('document.new') }}?source=shipment:{{ shipment.shipment_id }}"
-       class="{{ 'active' if active == 'write' }}">서류 작성 →</a>
+    <a href="{{ url_for('shipment.detail', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'detail' }}">요약</a>
     <a href="{{ url_for('tracking.detail', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'tracking' }}">Tracking</a>
     <a href="{{ url_for('assistant.index', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'assistant' }}">AI Assistant</a>
+    {# 이 건의 값(바이어·품목·조건)을 그대로 들고 서류 작성 화면으로 갑니다.
+       같은 내용을 두 번 적지 않게 doc_form.js가 ?source= 를 읽어 칸을 채웁니다.
+       back= 은 돌아올 자리입니다. 여기 없으면 작성 화면에서 이 건으로 돌아올
+       길이 브라우저 뒤로가기밖에 없습니다. #}
+    <a class="sub_tabs_last {{ 'active' if active == 'write' }}"
+       href="{{ url_for('document.new') }}?source=shipment:{{ shipment.shipment_id }}&back={{ shipment.shipment_id }}">서류 작성 →</a>
   </nav>
 {%- endmacro %}
 

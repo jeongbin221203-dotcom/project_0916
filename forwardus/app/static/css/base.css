@@ -247,6 +247,9 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .sub_tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 22px; overflow-x: auto; }
 .sub_tabs a { padding: 10px 14px; color: var(--muted); font-weight: 800; border-bottom: 2px solid transparent; white-space: nowrap; }
 .sub_tabs a.active, .sub_tabs a:hover { color: var(--blue); border-color: var(--blue); text-decoration: none; }
+/* 서류 작성은 이 화면을 **떠나는** 길입니다. 다른 탭과 붙여 두면 같은 화면
+   안에서 오가는 것으로 오해합니다. 오른쪽 끝으로 밀어 떼어 놓습니다. */
+.sub_tabs .sub_tabs_last { margin-left: auto; }
 
 /* Schedule route (shared by planning & detail) */
 .schedule_route { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; margin: 10px 0; }

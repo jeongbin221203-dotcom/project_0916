@@ -59,9 +59,24 @@ def new():
     칸을 채우는 일은 이리로 옮겼습니다. 사이드바 "서류 작성"이 여기입니다.
     """
 
+    # Shipment 화면에서 넘어왔으면 돌아갈 자리를 알려 줍니다. 없으면 브라우저
+    # 뒤로가기밖에 없는데, 칸을 채우다 누르면 적던 것이 날아갑니다.
+    back_id = (request.args.get("back") or "").strip()
+    back = None
+    if back_id:
+        try:
+            # 볼 권한이 있는 건만. 남의 건 번호를 주소에 적어 넣어도 열리지 않습니다.
+            found = shipment_service.get_or_404(back_id, viewer=current_user())
+        except ServiceError:
+            found = None
+        if found:
+            back = {"shipment_id": found.shipment_id, "project_name": found.project_name,
+                    "url": url_for("document.center", shipment_id=found.shipment_id)}
+
     return render_template("document/new.html",
                            checklist=document_start_service.checklist(),
                            sources=document_source_service.list_sources(current_user()),
+                           back=back,
                            recent=shipment_service.list_shipments(viewer=current_user())[:3])
 
 
