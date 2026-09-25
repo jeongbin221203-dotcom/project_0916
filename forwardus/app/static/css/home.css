@@ -888,13 +888,21 @@ body.home_talking .support_panel { display: none !important; }
 @media (max-width: 720px) { .cargo_modes { grid-template-columns: minmax(0, 1fr); } }
 
 /* 지난 대화를 불러올지 묻는 안내. 첫 화면 적는 칸 아래에 둡니다. */
-.home_kept { display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
-  gap: 10px 16px; margin: 14px auto 0; padding: 12px 16px; max-width: 640px;
+/* 한 줄로 눕힙니다. 줄바꿈하면 안내가 두세 줄을 차지해 대화가 밀려 내려갑니다.
+   다만 좁은 화면에서는 넘치느니 접히는 편이 낫습니다(wrap). */
+.home_kept { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 6px 12px; margin: 8px 0 0; padding: 5px 14px;
+  /* 폭은 정하지 않습니다. 적는 칸(.home_box)과 같은 부모 안에 있으므로
+     그냥 두면 저절로 같은 폭이 됩니다. 따로 정하면 어긋납니다. */
   border: 1px solid #bfdbfe; border-radius: 14px; background: #f5f9ff; }
-.home_kept_text { margin: 0; font-size: 13.5px; line-height: 1.6; }
-.home_kept_text small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.home_kept_text { margin: 0; font-size: 12.5px; line-height: 1.45; }
+/* 날짜를 같은 줄에 둡니다. block이면 한 줄을 더 먹어, 그만큼 대화가 덜 보입니다.
+   "9월 / 26일"로 갈라지지 않게 날짜는 통째로 붙여 둡니다. */
+.home_kept_text small { margin-left: 6px; color: var(--muted); font-size: 12px;
+  white-space: nowrap; }
+.home_kept_text { flex: 1 1 auto; min-width: 0; }
 .home_kept_buttons { display: flex; gap: 8px; }
-.home_kept_buttons .button { padding: 7px 14px; font-size: 13px; }
+.home_kept_buttons .button { padding: 4px 12px; font-size: 12px; }
 
 /* Shipment에서 서류 작성으로 넘어왔을 때 돌아가는 줄.
    화면 맨 위, 제목보다 앞에 둡니다. 칸을 다 채우고 나서야 "어떻게 돌아가지?"를

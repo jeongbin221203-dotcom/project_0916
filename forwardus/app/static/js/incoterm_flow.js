@@ -58,7 +58,13 @@
     while (costEnd < steps && costs[costEnd] === "S") costEnd += 1;
 
     bars.querySelector('[data-flow-bar="cost"]').innerHTML = runs(costs, "c", COST_TEXT)
-      + (costEnd > 0 && costEnd < steps ? mark(costEnd, "비용 이전", steps) : "");
+      // **늘 그립니다.** 어느 조건이든 비용이 넘어가는 지점은 있습니다.
+      //   EXW  맨 처음 (처음부터 구매자가 냅니다)
+      //   FOB  가운데
+      //   DPU·DDP  맨 끝 (내린 뒤부터 구매자가 냅니다)
+      // 예전에는 양 끝을 빼서 EXW와 DPU·DDP만 "비용 이전"이 안 보였습니다.
+      // 바로 아래 "위험 이전"은 같은 자리에 찍히니, 짝이 안 맞아 빠진 것처럼 보였습니다.
+      + mark(costEnd, "비용 이전", steps);
     bars.querySelector('[data-flow-bar="risk"]').innerHTML = runs(risks, "r", RISK_TEXT)
       + (riskFrom === riskTo ? mark(riskFrom, "위험 이전", steps)
         : mark(riskFrom, "위험 이전 범위", steps) + mark(riskTo, "", steps));
@@ -72,8 +78,13 @@
       el.innerHTML = `<span class="chip c_${costs[index]}">비용 ${escapeHtml(COST_TEXT[costs[index]])}</span>`
         + `<span class="chip r_${risks[index]}">위험 ${escapeHtml(RISK_TEXT[risks[index]])}</span>`;
     });
+    // 넘어가는 단계에 표시를 답니다. 막대와 아이콘의 세로줄이 어긋나는 폭에서는
+    // 이 표시가 유일한 단서입니다.
+    // 끝에서 넘어가는 조건(DPU·DDP)은 그 다음 아이콘이 없으므로 **마지막 아이콘**에
+    // 답니다. 예전에는 costEnd < steps 만 보아 DPU에는 아무 표시도 안 났습니다.
     if (stepEls[riskFrom]) stepEls[riskFrom].classList.add("risk_edge");
-    if (costEnd < steps && stepEls[costEnd]) stepEls[costEnd].classList.add("cost_edge");
+    const costStep = stepEls[costEnd] || stepEls[steps - 1];
+    if (costStep) costStep.classList.add("cost_edge");
   }
 
   window.ForwardusIncotermFlow = { render, COST_TEXT, RISK_TEXT };

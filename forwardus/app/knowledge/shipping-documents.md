@@ -24,7 +24,7 @@ render: document-issuers
 | 서류 | 언제 | 어디서 받나 |
 | --- | --- | --- |
 | **원산지증명서(C/O)** | FTA 특혜관세를 받을 때 | [대한상공회의소 무역인증](https://cert.korcham.net) (기관발급) / 관세청 — 협정마다 다르고, 한·미·한·EU 등은 **수출자 자율발급** |
-| **보험증권(Insurance Policy)** | CIF·CIP 조건, L/C가 요구할 때 | 손해보험사(적하보험). 금액은 **송장금액 110%** |
+| **보험증권(Insurance Policy)** | CIF·CIP 조건, L/C가 요구할 때 | 손해보험사(적하보험). 최소 **송장금액 110%**, 계약 통화로. **부보 범위가 조건마다 다릅니다** — CIF는 최소담보(ICC(C)), CIP는 최대담보(ICC(A))가 기본입니다 |
 | **검사증명서(Inspection Certificate)** | 바이어·수입국이 요구할 때 | [SGS Korea](https://www.sgsgroup.kr) · [Bureau Veritas Korea](https://www.bureauveritas.co.kr) · [Intertek Korea](https://www.intertek.co.kr) 등 검정기관 |
 | **식물검역증(Phytosanitary)·동물검역증** | 농산물·식물·목재 포장재(ISPM 15) | [농림축산검역본부](https://www.qia.go.kr) |
 | **위생증명서(식품)** | 수입국이 요구할 때 | [식품안전나라](https://www.foodsafetykorea.go.kr) · 지방식약청 |

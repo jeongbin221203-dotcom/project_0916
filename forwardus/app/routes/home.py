@@ -194,10 +194,27 @@ def api_support_chat():
     viewer = current_user()
     kept = chat_memory_service.context(viewer)
     history = kept["history"] or payload.get("history") or []
+    # 지금 작성 중인 건을 AI에게 함께 넘깁니다. 화면 머리글("Busan -> Istanbul
+    # 기준으로 답했습니다")과 같은 값입니다. 안 넘기면 AI는 지난 대화 요약만 보고,
+    # 머리글은 이스탄불인데 본문은 로스앤젤레스라고 답하는 일이 생깁니다.
+    current = {}
+    if viewer is not None:
+        draft = work_draft_service.load(viewer) or {}
+        at = draft.get("fields") or {}
+        goods = (draft.get("items") or [{}])[0] if draft.get("items") else {}
+        if at.get("origin_name") and at.get("destination_name"):
+            current["구간"] = f"{at['origin_name']} -> {at['destination_name']}"
+        if at.get("destination_country"):
+            current["도착국"] = at["destination_country"]
+        if goods.get("product_description"):
+            current["품목"] = goods["product_description"]
+        if at.get("transport_mode"):
+            current["운송"] = "항공" if at["transport_mode"] == "AIR" else "해상"
     try:
         result = support_chat_service.ask(question, history,
                                           brief=payload.get("style") == "brief",
-                                          memory=kept["summary"])
+                                          memory=kept["summary"],
+                                          current=current or None)
     except ServiceError as error:
         return jsonify({"success": False, "message": str(error),
                         "error_code": error.error_code, "source": "api"}), error.status
@@ -224,7 +241,17 @@ def api_support_chat():
         # 믿게 됩니다. ("치약 기준인데 수건인 줄 알고 보는" 일이 생깁니다)
         told = read_values.get("fields") or {}
         told_item = (read_values.get("items") or [{}])[0] if read_values else {}
-        if viewer is not None:
+        # 구간·품목을 **실제로 쓴 답**에만 붙입니다.
+        #
+        # "FOB랑 CIF는 어떻게 다른가요?"는 저장해 둔 설명(knowledge)으로 답합니다.
+        # 그 답은 어느 구간이든 똑같은데도 "부산 → 이스탄불 기준으로 답했습니다"가
+        # 붙었습니다. 맞춰서 답한 것처럼 보이게 하는 거짓말입니다. 그런 줄이 섞이면
+        # 정작 구간이 걸린 답에서도 이 줄을 안 믿게 됩니다.
+        #
+        # 구간·품목을 넘기는 곳은 AI로 답하는 길(api)과 우리가 계산하는 길(calculated)
+        # 둘뿐입니다. 나머지(knowledge·faq·cache·clarification)는 보지도 않습니다.
+        uses_context = result.get("source") in ("api", "calculated")
+        if viewer is not None and uses_context:
             kept = work_draft_service.load(viewer) or {}
             fields = kept.get("fields") or {}
             item = (kept.get("items") or [{}])[0] if kept.get("items") else {}

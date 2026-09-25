@@ -99,7 +99,11 @@ def test_서류에_적은_값이_운송_계획_모양으로_나온다(app):
     data = browser.get("/api/work-draft/planning").get_json()["data"]
     assert data["origin"]["code"] == "KRPUS" and data["destination"]["code"] == "USLAX"
     assert data["incoterms"] == "CIF" and data["transport_mode"] == "SEA"
-    assert data["departure_date"] == "2026-11-02"
+    # 발송 예상일은 **넘기지 않습니다.** (2026-09-26)
+    # 운송 계획 화면은 달력에서 날짜를 고르는 것으로 시작합니다. 미리 골라 두면
+    # 들어오자마자 이미 선택된 상태라, "다음 선택: Seller 발송 예상일" 안내와
+    # 화면이 어긋나 무엇을 해야 할지 알 수 없습니다.
+    assert data["departure_date"] is None
     fields = data["fields"]
     assert fields["exporter_name"] == "FORWARD COSMETICS" and fields["buyer_name"] == "ABC BEAUTY"
     assert fields["product_description"] == "Cream 50ml" and fields["quantity"] == "500"

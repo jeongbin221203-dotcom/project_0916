@@ -248,7 +248,8 @@ def _faq_context(hits) -> str:
 
 
 def _write_answer(bundle: dict, text: str, history: list | None, *,
-                  brief: bool = False, memory: str = "") -> dict:
+                  brief: bool = False, memory: str = "",
+                  current: dict | None = None) -> dict:
     """체인의 마지막 단계. 앞 단계가 모아 둔 근거로 답을 씁니다.
 
     bundle에는 체인이 지나온 것이 다 들어 있습니다(plan·documents·evidence).
@@ -271,6 +272,23 @@ def _write_answer(bundle: dict, text: str, history: list | None, *,
         messages.append({"role": "system",
                          "content": "지난 상담 요약입니다. 이어서 답하세요.\n"
                                     + _hide_bank(memory)})
+    # 지금 작성 중인 건. **지난 요약보다 뒤에** 둡니다.
+    #
+    # 왜 필요한가
+    #   화면에는 "Busan -> Istanbul 기준으로 답했습니다"라고 띄우면서, 정작
+    #   답은 "로스앤젤레스로 수출", "미국 FDA"라고 나온 적이 있습니다. 지난
+    #   대화 요약에 미국 건이 들어 있었고 AI는 그것을 집었습니다. 머리글과
+    #   본문이 다른 나라를 가리키면 어느 쪽을 믿어야 할지 알 수 없습니다.
+    #
+    #   그 머리글은 이 값으로 만듭니다. 같은 값을 AI에게도 줘야 둘이 맞습니다.
+    if current:
+        facts = " / ".join(f"{name} {value}" for name, value in current.items() if value)
+        if facts:
+            messages.append({"role": "system",
+                             "content": "지금 작성 중인 건입니다: " + facts + ". "
+                                        "이것이 기준입니다. 지난 대화에 다른 구간/나라/품목이 "
+                                        "나오더라도 이 건으로 답하세요. 사용자가 이번 말에서 "
+                                        "다른 구간을 적었다면 그 말을 따르세요."})
     for turn in (history or [])[-MAX_HISTORY:]:
         role = turn.get("role")
         content = _hide_bank(str(turn.get("content") or "").strip()[:MAX_QUESTION])
@@ -291,7 +309,7 @@ def _write_answer(bundle: dict, text: str, history: list | None, *,
 
 
 def ask(question: str, history: list | None = None, *, brief: bool = False,
-        memory: str = "") -> dict:
+        memory: str = "", current: dict | None = None) -> dict:
     """질문 하나에 답합니다. history는 [{role, content}] 형태입니다.
 
     brief는 오른쪽 아래 상담 창에서 옵니다. 그 창은 서식을 그리지 않아
@@ -338,7 +356,8 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     # 답을 쓰는 일은 체인의 마지막 단계에서 일어납니다. 어떤 말투로·얼마나 길게·어떤
     # 도구를 쓸지는 화면마다 달라서 그 부분만 여기서 만들어 체인에 넘깁니다.
     def write(bundle: dict) -> dict:
-        return _write_answer(bundle, text, history, brief=brief, memory=memory)
+        return _write_answer(bundle, text, history, brief=brief, memory=memory,
+                             current=current)
 
     # 손으로 적어 둔 깊은 자료가 나설 자리인지 봅니다. 두 가지 규칙을 지킵니다.
     #   - FAQ가 직접 답할 수 있으면(faq_direct) 그쪽이 먼저입니다. 검토·승인을 거친 답입니다.

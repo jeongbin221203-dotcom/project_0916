@@ -1301,10 +1301,8 @@
     const card = document.createElement("div");
     card.className = "home_kept";
     card.innerHTML = `
-      <p class="home_kept_text">지난 대화가 있습니다.
-        <b>${said}번</b> 물어보신 내용이 그대로 남아 있습니다.
-        <small>${when.getMonth() + 1}월 ${when.getDate()}일
-          ${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}</small></p>
+      <p class="home_kept_text">지난 대화 <b>${said}번</b>이 남아 있습니다.
+        <small>${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}</small></p>
       <div class="home_kept_buttons">
         <button type="button" class="button primary" data-kept-open>이어서 보기</button>
         <button type="button" class="button ghost" data-kept-drop>새로 시작</button>

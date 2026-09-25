@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import json
 from datetime import date
 
@@ -60,6 +62,23 @@ ICN_JSON = json.dumps({"response": {"body": {"totalCount": 3, "items": [
 
 METRICS = {"container_quantity": 2, "container_type": "40GP",
            "billable_revenue_ton": 12.5, "chargeable_weight_kg": 800.0}
+
+
+@pytest.fixture(autouse=True)
+def _fake_keys(app):
+    """가짜 키를 넣어 둡니다.
+
+    테스트 설정은 바깥 기관 키를 모두 비웁니다(실수로 진짜를 부르지 않게).
+    그런데 이 파일은 **응답을 흉내 내서 파서를 보는** 테스트라, 키가 없으면
+    수집기가 부르기도 전에 "키가 없습니다"로 멈춥니다.
+    진짜 키가 아니어도 됩니다. 바깥으로는 나가지 않습니다(conftest가 막습니다).
+    """
+
+    app.config["DATA_GO_KR_SERVICE_KEY"] = "test-key"
+    import config as _config
+
+    app.config["UNIPASS_API_KEYS"] = {name: "test-key" for name in _config.UNIPASS_SERVICES}
+    yield
 
 
 def test_sources_report_which_keys_are_missing(app):

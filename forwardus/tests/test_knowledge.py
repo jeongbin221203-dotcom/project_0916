@@ -129,7 +129,14 @@ class Test국가안내:
 
 
 class Test상담연결:
-    def test_지식으로_답하면_AI를_부르지_않는다(self, monkeypatch):
+    """app fixture가 꼭 필요합니다.
+
+    get_config는 앱 설정이 없으면 실제 Config(=.env)를 읽습니다. 그러면
+    테스트가 진짜 키로 기관을 부릅니다. FAQ 검색은 질문마다 OpenAI 임베딩을
+    부르므로, app 없이 돌리면 돈과 호출 수가 나갑니다. (2026-09-26)
+    """
+
+    def test_지식으로_답하면_AI를_부르지_않는다(self, app, monkeypatch):
         from app.services import support_chat_service
 
         def 부르면안됨(*args, **kwargs):  # noqa: N802
@@ -140,7 +147,7 @@ class Test상담연결:
         assert result["success"] and result["source"] == "knowledge"
         assert result["data"]["widget"] == "incoterms"
 
-    def test_나라_질문도_AI_없이_답한다(self, monkeypatch):
+    def test_나라_질문도_AI_없이_답한다(self, app, monkeypatch):
         from app.services import support_chat_service
 
         monkeypatch.setattr(support_chat_service.ai_client, "chat",

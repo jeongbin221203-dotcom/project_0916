@@ -178,7 +178,14 @@ def planning_prefill(viewer) -> dict:
         "source": stored["source"],
         "transport_mode": fields.get("transport_mode") or "SEA",
         "sea_mode": fields.get("sea_mode") or "",
-        "departure_date": fields.get("requested_departure_date") or None,
+        # 발송 예상일은 **넘기지 않습니다.** (2026-09-26 사용자 결정)
+        #
+        # 이 화면은 달력에서 날짜를 고르는 것으로 시작합니다. 안내도 "다음 선택:
+        # Seller 발송 예상일"이라고 적혀 있습니다. 그런데 미리 넣어 두면 들어오자마자
+        # 이미 골라진 상태라, 안내와 화면이 어긋나고 무엇을 해야 할지 알 수 없습니다.
+        # 날짜는 이 화면에서 정하는 값이지, 서류 화면에서 가져올 값이 아닙니다.
+        # (Buyer 요청 도착일은 바이어가 준 **사실**이라 그대로 가져옵니다)
+        "departure_date": None,
         "origin": _location(fields.get("origin_code"), fields.get("origin_name")),
         "destination": _location(fields.get("destination_code"), fields.get("destination_name")),
         "incoterms": fields.get("incoterms") or "",

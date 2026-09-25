@@ -36,7 +36,7 @@ def test_보이는_대화만_비우는_길과_아주_지우는_길이_따로다(
 
 def test_들어오면_묻고_고르게_한다():
     block = HOME[HOME.index("function offerKept"):HOME.index("showAction(current)")]
-    assert "지난 대화가 있습니다" in block
+    assert "지난 대화" in block and "남아 있습니다" in block
     assert "data-kept-open" in block and "data-kept-drop" in block
     # 이어서 보기 → 보관함에서 되살립니다. 새로 시작 → 보관함을 비웁니다.
     assert "chat.restoreKept(SOURCE)" in block

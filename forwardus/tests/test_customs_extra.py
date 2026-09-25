@@ -14,6 +14,23 @@ import pytest
 from app.collectors import customs_extra_client as extra
 
 
+@pytest.fixture(autouse=True)
+def _fake_keys(app):
+    """가짜 키를 넣어 둡니다.
+
+    테스트 설정은 바깥 기관 키를 모두 비웁니다(실수로 진짜를 부르지 않게).
+    그런데 이 파일은 **응답을 흉내 내서 파서를 보는** 테스트라, 키가 없으면
+    수집기가 부르기도 전에 "키가 없습니다"로 멈춥니다.
+    진짜 키가 아니어도 됩니다. 바깥으로는 나가지 않습니다(conftest가 막습니다).
+    """
+
+    app.config["DATA_GO_KR_SERVICE_KEY"] = "test-key"
+    import config as _config
+
+    app.config["UNIPASS_API_KEYS"] = {name: "test-key" for name in _config.UNIPASS_SERVICES}
+    yield
+
+
 def _reply(xml: str):
     return lambda *args, **kwargs: httpx.Response(
         200, text=xml, request=httpx.Request("GET", "https://x"))
@@ -212,8 +229,23 @@ def test_lookup_refuses_unknown_kinds_and_empty_queries(app):
             lookup_service.run("hs_code", "   ")
 
 
-def test_data_source_page_counts_what_is_connected(app, client):
-    """연결된 자료원 현황. 코드가 부르지 않는 서비스가 남아 있으면 드러납니다."""
+def test_data_source_page_counts_what_is_connected(app, client, monkeypatch):
+    """연결된 자료원 현황. 코드가 부르지 않는 서비스가 남아 있으면 드러납니다.
+
+    이 화면은 실제로 기관을 두드려 보는 것이 아니라 **키가 있는지와 코드가
+    부르는지**만 셉니다. 그래도 일부 수집기가 상태를 보려고 한 번 불러 보므로,
+    바깥으로 나가지 않게 막아 둡니다. 세는 결과는 달라지지 않습니다.
+    """
+
+    # httpx.request 한 곳만 막습니다.
+    #
+    # base_client.request_text를 갈면 안 됩니다. 수집기들이 `from ... import
+    # request_text`로 **각자 참조를 들고 있어** 갈아도 그대로 진짜를 부릅니다.
+    # 그러면 conftest의 차단에 걸리고, base_client가 그 기관을 "불통"으로 적어
+    # **다음 테스트까지 영향**을 줍니다. (실제로 뒤 테스트가 API_TIMEOUT을 받았습니다)
+    monkeypatch.setattr("httpx.request",
+                        lambda *a, **k: httpx.Response(
+                            503, text="", request=httpx.Request("GET", "https://x")))
 
     from app.services import lookup_service
 
