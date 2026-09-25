@@ -70,8 +70,54 @@ def _known_titles(found: list[dict]) -> str:
     return "\n".join(lines) if lines else "- (아직 없음)"
 
 
-def _country_notes(country_code: str, name: str = "") -> list[dict]:
-    """도착국에서 걸리는 인증. 우리가 정리해 둔 나라별 자료에서 꺼냅니다."""
+# 인증 이름에 나오는 말 → 그 인증이 걸리는 HS 류(앞 두 자리).
+#
+# 왜 필요한가
+#   나라별 인증 목록을 그대로 붙이면, 스킨로션(HS 33)을 보내는데 "섬유 라벨 FTC",
+#   "어린이제품 CPSC", "전기설비 UL·ETL"이 모두 "필수 서류"로 따라 나왔습니다.
+#   필요 없는 줄이 섞이면 정작 챙겨야 할 줄을 믿지 않게 됩니다.
+#
+#   여기 없는 말이 들어간 인증(CE 마킹·GPSR처럼 품목을 가리지 않는 것)은 **그대로
+#   둡니다.** 거르는 쪽이 틀렸을 때 서류가 사라지는 것보다, 한 줄 더 보이는 편이 낫습니다.
+CERT_SCOPE = {
+    ("전기", "전자", "무선", "통신", "FCC", "UL", "ETL", "NRTL", "PSE", "CCC",
+     "RoHS", "배터리", "EMC", "KC 전기"): {"84", "85", "90"},
+    ("식품", "음료", "농산", "축산", "수산", "위생증명", "Prior Notice", "HACCP"):
+        {f"{n:02d}" for n in range(1, 25)},
+    ("화장품", "INCI", "CFS"): {"33"},
+    ("의약", "의료기기", "MFDS", "식약처"): {"30", "90"},
+    ("섬유", "의류", "라벨 FTC", "FTC"): {f"{n:02d}" for n in range(50, 68)},
+    ("어린이", "완구", "CPSC", "CPC"): {"95", "96", "94"} |
+        {f"{n:02d}" for n in range(50, 68)},
+    ("자동차", "차량"): {"87"},
+    ("화학", "REACH", "MSDS"): {f"{n:02d}" for n in range(28, 39)},
+}
+
+
+def _cert_fits(title: str, chapters: set[str]) -> bool:
+    """이 인증이 지금 보내는 품목에 걸리는지.
+
+    품목을 모르면(HS부호를 아직 안 적었으면) 모두 보여 줍니다. 무엇을 보내는지
+    모르는 채로 거르면 필요한 서류를 감추게 됩니다.
+    """
+
+    if not chapters:
+        return True
+    scoped = False
+    for words, allowed in CERT_SCOPE.items():
+        if any(word in title for word in words):
+            scoped = True
+            if chapters & allowed:
+                return True
+    # 품목을 가리지 않는 인증(CE 마킹·GPSR 등)은 그대로 둡니다.
+    return not scoped
+
+
+def _country_notes(country_code: str, name: str = "", chapters: set[str] | None = None) -> list[dict]:
+    """도착국에서 걸리는 인증. 우리가 정리해 둔 나라별 자료에서 꺼냅니다.
+
+    chapters는 이 건의 HS 류(앞 두 자리)입니다. 품목에 안 걸리는 인증은 뺍니다.
+    """
 
     from app.processors import country_export_guide
 
@@ -92,6 +138,8 @@ def _country_notes(country_code: str, name: str = "") -> list[dict]:
         title = head.replace("**", "").strip()
         if not title:
             continue
+        if not _cert_fits(title, chapters or set()):
+            continue                      # 이 품목에 안 걸리는 인증입니다
         why = tail.replace("**", "").strip()
         if not why:
             why = "도착국에서 이 품목에 요구하는 인증입니다. 없으면 통관이 막힙니다."
@@ -243,6 +291,17 @@ class _Preview:
         self.destination_name = country_name
         self.requirement_documents = []
 
+    @property
+    def cargo(self):
+        """첫 품목. 원산지증명서 안내가 HS부호 하나를 이 이름으로 찾습니다.
+
+        이것이 없어서 미리보기에서는 원산지증명서가 통째로 빠졌습니다.
+        서류 작성 화면이 바로 이 미리보기를 쓰는데, 정작 가장 자주 필요한
+        서류가 목록에 없었습니다. (2026-09-25)
+        """
+
+        return self.cargos[0] if self.cargos else None
+
 
 def collect(shipment, *, use_ai: bool = True) -> dict:
     """이 건에 필요한 서류 한 목록. 올린 파일이 있으면 붙여서 돌려줍니다."""
@@ -285,8 +344,13 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
                     "요건승인이 없으면 수출신고가 수리되지 않습니다.",
              "source": "customs", "link": "", "confidence": "high"})
 
-    # 3. FTA 원산지증명서 (건이 있어야 협정 세율을 봅니다)
-    origin = _fta_origin(shipment) if not isinstance(shipment, _Preview) else None
+    # 3. FTA 원산지증명서
+    #
+    # 미리보기(HS부호만 넣고 아직 건을 만들기 전)에서도 보여 줍니다. 협정세율은
+    # 관세청이 있어야 나오지만, **어떤 협정을 쓸 수 있고 증명서를 어디서 어떤
+    # 서식으로 받는지**는 우리 표에 있습니다. 세율을 모른다고 서류 안내까지
+    # 빼면, 정작 가장 자주 필요한 서류가 목록에서 사라집니다.
+    origin = _fta_origin(shipment)
     if origin:
         add(origin)
 
@@ -296,8 +360,10 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
         # 도착국 칸이 비어 있으면 도착지 코드 앞 두 글자(UN/LOCODE)로 봅니다.
         port = (getattr(shipment, "destination_code", "") or "").strip().upper()
         country_code = port[:2] if len(port) >= 2 and port[:2].isalpha() else ""
+    # 이 건의 HS 류(앞 두 자리). 품목에 안 걸리는 인증을 빼는 데 씁니다.
+    chapters = {(cargo.hs_code or "")[:2] for cargo in cargos if (cargo.hs_code or "")[:2].isdigit()}
     for row in _country_notes(country_code,
-                              getattr(shipment, "destination_name", "") or ""):
+                              getattr(shipment, "destination_name", "") or "", chapters):
         add(row)
 
     # 5. AI 탐색 — 위에서 못 잡은 것만
