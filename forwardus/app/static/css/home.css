@@ -913,3 +913,13 @@ body.home_talking .support_panel { display: none !important; }
    떠올리는데, 그때 위로 올리는 것이 아래를 뒤지는 것보다 빠릅니다. */
 .doc_back { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
 .doc_back a { font-weight: 600; }
+
+/* 지난 대화를 골라서 불러오기. [골라서]를 누르면 안내 아래로 펼쳐집니다.
+   전부 불러오면 상관없는 말이 섞이고, 새로 시작하면 다 잃습니다. 그 사이를 둡니다. */
+.home_kept_pick { flex: 1 1 100%; display: grid; gap: 4px; margin-top: 6px;
+  padding-top: 6px; border-top: 1px solid #bfdbfe; }
+.home_kept_pick[hidden] { display: none; }
+.home_kept_row { display: flex; align-items: center; gap: 7px; font-size: 12px;
+  line-height: 1.4; text-align: left; cursor: pointer; }
+.home_kept_row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home_kept_pick .button { justify-self: start; margin-top: 3px; padding: 3px 10px; font-size: 11.5px; }

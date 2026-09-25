@@ -1305,8 +1305,10 @@
         <small>${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}</small></p>
       <div class="home_kept_buttons">
         <button type="button" class="button primary" data-kept-open>이어서 보기</button>
+        <button type="button" class="button ghost" data-kept-pick>골라서</button>
         <button type="button" class="button ghost" data-kept-drop>새로 시작</button>
-      </div>`;
+      </div>
+      <div class="home_kept_pick" data-kept-list hidden></div>`;
     hintEl.parentNode.insertBefore(card, hintEl);
 
     card.querySelector("[data-kept-open]").addEventListener("click", () => {
@@ -1315,6 +1317,33 @@
       if (!messages) return;
       logEl.innerHTML = "";
       restore();
+    });
+
+    /* 골라서 불러오기.
+       지난 대화가 다섯 번인데 그중 하나만 이어 가고 싶을 때가 있습니다.
+       전부 불러오면 상관없는 말이 섞이고, 새로 시작하면 다 잃습니다.
+       질문 하나와 그 답을 한 묶음으로 보여 주고, 체크한 것만 되살립니다. */
+    const listEl = card.querySelector("[data-kept-list]");
+    card.querySelector("[data-kept-pick]").addEventListener("click", () => {
+      if (!listEl.hidden) { listEl.hidden = true; return; }
+      const turns = chat.keptTurns();
+      if (!turns.length) return;
+      listEl.innerHTML = turns.map((turn) => `
+        <label class="home_kept_row">
+          <input type="checkbox" value="${turn.index}" checked>
+          <span>${escapeHtml(turn.text.slice(0, 70) || "(적은 말 없음)")}</span>
+        </label>`).join("")
+        + `<button type="button" class="button primary" data-kept-go>고른 것만 불러오기</button>`;
+      listEl.hidden = false;
+      listEl.querySelector("[data-kept-go]").addEventListener("click", () => {
+        const pick = [...listEl.querySelectorAll("input:checked")].map((box) => Number(box.value));
+        if (!pick.length) return;                 // 하나도 안 고르면 아무 일도 안 합니다
+        const messages = chat.restoreKept(SOURCE, pick);
+        card.remove();
+        if (!messages) return;
+        logEl.innerHTML = "";
+        restore();
+      });
     });
     card.querySelector("[data-kept-drop]").addEventListener("click", () => {
       chat.forgetKept();

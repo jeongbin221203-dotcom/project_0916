@@ -65,6 +65,32 @@
     } catch (error) { /* 보관 못 해도 지금 대화는 그대로입니다. */ }
   }
 
+  /* 보관함을 "질문 하나 + 그 뒤에 딸린 답들"로 나눕니다.
+
+     되살릴 때 질문만 골라내면 답이 남의 질문 밑에 붙습니다. 그래서 묶음으로
+     다룹니다. 맨 앞에 답이 먼저 오면(인사 등) 그것은 0번 묶음 앞에 둡니다. */
+  function turnsOf(messages) {
+    const turns = [];
+    (messages || []).forEach((message) => {
+      if (message.role === "user" || !turns.length) turns.push({ ask: message, rest: [] });
+      else turns[turns.length - 1].rest.push(message);
+    });
+    return turns.map((turn, index) => ({
+      index,
+      text: turn.ask.text || "",
+      mode: turn.ask.mode || "",
+      count: turn.rest.length,
+      messages: [turn.ask, ...turn.rest],
+    }));
+  }
+
+  function pickTurns(messages, pick) {
+    const wanted = new Set(pick.map(Number));
+    return turnsOf(messages)
+      .filter((turn) => wanted.has(turn.index))
+      .flatMap((turn) => turn.messages);
+  }
+
   function readKept() {
     try {
       const raw = window.localStorage.getItem(KEEP_KEY);
@@ -96,14 +122,28 @@
       return readKept();
     },
 
-    /* 보관함에 있는 것을 지금 대화로 되살립니다. */
-    restoreKept(source) {
+    /* 보관함에 있는 것을 지금 대화로 되살립니다.
+
+       pick을 주면 **고른 것만** 되살립니다. pick은 물어본 말(user)의 차례를
+       0부터 센 번호 배열입니다. 예: [0, 2] → 첫 번째와 세 번째 질문만.
+       그 질문에 딸린 답(assistant)도 함께 갑니다. 질문만 남고 답이 사라지면
+       무엇에 대한 답이었는지 알 수 없기 때문입니다.
+       pick이 없으면 예전처럼 전부 되살립니다. */
+    restoreKept(source, pick) {
       const kept = readKept();
       if (!kept) return null;
-      const state = { ...empty(), messages: kept.messages, docDraft: kept.docDraft || {} };
+      const messages = Array.isArray(pick) ? pickTurns(kept.messages, pick) : kept.messages;
+      if (!messages.length) return null;
+      const state = { ...empty(), messages, docDraft: kept.docDraft || {} };
       write(state);
       emit({ type: "restored", source });
       return state.messages;
+    },
+
+    /* 보관함을 "질문 하나 + 그 답들"의 묶음으로 나눠 돌려줍니다. 고르는 화면이 씁니다. */
+    keptTurns() {
+      const kept = readKept();
+      return kept ? turnsOf(kept.messages) : [];
     },
 
     /* 불러오지 않겠다고 하면 보관함을 비웁니다. 물어본 것을 또 묻지 않습니다. */

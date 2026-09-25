@@ -169,6 +169,16 @@ def planning_prefill(viewer) -> dict:
     carried = ("project_name", "exporter_name", "exporter_address", "buyer_name",
                "buyer_country", "buyer_address", "currency", "buyer_required_date")
     planning_fields.update({key: fields[key] for key in carried if fields.get(key)})
+
+    # 바이어가 준 값이 없으면 **아무것도 넘기지 않습니다.** (2026-09-26 사용자 결정)
+    #
+    # Buyer 요청 도착일은 바이어에게 받은 사실이라 가져옵니다. 그런데 바이어가
+    # 누구인지조차 안 적혀 있으면, 그 날짜는 누가 요청한 것인지 알 수 없습니다.
+    # 그런 값이 달력에 찍혀 있으면 "누가 정한 납기지?"가 되고, 그대로 두면
+    # 없는 약속을 지키려고 일정을 짜게 됩니다. 처음부터 비워 둡니다.
+    if not (planning_fields.get("buyer_name") or planning_fields.get("buyer_country")):
+        planning_fields.pop("buyer_required_date", None)
+        planning_fields.pop("buyer_address", None)
     if _total(items):
         planning_fields["invoice_value"] = _total(items)
     return {

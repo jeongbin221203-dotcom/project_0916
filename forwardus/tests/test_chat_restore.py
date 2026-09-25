@@ -48,3 +48,34 @@ def test_들어오면_묻고_고르게_한다():
 def test_화면에_그릴_모양이_있다():
     css = (ROOT / "app/static/css/home.css").read_text(encoding="utf-8")
     assert ".home_kept" in css and ".home_kept_buttons" in css
+
+
+def test_골라서_불러올_수_있다():
+    """지난 대화 다섯 번 중 하나만 이어 가고 싶을 때가 있습니다.
+
+    전부 불러오면 상관없는 말이 섞이고, 새로 시작하면 다 잃습니다.
+    질문 하나와 그 답을 한 묶음으로 보여 주고, 고른 것만 되살립니다.
+    """
+
+    # 보관함을 묶음으로 나눠 주는 창구가 있어야 화면이 목록을 그립니다.
+    assert "keptTurns()" in STORE
+    assert "function turnsOf" in STORE and "function pickTurns" in STORE
+    # 고른 번호를 넘기면 그것만, 안 넘기면 예전처럼 전부.
+    assert "restoreKept(source, pick)" in STORE
+    assert "Array.isArray(pick) ? pickTurns(kept.messages, pick) : kept.messages" in STORE
+
+
+def test_질문만_빼고_답을_남기지_않는다():
+    """질문만 골라내면 답이 남의 질문 밑에 붙습니다. 묶음으로 다뤄야 합니다."""
+
+    turns = STORE[STORE.index("function turnsOf"):STORE.index("function pickTurns")]
+    # 물어본 말이 나오면 새 묶음, 아니면 앞 묶음에 딸립니다.
+    assert 'message.role === "user"' in turns
+    assert "turns[turns.length - 1].rest.push(message)" in turns
+
+
+def test_화면에_골라서_단추가_있다():
+    block = HOME[HOME.index("function offerKept"):HOME.index("showAction(current)")]
+    assert "data-kept-pick" in block and "data-kept-go" in block
+    # 하나도 안 골랐으면 아무 일도 하지 않습니다.
+    assert "if (!pick.length) return;" in block

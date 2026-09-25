@@ -29,23 +29,35 @@ def build_dashboard(viewer) -> dict:
     tracked = [s for s in shipments if s.status in ARRIVED_STATUSES or s.delay_days > 0]
     delayed = [s for s in tracked if s.delay_days > 0]
     total_cost = sum(s.total_cost_krw for s in shipments)
-    total_cbm = sum(c.total_cbm for s in shipments for c in s.cargos)
-    total_kg = sum(c.total_weight_kg for s in shipments for c in s.cargos)
 
     # CBM단가와 KG단가는 같은 화물을 두 방식으로 나눈 값입니다. 그래서 둘의 비는
     # 곧 "1CBM이 몇 kg인가"가 됩니다. 이 값이 말이 안 되면 단가 둘 다 못 믿습니다.
-    # 평균만 보면 드러나지 않으므로(작은 건 하나가 전체를 끌어올립니다) 몇 건이
-    # 이상한지 세어 화면에 함께 적습니다.
     odd = [s for s in shipments
            if cargo_calculator.density_suspect(sum(c.total_cbm for c in s.cargos),
                                                sum(c.total_weight_kg for c in s.cargos))]
+
+    # **못 믿을 건은 단가 평균에서 뺍니다.** (2026-09-26)
+    #
+    # 50×50×50cm 상자가 2,400kg으로 적힌 건이 섞여 있었습니다. 그런 건 하나가
+    # 분모(부피)를 거의 안 늘리면서 분자(비용)는 그대로 더해, CBM단가를 통째로
+    # 끌어올립니다. 실제로 1CBM = 2,224kg이라는 불가능한 값이 나왔습니다.
+    #
+    # 값을 우리가 고치지는 않습니다. 무엇이 맞는지는 적은 사람이 압니다.
+    # 다만 **평균에서는 빼고, 뺐다는 사실을 화면에 적습니다.** 섞어서 평균을
+    # 내면 아무도 그 숫자를 못 씁니다.
+    sound = [s for s in shipments if s not in odd]
+    total_cbm = sum(c.total_cbm for s in sound for c in s.cargos)
+    total_kg = sum(c.total_weight_kg for s in sound for c in s.cargos)
+    sound_cost = sum(s.total_cost_krw for s in sound)
 
     kpi = {
         "total_shipments": len(shipments),
         "total_freight_krw": sum(_freight_krw(s) for s in shipments),
         "total_logistics_krw": total_cost,
-        "avg_cost_per_cbm": total_cost / total_cbm if total_cbm else None,
-        "avg_cost_per_kg": total_cost / total_kg if total_kg else None,
+        "avg_cost_per_cbm": sound_cost / total_cbm if total_cbm else None,
+        "avg_cost_per_kg": sound_cost / total_kg if total_kg else None,
+        # 단가를 낸 모집단. 화면이 "N건 중 M건으로 냈습니다"라고 적습니다.
+        "unit_cost_base": len(sound),
         "odd_density_count": len(odd),
         "odd_density_ids": [s.shipment_id for s in odd[:5]],
         "avg_transit_days": _avg([s.transit_days for s in shipments if s.transit_days]),
