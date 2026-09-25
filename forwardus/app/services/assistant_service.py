@@ -253,6 +253,12 @@ AI_SYSTEM_PROMPT = """당신은 한국 중소 수출기업의 담당자를 돕�
   자료에 없으면 "그 값은 아직 계산되지 않았습니다"라고 하세요.
 - "수출 가능합니다", "인증이 면제됩니다" 같은 단정을 하지 마세요.
   최종 판단은 세관과 수입국이 합니다.
+- **"확인할 요건이 없습니다"라고 절대 말하지 마세요.** 목록이 비어 있는 것은
+  "요건이 없다"가 아니라 "우리가 찾은 것이 없다"입니다. HS부호가 정확하지
+  않거나 기관 조회가 막혀 못 찾았을 수 있습니다. 그럴 때는
+  "우리 자료에서는 걸리는 것을 찾지 못했습니다. 다만 …"처럼
+  **찾지 못한 것인지 없는 것인지 구분해서** 말하세요.
+- 자료에 `요건조회_상태`가 "일부 실패"면 무엇을 못 봤는지 반드시 덧붙이세요.
 - 한국어로, 짧은 문장으로 씁니다. 무역 용어는 처음 쓸 때 우리말로 풀어 주세요.
 - 결론부터 말하고 이유를 덧붙이세요. 6문장을 넘기지 마세요.
 - 자료에서 위험해 보이는 것(납기 초과, 적재기한 임박, 요건 미확인)이 있으면 먼저 말하세요."""
@@ -269,11 +275,40 @@ def ai_context(shipment) -> dict:
     exception = exception_guide(shipment)
     flow = cash_flow(shipment)
 
-    requirements = []
-    for item in shipment.cargos:
-        for rule in export_requirements.check(item.hs_code, is_dangerous=item.is_dangerous):
-            requirements.append({"품목": item.product_description, "확인할 것": rule["title"],
-                                 "필요한 서류": rule["documents"], "어디서": rule["agency"]})
+    # 요건은 내부 규칙표만 보면 안 됩니다.
+    #
+    # 예전에는 export_requirements.check()만 돌렸습니다. 그 표에 없는 품목
+    # (예: 볼체인 HS 7117)이면 빈 목록이 되고, AI는 그것을 "요건이 없습니다"로
+    # 읽었습니다. **찾지 못한 것을 없다고 답하면 사람을 위험에 빠뜨립니다.**
+    # 이제 도착국 인증·세관장확인·FTA 원산지증명서까지 한 곳에서 모읍니다.
+    from app.services import required_docs_service
+
+    requirements, checked = [], {"규칙표": True}
+    try:
+        collected = required_docs_service.collect(shipment, use_ai=False)
+        for row in collected["documents"]:
+            requirements.append({"확인할 것": row["title"], "필요한 서류": row.get("documents") or [],
+                                 "어디서": row.get("agency", ""), "왜": row.get("why", ""),
+                                 "출처": row.get("source", "")})
+        checked["도착국_인증"] = any(r["출처"] == "country" for r in requirements) or True
+        checked["세관장확인"] = any(r["출처"] == "customs" for r in requirements)
+    except Exception:                                         # noqa: BLE001
+        # 모으다 실패해도 답은 나와야 합니다. 다만 못 봤다고 분명히 적습니다.
+        for item in shipment.cargos:
+            for rule in export_requirements.check(item.hs_code, is_dangerous=item.is_dangerous):
+                requirements.append({"품목": item.product_description, "확인할 것": rule["title"],
+                                     "필요한 서류": rule["documents"], "어디서": rule["agency"]})
+        checked["도착국_인증"] = False
+        checked["세관장확인"] = False
+
+    missing_hs = [item.product_description for item in shipment.cargos if not (item.hs_code or "").strip()]
+    status = "모두 확인" if all(checked.values()) and not missing_hs else "일부 실패"
+    limits = []
+    if not checked.get("세관장확인"):
+        limits.append("관세청 세관장확인대상 조회를 하지 못했습니다(기관 응답 없음 또는 키 없음).")
+    if missing_hs:
+        limits.append(f"HS부호가 비어 있는 품목이 있습니다: {', '.join(missing_hs)}. "
+                      "HS부호가 정해져야 걸리는 요건을 찾을 수 있습니다.")
 
     return {
         "건번호": shipment.shipment_id,
@@ -307,6 +342,11 @@ def ai_context(shipment) -> dict:
         "납기": exception.get("deadline"),
         "자금흐름_설명": flow.get("lines", []),
         "확인해야_할_수출요건": requirements,
+        # 목록이 비었을 때 "없다"가 아니라 "못 찾았다"임을 AI가 알아야 합니다.
+        "요건조회_상태": status,
+        "요건조회_못한_것": limits,
+        "요건목록_읽는_법": ("이 목록은 우리가 찾은 것입니다. 비어 있어도 '요건이 없다'는 뜻이 "
+                            "아닙니다. HS부호가 정확하지 않거나 기관 조회가 막히면 빠집니다."),
         "B_L번호": shipment.bl_no or "",
         "수출신고번호": shipment.export_declaration_no or "",
     }
