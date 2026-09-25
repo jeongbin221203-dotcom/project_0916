@@ -65,7 +65,11 @@ def test_AI는_이미_잡힌_것을_다시_내지_않는다(미국행, monkeypat
     def 가짜(messages, **kwargs):
         보낸것["prompt"] = messages[0]["content"]
         return {"success": True, "source": "api", "data": json.dumps({"documents": [
-            {"title": "FCC 적합성 선언서", "agency": "FCC", "why": "겹치는 답", "confidence": "high"},
+            # 치약(HS 3306)이라 FDA는 이미 목록에 있습니다. 겹치므로 버려야 합니다.
+            # (FCC로 시험하면 안 됩니다 — 화장품에는 안 걸려 목록에 없고, 그러면
+            #  겹치는 것이 아니라 새 항목이 되어 이 테스트가 뜻을 잃습니다)
+            {"title": "식품·화장품·의료기기 FDA 등록/신고", "agency": "FDA",
+             "why": "겹치는 답", "confidence": "high"},
             {"title": "캘리포니아 Prop 65 경고 라벨", "agency": "주정부",
              "why": "캘리포니아 판매 시 필요합니다.", "confidence": "low"},
         ]}, ensure_ascii=False)}
@@ -188,10 +192,46 @@ class TestHS부호만으로_미리보기:
         assert any("화장품" in title for title in titles)        # 우리 규칙표
         assert any("TAREKS" in title or "TSE" in title for title in titles)  # 도착국 인증
 
-    def test_건이_없으니_협정_원산지증명서는_빠진다(self, app, monkeypatch):
+    def test_건을_만들기_전에도_협정_원산지증명서를_알려_준다(self, app, monkeypatch):
+        """예전에는 미리보기에서 통째로 빠졌습니다. (2026-09-25 고침)
+
+        협정세율은 관세청이 있어야 나오지만, **어떤 협정을 쓸 수 있고 증명서를
+        어디서 어떤 서식으로 받는지**는 우리 표에 있습니다. 세율을 모른다고
+        서류 안내까지 빼면, 가장 자주 필요한 서류가 목록에서 사라집니다.
+        """
+
         _키없음(monkeypatch)
         data = required_docs_service.preview(["3306100000"], "TR")
-        assert all(row["source"] != "fta" for row in data["documents"])
+        origin = [row for row in data["documents"] if row["source"] == "fta"]
+        assert len(origin) == 1
+        assert "원산지증명서" in origin[0]["title"]
+        assert origin[0]["documents"]            # 함께 갖출 증빙까지 적혀 있어야 합니다
+
+    def test_품목에_안_걸리는_도착국_인증은_빼준다(self, app, monkeypatch):
+        """치약(HS 33)에 섬유 라벨·어린이제품·전기설비가 따라 나오면 안 됩니다.
+
+        필요 없는 줄이 섞이면 정작 챙겨야 할 줄을 믿지 않게 됩니다.
+        """
+
+        _키없음(monkeypatch)
+        titles = " ".join(row["title"] for row
+                          in required_docs_service.preview(["3306100000"], "US")["documents"])
+        assert "FDA" in titles                   # 화장품에 걸립니다
+        for 남 in ("섬유", "어린이", "UL", "FCC"):
+            assert 남 not in titles, 남
+
+        # 반대로 휴대전화(HS 85)에는 전기 쪽이 나와야 합니다.
+        phone = " ".join(row["title"] for row
+                         in required_docs_service.preview(["8517120000"], "DE")["documents"])
+        assert "RoHS" in phone or "배터리" in phone
+
+    def test_HS부호를_모르면_거르지_않는다(self, app, monkeypatch):
+        """무엇을 보내는지 모르는 채로 거르면 필요한 서류를 감추게 됩니다."""
+
+        _키없음(monkeypatch)
+        titles = " ".join(row["title"] for row
+                          in required_docs_service.preview([""], "US", products=["뭔가"])["documents"])
+        assert "FDA" in titles and "FCC" in titles
 
     def test_위험물이면_그_서류도_함께_나온다(self, app, monkeypatch):
         _키없음(monkeypatch)
