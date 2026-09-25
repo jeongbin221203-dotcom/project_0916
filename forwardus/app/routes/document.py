@@ -7,6 +7,7 @@ import io
 from flask import (Blueprint, flash, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
+from app.extensions import db
 from app.routes import error_response, load_shipment
 from app.routes.auth import current_user, login_required
 from app.services import (ServiceError, customs_filing_service, document_draft_service,
@@ -323,6 +324,45 @@ def requirements(shipment_id: str):
         shipment=shipment,
         check=requirement_service.requirements_for(shipment),
     )
+
+
+@document_bp.post("/<shipment_id>/requirements/hs-code")
+def set_hs_code(shipment_id: str):
+    """품목의 HS부호를 여기서 바로 적습니다.
+
+    왜 여기에 두나
+      이 화면은 "HS부호를 입력하면 이 품목에 걸린 요건을 짚어 드립니다"라고
+      안내하면서, 정작 **적을 자리를 주지 않았습니다.** 어디로 가야 하는지도
+      알려 주지 않아서, 안내를 읽고도 아무것도 할 수 없었습니다.
+
+      HS부호가 비어 있으면 수출요건도 필수 서류도 전부 빈 채로 나옵니다.
+      그 상태로 상담에 물으면 "확인할 요건이 없습니다"라고 답하기까지 했습니다.
+      그러니 이 화면에서 바로 적을 수 있어야 합니다.
+    """
+
+    shipment = load_shipment(shipment_id)
+    line_no = request.form.get("line_no", "1")
+    raw = (request.form.get("hs_code") or "").strip()
+    digits = "".join(ch for ch in raw if ch.isdigit())
+
+    try:
+        index = int(line_no) - 1
+        cargo = shipment.cargos[index]
+    except (ValueError, IndexError):
+        flash("어느 품목인지 찾지 못했습니다.", "error")
+        return redirect(url_for("document.requirements", shipment_id=shipment_id))
+
+    # 지우는 것도 허용합니다. 잘못 적었으면 비우고 다시 적을 수 있어야 합니다.
+    if raw and len(digits) not in (6, 10):
+        flash("HS부호는 6자리(국제 공통) 또는 10자리(한국 HSK)입니다. "
+              f"적어 주신 것은 {len(digits)}자리입니다.", "error")
+        return redirect(url_for("document.requirements", shipment_id=shipment_id))
+
+    cargo.hs_code = digits
+    db.session.commit()
+    flash(f"품목 {line_no}의 HS부호를 {digits or '(비움)'}으로 적었습니다."
+          if digits else f"품목 {line_no}의 HS부호를 비웠습니다.", "success")
+    return redirect(url_for("document.requirements", shipment_id=shipment_id))
 
 
 @document_bp.post("/<shipment_id>/requirements/upload")

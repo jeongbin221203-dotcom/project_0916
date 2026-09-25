@@ -349,7 +349,7 @@ def _ask_ai(text: str, images: list[str]) -> dict:
     result = ai_client.structured_chat(
         [{"role": "system", "content": EXTRACT_PROMPT}, {"role": "user", "content": content}],
         EXTRACT_SCHEMA, name="trade_document_extract", max_tokens=3000,
-        model=get_config("AI_DOC_MODEL", ai_client.MODEL), timeout=AI_TIMEOUT_SECONDS)
+        model=ai_client.model_name(get_config("AI_DOC_MODEL", "")), timeout=AI_TIMEOUT_SECONDS)
     if not result["success"]:
         # structured_chat의 문구는 HS 검색용이라 여기서 다시 씁니다.
         if result.get("error_code") == "API_TIMEOUT":

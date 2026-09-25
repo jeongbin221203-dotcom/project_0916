@@ -850,7 +850,7 @@ def _ai_read(message: str, draft: dict) -> dict:
          # 계좌번호·SWIFT는 AI로 보내지 않습니다.
          {"role": "user", "content": bank_redaction.strip_bank_numbers(message)[0]}],
         MERGE_SCHEMA, name="trade_document_merge", max_tokens=1200,
-        model=get_config("AI_DOC_MODEL", ai_client.MODEL), timeout=40)
+        model=ai_client.model_name(get_config("AI_DOC_MODEL", "")), timeout=40)
     if not result["success"]:
         return {}
     raw = result["data"]

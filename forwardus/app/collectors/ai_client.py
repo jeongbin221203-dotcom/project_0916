@@ -74,6 +74,21 @@ def embed(texts: list[str], *, timeout: float = 20) -> dict:
         return fail("API_INVALID_RESPONSE", "api", "임베딩 응답을 해석하지 못했습니다.")
 
 
+def model_name(setting: str = "", override: str = "") -> str:
+    """쓸 모형 이름. **빈 값은 "안 정했다"는 뜻입니다.**
+
+    .env에 `AI_HS_MODEL=` 처럼 이름만 적고 값을 비워 두는 일이 흔합니다.
+    get_config는 그 자리에 값이 "있다"고 보고 빈 문자열을 그대로 돌려줍니다.
+    그러면 OpenAI에 model=""로 보내게 되고, 요청이 통째로 거절됩니다.
+
+    실제로 그랬습니다. HS 검색의 **AI 적합도가 전부 "미확인"**으로 나왔는데,
+    키도 있고 일반 대화도 되는데 구조화 호출만 400으로 막혀 있었습니다.
+    비어 있으면 기본 모형으로 내려갑니다. (2026-09-26)
+    """
+
+    return (override or "").strip() or (setting or "").strip() or MODEL
+
+
 def structured_chat(messages: list[dict], schema: dict, *, name: str,
                     max_tokens: int = 1800, model: str | None = None,
                     timeout: float = 25) -> dict:
@@ -88,7 +103,8 @@ def structured_chat(messages: list[dict], schema: dict, *, name: str,
         return fail("API_AUTH_FAILED", "api", "OpenAI 키가 없어 일반 검색을 사용합니다.")
     result = request_text("POST", OPENAI_URL, timeout=timeout,
                           headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                          json={"model": model or get_config("AI_HS_MODEL", MODEL), "temperature": 0,
+                          json={"model": model_name(get_config("AI_HS_MODEL", ""), model or ""),
+                                "temperature": 0,
                                 "max_tokens": max_tokens, "messages": messages,
                                 "response_format": {"type": "json_schema", "json_schema": {
                                     "name": name, "strict": True, "schema": schema}}})

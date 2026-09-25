@@ -15,6 +15,21 @@ from app.collectors import port_stats_client as ports
 from app.collectors import trade_stats_client as trade
 
 
+@pytest.fixture(autouse=True)
+def _fake_key(app):
+    """가짜 키를 넣어 둡니다.
+
+    테스트 설정은 바깥 기관 키를 모두 비웁니다(실수로 진짜를 부르지 않게).
+    그런데 이 파일은 **응답을 흉내 내서 파서를 보는** 테스트라, 키가 없으면
+    수집기가 부르기도 전에 "키가 없습니다"로 멈춰 흉내 낸 응답에 닿지 못합니다.
+    진짜 키가 아니라 아무 글자나 있으면 됩니다. 바깥으로는 나가지 않습니다
+    (request_text를 갈아 끼우고, conftest가 연결 자체를 막습니다).
+    """
+
+    app.config["DATA_GO_KR_SERVICE_KEY"] = "test-key"
+    yield
+
+
 def _reply(text: str):
     return lambda *args, **kwargs: httpx.Response(
         200, text=text, request=httpx.Request("GET", "https://x"))

@@ -73,7 +73,7 @@ def _ask(name, prompt, payload, schema, max_tokens=1800):
         return fail("API_AUTH_FAILED", "api", "OpenAI 키가 없어 일반 검색을 사용합니다.")
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     fingerprint = hashlib.sha256(get_config("AI_API_KEY", "").encode()).hexdigest()
-    cache_key = (name, encoded, get_config("AI_HS_MODEL", ai_client.MODEL), fingerprint)
+    cache_key = (name, encoded, ai_client.model_name(get_config("AI_HS_MODEL", "")), fingerprint)
     with _cache_lock:
         cache = current_app.extensions.setdefault("hs_ai_cache", {})
         hit = cache.get(cache_key)

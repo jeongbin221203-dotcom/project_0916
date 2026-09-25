@@ -14,7 +14,7 @@
   const chat = window.ForwardusChat;
   if (!config || !fab || !panel || !chat) return;
 
-  const { postJson } = window.Forwardus;
+  const { postJson, escapeHtml } = window.Forwardus;
   const log = panel.querySelector("[data-support-log]");
   const chips = panel.querySelector("[data-support-chips]");
   const form = panel.querySelector("[data-support-form]");
@@ -36,7 +36,7 @@
 
   function plain(text) {
     // 줄바꿈은 살리고 나머지는 글자 그대로 넣습니다.
-    return window.Forwardus.escapeHtml(text).replace(/\n/g, "<br>");
+    return escapeHtml(text).replace(/\n/g, "<br>");
   }
 
   // 어느 탭에서 나눈 말인지 바뀌는 자리에 작은 구분선을 둡니다.
@@ -63,7 +63,7 @@
   function renderChips() {
     const items = config.intro.suggestions || [];
     chips.innerHTML = items
-      .map((text) => `<button type="button" class="support_chip">${window.Forwardus.escapeHtml(text)}</button>`)
+      .map((text) => `<button type="button" class="support_chip">${escapeHtml(text)}</button>`)
       .join("");
   }
 
@@ -135,10 +135,15 @@
     if (focus && !input.disabled) input.focus();
   }
 
-  function close() {
+  // focus: 접은 뒤 [고객 상담] 단추로 초점을 되돌릴지.
+  // 닫기(×)나 Esc로 접을 때는 되돌립니다 — 키보드만 쓰는 사람이 초점을
+  // 잃으면 화면 맨 처음부터 다시 훑어야 합니다.
+  // 바깥을 눌러 접을 때는 되돌리지 않습니다. 방금 누른 곳에서 초점을
+  // 빼앗아 오면 누른 단추가 안 눌립니다.
+  function close({ focus = true } = {}) {
     panel.hidden = true;
     fab.classList.remove("is_open");
-    fab.focus();
+    if (focus) fab.focus();
   }
 
   // 다른 화면(시작 화면의 탭)에서 더한 말도 여기에 그립니다.
@@ -154,7 +159,24 @@
   });
 
   fab.addEventListener("click", () => (panel.hidden ? open() : close()));
-  panel.querySelector("[data-support-close]").addEventListener("click", close);
+  panel.querySelector("[data-support-close]").addEventListener("click", () => close());
+
+  // 창 바깥을 누르면 접습니다.
+  //
+  // 이 창은 화면 오른쪽 아래를 덮습니다. 뒤에 있는 서류 카드나 단추를 누르려다
+  // 창에 가려 못 누르는 일이 있었습니다. 닫기(×)를 찾아 누르게 하는 것보다,
+  // 쓰던 곳을 그냥 누르면 비켜 주는 편이 자연스럽습니다.
+  //
+  // 적던 글이 있으면 접지 않습니다. 물어보려고 쓰다가 잠깐 딴 곳을 봤을 뿐인데
+  // 글이 사라지면 처음부터 다시 써야 합니다. (대화 내용은 chat이 들고 있어
+  // 접었다 펴도 남지만, 아직 보내지 않은 글은 입력칸에만 있습니다)
+  document.addEventListener("pointerdown", (event) => {
+    if (panel.hidden) return;
+    if (panel.contains(event.target) || fab.contains(event.target)) return;
+    if (input.value.trim()) return;
+    close({ focus: false });
+  });
+
   if (resetButton) {
     resetButton.addEventListener("click", () => {
       if (busy || !chat.messages().length) return;

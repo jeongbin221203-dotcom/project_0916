@@ -12,7 +12,7 @@
         <h2>수출요건 확인</h2>
         <p class="muted">{{ check.note }}</p>
       </div>
-      <a class="button ghost" href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}">서류 센터로</a>
+      <a class="button primary" href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}">서류 센터로</a>
     </div>
 
     {% for row in check.by_item %}
@@ -22,6 +22,28 @@
           <span class="mono muted small">{{ row.hs_code or 'HS부호 미입력' }}</span>
         </div>
         <p class="muted small">{{ row.summary }}</p>
+
+        {# HS부호를 여기서 바로 적습니다.
+           예전에는 "HS부호를 입력하면 …" 이라고 안내만 하고 적을 자리가 없었습니다.
+           어디로 가야 하는지도 알려 주지 않아, 안내를 읽고도 할 수 있는 일이
+           없었습니다. HS부호가 비면 요건도 필수 서류도 전부 빈 채로 나옵니다. #}
+        <form class="hs_set" method="post"
+              action="{{ url_for('document.set_hs_code', shipment_id=shipment.shipment_id) }}">
+          <input type="hidden" name="line_no" value="{{ row.line_no }}">
+          <label class="hs_set_label" for="hs_{{ row.line_no }}">HS부호</label>
+          <input class="text_input mono" id="hs_{{ row.line_no }}" name="hs_code"
+                 value="{{ row.hs_code }}" inputmode="numeric"
+                 placeholder="예: 7117190000 (10자리) 또는 711719 (6자리)"
+                 aria-describedby="hs_help_{{ row.line_no }}">
+          <button class="button" type="submit">저장</button>
+          <button class="button ghost" type="button" data-hs-open
+                  data-hs-query="{{ row.product_description }}">🔎 모르겠어요 · 찾아보기</button>
+          <p class="muted small hs_set_help" id="hs_help_{{ row.line_no }}">
+            6자리는 나라마다 같고, 10자리(HSK)는 한국 신고용입니다.
+            품목분류를 잘못 적으면 관세포탈이 될 수 있어, 확실하지 않으면
+            관세청 품목분류 사전심사를 받으세요.
+          </p>
+        </form>
 
         {# 관세청이 세번 10자리로 답해 주면 그것이 기준입니다. #}
         {% if row.official.available %}
