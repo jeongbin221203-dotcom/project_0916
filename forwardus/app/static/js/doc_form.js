@@ -718,6 +718,55 @@
   }
   form.addEventListener("input", score);
   form.addEventListener("change", score);
+
+  /* ----- "17 / 18"을 누르면 빠진 칸으로 갑니다 -----
+     숫자만 보여 주면 "하나가 비었다"는 것만 알고 어느 칸인지는 모릅니다. 그걸 찾으려고
+     화면을 위아래로 훑게 됩니다. 눌러서 바로 그 자리로 데려다 줍니다. */
+  function missingFields() {
+    const found = [];
+    panel.querySelectorAll(".doc_field").forEach((field) => {
+      if (field.closest("template") || field.hidden) return;
+      if (!field.querySelector(".doc_must")) return;
+      // 품목은 첫 줄만 셉니다. (점수와 같은 기준이어야 숫자가 맞습니다)
+      if (field.closest(".doc_item") && field.closest(".doc_item") !== itemsBox.querySelector(".doc_item")) return;
+      const input = field.querySelector("[data-doc-input]");
+      if (input && !input.value.trim()) found.push({ field, input });
+    });
+    return found;
+  }
+
+  function showMissing() {
+    clearInvalid();
+    const gaps = missingFields();
+    if (!gaps.length && !chosenSchedule) {
+      // 칸은 다 찼고 일정만 안 골랐습니다.
+      goToSection("schedule");
+      const box = panel.querySelector("[data-doc-schedules]");
+      if (box) box.classList.add("is_invalid");
+      return;
+    }
+    if (!gaps.length) {
+      doneEl.closest(".doc_score").classList.add("is_full");
+      setTimeout(() => doneEl.closest(".doc_score").classList.remove("is_full"), 1200);
+      return;
+    }
+    gaps.forEach(({ field }) => field.classList.add("is_invalid"));
+    const first = gaps[0];
+    const top = first.field.getBoundingClientRect().top + window.scrollY - 110;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    first.input.focus({ preventScroll: true });
+  }
+
+  const scoreBox = panel.querySelector(".doc_score");
+  if (scoreBox) {
+    scoreBox.setAttribute("role", "button");
+    scoreBox.setAttribute("tabindex", "0");
+    scoreBox.title = "누르면 아직 못 채운 칸으로 갑니다";
+    scoreBox.addEventListener("click", showMissing);
+    scoreBox.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); showMissing(); }
+    });
+  }
   // 도착지·품목·날짜가 바뀌면 지어 둘 견적명도 달라집니다.
   form.addEventListener("change", (event) => {
     if (!nameStep) return;
@@ -938,12 +987,21 @@
       `<a class="button small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">`
       + `${escapeHtml(row.label)} ↗</a>`).join("");
 
+    // 세율이 없을 수 있습니다(관세청 조회 실패). 그때는 발급 방식·서식을 대신 적습니다.
+    const paperOf = (row) => {
+      const mark = row.certificate || {};
+      const bits = [mark.method, mark.issuer && `발급 ${mark.issuer}`,
+                    mark.form && `서식: ${mark.form}`,
+                    mark.valid_for && `유효기간 ${mark.valid_for}`].filter(Boolean);
+      return bits.length ? bits.join(" · ") : (mark.how || row.about || "");
+    };
     const agreements = data.available && data.agreements.length
       ? `<div class="origin_list">${data.agreements.map((row) => `
           <div class="origin_row">
             <b>${escapeHtml(row.agreement)}</b>
-            <span class="origin_rate">${escapeHtml(row.rate || "-")}</span>
-            <small class="muted">${escapeHtml((row.certificate && row.certificate.how) || row.about || "")}</small>
+            <span class="origin_rate">${escapeHtml(row.rate === "" ? "세율 조회 안 됨"
+                                                    : (row.rate || "-"))}</span>
+            <small class="muted">${escapeHtml(paperOf(row))}</small>
           </div>`).join("")}</div>`
       : `<p class="doc_note">${escapeHtml(data.reason || "적용할 협정을 찾지 못했습니다.")}</p>`;
 

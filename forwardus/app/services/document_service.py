@@ -686,6 +686,44 @@ def document_items(document) -> dict:
             "note": PACKING_LIST_NOTE if document.doc_type == "packing_list" else ""}
 
 
+def _agreements_from_table(country: str) -> list[dict]:
+    """관세청 조회가 안 될 때 쓰는 우리 표. 세율은 없고 **협정과 발급 방식**만 있습니다.
+
+    세율을 지어내지 않습니다. 대신 "한·튀르키예 FTA를 쓸 수 있고, 자율발급이며,
+    송장에 원산지 문안을 적으면 된다"까지는 알려 줍니다. 그것만으로도 준비가 됩니다.
+    """
+
+    from app.processors import country_export_guide, fta_guide
+
+    code = (country or "").strip().upper()
+    if not code:
+        return []
+    certificates = fta_guide.seed().get("certificates") or {}
+    names = {code: name for code, name in
+             ((row_code, row_name) for row_code, row_name in _country_names().items())}
+    found = []
+    for agreement in country_export_guide.agreements(code):
+        # "한·튀르키예 FTA" → "튀르키예" 처럼 협정 이름에서 상대를 떼어 냅니다.
+        token = agreement.replace("한·", "").replace("한ㆍ", "").replace(" FTA", "")
+        token = token.replace(" CEPA", "").strip()
+        paper = certificates.get(token) or certificates.get(names.get(code, "")) or {}
+        if not paper and token == "RCEP":
+            paper = certificates.get("RCEP", {})
+        found.append({
+            "agreement": agreement,
+            "rate": "",
+            "about": "협정세율은 관세청 조회가 되면 함께 보여 드립니다.",
+            "certificate": paper,
+            "steps": fta_guide.steps_for(paper) if hasattr(fta_guide, "steps_for") else {},
+        })
+    return found
+
+
+def _country_names() -> dict:
+    from app.collectors import location_client
+
+    return {code: row["name"] for code, row in location_client._countries().items()}
+
 def origin_certificate_guide(shipment) -> dict:
     """이 건에 쓸 수 있는 협정과 필요한 원산지증명서를 정리합니다.
 
@@ -718,6 +756,18 @@ def origin_certificate_guide(shipment) -> dict:
 
     guide = planning_service.tariff_guide(hs_code, country)
     if not guide.get("available"):
+        # 관세청이 느리거나 멈췄습니다. 세율은 못 가져오지만 **어떤 협정을 쓸 수 있는지**는
+        # 우리 표에 있습니다. 빈손으로 돌려보내지 않습니다. 세율만 "조회 실패"로 둡니다.
+        fallback = _agreements_from_table(country)
+        if fallback:
+            return {**common, "available": True, "country": country, "hs_code": hs_code,
+                    "agreements": fallback,
+                    "agreement_names": [row["agreement"] for row in fallback],
+                    "rates_missing": True,
+                    "note": ("관세청 세율 조회가 지금 되지 않아 **협정세율은 빼고** 보여 드립니다. "
+                             "어떤 협정을 쓸 수 있는지와 발급 방식은 아래와 같습니다. "
+                             "세율은 FTA 강국 KOREA(fta.go.kr)에서 HS부호로 확인하세요."),
+                    "source": "ForwardUs 협정표"}
         return {**common, "available": False, "reason": guide.get("message", ""),
                 "country": guide.get("country", country)}
 

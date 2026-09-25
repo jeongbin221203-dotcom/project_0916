@@ -847,3 +847,10 @@ body.home_talking .support_panel { display: none !important; }
 .rq_upload input[type="file"] { flex: 1 1 200px; min-width: 0; font-size: 12.5px; }
 /* 관세사 자료에 함께 나가는 서류 목록 */
 .filing_papers { margin: 8px 0 0; padding-left: 18px; line-height: 2; }
+
+/* "채운 칸 / 전체"는 눌러서 못 채운 칸으로 갑니다. 누를 수 있다는 것이 보여야 합니다. */
+.doc_score { cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.doc_score:hover { border-color: #b7cbfb; box-shadow: 0 2px 10px rgba(43,102,246,.12); }
+.doc_score:focus-visible { outline: 3px solid rgba(43,102,246,.45); outline-offset: 2px; }
+.doc_score.is_full { border-color: #86efac; background: #f0fdf4; }
+.doc_score.is_full b { color: #15803d; }

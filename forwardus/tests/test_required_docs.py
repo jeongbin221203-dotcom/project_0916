@@ -214,3 +214,20 @@ class TestHS부호만으로_미리보기:
         form = (Path(__file__).parent.parent / "app/static/js/doc_form.js").read_text(encoding="utf-8")
         assert "requiredDocsPreviewUrl" in form
         assert 'event.target.name === "item_hs_code"' in form
+
+
+def test_채운_칸_숫자를_누르면_빠진_칸으로_간다():
+    """숫자만 보여 주면 "하나가 비었다"만 알고 어느 칸인지는 모릅니다.
+
+    17/18에서 그 하나를 찾으려고 화면을 훑게 됩니다. 눌러서 바로 가게 합니다.
+    """
+
+    form = (Path(__file__).parent.parent / "app/static/js/doc_form.js").read_text(encoding="utf-8")
+    assert "function missingFields" in form and "function showMissing" in form
+    # 점수와 같은 기준으로 세야 숫자가 맞습니다. (품목은 첫 줄만)
+    assert "품목은 첫 줄만 셉니다" in form
+    # 일정만 안 고른 경우도 짚어 줍니다.
+    assert 'goToSection("schedule")' in form
+
+    css = (Path(__file__).parent.parent / "app/static/css/home.css").read_text(encoding="utf-8")
+    assert ".doc_score { cursor: pointer;" in css
