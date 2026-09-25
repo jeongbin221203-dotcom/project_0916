@@ -107,6 +107,25 @@
     </div>
   </section>
 
+  {# 따로 발급받은 서류. 관세사가 신고할 때 함께 첨부합니다.
+     여기가 비어 있으면 "챙길 서류가 없다"가 아니라 "아직 안 올렸다"입니다. #}
+  <section class="card">
+    <h2>함께 보내는 서류 <small class="muted">따로 발급받은 것</small></h2>
+    {% if sheet.papers %}
+      <ul class="filing_papers">
+        {% for paper in sheet.papers %}
+          <li>📎 <b>{{ paper.filename }}</b>
+            {% if paper.note %}<span class="muted">· {{ paper.note }}</span>{% endif %}
+            <span class="muted small">{{ paper.status }}</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">아직 올려 두신 서류가 없습니다.
+        원산지증명서·인증서·검역증이 필요한 건이면
+        <a href="{{ url_for('document.new') }}">서류 작성 → 기타 필수 서류</a>에서 올려 주세요.</p>
+    {% endif %}
+  </section>
+
   {% if refund.available or refund.company %}
     <section class="card">
       <h2>간이정액 환급 <small class="muted">관세청 환급율표</small></h2>

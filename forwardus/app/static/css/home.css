@@ -817,3 +817,30 @@ body.home_talking .support_panel { display: none !important; }
 /* 대화에서 담아 둔 화물 정보 알림 (chat_capture_service) */
 .answer_kept { margin: 8px 0 0; padding: 7px 11px; border-radius: 10px; background: var(--green_soft);
   color: #07694f; font-size: 12.5px; font-weight: 700; }
+
+/* ----- 기타 필수 서류 (서류 작성 화면) -----
+   HS부호와 도착국으로 찾은 서류를 한 줄씩 둡니다. 어디서 찾은 것인지(관세청·규칙·협정·
+   도착국·AI)를 꼬리표로 밝힙니다. AI가 찾은 것은 색을 달리해 "확인하고 쓰라"고 말합니다. */
+.rq_count { margin-left: 6px; padding: 1px 9px; border-radius: 999px; background: var(--surface);
+  color: var(--muted); font-size: 12px; font-weight: 800; vertical-align: 2px; }
+.rq_list { display: grid; gap: 10px; margin-top: 10px; }
+.rq_row { padding: 12px 14px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.rq_row.is_done { border-color: #bbf7d0; background: #f6fef9; }
+.rq_head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rq_head b { font-size: 14.5px; }
+.rq_tag { padding: 1px 9px; border-radius: 999px; background: var(--surface); color: var(--muted);
+  font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+.rq_tag.must { background: #fee2e2; color: #b91c1c; }
+.rq_tag.ai { background: #ede9fe; color: #6d28d9; }
+.rq_tag.done { background: #dcfce7; color: #15803d; }
+.rq_why { margin: 6px 0 0; color: var(--ink); font-size: 13px; line-height: 1.65; }
+.rq_agency { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
+.rq_papers { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+.rq_files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rq_file { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  background: var(--surface); font-size: 12.5px; font-weight: 700; }
+.rq_file small { color: var(--muted); font-weight: 600; }
+.rq_upload { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.rq_upload input[type="file"] { flex: 1 1 200px; min-width: 0; font-size: 12.5px; }
+/* 관세사 자료에 함께 나가는 서류 목록 */
+.filing_papers { margin: 8px 0 0; padding-left: 18px; line-height: 2; }

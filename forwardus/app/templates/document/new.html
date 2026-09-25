@@ -61,7 +61,9 @@
       extractUrl: "{{ url_for('document.extract') }}",
       suggestNameUrl: "{{ url_for('document.suggest_name') }}",
       sourceUrl: "{{ url_for('document.source_values', kind='__KIND__', source_id='__ID__') }}",
-      originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}"
+      originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}",
+      {# 기타 필수 서류: HS·도착국으로 찾은 목록 (원산지증명서·인증서·검역증 …) #}
+      requiredDocsUrl: "{{ url_for('document.required_docs', shipment_id='__ID__') }}"
     };
   </script>
   <script src="{{ static_url('js/doc_upload.js') }}"></script>

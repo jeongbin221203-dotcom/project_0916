@@ -801,15 +801,86 @@
   async function loadOrigin(shipmentId) {
     originEmpty.hidden = true;
     originBody.hidden = false;
-    originBody.innerHTML = `<p class="muted small">불러오는 중입니다…</p>`;
-    const response = await getJson(config.originUrl.replace("__ID__", shipmentId));
-    if (!response.success) {
-      originBody.innerHTML = `<p class="doc_error_line">${escapeHtml(response.message)}</p>`;
+    originBody.innerHTML = `<p class="muted small">필요한 서류를 찾고 있습니다…
+      <small>(관세청 요건 · 도착국 인증 · 협정)</small></p>`;
+    // 두 가지를 함께 그립니다. 필요한 서류 목록(새로 만든 것)과 협정 안내(예전 것).
+    const [docs, origin] = await Promise.all([
+      getJson(config.requiredDocsUrl.replace("__ID__", shipmentId)),
+      getJson(config.originUrl.replace("__ID__", shipmentId)),
+    ]);
+    if (!docs.success && !origin.success) {
+      originBody.innerHTML = `<p class="doc_error_line">${escapeHtml(docs.message || origin.message)}</p>`;
       return;
     }
-    originBody.innerHTML = originHtml(response.data);
+    originBody.innerHTML = (docs.success ? requiredDocsHtml(docs.data) : "")
+      + (origin.success ? originHtml(origin.data) : "");
   }
 
+  /* ----- 기타 필수 서류 -----
+     HS부호와 도착국으로 찾은 서류를 한 목록으로 보여 줍니다. 어디서 찾은 것인지
+     (관세청·규칙·협정·도착국·AI) 함께 적습니다. AI가 찾은 것은 그렇다고 밝혀,
+     사람이 한 번 더 확인하고 쓰게 합니다. */
+  const DOC_SOURCE = {
+    customs: { label: "관세청 세관장확인", tone: "must" },
+    rule: { label: "수출요건", tone: "must" },
+    fta: { label: "FTA 특혜관세", tone: "" },
+    country: { label: "도착국 인증", tone: "" },
+    ai: { label: "AI가 찾음 · 확인 필요", tone: "ai" },
+  };
+
+  function requiredDocRow(row, uploadUrl) {
+    const source = DOC_SOURCE[row.source] || { label: "", tone: "" };
+    const files = (row.uploads || []).map((file) =>
+      `<span class="rq_file">📎 ${escapeHtml(file.filename)}`
+      + `<small>${escapeHtml(file.status_label || "")}</small></span>`).join("");
+    const papers = (row.documents || []).length
+      ? `<ul class="rq_papers">${row.documents.map((name) =>
+          `<li>${escapeHtml(name)}</li>`).join("")}</ul>` : "";
+    return `
+      <div class="rq_row${row.uploaded ? " is_done" : ""}">
+        <div class="rq_head">
+          <b>${escapeHtml(row.title)}</b>
+          <span class="rq_tag ${source.tone}">${escapeHtml(source.label)}</span>
+          ${row.uploaded ? '<span class="rq_tag done">올림</span>' : ""}
+        </div>
+        ${row.why ? `<p class="rq_why">${escapeHtml(row.why)}</p>` : ""}
+        ${row.agency ? `<p class="rq_agency">발급·신청: ${escapeHtml(row.agency)}</p>` : ""}
+        ${papers}
+        ${files ? `<div class="rq_files">${files}</div>` : ""}
+        <form class="rq_upload" method="post" enctype="multipart/form-data" action="${escapeHtml(uploadUrl)}">
+          <input type="hidden" name="requirement_key" value="${escapeHtml(row.key)}">
+          <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" required>
+          <button class="button small primary" type="submit">올리기</button>
+        </form>
+      </div>`;
+  }
+
+  function requiredDocsHtml(data) {
+    const rows = (data.documents || []);
+    const list = rows.length
+      ? rows.map((row) => requiredDocRow(row, data.upload_url)).join("")
+      : `<p class="doc_note">HS부호와 도착국으로는 따로 받아야 할 서류가 잡히지 않았습니다.
+         품목에 따라 달라지니 바이어가 요구하는 서류도 함께 확인해 주세요.</p>`;
+    const others = (data.others || []).length
+      ? `<p class="muted small">그 밖에 올려 두신 파일: `
+        + data.others.map((row) => escapeHtml(row.filename)).join(", ") + "</p>" : "";
+    const ai = data.ai_available
+      ? (data.ai_used ? "" : "<small class=\"muted\">AI가 더 찾은 것은 없습니다.</small>")
+      : "<small class=\"muted\">AI 키가 없어 우리 자료로만 찾았습니다.</small>";
+    return `
+      <section class="doc_group">
+        <h3><span aria-hidden="true">📎</span> ${escapeHtml(data.destination || "")} 보낼 때 필요한 서류
+          <span class="rq_count">${data.ready}/${data.total}</span></h3>
+        <p class="doc_note">${escapeHtml(data.note || "")} ${ai}</p>
+        <div class="rq_list">${list}</div>
+        ${others}
+        <p class="muted small"><a href="${escapeHtml(data.filing_url)}">관세사에게 넘길 자료 보기 →</a></p>
+      </section>`;
+  }
+
+  /* ----- 협정 안내 (원산지증명서) -----
+     기타 필수 서류 목록에도 원산지증명서 한 줄이 나옵니다. 여기서는 그 한 줄로는
+     모자란 것 — 이 건에 쓸 수 있는 협정과 세율, 신청 창구 — 을 펼쳐 보여 줍니다. */
   function originHtml(data) {
     const links = (data.apply_links || []).map((row) =>
       `<a class="button small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">`
@@ -840,7 +911,7 @@
         ${agreements}
       </section>
       <section class="doc_group">
-        <h3><span aria-hidden="true">🏛</span> 신청 창구</h3>
+        <h3><span aria-hidden="true">🏛</span> 원산지증명서 신청 창구</h3>
         <p class="doc_note">기관발급은 세관 또는 상공회의소에서 받습니다.</p>
         <div class="origin_links">${links}</div>
       </section>

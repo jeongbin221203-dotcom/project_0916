@@ -249,6 +249,28 @@ def origin_guide(shipment_id: str):
     }})
 
 
+@document_bp.get("/<shipment_id>/required-docs")
+def required_docs(shipment_id: str):
+    """이 건에 필요한 서류 한 목록. 서류 작성 화면의 '기타 필수 서류'가 씁니다.
+
+    HS부호와 도착국으로 관세청 요건·우리 규칙·FTA·도착국 인증을 모으고,
+    거기서 못 잡은 것만 AI가 보탭니다. (?ai=0 이면 AI를 부르지 않습니다)
+    """
+
+    from app.services import required_docs_service
+
+    shipment = load_shipment(shipment_id)
+    use_ai = request.args.get("ai", "1") != "0"
+    data = required_docs_service.collect(shipment, use_ai=use_ai)
+    return jsonify({"success": True, "data": {
+        **data,
+        "shipment_id": shipment.shipment_id,
+        "destination": shipment.destination_name or shipment.destination_code or "",
+        "upload_url": url_for("document.upload_requirement", shipment_id=shipment_id),
+        "filing_url": url_for("document.customs_filing", shipment_id=shipment_id),
+    }})
+
+
 @document_bp.get("/<shipment_id>/requirements")
 def requirements(shipment_id: str):
     """HS부호로 짚어 본 수출요건과 올려 둔 증빙 서류."""

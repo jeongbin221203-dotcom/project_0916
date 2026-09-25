@@ -188,8 +188,15 @@ def filing_sheet(shipment) -> dict:
     missing = [row["label"] for section in sections for row in section["rows"] if _blank(row["value"])]
     missing += [f"품목 {item['line_no']} HS CODE" for item in lines if _blank(item["hs_code"])]
 
+    # 따로 발급받은 서류(원산지증명서·인증서·검역증 …)도 함께 넘깁니다.
+    # 관세사는 신고할 때 이 파일들을 첨부합니다. 여기 없으면 "빠진 서류"가 됩니다.
+    papers = [{"key": doc.requirement_key, "filename": doc.filename,
+               "note": doc.agreement or "", "status": doc.review_label}
+              for doc in shipment.requirement_documents]
+
     return {
         "shipment_id": shipment.shipment_id,
+        "papers": papers,
         "sections": sections,
         # Jinja에서 dict.items()와 헷갈리지 않게 lines로 둡니다.
         "lines": lines,
@@ -234,6 +241,13 @@ def as_text(sheet: dict) -> str:
         if item["dangerous"]:
             parts.append(f"위험물 {item['dangerous']}")
         lines.append(" · ".join(parts))
+
+    # 따로 발급받은 서류도 목록에 적어 둡니다. 관세사가 신고할 때 함께 첨부합니다.
+    if sheet.get("papers"):
+        lines += ["", "■ 함께 보내는 서류 (따로 발급받은 것)"]
+        for paper in sheet["papers"]:
+            tail = f" · {paper['note']}" if paper["note"] else ""
+            lines.append(f"  - {paper['filename']}{tail}")
 
     if sheet["missing"]:
         lines += ["", "■ 아직 비어 있는 칸",
