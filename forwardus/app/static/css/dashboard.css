@@ -64,3 +64,11 @@ a.kpi_card.link:hover { border-color: #c7d7fd; box-shadow: 0 0 0 1px #c7d7fd; }
   .table_scroll .table { table-layout: auto; min-width: 920px; }
   .dash_table col { width: auto; }
 }
+
+/* 목록을 접었다 펼 수 있게. 아래 '비용·운송 분석'과 같은 모양으로 맞춥니다. */
+.dash_fold > summary { display: flex; cursor: pointer; list-style: none; align-items: center; }
+.dash_fold > summary::-webkit-details-marker { display: none; }
+.dash_fold > summary h2 { margin: 0; }
+.dash_fold > summary h2::before { content: "▸ "; color: var(--muted); }
+.dash_fold[open] > summary h2::before { content: "▾ "; }
+.dash_fold[open] > summary { margin-bottom: 14px; }

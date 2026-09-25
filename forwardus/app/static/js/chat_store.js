@@ -160,11 +160,24 @@
     },
 
     clear(source) {
-      write(empty());
+      // 보관함도 함께 비웁니다. "새 대화"를 눌렀는데 지난 대화가 되살아나면 안 됩니다.
+      forgetKept();
+      try {
+        window.sessionStorage.setItem(KEY, JSON.stringify(empty()));
+      } catch (error) { /* 무시 */ }
       // 서버에 남긴 상담 기억(Entity)도 함께 지웁니다. 로그인 전이면 서버에 아무것도 없습니다.
       try {
         fetch("/api/chat-memory", { method: "DELETE", keepalive: true }).catch(() => {});
       } catch (error) { /* 서버가 없어도 이 브라우저 대화는 비웁니다. */ }
+      emit({ type: "clear", source });
+    },
+
+    /* 보이는 대화만 비웁니다. 보관함과 서버 기억은 그대로 둡니다.
+       (로고·새로고침으로 화면을 처음으로 돌릴 때 씁니다. "새 대화"와 다릅니다) */
+    clearVisible(source) {
+      try {
+        window.sessionStorage.setItem(KEY, JSON.stringify(empty()));
+      } catch (error) { /* 무시 */ }
       emit({ type: "clear", source });
     },
 

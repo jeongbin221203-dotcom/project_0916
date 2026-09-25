@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from app.processors import cargo_calculator
 from app.services import shipment_service
 
 EXCLUDED_STATUSES = {"draft", "cancelled"}
@@ -31,12 +32,22 @@ def build_dashboard(viewer) -> dict:
     total_cbm = sum(c.total_cbm for s in shipments for c in s.cargos)
     total_kg = sum(c.total_weight_kg for s in shipments for c in s.cargos)
 
+    # CBM단가와 KG단가는 같은 화물을 두 방식으로 나눈 값입니다. 그래서 둘의 비는
+    # 곧 "1CBM이 몇 kg인가"가 됩니다. 이 값이 말이 안 되면 단가 둘 다 못 믿습니다.
+    # 평균만 보면 드러나지 않으므로(작은 건 하나가 전체를 끌어올립니다) 몇 건이
+    # 이상한지 세어 화면에 함께 적습니다.
+    odd = [s for s in shipments
+           if cargo_calculator.density_suspect(sum(c.total_cbm for c in s.cargos),
+                                               sum(c.total_weight_kg for c in s.cargos))]
+
     kpi = {
         "total_shipments": len(shipments),
         "total_freight_krw": sum(_freight_krw(s) for s in shipments),
         "total_logistics_krw": total_cost,
         "avg_cost_per_cbm": total_cost / total_cbm if total_cbm else None,
         "avg_cost_per_kg": total_cost / total_kg if total_kg else None,
+        "odd_density_count": len(odd),
+        "odd_density_ids": [s.shipment_id for s in odd[:5]],
         "avg_transit_days": _avg([s.transit_days for s in shipments if s.transit_days]),
         "delay_rate": len(delayed) / len(tracked) * 100 if tracked else None,
         "delay_sample": len(tracked),

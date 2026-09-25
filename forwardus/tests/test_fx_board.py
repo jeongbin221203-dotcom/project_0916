@@ -167,7 +167,7 @@ def test_사이드바는_기본_아이콘_레일이고_토글과_말풍선과_�
     toggle = re.search(r"<button[^>]*data-rail-toggle[^>]*>", rail, re.S).group(0)
     assert 'aria-expanded="false"' in toggle and 'data-tip="사이드바 열기"' in toggle
     # 메뉴마다 말풍선 이름이 있습니다. (접혔을 때 아이콘만 보이므로)
-    for name in ("홈", "운송 예상 견적", "수출서류작성", "환율"):
+    for name in ("홈", "운송 예상 견적", "수출 서류 작성", "환율"):
         assert f'data-tip="{name}"' in rail, name
     assert "title=" not in rail           # 브라우저 기본 말풍선과 겹치지 않게
     # 펼쳐 둔 상태는 그리기 전에 붙여 번쩍임이 없게 합니다. (isSidebarExpanded)

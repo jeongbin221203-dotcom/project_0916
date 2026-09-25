@@ -219,14 +219,23 @@ def api_support_chat():
         summary = chat_capture_service.cargo_summary(first) if first else None
         if summary:
             result["data"]["cargo"] = summary
-        # 이번 말에 경로가 없으면 앞서 알려 주신 구간으로 답합니다. 그때는 **어느 구간
-        # 기준인지 밝힙니다.** 밝히지 않으면 엉뚱한 구간의 기간·운임을 그대로 믿게 됩니다.
+        # 이번 말에 없는 것은 앞서 알려 주신 값으로 답합니다. 그때는 **무엇을 기준으로
+        # 답했는지 밝힙니다.** 밝히지 않으면 엉뚱한 구간·품목의 기간과 운임을 그대로
+        # 믿게 됩니다. ("치약 기준인데 수건인 줄 알고 보는" 일이 생깁니다)
         told = read_values.get("fields") or {}
-        if viewer is not None and not (told.get("origin_code") and told.get("destination_code")):
-            kept = (work_draft_service.load(viewer) or {}).get("fields") or {}
-            if kept.get("origin_name") and kept.get("destination_name"):
-                result["data"]["assumed_route"] = {
-                    "origin": kept["origin_name"], "destination": kept["destination_name"],
-                    "from_now": bool(told.get("origin_code") or told.get("destination_code")),
-                }
+        told_item = (read_values.get("items") or [{}])[0] if read_values else {}
+        if viewer is not None:
+            kept = work_draft_service.load(viewer) or {}
+            fields = kept.get("fields") or {}
+            item = (kept.get("items") or [{}])[0] if kept.get("items") else {}
+            assumed = {}
+            if not (told.get("origin_code") and told.get("destination_code")):
+                if fields.get("origin_name") and fields.get("destination_name"):
+                    assumed["route"] = f"{fields['origin_name']} → {fields['destination_name']}"
+            if not told_item.get("product_description") and item.get("product_description"):
+                assumed["item"] = item["product_description"]
+            if not told.get("transport_mode") and fields.get("transport_mode"):
+                assumed["mode"] = "항공" if fields["transport_mode"] == "AIR" else "해상"
+            if assumed:
+                result["data"]["assumed"] = assumed
     return jsonify(result), (200 if result["success"] else 502)

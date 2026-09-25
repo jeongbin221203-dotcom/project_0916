@@ -215,17 +215,21 @@ def from_customs() -> dict:
     result = exchange_client.fetch_krw_rates()
     rates = result["data"]
     live = result["source"] == "api"
+    # 고시환율이 아니어도 시장 환율·저장해 둔 환율은 실제 값입니다. 그것까지
+    # "예시 고정 환율"이라 적으면 쓸 수 있는 값을 못 쓰게 만듭니다.
+    real = exchange_client.rate_is_real(result)
     out = [_row(code, 100 if code in UNIT_100 else 1,
                 value * (100 if code in UNIT_100 else 1), None)
            for code, value in rates.items() if code != "KRW" and value]
     return ok({
-        "source": "customs" if live else "mock",
-        "source_label": "관세청 고시 관세환율(주간)" if live else "예시 고정 환율",
+        "source": "customs" if live else result["source"],
+        "source_label": ("관세청 고시 관세환율(주간)" if live
+                         else exchange_client.RATE_SOURCES.get(result["source"], "예시 고정 환율")),
         "as_of": result.get("applied_date") or "", "prev_date": "", "spread": "estimate",
-        "note": ("수출입 신고 가격 환산용 관세환율입니다. 전일 대비는 제공하지 않습니다."
-                 if live else "환율을 받지 못해 예시 고정 환율을 보여 드립니다. 실제 거래에 쓰지 마세요."),
+        "note": ("수출입 신고 가격 환산용 관세환율입니다. 전일 대비는 제공하지 않습니다." if live
+                 else exchange_client.rate_basis(result)),
         "rows": _order(out),
-    }, "api" if live else "mock")
+    }, "api" if real else "mock")
 
 
 def board() -> dict:

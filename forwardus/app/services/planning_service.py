@@ -304,15 +304,15 @@ def exchange_rates() -> dict:
     """
 
     result = exchange_client.fetch_krw_rates()
-    applied = result.get("applied_date") or ""
-    live = result["source"] == "api"
     return {
         "success": result["success"],
         "data": result["data"],
         "source": result["source"],
-        "applied_date": applied,
-        "basis": (f"관세청 고시환율{f' · {applied} 적용' if applied else ''}" if live
-                  else "고시환율을 받지 못해 임시 환율로 환산했습니다"),
+        "applied_date": result.get("applied_date") or "",
+        # 무슨 환율인지는 exchange_client가 한 곳에서 정합니다. 고시환율을 못 받아도
+        # 시장 환율·저장해 둔 환율은 실제 값이라 "임시"라고 부르면 안 됩니다.
+        "basis": exchange_client.rate_basis(result),
+        "is_real": exchange_client.rate_is_real(result),
     }
 
 

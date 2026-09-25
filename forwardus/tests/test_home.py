@@ -268,7 +268,7 @@ def test_잠가도_위쪽_메뉴는_그대로_쓴다(app, client):
     assert "disabled" not in nav and "disabled" not in rail and "inert" not in rail
     # 위쪽에는 로그인(또는 이름) 자리만 둡니다. 갈 길은 왼쪽 사이드바에 모았습니다.
     assert "로그인" in nav or "로그아웃" in nav
-    for label in ("운송 예상 견적", "수출서류작성", "컨테이너 조회", "관세청 조회"):
+    for label in ("운송 예상 견적", "수출 서류 작성", "컨테이너 조회", "관세청 조회"):
         assert label in rail, label
     # 일정 역산은 없앤 기능입니다. 어디에도 남기지 않습니다.
     assert "일정 역산" not in nav and "일정 역산" not in rail
@@ -313,7 +313,7 @@ def test_조회_메뉴는_사이드바에_있고_위쪽에는_없다(app, client
     # 운송 계획도 사이드바에서만 다닙니다.
     assert "운송 예상 견적" in rail and "운송 예상 견적" not in nav
 
-    # 순서: 홈 → 수출서류작성 → 운송 예상 견적 → 조회들. 서류를 만들다가 운임을 봅니다.
+    # 순서: 홈 → 수출 서류 작성 → 운송 예상 견적 → 조회들. 서류를 만들다가 운임을 봅니다.
     keys = [row["key"] for row in sidebar.RAIL]
     assert keys == ["home", "documents", "planning", "dashboard", "container", "lookup"]
     # 지금 보는 화면이 사이드바에 표시됩니다.

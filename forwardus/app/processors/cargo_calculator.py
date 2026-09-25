@@ -37,6 +37,84 @@ def round_volume(value: float, digits: int = 4) -> float:
     return rounded
 
 
+# 1CBM당 몇 kg이면 그것이 무슨 물질인지. 숫자만 들이밀면 사람은 판단을 못 합니다.
+# "1CBM당 19,200kg"보다 "금만큼 무겁습니다"가 훨씬 빨리 와닿습니다.
+DENSITY_MARKS = (
+    (1_000, "물"),
+    (2_700, "알루미늄"),
+    (7_850, "강철"),
+    (11_340, "납"),
+    (19_250, "텅스텐"),
+    (19_300, "금"),
+    (21_450, "백금"),
+    (22_590, "오스뮴"),
+)
+
+# 오스뮴은 지구에서 가장 무거운 물질입니다. 1CBM당 22,590kg.
+# 이보다 무거운 화물은 지구에 존재하지 않으므로, 넘으면 적은 값이 틀린 것입니다.
+HEAVIEST_ON_EARTH = 22_590
+HEAVIEST_NAME = "오스뮴"
+
+# 물보다 무거우면(1,500) 흔치 않아 한 번 짚고, 강철보다 무거우면(7,850) 중금속이
+# 아닌 한 잘못 적은 값입니다. 다만 **막지 않습니다.** 금괴·텅스텐·납괴는 실제로
+# 오가는 화물이고, 강철보다 무겁다고 해서 없는 화물이 되는 것은 아닙니다.
+# 무엇을 보내는지는 보낸 사람이 압니다. 우리는 값이 무엇쯤 되는지만 알려 줍니다.
+HEAVY_DENSITY = 1_500
+HEAVY_METAL_DENSITY = 7_850
+
+
+def density_material(density: float) -> str:
+    """그 밀도가 어느 물질쯤 되는지. 가장 가까운 아래쪽 물질 이름입니다."""
+
+    name = ""
+    for mark, material in DENSITY_MARKS:
+        if density >= mark:
+            name = material
+    return name
+
+
+def density_suspect(total_cbm: float, total_weight_kg: float) -> bool:
+    """중금속이 아니면 잘못 적었다고 볼 만한 값인지.
+
+    물보다 무거운 정도(1,500)는 흔합니다. 집계 화면에서 그것까지 "확인 필요"로
+    세면 정작 봐야 할 건이 묻힙니다. 강철보다 무거운 것만 셉니다.
+    """
+
+    if total_cbm <= 0 or total_weight_kg <= 0:
+        return False
+    return total_weight_kg / total_cbm >= HEAVY_METAL_DENSITY
+
+
+def density_note(total_cbm: float, total_weight_kg: float) -> str:
+    """부피에 견주어 중량이 말이 되는지. 이상하면 왜 이상한지 적어 돌려줍니다."""
+
+    if total_cbm <= 0 or total_weight_kg <= 0:
+        return ""
+    density = total_weight_kg / total_cbm
+    if density < HEAVY_DENSITY:
+        return ""
+
+    measure = (f"적어 주신 값은 1CBM당 {density:,.0f}kg입니다 "
+               f"(부피 {total_cbm:,.3f}CBM · 중량 {total_weight_kg:,.0f}kg).")
+
+    # 오스뮴보다 무거운 것은 지구에 없습니다. 여기만은 틀렸다고 말해도 됩니다.
+    if density > HEAVIEST_ON_EARTH:
+        return (f"{measure} 지구에서 가장 무거운 물질인 {HEAVIEST_NAME}이 1CBM당 "
+                f"{HEAVIEST_ON_EARTH:,}kg입니다. 이보다 무거운 화물은 없으니 "
+                "값이 잘못 적혔습니다. 포장당 중량 칸에 전체 중량을 적었거나, "
+                "상자 크기를 잘못 적지 않았는지 확인해주세요.")
+
+    # 강철~오스뮴 사이. 중금속이면 맞는 값입니다. 우리가 정할 일이 아닙니다.
+    if density >= HEAVY_METAL_DENSITY:
+        return (f"{measure} {density_material(density)}만큼 무겁습니다. "
+                f"금·텅스텐·납 같은 중금속을 상자에 꽉 채웠다면 나올 수 있는 값입니다. "
+                "그런 화물이 맞으면 그대로 두세요. 아니라면 포장당 중량 칸에 "
+                "전체 중량을 적지 않았는지 확인해주세요.")
+
+    return (f"{measure} 물이 1CBM당 1,000kg이니 물보다 무거운 화물입니다. "
+            "맞다면 그대로 두셔도 됩니다. 운임은 부피가 아니라 중량으로 매겨집니다.")
+
+
 def calculate_revenue_ton(total_cbm: float, total_weight_kg: float) -> float:
     """Revenue Ton = max(Total CBM, Total Weight / 1000)."""
 
@@ -94,6 +172,7 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
         "product_description": str(payload.get("product_description") or "").strip()[:300],
         "net_weight_kg": net_weight,
         "net_weight_warning": net_warning,
+        "density_warning": density_note(total_cbm, total_weight_kg),
         "total_cbm": round_volume(total_cbm),
         "total_weight_kg": round(total_weight_kg, 2),
         "revenue_ton": round(revenue_ton, 3),
@@ -136,7 +215,8 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
                         for index, line in enumerate(lines, start=1) if line.get("dg_warning")],
         "warnings": [{"line_no": index, "message": line[key]}
                      for index, line in enumerate(lines, start=1)
-                     for key in ("net_weight_warning", "units_warning") if line.get(key)],
+                     for key in ("net_weight_warning", "units_warning", "density_warning")
+                     if line.get(key)],
         "quantity": sum(line["quantity"] for line in lines),
         # 품목별 금액을 모두 적었으면 그 합이 송장 금액입니다.
         # 하나라도 비어 있으면 지어내지 않고 None을 돌려줍니다.

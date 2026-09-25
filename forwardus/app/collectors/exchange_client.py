@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import xml.etree.ElementTree as ET
 from datetime import date
 from time import monotonic
@@ -130,16 +131,156 @@ def _remember(key: str, make):
     return value
 
 
+# 출처마다 화면에 뭐라고 적을지. 한 곳에서 정합니다. 쓰는 곳이 제각각 판단하면
+# 같은 환율을 어디서는 "고시환율", 어디서는 "임시 환율"이라고 부르게 됩니다.
+RATE_SOURCES = {
+    "api": "관세청 고시환율",
+    "market": "시장 환율 (고시환율을 받지 못해 실제 시장 환율로 환산)",
+    "stored": "지난번에 받아 둔 환율",
+    "mock": "예시 고정 환율 — 실제 거래에 쓰지 마세요",
+}
+
+
+def rate_is_real(result: dict) -> bool:
+    """지어낸 값이 아닌지. 예시 고정 환율만 거짓입니다."""
+
+    return result.get("source") in ("api", "market", "stored")
+
+
+def rate_basis(result: dict) -> str:
+    """"무슨 환율로 환산했는지"를 화면에 적을 한 줄."""
+
+    source = result.get("source") or "mock"
+    label = RATE_SOURCES.get(source, RATE_SOURCES["mock"])
+    applied = result.get("applied_date") or ""
+    if source == "stored":
+        days = result.get("stored_days")
+        when = f"{applied} 기준" if applied else f"{result.get('saved_date', '')} 저장"
+        ago = f" · {days}일 지난 값" if isinstance(days, int) and days > 0 else ""
+        return f"{label} ({when}{ago}). 최신 환율을 받지 못했습니다."
+    return f"{label}{f' · {applied} 적용' if applied else ''}"
+
+
 def fetch_krw_rates() -> dict:
     """통화별 원화 환율. 관세청 고시 환율을 쓰고, 못 받으면 고정 환율로 버팁니다."""
 
     return _remember("rates", _read_krw_rates)
 
 
+# 마지막으로 **진짜** 받아 낸 환율을 디스크에 남겨 둡니다.
+#
+# 왜 필요한가
+#   관세청이 막히면 지금까지는 곧장 예시 환율(USD 1,380 · 통화 4개)로 내려갔습니다.
+#   그 값으로 견적이 나가고, 화면에는 그냥 숫자로 보입니다. 서버를 다시 켜면
+#   기억해 둔 것도 사라져 또 예시로 갑니다.
+#   실제로 받아 낸 환율은 며칠 지났어도 예시보다 훨씬 정확합니다. 그러니 남깁니다.
+LAST_GOOD_FILE = "krw_rates_last_good"
+# 저장해 둔 환율을 이 날수까지만 씁니다. 그 뒤로는 너무 옛날 값이라
+# 예시와 다를 바 없어, 며칠 지난 값이라고 분명히 말해 줍니다.
+STORED_MAX_DAYS = 30
+
+
+def _save_last_good(rates: dict, applied_date: str, origin: str) -> None:
+    """받아 낸 환율을 파일로 남깁니다. 실패해도 조회를 멈추지 않습니다."""
+
+    from app.collectors import file_cache
+
+    file_cache.write(LAST_GOOD_FILE, {
+        "krw_per_unit": {code: value for code, value in rates.items() if value},
+        "applied_date": applied_date,
+        "origin": origin,
+        "saved_date": date.today().isoformat(),
+    })
+
+
+def _last_good() -> dict | None:
+    """저장해 둔 환율. 없거나 너무 오래됐으면 None."""
+
+    from app.collectors import file_cache
+
+    found = file_cache.read(LAST_GOOD_FILE)
+    if not found:
+        return None
+    data, age_days = found
+    rates = (data or {}).get("krw_per_unit") or {}
+    if not rates.get("USD") or age_days > STORED_MAX_DAYS:
+        return None
+    rates = dict(rates)
+    rates["KRW"] = 1.0
+    return {**ok(rates, "stored"),
+            "applied_date": data.get("applied_date") or "",
+            "saved_date": data.get("saved_date") or "",
+            "stored_days": round(age_days),
+            "origin": data.get("origin") or ""}
+
+
+def _from_open_exchange_rates() -> dict | None:
+    """시장 환율(달러 기준)을 원화 기준으로 바꿔 씁니다.
+
+    관세환율과 쓰임이 다릅니다. 신고가격 환산에 쓰는 고시 환율이 아니라
+    시장 환율이라, 이 값을 쓸 때는 화면에 그렇다고 적어야 합니다.
+    다만 예시 고정 환율보다는 비교할 수 없이 정확합니다.
+    """
+
+    app_id = get_config("OPEN_EXCHANGE_RATES_APP_ID", "")
+    if not app_id:
+        return None
+
+    from app.collectors import file_cache
+
+    result = request_text("GET", "https://openexchangerates.org/api/latest.json",
+                          timeout=15, params={"app_id": app_id})
+    body = None
+    if result["success"]:
+        try:
+            body = json.loads(result["data"])
+        except ValueError:
+            body = None
+    if not isinstance(body, dict) or body.get("error") or not (body.get("rates") or {}).get("KRW"):
+        # 받지 못했으면 fx 시세표가 받아 둔 파일이라도 씁니다.
+        found = file_cache.read("fx_oxr_latest")
+        body = found[0] if found else None
+    per_usd = (body or {}).get("rates") or {}
+    krw = per_usd.get("KRW")
+    if not krw:
+        return None
+
+    # per_usd[code] = 1달러당 그 통화 몇 단위. 원화 환산은 KRW ÷ 그 값입니다.
+    rates = {"KRW": 1.0}
+    for code, value in per_usd.items():
+        code = code.upper()
+        if code == "KRW" or not value or not is_currency_code(code):
+            continue
+        rates[code] = krw / value
+    if "USD" not in rates:
+        return None
+    stamp = body.get("timestamp")
+    applied = (date.fromtimestamp(int(stamp)).isoformat() if stamp else date.today().isoformat())
+    return {**ok(rates, "market"), "applied_date": applied}
+
+
 def _read_krw_rates() -> tuple[dict, float]:
+    """받는 곳을 차례로 내려갑니다. 예시 환율은 **맨 마지막**입니다.
+
+      1. 관세청 고시 관세환율   — 신고가격 환산에 맞는 값
+      2. 시장 환율(OXR)        — 고시환율은 아니지만 실제 값
+      3. 저장해 둔 지난 실환율   — 며칠 지났어도 예시보다 정확
+      4. 예시 고정 환율         — 여기까지 오면 화면에 경고가 떠야 합니다
+    """
+
     result = fetch_unipass_rates()
     if result["success"]:
+        _save_last_good(result["data"], result.get("applied_date", ""), "customs")
         return result, LIVE_TTL
+
+    market = _from_open_exchange_rates()
+    if market:
+        _save_last_good(market["data"], market.get("applied_date", ""), "market")
+        return market, LIVE_TTL
+
+    stored = _last_good()
+    if stored:
+        return stored, FAILED_TTL
 
     rates = dict(load_mock("exchange_rates")["krw_per_unit"])
     rates["USD"] = float(get_config("EXCHANGE_RATE_USD_KRW", rates["USD"]))

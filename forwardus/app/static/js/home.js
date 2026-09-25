@@ -477,7 +477,7 @@
     appendLinks(row, response.data.links);
     // 치수와 수량을 적어 주셨으면 CBM·운임톤과 LCL/FCL을 바로 알려 드립니다.
     // 이건 계산이라 AI를 기다리지 않습니다. (숫자를 지어내면 안 되는 자리입니다)
-    if (response.data.assumed_route) appendRoute(row, response.data.assumed_route);
+    if (response.data.assumed) appendRoute(row, response.data.assumed);
     if (response.data.cargo) appendCargo(row, response.data.cargo);
     // 대화에 적은 화물 정보를 담아 두었으면 한 줄 알립니다. 어디에 쓰이는지까지.
     if ((response.data.captured || []).length) {
@@ -501,11 +501,15 @@
   /* ----- 어느 구간 기준인지 밝히기 -----
      이번 말에 출발·도착지가 없으면 앞서 알려 주신 구간으로 답합니다. 그 사실을
      밝히지 않으면, 엉뚱한 구간의 기간과 운임을 그대로 믿게 됩니다. */
-  function appendRoute(row, route) {
+  function appendRoute(row, assumed) {
+    const bits = [];
+    if (assumed.route) bits.push(`📍 <b>${escapeHtml(assumed.route)}</b>`);
+    if (assumed.item) bits.push(`📦 <b>${escapeHtml(assumed.item)}</b>`);
+    if (assumed.mode) bits.push(`🚢 <b>${escapeHtml(assumed.mode)}</b>`);
+    if (!bits.length) return;
     const note = document.createElement("p");
     note.className = "answer_route";
-    note.innerHTML = `📍 <b>${escapeHtml(route.origin)} → ${escapeHtml(route.destination)}</b>`
-      + " 기준으로 답했습니다. 다른 구간이면 알려 주세요.";
+    note.innerHTML = bits.join(" · ") + " 기준으로 답했습니다. 다르면 알려 주세요.";
     row.prepend(note);
   }
 
@@ -517,13 +521,26 @@
     box.className = "answer_cargo";
     const containers = cargo.containers
       ? ` · ${cargo.containers}대 (${escapeHtml(cargo.container_type)})` : "";
+    const air = cargo.air || {};
     box.innerHTML = `
-      <p class="answer_cargo_head">📦 적어 주신 화물로 계산하면
-        <b>${cargo.total_cbm} CBM</b> · 운임톤 <b>${cargo.revenue_ton} R/T</b>
-        → <b class="cargo_mode">${escapeHtml(cargo.mode)}</b>${containers}</p>
-      <p class="answer_cargo_why">${escapeHtml(cargo.reason)}</p>
-      <p class="answer_cargo_detail">한 포장 ${cargo.per_package_cbm} CBM
+      <p class="answer_cargo_head">📦 적어 주신 화물: <b>${cargo.total_cbm} CBM</b>
         · 총 중량 ${cargo.total_weight_kg.toLocaleString()} kg
+        <small>(한 포장 ${cargo.per_package_cbm} CBM)</small></p>
+      <div class="cargo_modes">
+        <div class="cargo_mode_box">
+          <b>🚢 해상</b>
+          <span>운임톤 <b>${cargo.revenue_ton} R/T</b> → <b class="cargo_mode">${escapeHtml(cargo.mode)}</b>${containers}</span>
+          <small>${escapeHtml(cargo.reason)}</small>
+        </div>
+        <div class="cargo_mode_box">
+          <b>✈️ 항공</b>
+          <span>청구중량 <b>${(air.chargeable_weight_kg || 0).toLocaleString()} kg</b>
+            <small>(${escapeHtml(air.charged_by || "")} 기준)</small></span>
+          <small>용적중량 ${(air.volume_weight_kg || 0).toLocaleString()} kg
+            = 가로×세로×높이 ÷ 6,000. 실중량과 견줘 큰 쪽으로 냅니다.</small>
+        </div>
+      </div>
+      <p class="answer_cargo_detail">어느 쪽으로 보내실지 알려 주시면 그 기준으로 더 자세히 봐 드립니다.
         <a href="/planning/new">운송 예상 견적에서 운임 보기 →</a></p>`;
     row.appendChild(box);
   }
@@ -1269,6 +1286,52 @@
     showStored(event.message);
   });
 
-  restore();
+  /* ----- 새로 들어왔을 때 -----
+     로고를 누르거나 새로고침하면 화면은 처음으로 돌아갑니다. 그런데 나눈 대화가
+     그대로 사라지면 "방금 물어본 게 어디 갔지" 하게 됩니다. 그래서 보관해 두고
+     **불러올지 물어봅니다.** 우리가 대신 정하지 않습니다.
+
+     이 화면에 들어올 때마다 보이는 대화는 비웁니다. 보관함은 그대로 둡니다. */
+  function offerKept() {
+    const kept = chat.kept();
+    if (!kept) return false;
+    const when = new Date(kept.savedAt || Date.now());
+    const said = kept.messages.filter((row) => row.role === "user").length;
+
+    const card = document.createElement("div");
+    card.className = "home_kept";
+    card.innerHTML = `
+      <p class="home_kept_text">지난 대화가 있습니다.
+        <b>${said}번</b> 물어보신 내용이 그대로 남아 있습니다.
+        <small>${when.getMonth() + 1}월 ${when.getDate()}일
+          ${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}</small></p>
+      <div class="home_kept_buttons">
+        <button type="button" class="button primary" data-kept-open>이어서 보기</button>
+        <button type="button" class="button ghost" data-kept-drop>새로 시작</button>
+      </div>`;
+    hintEl.parentNode.insertBefore(card, hintEl);
+
+    card.querySelector("[data-kept-open]").addEventListener("click", () => {
+      const messages = chat.restoreKept(SOURCE);
+      card.remove();
+      if (!messages) return;
+      logEl.innerHTML = "";
+      restore();
+    });
+    card.querySelector("[data-kept-drop]").addEventListener("click", () => {
+      chat.forgetKept();
+      card.remove();
+      input.focus();
+    });
+    return true;
+  }
+
+  // 들어올 때마다 보이는 대화를 비웁니다. 보관함에 남은 것은 위에서 여쭤봅니다.
+  // (탭 안에서 화면을 오갈 때도 같습니다. 한 번 누르면 그대로 이어집니다)
+  if (chat.messages().length) {
+    logEl.innerHTML = "";
+    chat.clearVisible(SOURCE);
+  }
+  if (!offerKept()) restore();
   showAction(current);
 })();

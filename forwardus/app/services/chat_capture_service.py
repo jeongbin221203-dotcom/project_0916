@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import re
 
+# 항공 용적중량 기준. 가로×세로×높이(cm) ÷ 6,000 = kg (IATA 관행)
+AIR_DIVISOR = 6_000
+
 from app.services import document_pipeline_service as pipeline
 from app.services import work_draft_service
 
@@ -220,6 +223,11 @@ def cargo_summary(item: dict) -> dict | None:
     total_cbm = round(one_cbm * count, 3)
     total_weight = round(per_package * count, 2)
     advice = sea_mode_advisor.recommend(total_cbm, total_weight)
+
+    # 항공은 계산법이 다릅니다. 부피(cm³)를 6,000으로 나눈 용적중량과 실중량 중
+    # **큰 값**으로 청구합니다. 해상 R/T와 나란히 보여야 어느 쪽이 나은지 판단합니다.
+    volume_weight = round(length * width * height / AIR_DIVISOR * count, 2)
+    chargeable = round(max(volume_weight, total_weight), 2)
     return {
         "per_package_cbm": round(one_cbm, 4),
         "total_cbm": total_cbm,
@@ -230,4 +238,10 @@ def cargo_summary(item: dict) -> dict | None:
         "containers": advice.get("containers", 0),
         "reason": advice["reason"],
         "confidence": advice["confidence"],
+        "air": {
+            "volume_weight_kg": volume_weight,
+            "chargeable_weight_kg": chargeable,
+            # 무엇으로 과금되는지 밝힙니다. 부피로 과금되면 항공이 특히 불리합니다.
+            "charged_by": "부피" if volume_weight > total_weight else "실중량",
+        },
     }

@@ -25,12 +25,14 @@
     <div class="kpi_card"><small>이번 달 서류</small><b>{{ stats.month_documents }}</b><span class="muted small">작성된 무역 서류</span></div>
   </section>
 
-  <section class="card">
-    <div class="row_between dash_table_head">
+  {# 아래 '비용·운송 분석'과 같은 방식으로 접었다 펼 수 있게 합니다. 목록이 길어
+     아래 분석까지 내려가려면 한참 굴려야 했습니다. 기본은 펼침(open)입니다. #}
+  <details class="card dash_fold" open>
+    <summary class="row_between dash_table_head">
       <h2>전체 Shipments <span class="muted small">{{ shipments|length }}건</span></h2>
       <a class="button ghost" href="{{ url_for('dashboard.admin_export', **request.args) }}"
-         download>⬇ 엑셀(CSV) 내려받기</a>
-    </div>
+         download onclick="event.stopPropagation()">⬇ 엑셀(CSV) 내려받기</a>
+    </summary>
     {% include "dashboard/_filters.html" %}
     {% if shipments %}
       <div class="table_scroll">
@@ -75,7 +77,7 @@
     {% else %}
       <p class="muted">조건에 맞는 Shipment가 없습니다.</p>
     {% endif %}
-  </section>
+  </details>
 
   {% include "dashboard/_analytics.html" %}
 {% endblock %}

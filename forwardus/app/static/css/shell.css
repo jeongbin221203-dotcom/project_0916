@@ -39,7 +39,9 @@
   display: flex; flex-direction: column; align-items: stretch; gap: 2px;
   width: var(--rail_w); padding: 8px 8px 12px;
   height: calc(100vh / var(--ui_scale, 1) - var(--header_h));
-  overflow-y: auto; overscroll-behavior: contain;
+  /* 세로로만 넘깁니다. 가로 막대가 생기면 60px 레일 아래에 쓸모없는 막대가 깔립니다.
+     (펼침 드로어가 잠깐 164px가 되면서 가로 넘침으로 잡히던 것이 원인입니다) */
+  overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
   background: var(--white); border-right: 1px solid var(--line);
   transition: width .25s ease-in-out, box-shadow .25s ease-in-out;
 }
