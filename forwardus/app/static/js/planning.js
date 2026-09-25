@@ -1525,66 +1525,10 @@
     renderFlowHighlight(current ? incotermByCode[current.value] : null);
   }
 
-  /* 흐름 그림 색칠: 비용과 위험을 따로 칠합니다.
-     flow.costs  단계별 비용 부담 S 판매자 / B Buyer / C 운송계약 확인 / P 인도 장소에 따라
-     flow.risk_at 위험이 넘어가는 단계 경계(0~8). [a, b]면 약정 장소에 따라 그 사이 어딘가입니다.
-     C조건은 판매자가 주운송 운임까지 내지만 위험은 출발지 쪽에서 넘어가, 두 막대의 끝이 다릅니다. */
-  const FLOW_COST_TEXT = { S: "판매자", B: "Buyer", C: "운송계약 확인", P: "인도 장소에 따라" };
-  const FLOW_RISK_TEXT = { S: "판매자", B: "Buyer", P: "인도지에 따라" };
-
-  function flowRuns(values, prefix, texts) {
-    const runs = [];
-    values.forEach((value, index) => {
-      const last = runs[runs.length - 1];
-      if (last && last.value === value) last.end = index + 1;
-      else runs.push({ value, start: index, end: index + 1 });
-    });
-    return runs.map((run) => `<span class="fbar ${prefix}_${run.value}" style="grid-column: ${run.start + 1} / ${run.end + 1}">`
-      + `${escapeHtml(texts[run.value])}</span>`).join("");
-  }
-
-  function flowMark(at, label, total) {
-    const edge = at === 0 ? " at_start" : at === total ? " at_end" : "";
-    return `<span class="fmark${edge}" style="--at: ${at}">${label ? `<span>${escapeHtml(label)}</span>` : ""}</span>`;
-  }
-
+  /* 흐름 그림 색칠은 인코텀즈 화면(/lookup/incoterms)과 같은 코드를 씁니다.
+     규칙(C조건은 비용과 위험의 끝이 다름)이 두 군데에 따로 적히면 한쪽만 고쳐집니다. */
   function renderFlowHighlight(term) {
-    const bars = document.querySelector("[data-flow-bars]");
-    const legend = document.querySelector("[data-flow-legend]");
-    const chips = document.querySelectorAll("[data-flow-chips]");
-    const stepEls = document.querySelectorAll(".flow_step");
-    if (!bars) return;
-    stepEls.forEach((el) => el.classList.remove("risk_edge", "cost_edge"));
-    if (!term || !term.flow) {
-      bars.hidden = true;
-      legend.hidden = true;
-      chips.forEach((el) => { el.innerHTML = ""; });
-      return;
-    }
-    const total = incotermData.steps.length;
-    const costs = term.flow.costs.split("");
-    const [riskFrom, riskTo] = Array.isArray(term.flow.risk_at) ? term.flow.risk_at : [term.flow.risk_at, term.flow.risk_at];
-    const risks = costs.map((_, index) => (index < riskFrom ? "S" : index < riskTo ? "P" : "B"));
-    // 판매자 비용이 끝나는 경계: 판매자(S)가 이어지는 마지막 단계 뒤
-    let costEnd = 0;
-    while (costEnd < total && costs[costEnd] === "S") costEnd += 1;
-
-    bars.querySelector('[data-flow-bar="cost"]').innerHTML = flowRuns(costs, "c", FLOW_COST_TEXT)
-      + (costEnd > 0 && costEnd < total ? flowMark(costEnd, "비용 이전", total) : "");
-    bars.querySelector('[data-flow-bar="risk"]').innerHTML = flowRuns(risks, "r", FLOW_RISK_TEXT)
-      + (riskFrom === riskTo ? flowMark(riskFrom, "위험 이전", total)
-        : flowMark(riskFrom, "위험 이전 범위", total) + flowMark(riskTo, "", total));
-    bars.hidden = false;
-    legend.hidden = false;
-    legend.querySelector(".lg_contract").hidden = !costs.includes("C");
-    legend.querySelector(".lg_place").hidden = !(costs.includes("P") || riskFrom !== riskTo);
-
-    chips.forEach((el, index) => {
-      el.innerHTML = `<span class="chip c_${costs[index]}">비용 ${escapeHtml(FLOW_COST_TEXT[costs[index]])}</span>`
-        + `<span class="chip r_${risks[index]}">위험 ${escapeHtml(FLOW_RISK_TEXT[risks[index]])}</span>`;
-    });
-    if (stepEls[riskFrom]) stepEls[riskFrom].classList.add("risk_edge");
-    if (costEnd < total && stepEls[costEnd]) stepEls[costEnd].classList.add("cost_edge");
+    window.ForwardusIncotermFlow.render(document, term, incotermData.steps.length);
   }
 
   function selectIncoterm(code) {

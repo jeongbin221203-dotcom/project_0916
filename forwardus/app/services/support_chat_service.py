@@ -250,8 +250,32 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
         return {"success": True, "source": "calculated",
                 "data": {"answer": origin_answer()}}
 
+    # 미리 정리해 둔 실무 자료로 답할 수 있는 질문은 AI를 부르지 않습니다.
+    # 기다림이 없고, 같은 질문에 늘 같은 기준으로 답합니다. (knowledge_service)
+    # 다만 실적·세율처럼 자료를 찾아야 하는 질문은 가로채지 않습니다.
+    from app.services import knowledge_service
+
+    if not wants_data(text):
+        # "멕시코에 수출하려면?"처럼 나라를 대면 그 나라 안내를 만들어 냅니다. (237개국)
+        found = knowledge_service.lookup(text)
+        if found:
+            data = knowledge_service.answer(found)
+            data.setdefault("links", [])
+            # 저장해 둔 링크 뒤에 화면 링크(서류 작성·운송 계획)를 이어 붙입니다.
+            for link in answer_links.pick(text, data["answer"]):
+                if link["url"] not in {row["url"] for row in data["links"]}:
+                    data["links"].append(link)
+            # 바깥 창구(관세청·검역본부…)를 앞에, 우리 화면을 뒤에 둡니다.
+            data["links"].sort(key=lambda row: 0 if row["url"].startswith("http") else 1)
+            return {"success": True, "source": "knowledge", "data": data}
+
     messages = [{"role": "system", "content": BRIEF_SYSTEM_PROMPT if brief else SYSTEM_PROMPT},
                 {"role": "system", "content": _incoterms_reference()}]
+    # 바로 답하기엔 모자라도 가까운 자료가 있으면 AI에게 넘깁니다. 그러면 비슷한
+    # 질문에도 우리가 정리해 둔 기관명·서류 이름·절차로 답이 나옵니다.
+    hint = knowledge_service.reference(text)
+    if hint:
+        messages.append({"role": "system", "content": hint})
     # 오래된 대화는 요약으로 들고 옵니다. 원문 전체를 보내면 토큰만 쓰고 답이 흐려집니다.
     if memory.strip():
         messages.append({"role": "system",

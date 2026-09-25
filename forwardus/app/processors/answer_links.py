@@ -110,4 +110,7 @@ def pick(question: str, answer: str = "") -> list[dict]:
             continue
         seen.add(link["url"])
         picked.append(link)
+    # 바깥 창구(관세청·식약처…)를 앞에 둡니다. 답을 읽고 나면 다음에 할 일은
+    # 대개 그 기관에서 확인하는 것이고, 우리 화면은 언제든 왼쪽 줄에서 갈 수 있습니다.
+    picked.sort(key=lambda link: 0 if link["url"].startswith("http") else 1)
     return picked[:MAX_LINKS]

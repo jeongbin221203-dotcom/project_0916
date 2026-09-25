@@ -89,6 +89,9 @@
     chipsBox.innerHTML = fill + (action.examples || [])
       .map((text) => `<button type="button" data-home-chip>${escapeHtml(text)}</button>`)
       .join("") + files;
+    // 탭을 옮기면 예시 줄을 늘 처음부터 보여 줍니다. 앞 탭에서 오른쪽으로 밀어 둔
+    // 자리가 남아 있으면, 새 탭의 첫 예시가 왼쪽으로 잘린 채 시작합니다.
+    chipsBox.scrollLeft = 0;
     if (logEl.children.length) logEl.hidden = false;
 
     // 사람이 무엇부터 적어야 할지 모르는 것이 가장 흔한 막힘입니다.
@@ -349,10 +352,44 @@
     // 물어본 말은 위로 올려 붙입니다. 답이 그 아래로 이어서 나오니
     // 눈이 한 자리에 머뭅니다. 매번 맨 아래로 끌어내리면 글이 길 때
     // 답의 끝부터 보이게 되어 읽을 자리를 찾느라 화면이 튑니다.
-    if (kind === "me" && !restoring) {
-      row.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (restoring) return row;
+    if (kind === "me") {
+      lastQuestion = row;
+      pinToTop(row);
+    } else if (kind !== "bot wait") {
+      // 답(또는 안내)이 붙은 뒤 다시 한 번 붙여 줍니다. 이 그림 프레임은 지금 한 묶음의
+      // 일이 끝난 뒤 돕니다. 그래서 답 아래의 출처·링크까지 다 그려진 다음에 잽니다.
+      requestAnimationFrame(pinQuestion);
     }
     return row;
+  }
+
+  /* ----- 물어본 말을 화면 맨 위에 붙이기 -----
+     답이 오기 전에는 아래에 내용이 없어 아무리 끌어올려도 질문이 화면 가운데나
+     아래에 남습니다. (브라우저는 문서 끝보다 더 내려가지 못합니다) 그래서
+     1) 모자란 만큼 대화 아래에 임시 여백을 두고
+     2) 답이 온 뒤 한 번 더 붙여 줍니다. 여백은 그때 다시 계산해 줄어듭니다. */
+  let lastQuestion = null;
+
+  function headRoom() {
+    // 위쪽 머리글이 화면에 붙어 있으면 그 아래부터가 "맨 위"입니다.
+    const header = document.querySelector(".app_header, header");
+    if (!header) return 12;
+    const fixed = ["sticky", "fixed"].includes(getComputedStyle(header).position);
+    return (fixed ? Math.ceil(header.getBoundingClientRect().height) : 0) + 12;
+  }
+
+  function pinToTop(row) {
+    if (!row || !logEl) return;
+    const target = Math.max(0, window.scrollY + row.getBoundingClientRect().top - headRoom());
+    const short = target + window.innerHeight - document.documentElement.scrollHeight;
+    // 남는 여백은 늘 다시 계산합니다. 답이 길어지면 여백이 사라집니다.
+    logEl.style.paddingBottom = short > 0 ? `${Math.ceil(short)}px` : "";
+    window.scrollTo({ top: target, behavior: "smooth" });
+  }
+
+  function pinQuestion() {
+    if (lastQuestion && lastQuestion.isConnected) pinToTop(lastQuestion);
   }
 
   async function askSupport(question) {
@@ -393,6 +430,11 @@
       });
       row.appendChild(note);
     }
+    // 인코텀즈처럼 눌러 봐야 아는 것은 글 대신 표를 답 안에 답니다.
+    // 화면을 옮기지 않고 이 자리에서 조건을 바꿔 가며 볼 수 있습니다.
+    if (response.data.widget === "incoterms" && window.ForwardusIncotermWidget) {
+      window.ForwardusIncotermWidget.attach(row, guessIncoterm(question));
+    }
     appendLinks(row, response.data.links);
     // 대화에 적은 화물 정보를 담아 두었으면 한 줄 알립니다. 어디에 쓰이는지까지.
     if ((response.data.captured || []).length) {
@@ -403,6 +445,14 @@
       row.appendChild(note);
     }
     rememberHsQueries(answer);
+  }
+
+  // "FOB랑 CIF는 어떻게 다른가요?"처럼 조건을 집어 물었으면 그 조건을 먼저 펴 줍니다.
+  const INCOTERM_CODES = ["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"];
+
+  function guessIncoterm(question) {
+    const upper = String(question || "").toUpperCase();
+    return INCOTERM_CODES.find((code) => upper.includes(code)) || "";
   }
 
   /* ----- 답 아래의 관련 링크 -----

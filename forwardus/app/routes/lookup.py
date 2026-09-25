@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, jsonify, render_template, request
 
 from app.services import ServiceError, lookup_service
 
@@ -27,6 +27,30 @@ def index():
         result=result,
         error=error,
     )
+
+
+@lookup_bp.get("/incoterms")
+def incoterms():
+    """인코텀즈 한눈에 보기. 조건을 눌러 비용·위험이 넘어가는 지점을 봅니다.
+
+    내용은 운송 계획 화면이 쓰는 표(INCOTERMS_INFO)를 그대로 씁니다. 글을 두 벌로
+    두면 한쪽만 고쳐집니다. 상담 답변에서 이 주소로 연결합니다.
+    """
+
+    from app.processors.cost_calculator import INCOTERMS_FLOW_STEPS, INCOTERMS_INFO
+
+    return render_template("lookup/incoterms.html",
+                           terms=INCOTERMS_INFO, flow=INCOTERMS_FLOW_STEPS)
+
+
+@lookup_bp.get("/api/incoterms")
+def api_incoterms():
+    """11개 조건 자료. 홈 대화 답변 안의 표(incoterm_widget.js)가 한 번 받아 씁니다."""
+
+    from app.processors.cost_calculator import INCOTERMS_FLOW_STEPS, INCOTERMS_INFO
+
+    return jsonify({"success": True,
+                    "data": {"terms": INCOTERMS_INFO, "steps": INCOTERMS_FLOW_STEPS}})
 
 
 @lookup_bp.get("/sources")

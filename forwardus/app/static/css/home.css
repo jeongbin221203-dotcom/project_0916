@@ -266,32 +266,37 @@
    대화 목록은 그만큼 + 여유를 아래에 비워 두어, 끝까지 내리면 마지막 답의
    출처·각주까지 덩어리에 가리지 않고 보입니다. */
 .home_center.talking {
-  padding-bottom: calc(var(--composer_h, 170px) + 20px);
+  padding-bottom: calc(var(--composer_h, 170px) + 8px);
 }
 /* 대화 중에는 가운데 아래 여백(72px)이 적는 칸 자리와 겹쳐 빈자리가 너무 커집니다. */
 .home_stage:has(.home_center.talking) { padding-bottom: 0; }
 /* scrollIntoView·앵커 이동도 덩어리 뒤로 들어가지 않게 같은 만큼 비워 둡니다. */
-html:has(.home_center.talking) { scroll-padding-bottom: calc(var(--composer_h, 170px) + 16px); }
+html:has(.home_center.talking) { scroll-padding-bottom: calc(var(--composer_h, 170px) + 8px); }
 .home_center.talking .home_hello { display: none; }
 .home_center.talking .home_log { margin-top: 8px; }
 
 .home_center.talking .home_composer {
   position: fixed; left: var(--rail_w); right: 0; bottom: 0; z-index: 30;
-  padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 16px calc(10px + env(safe-area-inset-bottom, 0px));
   /* 덩어리 자체는 불투명하게 칠합니다. 탭 단추 사이로 답 글자가 비쳐 보이면 겹쳐 보입니다. */
   background: var(--surface);
   box-shadow: 0 -1px 0 rgba(15, 23, 42, .04);
 }
 /* 위로 스크롤되는 답이 덩어리 위 끝에서 뚝 끊기지 않게 짧게 흐려 줍니다. (클릭은 통과) */
 .home_center.talking .home_composer::before {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 22px;
+  content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 8px;
   background: linear-gradient(to bottom, rgba(244, 247, 251, 0), var(--surface));
   pointer-events: none;
 }
 .home_center.talking .home_box,
 .home_center.talking .home_actions { width: min(720px, 100%); margin-inline: auto; }
 
-.home_center.talking .home_actions { margin-bottom: 8px; }
+/* 대화 중에는 답 글자가 탭 줄 바로 위까지 이어지게 합니다.
+   예전에는 세 군데가 더해져 92px이 비었습니다. (목록 아래 예비 20 + 덩어리 안쪽 8 + 탭 위 64)
+   지금은 4 + 6 + 6 이고, 위쪽 흐림도 8px만 둡니다. 첫 화면의 64px은 로고와 띄우려던
+   것이라 그대로 둡니다. 좌우 여백은 auto로 적습니다. 0으로 적으면 바로 위의
+   margin-inline: auto가 지워져 탭 줄만 왼쪽으로 밀립니다. */
+.home_center.talking .home_actions { margin: 6px auto; }
 .home_center.talking .home_actions button { padding: 6px 13px; font-size: 12.5px; }
 
 /* 대화 중 적는 칸: 2줄 높이 + 아래 단추 줄. (예전 184px → 약 138px) */

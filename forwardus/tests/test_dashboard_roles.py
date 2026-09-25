@@ -189,7 +189,7 @@ def test_관리자_API는_회원에게_403_로그인_전에는_401(client, anon_
 # --- 전역 사이드바 -----------------------------------------------------------------------
 
 @pytest.mark.parametrize("path, active", [
-    ("/", "홈"), ("/planning/new", "운송 계획"), ("/documents/new", "서류 작성"),
+    ("/", "홈"), ("/planning/new", "운송 예상 견적"), ("/documents/new", "수출서류작성"),
     ("/dashboard", "Dashboard"), ("/lookup/", "관세청 조회"),
     ("/tracking/container", "컨테이너 조회")])
 def test_사이드바는_어느_화면에나_같은_자리에_있다(client, path, active):
@@ -201,7 +201,9 @@ def test_사이드바는_어느_화면에나_같은_자리에_있다(client, pat
     assert "js/sidebar.js" in html and "css/shell.css" in html
     # 접힘/펼침은 그리기 전에 저장된 값으로 붙입니다. 화면을 옮겨도 그대로입니다.
     assert html.index("isSidebarExpanded") < html.index("<body")
-    for name in ("홈", "운송 계획", "서류 작성", "Dashboard", "컨테이너 조회", "관세청 조회", "환율"):
+    # 이 브라우저는 마스터입니다. Dashboard는 마스터에게만 보입니다. (아래 테스트에서 확인)
+    for name in ("홈", "수출서류작성", "운송 예상 견적", "Dashboard", "컨테이너 조회",
+                 "관세청 조회", "환율"):
         assert f'data-tip="{name}"' in html, (path, name)
     current = _active_rail(html)
     if active:
@@ -210,10 +212,22 @@ def test_사이드바는_어느_화면에나_같은_자리에_있다(client, pat
         assert not current, path
 
 
-def test_Shipment_상세도_Dashboard_아래에_있다(client, create_shipment):
-    shipment = create_shipment()
-    html = client.get(f"/shipments/{shipment.shipment_id}").get_data(as_text=True)
-    assert 'data-tip="Dashboard"' in _active_rail(html)
+def test_Dashboard는_마스터에게만_보인다(app, client, two_members):
+    """이용자 화면에서는 감춥니다. 대신 홈 대화로 일을 끝냅니다.
+
+    감추는 것은 길(사이드바·이름 메뉴)뿐이고, 주소는 그대로 살아 있습니다.
+    (내 건만 보이는 것은 위의 권한 테스트가 지킵니다)
+    """
+
+    member, _, _ = two_members
+    html = member.get("/").get_data(as_text=True)
+    assert 'data-tip="Dashboard"' not in html
+    assert 'href="/dashboard"' not in html
+    assert member.get("/dashboard").status_code == 200
+
+    master_html = client.get("/").get_data(as_text=True)
+    assert 'data-tip="Dashboard"' in master_html
+    assert "전체 Dashboard" in master_html
 
 
 def test_환율_창은_어느_화면에서나_열린다(client):

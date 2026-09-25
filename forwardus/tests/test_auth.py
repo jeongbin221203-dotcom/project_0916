@@ -47,12 +47,10 @@ def test_nav_has_dashboard_instead_of_shipments(client):
     nav = _nav(client)
     assert "김무역님" in nav and "data-user-menu-toggle" in nav
     assert ">Shipments<" not in nav
-    assert nav.count('href="/dashboard"') == 1
-    # Dashboard는 로그아웃 위에, 같은 이름 메뉴 안에 있습니다.
+    # 일반 회원에게는 Dashboard를 내놓지 않습니다. 이름 메뉴에는 로그아웃만 있습니다.
     panel = nav.split("data-user-menu-panel", 1)[1]
-    assert 'href="/dashboard"' in panel and "/auth/logout" in panel
-    assert panel.index('href="/dashboard"') < panel.index("/auth/logout")
-    assert "내 Dashboard" in panel
+    assert 'href="/dashboard"' not in panel
+    assert "/auth/logout" in panel
 
 
 def test_dashboard_requires_login(client):

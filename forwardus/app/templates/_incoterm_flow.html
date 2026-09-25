@@ -1,0 +1,37 @@
+{# 출발지에서 도착지까지 8단계 흐름 그림. 운송 계획 화면과 인코텀즈 화면이 함께 씁니다.
+   부르는 쪽이 steps(= INCOTERMS_FLOW_STEPS)를 넘깁니다. 색칠은 incoterm_flow.js가 합니다. #}
+{% set flow_icons = {
+  "factory": '<path d="M3 20V10l5 3V10l5 3V6h3v14z"/><path d="M16 6V3h3v17"/><path d="M6 17h2M11 17h2"/>',
+  "truck": '<path d="M2 6h11v10H2z"/><path d="M13 9h4l3 3v4h-7"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/>',
+  "terminal": '<path d="M3 20h18"/><path d="M4 20v-6h7v6M13 20v-9h7v9"/><path d="M4 17h7M13 14h7M13 17h7"/>',
+  "crane": '<path d="M6 21V4l12 3"/><path d="M6 7h13"/><path d="M16 7v5"/><path d="M14 12h4v3h-4z"/><path d="M3 21h8"/>',
+  "main": '<path d="M3 15l2 4h14l2-4z"/><path d="M6 15V9h12v6"/><path d="M9 9V6h6v3"/><path d="M2 21c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 4-1"/>',
+  "warehouse": '<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-8h10v8"/><path d="M7 16h10"/>',
+} %}
+<figure class="incoterm_flow" aria-labelledby="incoterm_flow_title">
+  <figcaption id="incoterm_flow_title" class="sr_only">출발지에서 도착지까지의 운송 흐름 8단계</figcaption>
+  <div class="flow_ends" aria-hidden="true"><span>판매자(Seller) 쪽</span><span>Buyer 쪽</span></div>
+  <ol class="flow_track">
+    {% for step in steps %}
+      <li class="flow_step">
+        <span class="flow_icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ flow_icons[step.icon]|safe }}</svg></span>
+        <span class="flow_label"><span class="flow_no">{{ loop.index }}</span>{{ step.label }}<small>{{ step.note }}</small></span>
+        {# 좁은 화면(4열·세로)에서 이 단계의 비용·위험 부담자를 보여줍니다. 넓은 화면은 아래 막대로 봅니다. #}
+        <span class="flow_chips" data-flow-chips aria-hidden="true"></span>
+      </li>
+    {% endfor %}
+  </ol>
+  {# 조건을 고르면 칠해지는 막대. 비용과 위험을 한 막대로 합치지 않습니다(C조건은 두 지점이 다릅니다). #}
+  <div class="flow_bars" data-flow-bars aria-hidden="true" hidden>
+    <div class="flow_bar_row"><span class="flow_bar_title">비용 부담</span><div class="flow_bar" data-flow-bar="cost"></div></div>
+    <div class="flow_bar_row"><span class="flow_bar_title">위험 부담</span><div class="flow_bar" data-flow-bar="risk"></div></div>
+  </div>
+  <div class="flow_legend" data-flow-legend aria-hidden="true" hidden>
+    <span class="lg lg_cost">판매자 비용</span>
+    <span class="lg lg_risk">판매자 위험</span>
+    <span class="lg lg_buyer">Buyer 부담</span>
+    <span class="lg lg_contract">운송계약 확인</span>
+    <span class="lg lg_place">인도 장소에 따라</span>
+  </div>
+</figure>
