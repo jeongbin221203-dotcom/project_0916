@@ -122,10 +122,20 @@ class Config:
     # (UNI-PASS 키는 26자, 이 키는 64자로 서로 다른 체계입니다)
     #   신청: https://www.data.go.kr/data/15101589/openapi.do
     #
-    # 이름이 둘입니다. 포털 키라는 게 드러나는 DATA_PORTAL_KEY_CUSTOMS 를 먼저 보고,
-    # 없으면 예전 이름(UNIPASS_KEY_CUSTOMS)을 씁니다. .env를 고치지 않아도 계속 돌아갑니다.
+    # 이름이 셋입니다. 앞에서부터 찾습니다.
+    #   1. DATA_PORTAL_KEY_CUSTOMS  이 서비스만 따로 받은 키
+    #   2. UNIPASS_KEY_CUSTOMS      예전 이름 (.env를 안 고쳐도 돌아가게)
+    #   3. DATA_GO_KR_SERVICE_KEY   포털 공통 키
+    #
+    # 3번을 넣은 이유: 포털은 계정 키 하나를 서비스마다 [활용신청]해서 씁니다.
+    # 이 서비스를 신청해 두었다면 공통 키가 그대로 통합니다. 따로 적지 않아도
+    # 되게 합니다. (2026-09-26 승인 확인 — 공통 키로 조회됩니다)
+    #
+    # 주의: 계정이 둘이면 키도 둘입니다. 신청한 계정의 키여야 통합니다.
+    # 신청하지 않은 키를 쓰면 "등록되지 않은 서비스키"(코드 30)로 거절됩니다.
     CUSTOMS_CONFIRM_API_KEY = (os.getenv("DATA_PORTAL_KEY_CUSTOMS", "").strip()
-                               or os.getenv("UNIPASS_KEY_CUSTOMS", "").strip())
+                               or os.getenv("UNIPASS_KEY_CUSTOMS", "").strip()
+                               or os.getenv("DATA_GO_KR_SERVICE_KEY", "").strip())
 
 
     # 시작 화면을 잠급니다.
@@ -166,6 +176,30 @@ class TestConfig(Config):
     # (실제로 이것 때문에 한 번 실패했습니다)
     # AI를 보는 테스트는 ai_client.chat을 흉내 내서 씁니다.
     AI_API_KEY = ""
+
+    # 같은 이유로 **바깥 기관 키도 모두 비웁니다.** (2026-09-26)
+    #
+    # AI만 막아 두었더니 다른 것이 새고 있었습니다. Shipment를 만드는 fixture가
+    # 환율을 받으려고 관세청을 불렀고, 건을 만드는 테스트는 거의 전부이므로
+    # 테스트를 한 번 돌릴 때마다 기관을 수백 번 두드렸습니다.
+    #
+    # 그러면 세 가지가 나빠집니다.
+    #   - 공공데이터포털은 하루 호출 수가 정해져 있습니다. 테스트로 다 쓰면
+    #     그날은 화면에서도 조회가 안 됩니다.
+    #   - 기관이 멈추면 우리 테스트가 같이 빨개집니다. 우리 코드는 멀쩡한데요.
+    #   - 그날 응답에 따라 결과가 달라져, 어제 초록이던 것이 오늘 빨개집니다.
+    #
+    # 키가 없어도 목록·계산은 나와야 합니다. 그 길(대체 데이터·저장본)이
+    # 제대로 되어 있는지를 테스트가 함께 보게 됩니다.
+    # 실제 기관을 불러야 하는 테스트는 @pytest.mark.live 를 붙이고 따로 돌립니다.
+    UNIPASS_API_KEYS = {}
+    CUSTOMS_CONFIRM_API_KEY = ""
+    DATA_GO_KR_SERVICE_KEY = ""
+    OPEN_EXCHANGE_RATES_APP_ID = ""
+    EXCHANGE_API_KEY = ""
+    SCHEDULE_API_KEY = ""
+    TRACKING_API_KEY = ""
+    CUSTOMS_API_KEY = ""
 
     # 기관이 막혀 있으면 연결이 끊길 때까지 기다립니다. 기본 8초인데,
     # Shipment를 만드는 테스트마다 한 번씩 물어보니 전체가 한 시간을 넘겼습니다.

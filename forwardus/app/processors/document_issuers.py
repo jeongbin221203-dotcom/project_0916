@@ -232,3 +232,118 @@ def links_for(name: str) -> list[dict]:
     links = [{"label": row["agency"], "url": row["url"]}] if row.get("url") else []
     links += [{"label": label, "url": url} for label, url in row.get("extra", [])]
     return links
+
+
+# --- 나라별 규제기관 --------------------------------------------------------------
+#
+# 위 ISSUERS는 **한국에서 받는** 서류입니다. 이건 **보내는 나라가** 요구하는 것을
+# 어디에 물어야 하는지입니다. 둘은 다릅니다.
+#
+#   위생증명서  → 한국 식약처가 발급  (ISSUERS)
+#   FDA 등록   → 미국 FDA에 직접 신고 (아래)
+#
+# "미국 FDA 인증이 필요합니다"까지만 말하면 사람은 또 검색해야 합니다. 검색하면
+# 대행업체가 먼저 나옵니다. 공식 창구를 바로 짚어 줍니다.
+#
+# 여기 없는 나라는 비워 둡니다. 지어내지 않습니다.
+COUNTRY_AGENCIES = {
+    "US": [
+        {"label": "FDA (식품·화장품·의약품·의료기기)", "url": "https://www.fda.gov",
+         "note": "시설 등록과 품목 신고. 미국 내 대리인(U.S. Agent)이 있어야 합니다."},
+        {"label": "FCC (무선·전자기기)", "url": "https://www.fcc.gov/oet/ea",
+         "note": "무선은 Certification, 일반 전자기기는 SDoC입니다."},
+        {"label": "CPSC (어린이제품·소비재 안전)", "url": "https://www.cpsc.gov",
+         "note": "어린이제품은 CPC(적합성증명서)를 함께 보내야 합니다."},
+        {"label": "CBP (통관)", "url": "https://www.cbp.gov",
+         "note": "원산지 표시 규정이 엄격합니다. 물품 자체에 항구적으로 표시합니다."},
+    ],
+    "EU": [
+        {"label": "NANDO · EU 인증기관(Notified Body) 찾기",
+         "url": "https://ec.europa.eu/growth/tools-databases/nando/",
+         "note": "CE 마킹에서 제3자 인증이 필요한 품목의 기관을 여기서 찾습니다."},
+        {"label": "ECHA (화학물질 REACH)", "url": "https://echa.europa.eu",
+         "note": "연 1톤 이상이면 등록 대상입니다. EU 역내 대리인이 필요합니다."},
+        {"label": "Access2Markets · 품목별 요건·관세",
+         "url": "https://trade.ec.europa.eu/access-to-markets/en/home",
+         "note": "HS부호와 나라를 넣으면 그 품목에 걸리는 EU 요건이 모두 나옵니다."},
+    ],
+    "CN": [
+        {"label": "SAMR · 국가시장감독관리총국", "url": "https://www.samr.gov.cn",
+         "note": "CCC 강제인증을 관장합니다."},
+        {"label": "중국 해관총서 (통관·검역)", "url": "http://www.customs.gov.cn",
+         "note": "식품 수출자는 해관총서 등록(GACC)이 되어 있어야 합니다."},
+    ],
+    "JP": [
+        {"label": "경제산업성 (전기용품 PSE)", "url": "https://www.meti.go.jp",
+         "note": "특정전기용품은 국가등록 검사기관의 적합성검사가 필요합니다."},
+        {"label": "후생노동성 (식품·의약품)", "url": "https://www.mhlw.go.jp",
+         "note": "식품은 수입신고(식품등수입신고서)가 따로 있습니다."},
+    ],
+    "VN": [
+        {"label": "베트남 과학기술부 (품질·CR 마크)", "url": "https://www.most.gov.vn",
+         "note": "품목별 적합성인증(CR) 대상이 넓습니다."},
+    ],
+    "IN": [
+        {"label": "BIS · 인도표준국", "url": "https://www.bis.gov.in",
+         "note": "BIS 강제인증 품목이 계속 늘고 있습니다. 외국제조사 등록(FMCS)이 오래 걸립니다."},
+    ],
+    "ID": [
+        {"label": "BPOM (식품·화장품·의약품)", "url": "https://www.pom.go.id",
+         "note": "화장품·식품은 사전 등록(NIE)이 필요합니다."},
+        {"label": "할랄청 BPJPH", "url": "https://bpjph.halal.go.id",
+         "note": "식음료는 할랄 인증이 단계적으로 의무화되었습니다."},
+    ],
+    "TR": [
+        {"label": "TSE · 튀르키예표준협회", "url": "https://www.tse.org.tr",
+         "note": "CE와 별도로 TSE 인증을 요구하는 품목이 있습니다."},
+        {"label": "TAREKS (수입 적합성 검사)", "url": "https://www.ticaret.gov.tr",
+         "note": "무역부 전자시스템으로 수입 전 검사를 신청합니다."},
+    ],
+    "SA": [
+        {"label": "SASO · 사우디표준청", "url": "https://www.saso.gov.sa",
+         "note": "SABER 시스템에서 적합인증서(CoC)를 받아야 통관됩니다."},
+    ],
+    "AE": [
+        {"label": "ESMA · UAE 표준측량청", "url": "https://www.moiat.gov.ae",
+         "note": "ECAS 적합성 인증 대상 품목이 있습니다."},
+    ],
+    "GB": [
+        {"label": "UKCA 적합성 표시 안내", "url": "https://www.gov.uk/guidance/using-the-ukca-marking",
+         "note": "CE가 아니라 UKCA입니다. 영국 내 책임자(UK Responsible Person)가 필요합니다."},
+    ],
+    "AU": [
+        {"label": "ACMA (무선·통신)", "url": "https://www.acma.gov.au",
+         "note": "RCM 표시 대상입니다."},
+        {"label": "호주 농업부 (검역)", "url": "https://www.agriculture.gov.au",
+         "note": "검역이 세계에서 가장 엄격한 축에 듭니다. 목재 포장재를 특히 봅니다."},
+    ],
+    "CA": [
+        {"label": "Health Canada (식품·화장품·의약품)", "url": "https://www.canada.ca/en/health-canada.html",
+         "note": "화장품은 판매 전 신고(Cosmetic Notification)가 필요합니다."},
+    ],
+    "MX": [
+        {"label": "NOM · 멕시코 공식규격 (경제부)", "url": "https://www.gob.mx/se",
+         "note": "NOM 인증은 멕시코 내 인증기관에서만 받습니다. 수입자 명의가 필요합니다."},
+    ],
+    "BR": [
+        {"label": "INMETRO (제품 인증)", "url": "https://www.gov.br/inmetro",
+         "note": "강제인증 품목이 많고 현지 시험을 요구합니다."},
+        {"label": "ANVISA (식품·화장품·의약품)", "url": "https://www.gov.br/anvisa",
+         "note": "등록 없이는 통관되지 않습니다."},
+    ],
+}
+
+# EU 회원국은 나라마다 따로 두지 않고 EU 묶음을 씁니다.
+# (CE·REACH는 회원국이 아니라 EU가 정합니다)
+
+
+def agencies_for(country_code: str) -> list[dict]:
+    """그 나라 규제기관. 모르는 나라면 빈 목록입니다. 지어내지 않습니다."""
+
+    code = str(country_code or "").strip().upper()
+    if not code:
+        return []
+    if code in COUNTRY_AGENCIES:
+        return COUNTRY_AGENCIES[code]
+    from app.processors import country_export_guide
+    return COUNTRY_AGENCIES["EU"] if code in country_export_guide._eu_members() else []

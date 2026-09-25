@@ -5,6 +5,7 @@ must: 수출 서류, 필요한 서류, 무역 서류, 서류 종류, 상업송�
 ask: 수출할 때 꼭 필요한 서류가 뭔가요?
 links: 📄 서류 작성하러 가기 (상업송장·포장명세서 자동 작성)|/documents/new ;; 대한상공회의소 무역인증서비스 (C/O 발급)|https://cert.korcham.net ;; 관세청 UNI-PASS (수출신고·신고필증)|https://unipass.customs.go.kr ;; 농림축산검역본부 (식물·동물 검역증)|https://www.qia.go.kr ;; 식품안전나라 (식품·건강기능식품)|https://www.foodsafetykorea.go.kr ;; 화학물질정보처리시스템 (MSDS)|https://kreach.me.go.kr
 see: export-declaration, bill-of-lading, fta-origin, letter-of-credit
+render: document-issuers
 ---
 수출 한 건에 나오는 서류는 **거의 늘 같은 다섯 개**이고, 거래 조건에 따라 몇 개가 더 붙습니다.
 

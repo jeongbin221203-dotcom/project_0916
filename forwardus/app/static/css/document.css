@@ -75,7 +75,17 @@
 /* 서류가 어떤 성격인지 (필수 / 참고용 / 예시 양식) */
 .doc_role { justify-self: start; padding: 2px 9px; border-radius: 999px;
   font-size: 11px; font-weight: 800; }
-.doc_role_required { background: #fee2e2; color: #b91c1c; }
+/* "필수"는 **정상 상태**입니다. 빨강을 쓰면 안 됩니다.
+   예전에는 #fee2e2/#b91c1c 였는데, 이것은 .badge.review_failed(검증 실패)와
+   똑같은 빨강입니다. 그래서 "Commercial Invoice [Validated] [필수]"가
+   "검증은 됐는데 뭔가 빨간 게 떠 있다"로 읽혔습니다.
+
+   빨강은 **잘못된 것에만** 씁니다. 필수는 호박색으로 표시합니다.
+     - 가장 먼저 눈에 들어와야 합니다. 이 화면에서 제일 중요한 정보입니다.
+     - 그런데 "잘못됐다"로 읽히면 안 됩니다. 호박색은 "챙기세요"입니다.
+     - 모양(채운 알약)은 참고용·예시 양식과 똑같이 둡니다. 하나만 테두리로
+       만들었더니 나란히 놓였을 때 따로 노는 것처럼 보였습니다. (2026-09-26) */
+.doc_role_required { background: #fef3c7; color: #92400e; }
 .doc_role_reference { background: #e0f2fe; color: #0369a1; }
 .doc_role_sample { background: #f1f5f9; color: #475569; }
 .doc_role_note { margin: 0; line-height: 1.55; }

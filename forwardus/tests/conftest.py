@@ -16,6 +16,47 @@ from config import TestConfig  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def _no_network(request, monkeypatch):
+    """테스트는 **바깥으로 나가지 않습니다.** `live` 표시가 있을 때만 허용합니다.
+
+    왜 막나
+      테스트가 실제 기관을 부르면 세 가지가 한꺼번에 나빠집니다.
+        1. 키를 씁니다. 공공데이터포털은 하루 호출 수가 정해져 있어, 테스트를
+           한 번 돌릴 때마다 실제 조회에 쓸 몫이 줄어듭니다. 넘기면 그날은
+           화면에서도 조회가 안 됩니다.
+        2. 기관이 멈추면 우리 테스트가 같이 빨개집니다. 우리 코드는 멀쩡한데요.
+        3. 그날 환율·그날 응답에 따라 결과가 달라져, 어제 초록이던 것이
+           오늘 빨개집니다.
+
+      실제로 `test_fx_board.py`와 `test_exchange_client.py`가 그날 환율을
+      받아 오고 있었습니다. 파일 첫 줄에 "바깥은 부르지 않습니다"라고 적혀
+      있었는데도요. 사람이 지키기로 한 규칙은 이렇게 샙니다. 그래서 막습니다.
+
+    실제로 부르고 싶으면
+        @pytest.mark.live 를 붙이고  `pytest -m live` 로 따로 돌립니다.
+    """
+
+    if request.node.get_closest_marker("live"):
+        return
+
+    import socket
+
+    real_connect = socket.socket.connect
+
+    def blocked(self, address, *args, **kwargs):
+        # 같은 컴퓨터 안(테스트 서버·DB)은 막지 않습니다. 바깥만 막습니다.
+        host = address[0] if isinstance(address, tuple) else str(address)
+        if host in ("127.0.0.1", "::1", "localhost"):
+            return real_connect(self, address, *args, **kwargs)
+        raise RuntimeError(
+            f"테스트가 바깥({host})을 부르려 했습니다. 기관을 실제로 부르면 "
+            "키를 쓰고 결과가 날마다 달라집니다. 응답을 흉내 내거나, 정말 "
+            "불러야 하면 @pytest.mark.live 를 붙이세요.")
+
+    monkeypatch.setattr(socket.socket, "connect", blocked)
+
+
+@pytest.fixture(autouse=True)
 def _fresh_exchange_cache():
     """환율은 한 번 받으면 한 시간 기억해 둡니다.
 

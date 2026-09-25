@@ -87,7 +87,7 @@ def hs_navigation(hs_code: str) -> dict:
         return fail("VALIDATION_ERROR", "api", "HS부호 10자리가 필요합니다.")
     result = _call("hs_navigation", {"hsSgn": digits}, "HS 내비게이션", timeout=8)
     if not result["success"]:
-        return result
+        return snapshot.recall(f"hs_nav_{digits}", "law") or result
     root = result["data"]
     if root.tag != "cmtrStatsQryRtnVo":
         return fail("API_INVALID_RESPONSE", "api")
@@ -103,7 +103,7 @@ def hs_navigation(hs_code: str) -> dict:
             return fail("API_INVALID_RESPONSE", "api", "내비게이션 건수를 확인할 수 없습니다.")
         rows.append({"code": code, "name": _text(row, "prlstNm"),
                      "count": int(count), "rank": int(rank) if rank.isdigit() else None})
-    return ok(rows, "api")
+    return snapshot.remember(f"hs_nav_{digits}", ok(rows, "api"))
 
 
 def _iso(value: str) -> str:
@@ -268,7 +268,8 @@ def refund_rate(hs_code: str, base_date: date | None = None) -> dict:
             "stop_date": _iso(_text(row, "ceseDt")),
         })
     rows = [row for row in rows if row["amount_krw"]]
-    return ok(rows, "api") if rows else _empty(root, "간이정액 환급율표")
+    return (snapshot.remember(f"refund_rate_{digits}", ok(rows, "api")) if rows
+            else _empty(root, "간이정액 환급율표"))
 
 
 def refund_company(clearance_code_value: str) -> dict:
@@ -365,7 +366,8 @@ def shortened_loading_period(hs_code: str) -> dict:
     } for row in _rows(root, "expFfmnPridShrtTrgtPrlstQryRsltVo",
                        "expFfmnPridShrtTrgtPrlstQryVo")]
     rows = [row for row in rows if row["product"] or row["deadline"]]
-    return ok(rows, "api") if rows else _empty(root, "수출이행기간 단축대상")
+    return (snapshot.remember(f"short_period_{digits}", ok(rows, "api")) if rows
+            else _empty(root, "수출이행기간 단축대상"))
 
 
 # --- 6. 항공사 · 포워더 ---------------------------------------------------------

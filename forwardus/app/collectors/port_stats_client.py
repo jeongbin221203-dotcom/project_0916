@@ -18,6 +18,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from datetime import date
 
+from app.collectors import snapshot
 from app.collectors.base_client import fail, get_config, ok, request_text
 
 HARBOR_URL = "https://apis.data.go.kr/1192000/SsopVsslEtryndHarbor2/YM"
@@ -106,7 +107,9 @@ def port_traffic(months: int = 6) -> dict:
     start, end = _period(months)
     result = _call(HARBOR_URL, {"sym": start, "eym": end}, "항만별 선박입출항실적")
     if not result["success"]:
-        return result
+        # 통계는 한두 달 늦게 올라옵니다. 기관이 막혔다고 빈 화면을 주느니
+        # 지난번에 받아 둔 값을 "며칠 전 값"이라고 밝히고 보여 줍니다.
+        return snapshot.recall(f"port_traffic_{months}", "stats") or result
 
     rows = [{
         "period": row.get("useYm", ""),
@@ -118,8 +121,9 @@ def port_traffic(months: int = 6) -> dict:
         "departed_tonnage": _number(row.get("satGrtg")),
     } for row in _flatten(result["data"])]
     rows = [row for row in rows if row["port"]]
-    return ok({"from": start, "to": end, "rows": rows,
-               "note": "척수와 총톤수입니다. 통계는 한두 달 늦게 올라옵니다."}, "api")
+    return snapshot.remember(f"port_traffic_{months}", ok(
+        {"from": start, "to": end, "rows": rows,
+         "note": "척수와 총톤수입니다. 통계는 한두 달 늦게 올라옵니다."}, "api"))
 
 
 def container_throughput(months: int = 6) -> dict:

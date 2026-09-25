@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 from datetime import date
 
 from app.collectors import file_cache
+from app.collectors import snapshot
 from app.collectors.base_client import fail, get_config, ok, request_text
 
 BASE = "https://apis.data.go.kr/1220000"
@@ -173,7 +174,7 @@ def item_trade(hs_code: str, country_code: str = "", year: int | None = None) ->
 
         result = _call(ITEM_URL if country_code else COUNTRY_URL, params, "수출입무역통계")
         if not result["success"]:
-            return result
+            return snapshot.recall(f"item_trade_{digits}_{country_code}", "stats") or result
         if result["data"]:
             break
 
@@ -182,14 +183,14 @@ def item_trade(hs_code: str, country_code: str = "", year: int | None = None) ->
     totals = [row for row in rows if row["period"] in ("총계", "합계")
               or row["country_code"] == "-"]
     rows = [row for row in rows if row not in totals]
-    return ok({
+    return snapshot.remember(f"item_trade_{digits}_{country_code}", ok({
         "hs_code": digits,
         "country_code": country_code.upper() if country_code else "",
         "from": start, "to": end,
         "rows": rows,
         "total": totals[0] if totals else None,
         "unit_note": "금액 단위는 달러(USD), 중량 단위는 kg입니다.",
-    }, "api")
+    }, "api"))
 
 
 def top_destinations(hs_code: str, limit: int = 10, year: int | None = None) -> dict:

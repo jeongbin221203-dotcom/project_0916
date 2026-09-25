@@ -26,6 +26,7 @@ import json
 import re
 
 from app.collectors import ai_client
+from app.processors import document_issuers
 
 # AI에게 물을 때 한 번에 보는 품목 수. 품목이 많아도 앞의 몇 개면 성격이 드러납니다.
 AI_ITEM_LIMIT = 3
@@ -111,6 +112,20 @@ def _cert_fits(title: str, chapters: set[str]) -> bool:
                 return True
     # 품목을 가리지 않는 인증(CE 마킹·GPSR 등)은 그대로 둡니다.
     return not scoped
+
+
+def _issuer_for(row: dict) -> dict | None:
+    """줄 제목으로 못 찾으면 그 줄이 요구하는 서류 이름들로 찾습니다.
+
+    규칙표의 줄은 제목이 품목입니다("화장품"). 발급처는 품목이 아니라 그 아래
+    적힌 서류("자유판매증명서 (CFS)")에 붙어 있습니다.
+    """
+
+    for paper in row.get("documents") or []:
+        guide = document_issuers.find(paper)
+        if guide:
+            return guide
+    return None
 
 
 def _country_notes(country_code: str, name: str = "", chapters: set[str] | None = None) -> list[dict]:
@@ -317,6 +332,21 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
         if row["key"] in seen:
             return
         seen.add(row["key"])
+        # 서류 이름만 알려 주면 "그래서 어디로 가야 하나"가 남습니다. 발급처·신청
+        # 방법·걸리는 시간·공식 주소를 우리 표에서 찾아 붙입니다.
+        # 주소는 그 표에서만 꺼냅니다. AI가 지어내면 없는 창구로 보내게 됩니다.
+        guide = document_issuers.find(row["title"]) or _issuer_for(row)
+        if guide:
+            row.setdefault("how", guide["how"])
+            row["lead_time"] = guide.get("lead_time", "")
+            if not row.get("link"):
+                row["link"] = guide.get("url", "")
+            row["links"] = document_issuers.links_for(guide["title"])
+            # 기관 이름이 "도착국 인증기관"처럼 두루뭉술하면 표의 이름으로 바꿉니다.
+            if not row.get("agency") or row["agency"].startswith("도착국 인증기관"):
+                row["agency"] = guide["agency"]
+            if guide.get("caution"):
+                row["caution"] = guide["caution"]
         found.append(row)
 
     # 1·2. 관세청 세관장확인 + 우리 규칙표

@@ -29,12 +29,89 @@ VALIDATION_FIELDS = {
     "consignee": "Consignee",
     "pol": "POL",
     "pod": "POD",
+
+    # 아래는 2026-09-26에 넣었습니다.
+    #
+    # 그 전에는 위 열 칸만 봤습니다. 서식 칸은 64개인데 10개만 본 것입니다.
+    # 적합성 검사를 100회 돌려 보니 **수출자명·품명·선박명이 서류마다 달라도
+    # 전부 통과**였습니다. 이것들은 실제로 가장 자주 사고가 나는 칸입니다.
+    #   - 수출자명이 L/C와 한 글자 다르면 은행에서 서류가 돌아옵니다.
+    #   - 품명이 송장과 패킹리스트에서 다르면 통관이 보류됩니다.
+    #   - B/L의 선박명이 송장과 다르면 바이어가 물건을 못 찾습니다.
+    "exporter": "Shipper / Exporter",
+    "exporter_address": "Shipper 주소",
+    "consignee_address": "Consignee 주소",
+    "notify_party": "Notify Party",
+    "product_description": "품명",
+    "package_type": "포장 종류",
+    "shipping_marks": "화인 (Shipping Marks)",
+    "total_cbm": "Total CBM",
+    "etd": "출항일 (ETD)",
+    "vessel_or_flight": "선박·항공편",
+    "carrier": "선사·항공사",
+    "payment_terms": "결제 조건",
+    "freight_term": "운임 조건",
+    "dangerous_goods": "위험물 표시",
 }
+
+# 일부러 검사하지 않는 칸. 서류마다 **달라도 되는** 것들입니다.
+#   doc_no      서류마다 자기 번호를 씁니다 (CI-… / PL-…)
+#   doc_date    송장 작성일과 포장일은 다를 수 있습니다
+#   remarks     자유롭게 적는 칸입니다
+#   signed_by   서류마다 서명자가 다를 수 있습니다
+#   unit_price  견적송장(PI)은 제안가, 상업송장(CI)은 확정가라 다를 수 있습니다
+# 이 목록을 줄이려면 "정말 달라도 되는가"를 먼저 따져 보세요. 잘못 넣으면
+# 멀쩡한 서류에 경고가 떠서, 사람이 경고를 안 믿게 됩니다.
+NOT_COMPARED = ("doc_no", "doc_date", "remarks", "signed_by", "unit_price")
 
 NUMERIC_TOLERANCE = 0.01
 
 
-def _normalize(value):
+# 숫자로 읽어야 하는 칸. 이 칸만 "3,000.00"과 3000.0을 같게 봅니다.
+#
+# 왜 칸을 정해 두나
+#   전부 숫자로 읽으려 하면 HS부호가 망가집니다. "0303890000"을 숫자로 바꾸면
+#   303890000.0이 되어 앞의 0이 사라지고, 다른 부호와 같아져 버립니다.
+#   숫자인 칸만 숫자로 읽습니다.
+NUMERIC_FIELDS = ("quantity", "gross_weight_kg", "net_weight_kg",
+                  "invoice_value", "total_cbm", "unit_price", "amount")
+
+# 금액 칸에 붙는 기호. 떼고 숫자만 봅니다. ("USD 3,000.00" · "$3,000")
+_MONEY_MARKS = ("USD", "EUR", "JPY", "CNY", "KRW", "$", "€", "¥", "₩", ",", " ")
+
+
+def _as_number(value):
+    """숫자로 읽어 봅니다. 숫자가 아니면 None."""
+
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for mark in _MONEY_MARKS:
+        text = text.replace(mark, "")
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _normalize(value, field: str = ""):
+    """견줄 수 있는 모양으로 고칩니다.
+
+    글자는 앞뒤·가운데 공백을 하나로 줄이고 대문자로 맞춥니다. 대소문자는
+    일부러 무시합니다 — 은행도 대소문자만 다른 것은 불일치로 보지 않습니다.
+
+    숫자 칸(NUMERIC_FIELDS)은 숫자로 읽습니다. 그래야 송장에 "3,000.00"으로
+    적고 기록에 3000.0으로 있는 것이 같은 값이 됩니다. 예전에는 이것이
+    "값이 다릅니다" 경고로 떴습니다. 쉼표를 넣어 적는 것이 오히려 흔한데,
+    멀쩡한 서류에 경고가 뜨면 사람이 경고를 안 믿게 됩니다. (2026-09-26)
+    """
+
+    if field in NUMERIC_FIELDS:
+        number = _as_number(value)
+        if number is not None:
+            return number
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value)
     if value is None:
@@ -60,7 +137,7 @@ def _written(documents, form_fields, field) -> dict[str, object]:
         shown = form_fields.get(doc_type)
         if field not in data or (shown is not None and field not in shown):
             continue
-        value = _normalize(data[field])
+        value = _normalize(data[field], field)
         if value != "":
             written[doc_type] = value
     return written
@@ -175,12 +252,12 @@ def validate_documents(documents: dict[str, dict], reference: dict,
     for field, field_label in VALIDATION_FIELDS.items():
         if field not in reference or reference[field] in (None, ""):
             continue
-        expected = _normalize(reference[field])
+        expected = _normalize(reference[field], field)
         for doc_type, data in documents.items():
             shown = form_fields.get(doc_type)
             if field not in data or (shown is not None and field not in shown):
                 continue
-            actual = _normalize(data[field])
+            actual = _normalize(data[field], field)
             if actual == "":
                 findings.append({
                     "status": "warning",

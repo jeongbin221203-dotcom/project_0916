@@ -78,7 +78,27 @@ def _incoterms_table() -> str:
 
 
 # 머리글의 render: 이름 → 본문 뒤에 덧붙일 글을 만드는 함수.
-RENDERERS = {"incoterms": _incoterms_table}
+def _issuer_table() -> str:
+    """서류를 **어디서 어떻게** 받는지. 표는 processors/document_issuers가 정본입니다.
+
+    "위생증명서·COA 등이 필요할 수 있습니다"까지만 답하던 것을 고치려고 붙였습니다.
+    이름을 알아도 처음 수출하는 사람은 어디로 가야 하는지를 모릅니다.
+    """
+
+    from app.processors import document_issuers
+
+    lines = ["", "### 어디서 어떻게 받나", "",
+             "| 서류 | 발급처 | 걸리는 시간 | 신청 |",
+             "| --- | --- | --- | --- |"]
+    for row in document_issuers.ISSUERS:
+        lines.append(f"| {row['title']} | {row['agency']} | {row.get('lead_time', '')} | "
+                     f"{row.get('url', '')} |")
+    lines += ["", "표에 없는 서류는 품목·나라에 따라 갈립니다. 화물을 적어 주시면 "
+                  "그 건에 걸리는 것만 골라 드립니다."]
+    return "\n".join(lines)
+
+
+RENDERERS = {"incoterms": _incoterms_table, "document-issuers": _issuer_table}
 
 
 def _compact(text: str) -> str:
