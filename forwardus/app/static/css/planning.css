@@ -460,3 +460,13 @@ html.modal_open, html.modal_open body { overflow: hidden; }
 /* 신용장(L/C) 선적 마감 안내 (planning.js) */
 .lc_note { display: block; margin-bottom: 14px; }
 .lc_note small { display: block; margin-top: 4px; font-weight: 600; opacity: .85; }
+
+/* 이 짐이면 LCL인가 FCL인가 (planning.js · processors/sea_mode_advisor) */
+.sea_advice { display: grid; gap: 4px; margin: 12px 0 0; padding: 11px 13px; border-radius: 12px;
+  border: 1px solid #c7d7fd; background: var(--blue_soft); color: var(--blue_dark); font-size: 13px; }
+.sea_advice.is_close { border-color: #fcd34d; background: var(--amber_soft); color: #8a4f00; }
+.sea_advice[hidden] { display: none; }
+.sea_advice b { font-size: 14px; }
+.sea_advice small { color: inherit; opacity: .85; }
+.sea_advice .link_button { color: inherit; text-decoration: underline; font-weight: 800; }
+.sea_advice_same { font-style: normal; opacity: .75; }

@@ -10,9 +10,9 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
 from app.routes import error_response, load_shipment
 from app.routes.auth import current_user, login_required
 from app.services import (ServiceError, customs_filing_service, document_draft_service,
-                          translate_service,
-                          document_extract_service, document_service, document_start_service,
-                          draft_document_service, requirement_service, shipment_service)
+                          document_extract_service, document_service, document_source_service,
+                          document_start_service, draft_document_service, requirement_service,
+                          shipment_service, translate_service)
 from app.validators import ValidationError
 
 document_bp = Blueprint("document", __name__, url_prefix="/documents")
@@ -61,7 +61,24 @@ def new():
 
     return render_template("document/new.html",
                            checklist=document_start_service.checklist(),
+                           sources=document_source_service.list_sources(current_user()),
                            recent=shipment_service.list_shipments(viewer=current_user())[:3])
+
+
+@document_bp.get("/api/sources/<kind>/<source_id>")
+@login_required
+def source_values(kind: str, source_id: str):
+    """고른 건의 칸 값을 돌려줍니다. 화면이 서류 작성 칸을 채우는 데 씁니다.
+
+    목록은 화면을 그릴 때 함께 내려보내므로(new.html) 따로 부르지 않습니다.
+    값은 고른 뒤에만 필요해서 여기서 받습니다.
+    """
+
+    try:
+        return jsonify({"success": True,
+                        "data": document_source_service.load(current_user(), kind, source_id)})
+    except (ValidationError, ServiceError) as exc:
+        return error_response(exc)
 
 
 @document_bp.post("/draft/preview")
@@ -352,9 +369,14 @@ def save_customs_filing(shipment_id: str):
 def generate(shipment_id: str):
     shipment = load_shipment(shipment_id)
     overwrite = request.form.get("overwrite") == "1"
+    # 확정한 서류는 다시 만들지 않습니다. 건너뛴 것을 이름으로 알려 줍니다.
+    locked = document_service.locked_documents(shipment)
     created = document_service.generate_documents(shipment, overwrite=overwrite)
     flash(f"{len(created)}개 문서를 Shipment 데이터로 작성했습니다."
           if created else "이미 모든 문서가 최신 서식으로 작성되어 있습니다.", "success")
+    if locked:
+        flash(f"확정한 서류는 그대로 두었습니다: {', '.join(locked)}. "
+              "새 내용으로 바꾸려면 그 서류를 열어 고치세요. (확정이 풀립니다)", "info")
     return redirect(url_for("document.center", shipment_id=shipment_id))
 
 

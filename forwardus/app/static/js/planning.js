@@ -65,7 +65,7 @@
   /* ----- 입력값 임시 저장: 다른 메뉴에 다녀와도 내용이 남습니다 ----- */
   // 탭을 새로 열면 빈 화면에서 시작하고, 메뉴를 오갈 때만 입력이 유지되도록
   // sessionStorage를 씁니다. (브라우저를 닫으면 사라집니다)
-  const DRAFT_KEY = "forwardus:planning-draft";
+  const DRAFT_KEY = window.ForwardusStore.key("forwardus:planning-draft");
   const draftStore = window.sessionStorage;
 
   const DRAFT_FIELDS = [
@@ -314,6 +314,8 @@
     saveDraftSoon();
     updateSelectedDates();
     refreshOutlook();
+    // 항공에서는 LCL·FCL 권고가 뜻이 없어 숨깁니다.
+    if (state.metrics) renderSeaAdvice(state.metrics.sea_mode_advice);
   });
   bindToggle(form.querySelector("[data-toggle=sea_mode]"), (value) => {
     state.sea_mode = value;
@@ -321,6 +323,8 @@
     invalidateSchedules();
     saveDraftSoon();
     refreshOutlook();   // FCL/LCL에 따라 소요일과 안내가 달라집니다.
+    // 권고가 지금 고른 방식과 같은지 다시 봅니다. (같으면 "바꾸기"를 띄우지 않습니다)
+    if (state.metrics) renderSeaAdvice(state.metrics.sea_mode_advice);
   });
   applyMode();
 
@@ -1281,8 +1285,41 @@
     set("container", `${metrics.container_quantity} × ${metrics.container_type}`);
     set("volume_weight_kg", `${formatNumber(metrics.volume_weight_kg, 1)} kg`);
     set("chargeable_weight_kg", `${formatNumber(metrics.chargeable_weight_kg, 1)} kg`);
+    renderSeaAdvice(metrics.sea_mode_advice);
     syncInvoiceValue(metrics.amount);
   }
+
+  /* ----- 이 짐이면 LCL인가 FCL인가 -----
+     기준은 서버(processors/sea_mode_advisor)가 정합니다. 여기서는 보여 주고,
+     누르면 [해상 운송 방식]을 그 값으로 바꿔 줍니다. 항공을 고른 동안에는 뜻이 없어 숨깁니다. */
+  const seaAdviceBox = document.querySelector("[data-sea-advice]");
+
+  function renderSeaAdvice(advice) {
+    if (!seaAdviceBox) return;
+    if (!advice || !advice.mode || state.transport_mode === "AIR") {
+      seaAdviceBox.hidden = true;
+      seaAdviceBox.innerHTML = "";
+      return;
+    }
+    const same = advice.mode === state.sea_mode;
+    const notes = (advice.notes || []).map((note) => `<small>${escapeHtml(note)}</small>`).join("");
+    seaAdviceBox.className = `sea_advice ${advice.confidence === "clear" ? "is_clear" : "is_close"}`;
+    seaAdviceBox.innerHTML = `<b>${escapeHtml(advice.mode)} ${advice.confidence === "clear" ? "권장" : "쪽 (경계 구간)"}</b>`
+      + ` <span>${escapeHtml(advice.reason)}</span>`
+      + (same ? `<em class="sea_advice_same">지금 고른 방식과 같습니다</em>`
+              : ` <button type="button" class="link_button" data-sea-apply="${escapeHtml(advice.mode)}">`
+                + `${escapeHtml(advice.mode)}로 바꾸기</button>`)
+      + notes;
+    seaAdviceBox.hidden = false;
+  }
+
+  seaAdviceBox?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-sea-apply]");
+    if (!button) return;
+    const target = form.querySelector(`[data-toggle=sea_mode] [data-value=${button.dataset.seaApply}]`);
+    if (target) target.click();
+    renderSeaAdvice(state.metrics ? state.metrics.sea_mode_advice : null);
+  });
 
   // 품목별 금액을 모두 적었으면 Invoice Value를 그 합으로 맞춥니다.
   // 한 건이라도 비어 있으면 손대지 않아 직접 적은 값이 남습니다.

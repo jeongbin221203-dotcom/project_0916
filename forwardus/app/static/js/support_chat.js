@@ -50,14 +50,14 @@
     log.appendChild(row);
   }
 
+  // 그린 말풍선을 돌려줍니다. 답 아래에 관련 링크를 덧붙이는 데 씁니다.
   function showMessage(message) {
     modeDivider(message.mode);
     if (message.role === "user") {
-      bubble("user", plain(message.text));
-    } else {
-      bubble("bot", chat.render(message.text),
-             message.kind === "note" || message.kind === "warn" ? "support_note" : "support_rich");
+      return bubble("user", plain(message.text));
     }
+    return bubble("bot", chat.render(message.text),
+                  message.kind === "note" || message.kind === "warn" ? "support_note" : "support_rich");
   }
 
   function renderChips() {
@@ -101,14 +101,29 @@
     waiting.remove();
 
     if (response.success) {
-      showMessage(chat.append({ role: "assistant", text: response.data.answer, mode: SOURCE },
-                              SOURCE));
+      const row = showMessage(chat.append({ role: "assistant", text: response.data.answer, mode: SOURCE },
+                                          SOURCE));
+      appendLinks(row, response.data.links);
     } else {
       bubble("bot", plain(response.message || "답변을 받지 못했습니다. 잠시 후 다시 물어봐 주세요."),
              "support_offline");
     }
     busy = false;
     input.focus();
+  }
+
+  // 답 아래의 관련 링크. 주소는 서버 표에서만 옵니다. (support_chat_service · answer_links)
+  function appendLinks(row, links) {
+    if (!row || !(links || []).length) return;
+    const box = document.createElement("p");
+    box.className = "answer_links";
+    box.innerHTML = links.map((link) => {
+      const outside = /^https?:/.test(link.url);
+      const attrs = outside ? ` target="_blank" rel="noopener"` : "";
+      return `<a class="answer_link${outside ? " is_outside" : ""}" href="${escapeHtml(link.url)}"${attrs}>`
+        + `${escapeHtml(link.label)}${outside ? " ↗" : ""}</a>`;
+    }).join("");
+    row.appendChild(box);
   }
 
   let rendered = false;

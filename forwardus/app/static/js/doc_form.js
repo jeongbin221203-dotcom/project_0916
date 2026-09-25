@@ -426,7 +426,9 @@
        서버(/api/work-draft)  다른 기기·다른 탭에서도 이어 쓰는 값. 비공개 칸은 빼고 저장합니다.
 
      돌아왔을 때는 둘 중 나중에 저장된 것을 씁니다. */
-  const LOCAL_KEY = "forwardus:doc-form-draft";
+  const LOCAL_KEY = window.ForwardusStore.key("forwardus:doc-form-draft");
+  // 시작 화면에서 넘어온 초안. 같은 회원 것만 집습니다. (home.js에서 넣습니다)
+  const DOC_DRAFT_KEY = window.ForwardusStore.key("forwardus:doc-draft");
 
   function saveLocal() {
     const draft = { ...sharedValues(), savedAt: Date.now(), lc: { ...carried }, tab: currentTab };
@@ -549,9 +551,9 @@
     // 시작 화면에서 "적은 내용으로 칸 채우기"로 넘어온 경우가 가장 먼저입니다. (방금 고른 값)
     let stashed = null;
     try {
-      const raw = window.sessionStorage.getItem("forwardus:doc-draft");
+      const raw = window.sessionStorage.getItem(DOC_DRAFT_KEY);
       if (raw) {
-        window.sessionStorage.removeItem("forwardus:doc-draft");
+        window.sessionStorage.removeItem(DOC_DRAFT_KEY);
         stashed = JSON.parse(raw);
       }
     } catch (error) { /* 깨졌으면 없는 것으로 봅니다. */ }
@@ -1080,6 +1082,36 @@
         uploadResult.hidden = false;
         uploadResult.scrollIntoView({ behavior: "smooth", block: "start" });
       },
+    });
+  }
+
+  /* ----- 이미 만든 건에서 가져오기 -----
+     같은 바이어에게 두 번째로 보내는 일이 흔합니다. 그때마다 주소·품목·조건을
+     처음부터 다시 적게 하면 오타가 납니다.
+
+     고르면 올린 서류와 같이 칸을 비우고 다시 채웁니다. 앞서 적어 둔 값이 섞이면
+     어느 건의 값인지 알 수 없습니다. 채우기만 하고 만들지는 않습니다. */
+  const sourcePick = document.querySelector("[data-doc-source]");
+  const sourceStatus = document.querySelector("[data-doc-source-status]");
+  if (sourcePick && config.sourceUrl) {
+    sourcePick.addEventListener("change", async () => {
+      const picked = sourcePick.value;
+      sourceStatus.textContent = "";
+      if (!picked) return;
+      const [kind, id] = picked.split(/:(.*)/s);
+      const label = sourcePick.options[sourcePick.selectedIndex].textContent.trim();
+      sourceStatus.textContent = "가져오는 중입니다…";
+      const response = await getJson(
+        config.sourceUrl.replace("__KIND__", encodeURIComponent(kind))
+                        .replace("__ID__", encodeURIComponent(id)));
+      if (!response.success) {
+        sourceStatus.textContent = response.message || "가져오지 못했습니다.";
+        sourcePick.value = "";
+        return;
+      }
+      clearForm();
+      window.FORWARDUS_DOC_FILL(response.data);
+      sourceStatus.textContent = `${label}에서 가져왔습니다. 노란 칸이 가져온 값입니다.`;
     });
   }
 

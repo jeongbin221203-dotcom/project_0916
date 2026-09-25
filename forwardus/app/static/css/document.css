@@ -20,7 +20,8 @@
 
 @media print {
   .site_header, .site_footer, .flash_stack, .no_print { display: none !important; }
-  body { background: #fff; }
+  /* 배경 그라데이션은 종이에 찍지 않습니다. 잉크만 먹고 서류가 탁해집니다. */
+  html, body { background: #fff; }
   .paper { box-shadow: none; border: 0; padding: 0; max-width: none; }
 }
 

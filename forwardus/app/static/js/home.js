@@ -11,6 +11,8 @@
   // 고래 상담창과 같은 대화를 나눠 씁니다. 다른 화면에 갔다 와도 이어집니다.
   const chat = window.ForwardusChat;
   const SOURCE = "home";
+  // 서류 작성 화면으로 넘기는 초안. 회원마다 따로 둡니다. (base.js ForwardusStore)
+  const DOC_DRAFT_KEY = window.ForwardusStore.key("forwardus:doc-draft");
 
   const input = stage.querySelector("[data-home-input]");
   const chipsBox = stage.querySelector("[data-home-chips]");
@@ -199,7 +201,7 @@
     // 서류 작성 화면이 집어 갈 수 있게 놓아 둡니다. 탭을 새로 열면
     // 사라지는 것이 맞습니다 — 확정은 그 화면에서 사람이 합니다.
     try {
-      window.sessionStorage.setItem("forwardus:doc-draft",
+      window.sessionStorage.setItem(DOC_DRAFT_KEY,
                                     JSON.stringify(response.data.form));
     } catch (error) {
       /* 저장 공간이 없으면 링크만 드립니다. */
@@ -391,7 +393,32 @@
       });
       row.appendChild(note);
     }
+    appendLinks(row, response.data.links);
+    // 대화에 적은 화물 정보를 담아 두었으면 한 줄 알립니다. 어디에 쓰이는지까지.
+    if ((response.data.captured || []).length) {
+      const note = document.createElement("p");
+      note.className = "answer_kept";
+      note.textContent = `📌 ${response.data.captured.join(" · ")}을(를) 담아 두었습니다. `
+        + "서류 작성·운송 계획 화면에서 그대로 씁니다.";
+      row.appendChild(note);
+    }
     rememberHsQueries(answer);
+  }
+
+  /* ----- 답 아래의 관련 링크 -----
+     화면(서류 작성·관세청 조회…)과 기관 창구(식약처·검역본부…)를 함께 답니다.
+     주소는 서버가 들고 있는 표에서만 옵니다. AI가 만든 주소는 쓰지 않습니다. */
+  function appendLinks(row, links) {
+    if (!row || !(links || []).length) return;
+    const box = document.createElement("p");
+    box.className = "answer_links";
+    box.innerHTML = `<span>관련 자료</span>` + links.map((link) => {
+      const outside = /^https?:/.test(link.url);
+      const attrs = outside ? ` target="_blank" rel="noopener"` : "";
+      return `<a class="answer_link${outside ? " is_outside" : ""}" href="${escapeHtml(link.url)}"${attrs}`
+        + ` title="${escapeHtml(link.note || "")}">${escapeHtml(link.label)}${outside ? " ↗" : ""}</a>`;
+    }).join("");
+    row.appendChild(box);
   }
 
   /* ----- HS CODE 간편 검색 -----
@@ -584,7 +611,7 @@
     const fields = { ...pipe.draft };
     delete fields.items;
     try {
-      window.sessionStorage.setItem("forwardus:doc-draft",
+      window.sessionStorage.setItem(DOC_DRAFT_KEY,
         // draftId: 그 화면에서 서류를 만들면 이 초안이 Shipment로 승격됩니다.
         JSON.stringify({ fields, items: pipe.draft.items || [], draftId: savedDraftId }));
     } catch (error) {
@@ -902,7 +929,7 @@
         const fields = { ...docDraft };
         delete fields.items;
         delete fields.kind;
-        window.sessionStorage.setItem("forwardus:doc-draft",
+        window.sessionStorage.setItem(DOC_DRAFT_KEY,
           JSON.stringify({ fields, items: docDraft.items || [] }));
       } catch (error) {
         /* 저장 공간이 없으면 링크만 드립니다. */

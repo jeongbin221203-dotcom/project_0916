@@ -1,3 +1,66 @@
+/* 브라우저에 남기는 값의 자리 — 회원마다 따로 둡니다.
+ *
+ * 한 탭에서 A가 로그아웃하고 B가 로그인하면, A가 적어 둔 바이어 주소·이메일이
+ * B의 서류 칸에 그대로 채워지곤 했습니다. sessionStorage는 탭이 살아 있는 한
+ * 남고, 로그아웃은 키를 지우지 않았기 때문입니다.
+ *
+ * 그래서 두 가지를 같이 합니다.
+ *   1. 키마다 "누구 것인지"를 붙입니다. 남의 것은 애초에 읽히지 않습니다.
+ *   2. 로그아웃할 때 그 회원 것을 지웁니다. 탭을 살려 둔 채 계정만 바꿔도
+ *      거래처 정보가 넘어가지 않습니다.
+ *
+ * 이 파일은 base.html에서 다른 스크립트보다 먼저 읽힙니다. 아래 모두가 씁니다.
+ * (work_draft · doc_form · planning · doc_upload · home · hs_modal · chat_store)
+ */
+(function () {
+  "use strict";
+
+  const SCOPE = window.FORWARDUS_SCOPE || "guest";
+
+  // 로그아웃하면 지웁니다. 거래처 정보가 들어 있습니다.
+  // (여기 적는 것은 접두사입니다. 실제 키에는 뒤에 :스코프가 붙습니다.)
+  const PRIVATE = [
+    "forwardus:work-private",     // 바이어 주소·이메일·Notify Party
+    "forwardus:doc-form-draft",   // 서류 작성 폼에 적던 값 전체
+    "forwardus:planning-draft",   // 운송 계획에 적던 값
+    "forwardus:doc-draft",        // 화면 사이로 넘기는 서류 초안
+  ];
+  // forwardus:hs-queries 는 일부러 남깁니다. 그 회원이 찾아본 품명이라,
+  // 다시 로그인하면 그대로 있는 편이 낫습니다. (hs_modal.js)
+
+  function key(base) {
+    return `${base}:${SCOPE}`;
+  }
+
+  function drop(store, name) {
+    try { store.removeItem(name); } catch (error) { /* 못 지워도 막지 않습니다. */ }
+  }
+
+  function clearPrivate() {
+    [window.sessionStorage, window.localStorage].forEach((store) => {
+      PRIVATE.forEach((base) => drop(store, key(base)));
+    });
+  }
+
+  // 스코프가 없던 시절의 키를 치웁니다. 이제 아무도 읽지 않는데 거래처 정보가
+  // 담긴 채 브라우저에 남습니다. 읽는 쪽이 이미 새 키를 보므로 지워도 잃는 것이
+  // 없습니다.
+  function dropLegacy() {
+    [window.sessionStorage, window.localStorage].forEach((store) => {
+      PRIVATE.concat(["forwardus:hs-queries"]).forEach((base) => drop(store, base));
+    });
+  }
+
+  window.ForwardusStore = { scope: SCOPE, key, clearPrivate };
+  dropLegacy();
+
+  // 로그아웃하면 그 회원이 적어 둔 것을 지웁니다.
+  // 같은 컴퓨터를 다른 사람이 쓸 수 있습니다.
+  document.addEventListener("submit", (event) => {
+    if (event.target.closest && event.target.closest(".nav_logout")) clearPrivate();
+  });
+})();
+
 /* Shared helpers and global UI behavior. */
 (function () {
   "use strict";
@@ -286,16 +349,22 @@
     input.addEventListener("focus", open);
   });
 
-  /* ----- 새로고침·홈 버튼은 "처음부터 다시" ----- */
+  /* ----- 홈 버튼은 "처음부터 다시" ----- */
   // 입력하던 내용과 나누던 대화는 탭 세션에 임시 저장됩니다(메뉴를 오가도 유지).
-  // 새로고침하거나 홈 버튼(로고 · 왼쪽 줄의 홈 등)을 누르면 그 내용을 지우고
-  // 첫 화면으로 돌아갑니다. 대화가 남아 있으면 홈을 눌러도 대화 화면이 다시 떠서
-  // 첫 화면으로 못 돌아갑니다.
-  const DRAFT_KEY = "forwardus:planning-draft";
+  // 홈 버튼(로고 · 왼쪽 줄의 홈 등)을 누르면 그 내용을 지우고 첫 화면으로
+  // 돌아갑니다. 대화가 남아 있으면 홈을 눌러도 대화 화면이 다시 떠서 첫
+  // 화면으로 못 돌아갑니다.
+  //
+  // 새로고침(F5)은 건드리지 않습니다.
+  //
+  // 예전에는 새로고침도 "처음부터 다시"로 보고 초안을 지운 뒤 홈으로
+  // 보냈습니다. 그런데 새로고침은 화면이 이상할 때 사람이 가장 먼저 누르는
+  // 것입니다. 고쳐 보려고 누른 사람이 적던 것을 통째로 잃고 첫 화면에 서
+  // 있게 됩니다. planning.js가 beforeunload로 저장해 둔 초안까지 같은 키라
+  // 함께 지워졌습니다. 새로고침 뒤에는 보던 화면과 적던 값이 그대로 있어야
+  // 합니다.
+  const DRAFT_KEY = window.ForwardusStore.key("forwardus:planning-draft");
   const CHAT_PREFIX = "forwardus:chat:";
-  const brand = document.querySelector(".brand");
-  const homeUrl = brand ? brand.getAttribute("href") : "/";
-
   function clearDraft() {
     [window.sessionStorage, window.localStorage].forEach((store) => {
       try {
@@ -307,19 +376,6 @@
     });
   }
 
-  function isReload() {
-    const entry = (window.performance && window.performance.getEntriesByType)
-      ? window.performance.getEntriesByType("navigation")[0] : null;
-    return entry ? entry.type === "reload" : false;
-  }
-
-  if (isReload()) {
-    clearDraft();
-    if (window.location.pathname !== homeUrl) {
-      window.location.replace(homeUrl);
-      return;
-    }
-  }
   document.addEventListener("click", (event) => {
     if (event.target.closest && event.target.closest("[data-home-reset]")) clearDraft();
   });

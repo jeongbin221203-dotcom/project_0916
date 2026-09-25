@@ -127,7 +127,8 @@
 
 /* 좁은 화면에서는 사이드바가 위에 가로로 눕습니다. (shell.css) 가운데만 맞춥니다. */
 @media (max-width: 860px) {
-  .home_stage { width: 100%; background: var(--surface); padding-top: 40px; }
+  /* 배경은 화면 전체 그라데이션(base.css html)이 맡습니다. 여기서 색을 깔면 덮습니다. */
+  .home_stage { width: 100%; padding-top: 40px; }
   .home_box textarea { min-height: 56px; font-size: 16px; }
 }
 
@@ -497,6 +498,14 @@ body.page_home .site_footer { display: none; }
 .home_chips .chip_file:hover { border-color: var(--navy); background: #f1f5f9; }
 
 /* 서류 올려서 칸 채우기 (doc_upload.js). 시작 화면과 서류 작성 화면이 같이 씁니다. */
+/* 이미 만든 건에서 칸을 가져오는 줄. 올려서 채우기 바로 위에 둡니다.
+   둘 다 "칸을 미리 채우는" 같은 일이라 나란히 보이는 편이 낫습니다. */
+.doc_source_pick { width: min(920px, 100%); margin: 0 auto 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.doc_source_pick label { font-weight: 600; white-space: nowrap; }
+.doc_source_pick select { flex: 1 1 260px; min-width: 0; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; }
+
 .doc_upload_wrap { width: min(920px, 100%); margin: 0 auto 16px; }
 .doc_drop { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; align-items: center;
   padding: 16px 20px; border: 2px dashed #c7d7fd; border-radius: var(--radius);
@@ -802,3 +811,7 @@ body.home_talking .support_panel { display: none !important; }
 .doc_group.is_invalid, .doc_item.is_invalid { border-color: var(--red); box-shadow: 0 0 0 2px rgba(217,59,59,.16); }
 .doc_field.is_invalid::after { content: "채워 주세요"; justify-self: start; margin-top: 3px; padding: 0 7px;
   border-radius: 999px; background: var(--red_soft); color: var(--red); font-size: 11px; font-weight: 800; }
+
+/* 대화에서 담아 둔 화물 정보 알림 (chat_capture_service) */
+.answer_kept { margin: 8px 0 0; padding: 7px 11px; border-radius: 10px; background: var(--green_soft);
+  color: #07694f; font-size: 12.5px; font-weight: 700; }
