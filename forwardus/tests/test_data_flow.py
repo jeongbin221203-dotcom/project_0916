@@ -124,3 +124,20 @@ def test_탭만_바꿀_때는_화면을_끌어올리지_않는다():
     assert 'say("bot", action.opener, { pin: false })' in js
     # 진짜 답에는 그대로 붙입니다.
     assert 'kind !== "bot wait" && pin' in js
+
+
+def test_아무_말도_안_했으면_탭을_바꿔도_첫_화면이다():
+    """탭만 눌렀는데 로고가 접히고 적는 칸이 아래로 붙으면 화면이 통째로 바뀝니다.
+
+    무엇을 적어야 하는지는 적는 칸의 안내 글과 예시 단추가 이미 말해 줍니다.
+    인사말은 이야기가 시작된 뒤에만 답니다.
+    """
+
+    from pathlib import Path
+
+    js = (Path(__file__).parent.parent / "app/static/js/home.js").read_text(encoding="utf-8")
+    block = js[js.index("function greetFor"):js.index("function selectMode")]
+    assert 'chat.messages().some((row) => row.role === "user")' in block
+    assert "if (!spoken) {" in block
+    # 첫 화면에서는 인사를 보관함에서도 지웁니다. (다시 들어와도 첫 화면)
+    assert "chat.replaceGreeting(null, SOURCE)" in block

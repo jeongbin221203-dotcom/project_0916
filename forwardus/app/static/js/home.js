@@ -103,6 +103,17 @@
   // 인사는 지금 고른 탭의 것 하나만 보입니다. 다른 탭으로 넘어가면 앞 탭의
   // 인사를 지우고 새 인사를 맨 아래에 둡니다. 적은 말이 있든 없든 같습니다.
   function greetFor(action) {
+    /* 아직 아무 말도 안 하셨으면 첫 화면을 그대로 둡니다.
+       인사말을 띄우면 로고가 접히고 적는 칸이 화면 아래로 붙어, 탭만 눌렀는데
+       화면이 통째로 바뀝니다. 무엇을 적어야 하는지는 적는 칸의 안내 글과
+       예시 단추가 이미 말해 줍니다. */
+    const spoken = chat.messages().some((row) => row.role === "user");
+    if (!spoken) {
+      logEl.querySelectorAll("[data-greeting]").forEach((row) => row.remove());
+      chat.replaceGreeting(null, SOURCE);
+      return;
+    }
+
     const last = logEl.lastElementChild;
     // 같은 탭을 다시 눌렀고 그 인사가 아직 맨 아래에 있으면 그대로 둡니다.
     if (last && last.dataset.greeting === action.key) return;

@@ -17,6 +17,11 @@
 
   const SCOPE = (window.FORWARDUS_CHAT && window.FORWARDUS_CHAT.scope) || "guest";
   const KEY = `forwardus:chat:${SCOPE}`;
+  /* 보관함. 지금 보는 대화(sessionStorage)와 별개로 한 벌 더 둡니다.
+     새로고침하거나 로고를 누르면 화면은 처음으로 돌아가지만, 여기 남은 것을
+     "지난 대화를 불러올까요?"로 여쭤봅니다. 사람이 고르게 하고 우리가 정하지 않습니다.
+     회원마다 따로 두고, 새 대화를 시작하면 여기도 함께 비웁니다. */
+  const KEEP_KEY = `forwardus:chat-kept:${SCOPE}`;
   // 오래 쓰면 저장 공간을 넘습니다. 뒤쪽만 남깁니다.
   const MAX_MESSAGES = 200;
   // AI에게 넘기는 앞 대화. 서버도 뒤쪽 몇 개만 쓰지만 보내는 양부터 줄입니다.
@@ -46,6 +51,33 @@
     } catch (error) {
       /* 저장 공간이 없으면 이 화면에서만 이어집니다. */
     }
+    keep(state);
+  }
+
+  /* 주고받은 말이 있을 때만 보관합니다. 인사만 있는 것은 보관할 이유가 없습니다. */
+  function keep(state) {
+    try {
+      const real = (state.messages || []).filter((row) => !row.kind || row.kind === "note");
+      if (!real.some((row) => row.role === "user")) return;
+      window.localStorage.setItem(KEEP_KEY, JSON.stringify({
+        savedAt: Date.now(), messages: state.messages, docDraft: state.docDraft || {},
+      }));
+    } catch (error) { /* 보관 못 해도 지금 대화는 그대로입니다. */ }
+  }
+
+  function readKept() {
+    try {
+      const raw = window.localStorage.getItem(KEEP_KEY);
+      if (!raw) return null;
+      const kept = JSON.parse(raw);
+      return Array.isArray(kept.messages) && kept.messages.length ? kept : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function forgetKept() {
+    try { window.localStorage.removeItem(KEEP_KEY); } catch (error) { /* 무시 */ }
   }
 
   function emit(event) {
@@ -57,6 +89,26 @@
   const ForwardusChat = {
     messages() {
       return read().messages;
+    },
+
+    /* 보관해 둔 지난 대화. 화면이 "불러올까요?"를 물을 때 씁니다. */
+    kept() {
+      return readKept();
+    },
+
+    /* 보관함에 있는 것을 지금 대화로 되살립니다. */
+    restoreKept(source) {
+      const kept = readKept();
+      if (!kept) return null;
+      const state = { ...empty(), messages: kept.messages, docDraft: kept.docDraft || {} };
+      write(state);
+      emit({ type: "restored", source });
+      return state.messages;
+    },
+
+    /* 불러오지 않겠다고 하면 보관함을 비웁니다. 물어본 것을 또 묻지 않습니다. */
+    forgetKept() {
+      forgetKept();
     },
 
     /* 한 줄을 더합니다. source는 더한 쪽 화면입니다. 그 화면은 이미 그렸으니

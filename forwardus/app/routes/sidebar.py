@@ -13,15 +13,14 @@ RAIL = [
     {"key": "home", "icon": "🏠", "tone": "", "label": "홈", "endpoint": "home.index",
      "note": "대화로 묻고 서류를 만듭니다", "blueprints": ("home",)},
     # 서류를 먼저 두었습니다. 대부분 서류를 만들다가 운임을 궁금해합니다.
-    {"key": "documents", "icon": "📄", "tone": "green", "label": "수출서류작성", "endpoint": "document.new",
+    {"key": "documents", "icon": "📄", "tone": "green", "label": "수출 서류 작성", "endpoint": "document.new",
      "note": "상업송장·포장명세서를 Shipment 데이터로 자동 작성합니다", "blueprints": ("document",)},
     {"key": "planning", "icon": "📦", "tone": "blue", "label": "운송 예상 견적", "endpoint": "planning.new",
      "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다", "blueprints": ("planning",)},
     # Shipment 상세·추적·AI 도우미 화면은 Dashboard 아래에 있습니다.
-    # Dashboard는 사이드바에 내놓지 않습니다. 이용자는 홈에서 대화로 일을 끝내고,
-    # 현황 화면은 마스터가 볼 때만 필요합니다. 주소(/dashboard)는 그대로 살아 있습니다.
+    # 회원은 자기가 만든 건만, 마스터는 전체를 봅니다. (권한은 dashboard_service가 가립니다)
     {"key": "dashboard", "icon": "📊", "tone": "violet", "label": "Dashboard", "endpoint": "dashboard.index",
-     "note": "내 Shipment 현황 (마스터는 전체)", "master_only": True,
+     "note": "내 Shipment 현황 (마스터는 전체)",
      "blueprints": ("dashboard", "shipment", "tracking", "assistant")},
     # 위쪽 메뉴에 있던 조회 두 가지를 이리로 옮겼습니다. 조회는 어느 화면에서나 자주 씁니다.
     {"key": "container", "icon": "🔎", "tone": "blue", "label": "컨테이너 조회",

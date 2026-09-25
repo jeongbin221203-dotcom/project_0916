@@ -42,9 +42,7 @@
       <div class="rail_flyout" id="rail_recent" hidden>
         <div class="row_between">
           <b>최근 Shipment</b>
-          {% if current_user and current_user.is_master %}
-            <a href="{{ url_for('dashboard.index') }}">Dashboard →</a>
-          {% endif %}
+          <a href="{{ url_for('dashboard.index') }}">Dashboard →</a>
         </div>
         {% for s in sidebar.recent %}
           <a class="rail_ship" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">

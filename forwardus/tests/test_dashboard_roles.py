@@ -212,22 +212,21 @@ def test_사이드바는_어느_화면에나_같은_자리에_있다(client, pat
         assert not current, path
 
 
-def test_Dashboard는_마스터에게만_보인다(app, client, two_members):
-    """이용자 화면에서는 감춥니다. 대신 홈 대화로 일을 끝냅니다.
+def test_회원도_Dashboard로_갈_수_있고_보이는_범위만_다르다(app, client, two_members):
+    """회원은 자기가 만든 건만, 마스터는 모든 회원 것을 봅니다.
 
-    감추는 것은 길(사이드바·이름 메뉴)뿐이고, 주소는 그대로 살아 있습니다.
+    길은 둘 다 열어 둡니다. 감추는 것은 길이 아니라 **남의 자료**입니다.
     (내 건만 보이는 것은 위의 권한 테스트가 지킵니다)
     """
 
     member, _, _ = two_members
     html = member.get("/").get_data(as_text=True)
-    assert 'data-tip="Dashboard"' not in html
-    assert 'href="/dashboard"' not in html
+    assert 'data-tip="Dashboard"' in html and 'href="/dashboard"' in html
+    assert "내 Dashboard" in html                 # 회원에게는 "내"
     assert member.get("/dashboard").status_code == 200
 
     master_html = client.get("/").get_data(as_text=True)
-    assert 'data-tip="Dashboard"' in master_html
-    assert "전체 Dashboard" in master_html
+    assert "전체 Dashboard" in master_html        # 마스터에게는 "전체"
 
 
 def test_환율_창은_어느_화면에서나_열린다(client):

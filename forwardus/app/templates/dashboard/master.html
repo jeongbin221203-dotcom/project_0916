@@ -34,7 +34,12 @@
     {% include "dashboard/_filters.html" %}
     {% if shipments %}
       <div class="table_scroll">
-        <table class="table">
+        <table class="table dash_table">
+          {# 칸 폭을 정해 둡니다. 안 정하면 긴 견적명 하나가 표를 화면 밖으로 늘립니다. #}
+          <colgroup>
+            <col class="c_id"><col class="c_owner"><col class="c_name"><col class="c_route">
+            <col class="c_buyer"><col class="c_date"><col class="c_date"><col class="c_status">
+          </colgroup>
           <thead>
             <tr><th>Shipment ID</th><th>작성자</th><th>견적명</th><th>Route</th><th>Buyer</th>
                 <th>ETD</th><th>ETA</th><th>상태 (바로 변경)</th></tr>
