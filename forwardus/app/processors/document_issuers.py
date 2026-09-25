@@ -17,6 +17,18 @@
   서류 이름은 서식마다 다르게 적힙니다(위생증명서 / Health Certificate / 보건증).
   그래서 이름이 정확히 같은지 보지 않고, `keywords` 가운데 하나라도 들어 있으면
   같은 서류로 봅니다.
+
+주소를 다시 확인하려면
+      python scripts/check_doc_links.py
+
+  몇 곳은 **기계가 두드리는 것을 막아** 자동 확인이 안 됩니다. 주소가 틀린 것이
+  아니라 차단당한 것입니다. (2026-09-25 확인)
+      FDA·access.fda.gov  기계 접속 차단 (abuse-detection으로 돌려보냄)
+      FCC                 HTTP 403
+      식약처·식품안전나라      연결 시간 초과
+      한국해사위험물검사원      인증서 문제 (SSLError) — 브라우저에서는 열립니다
+      관세청 UNI-PASS       기관 서버가 멈춰 있음
+  이런 곳은 사람이 브라우저로 한 번 열어 보고 고쳐야 합니다.
 """
 
 from __future__ import annotations
