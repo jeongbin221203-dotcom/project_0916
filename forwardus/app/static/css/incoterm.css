@@ -201,12 +201,33 @@ html.modal_open, html.modal_open body { overflow: hidden; }
 .incoterm_widget { margin: 14px 0 4px; padding: 14px 14px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); }
 .incoterm_widget_title { margin: 0 0 4px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .incoterm_widget_wait { margin: 0; color: var(--muted); font-size: 13px; }
-.incoterm_widget .incoterm_flow { margin-top: 10px; }
-.incoterm_widget .incoterm_area { margin-top: 12px; }
-.incoterm_widget .incoterm_pick { font-size: 21px; }
-.incoterm_widget .incoterm_card { min-height: 46px; }
-.incoterm_widget .incoterm_detail { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-.incoterm_widget .incoterm_detail_head h2 { font-size: 17px; }
-.incoterm_widget .incoterm_detail p { font-size: 13.5px; line-height: 1.7; }
+/* 대화 안에서는 한 화면에 그림·조건 칸·설명이 같이 보여야 합니다. 화면 크기는 그대로
+   두고 안쪽 것만 줄입니다. 아이콘을 줄이면 점선이 지나는 높이도 같이 내려야 합니다. */
+.incoterm_widget .incoterm_flow { margin-top: 8px; padding: 10px 10px 8px; }
+.incoterm_widget .flow_track { row-gap: 8px; }
+.incoterm_widget .flow_icon { width: 32px; height: 32px; border-radius: 10px; }
+.incoterm_widget .flow_icon svg { width: 19px; height: 19px; }
+.incoterm_widget .flow_step::before { top: 16px; }
+.incoterm_widget .flow_label { font-size: 11px; line-height: 1.25; }
+.incoterm_widget .flow_label small { font-size: 10px; margin-top: 1px; }
+.incoterm_widget .flow_no { width: 14px; height: 14px; font-size: 9px; margin-right: 3px; }
+.incoterm_widget .flow_ends span { font-size: 10.5px; padding: 1px 8px; }
+.incoterm_widget .flow_bars { margin-top: 9px; gap: 6px; }
+.incoterm_widget .flow_bar { min-height: 21px; }
+.incoterm_widget .flow_bar_title { font-size: 10.5px; margin-bottom: 2px; }
+.incoterm_widget .fbar { font-size: 10.5px; }
+.incoterm_widget .fmark span { font-size: 9.5px; }
+.incoterm_widget .flow_legend { margin-top: 7px; font-size: 10.5px; gap: 3px 10px; }
+.incoterm_widget .incoterm_area { margin-top: 9px; }
+.incoterm_widget .incoterm_grid { gap: 7px; padding-top: 4px; }
+.incoterm_widget .incoterm_pick { font-size: 18px; }
+.incoterm_widget .incoterm_card { min-height: 38px; border-radius: 11px; }
+.incoterm_widget .incoterm_detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.incoterm_widget .incoterm_detail_head h2 { font-size: 16px; }
+.incoterm_widget .incoterm_detail_sub { margin: 3px 0 8px; font-size: 12px; }
+.incoterm_widget .incoterm_detail p { font-size: 13px; line-height: 1.65; }
+.incoterm_widget .incoterm_summary { font-size: 14px; }
+.incoterm_widget .tip_facts { margin: 10px 0; padding: 9px 11px; font-size: 12.5px; }
+.incoterm_widget .incoterm_widget_title { font-size: 12.5px; }
 .incoterm_widget .duty_table { font-size: 12.5px; }
 .incoterm_widget_more { margin: 10px 0 0; font-size: 12.5px; }

@@ -70,7 +70,7 @@ def _known_titles(found: list[dict]) -> str:
     return "\n".join(lines) if lines else "- (아직 없음)"
 
 
-def _country_notes(country_code: str) -> list[dict]:
+def _country_notes(country_code: str, name: str = "") -> list[dict]:
     """도착국에서 걸리는 인증. 우리가 정리해 둔 나라별 자료에서 꺼냅니다."""
 
     from app.processors import country_export_guide
@@ -81,32 +81,86 @@ def _country_notes(country_code: str) -> list[dict]:
         note = country_export_guide.EU_NOTE
     if not note:
         return []
+    # 그 나라 조심할 점은 인증마다 따로 적혀 있지 않습니다. 목록 맨 앞 줄에 함께 붙여
+    # "이 나라는 이런 걸 조심하라"를 같이 보게 합니다.
+    watch = [row.replace("**", "") for row in note.get("watch", [])]
+    guide = note.get("knowledge", "")
     found = []
     for line in note.get("certs", []):
-        # "**NOM 강제인증** — 없으면 통관 거부" → 앞의 굵은 부분이 서류 이름입니다.
-        title = line.split("—")[0].replace("**", "").strip()
+        # "**NOM 강제인증** — 없으면 통관 거부" → 앞의 굵은 부분이 이름, 뒤가 설명입니다.
+        head, _, tail = line.partition("—")
+        title = head.replace("**", "").strip()
         if not title:
             continue
+        why = tail.replace("**", "").strip()
+        if not why:
+            why = "도착국에서 이 품목에 요구하는 인증입니다. 없으면 통관이 막힙니다."
+        papers = watch if not found else []
         found.append({"key": f"country_{code}_{len(found)}", "title": title,
-                      "documents": [], "agency": "도착국 인증기관",
-                      "why": line.replace("**", ""), "source": "country",
+                      "documents": papers,
+                      "agency": ("도착국 인증기관 — 필요 서류·발급처·기간은 "
+                                 f"상담에서 \"{name or code} 인증\"이라고 물어보세요"
+                                 if guide else "도착국 인증기관"),
+                      "why": why, "source": "country",
                       "link": "", "confidence": "high"})
     return found
 
 
+# 원산지증명서를 받으려면 함께 갖춰야 하는 증빙. 발급은 쉬워도 검증은 5년 뒤에 옵니다.
+ORIGIN_EVIDENCE = [
+    "원산지소명서 (품목별 원산지결정기준 충족 설명)",
+    "자재명세서(BOM)와 제조공정도",
+    "국내 공급자에게 받은 원산지확인서 또는 수입신고필증",
+    "원가계산서 (부가가치기준을 쓸 때)",
+]
+
+
 def _fta_origin(shipment) -> dict | None:
-    """도착국에 쓸 협정이 있으면 원산지증명서를 목록에 올립니다."""
+    """도착국에 쓸 협정이 있으면 원산지증명서를 목록에 올립니다.
+
+    협정마다 **발급 방식과 서식이 다릅니다.** 기관발급인지 자율발급인지, 어떤 서식에
+    무엇을 적는지까지 적어 둡니다. "원산지증명서 필요"라고만 적으면, 자율발급 협정에서
+    상공회의소를 찾아가거나 반대로 기관발급인데 송장에 문안만 적는 일이 생깁니다.
+    """
 
     from app.services import document_service
 
     guide = document_service.origin_certificate_guide(shipment)
     if not guide.get("available") or not guide.get("agreements"):
         return None
-    names = " · ".join(row["agreement"] for row in guide["agreements"][:2])
-    return {"key": "origin", "title": "원산지증명서 (C/O)", "documents": [],
-            "agency": "세관 또는 대한상공회의소 (협정에 따라 자율발급)",
-            "why": f"{names} 특혜관세를 받으려면 필요합니다. 협정마다 서식이 다릅니다.",
-            "source": "fta", "link": "", "confidence": "high"}
+
+    rows = guide["agreements"]
+    names = " · ".join(row["agreement"] for row in rows[:3])
+    first = rows[0]
+    paper = first.get("certificate") or {}
+    steps = first.get("steps") or {}
+    method = paper.get("method", "")
+    issuer = paper.get("issuer", "")
+
+    lines = []
+    for row in rows[:3]:
+        mark = row.get("certificate") or {}
+        bits = [f"**{row['agreement']}**"]
+        if row.get("rate") not in (None, ""):
+            bits.append(f"협정세율 {row['rate']}%")
+        if mark.get("method"):
+            bits.append(mark["method"])
+        if mark.get("issuer"):
+            bits.append(f"발급 {mark['issuer']}")
+        if mark.get("form"):
+            bits.append(f"서식: {mark['form']}")
+        if mark.get("valid_for"):
+            bits.append(f"유효기간 {mark['valid_for']}")
+        lines.append(" · ".join(bits))
+    lines.append("증빙 보관 5년 (사후 검증에 대비합니다)")
+
+    why = (f"{names} 특혜관세를 받으려면 필요합니다. "
+           + (steps.get("where") or "협정마다 서식과 발급 주체가 다릅니다."))
+    return {"key": "origin", "title": "원산지증명서 (C/O)",
+            "documents": lines + ORIGIN_EVIDENCE,
+            "agency": (f"{method} · {issuer}".strip(" ·")
+                       or "세관 또는 대한상공회의소 (협정에 따라 자율발급)"),
+            "why": why, "source": "fta", "link": "", "confidence": "high"}
 
 
 def ai_extra(items: list[dict], country_name: str, found: list[dict]) -> list[dict]:
@@ -195,7 +249,13 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
         add(origin)
 
     # 4. 도착국 인증
-    for row in _country_notes(getattr(shipment, "destination_country", "")):
+    country_code = (getattr(shipment, "destination_country", "") or "").strip().upper()
+    if not country_code:
+        # 도착국 칸이 비어 있으면 도착지 코드 앞 두 글자(UN/LOCODE)로 봅니다.
+        port = (getattr(shipment, "destination_code", "") or "").strip().upper()
+        country_code = port[:2] if len(port) >= 2 and port[:2].isalpha() else ""
+    for row in _country_notes(country_code,
+                              getattr(shipment, "destination_name", "") or ""):
         add(row)
 
     # 5. AI 탐색 — 위에서 못 잡은 것만

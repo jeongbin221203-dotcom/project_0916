@@ -9,7 +9,7 @@
       <h1>내 Dashboard</h1>
       <p class="muted">내가 만든 Shipment만 보입니다.</p>
     </div>
-    <a class="button primary" href="{{ url_for('planning.new') }}">새 운송 계획</a>
+    <a class="button primary" href="{{ url_for('planning.new') }}">운송 예상 견적</a>
   </div>
 
   <section class="kpi_grid four" aria-label="내 화물 현황">
@@ -134,8 +134,8 @@
       <p class="muted">조건에 맞는 Shipment가 없습니다.</p>
     {% else %}
       <div class="empty_state">
-        <p class="muted">운송 계획에서 스케줄을 선택하면 Shipment가 생성됩니다.</p>
-        <a class="button primary" href="{{ url_for('planning.new') }}">새 운송 계획 시작</a>
+        <p class="muted">운송 예상 견적에서 스케줄을 선택하면 Shipment가 생성됩니다.</p>
+        <a class="button primary" href="{{ url_for('planning.new') }}">운송 예상 견적 시작</a>
       </div>
     {% endif %}
   </section>

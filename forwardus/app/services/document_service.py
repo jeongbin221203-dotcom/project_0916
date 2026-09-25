@@ -697,7 +697,13 @@ def origin_certificate_guide(shipment) -> dict:
 
     cargo = shipment.cargo
     hs_code = (cargo.hs_code if cargo else "") or ""
-    country = shipment.destination_country or ""
+    # 도착국이 비어 있으면 도착지 코드에서 꺼냅니다. UN/LOCODE는 앞 두 글자가 나라입니다.
+    # (예전에 만든 건에는 나라 칸이 비어 있는 경우가 있어, 협정을 못 찾는 일이 있었습니다)
+    country = (shipment.destination_country or "").strip().upper()
+    if not country:
+        code = (shipment.destination_code or "").strip().upper()
+        if len(code) >= 2 and code[:2].isalpha():
+            country = code[:2]
     from app.processors import fta_guide
     from app.services import requirement_service
 

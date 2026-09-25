@@ -57,7 +57,7 @@ def quick_actions() -> list[dict]:
          # 달라 따로 둡니다. (/documents/blank/<kind>.pdf)
          "downloads": [{"label": "패킹리스트(PDF)", "kind": "packing_list_std"},
                        {"label": "상업송장(PDF)", "kind": "commercial_invoice"}]},
-        {"key": "planning", "icon": "📦", "label": "운송 계획",
+        {"key": "planning", "icon": "📦", "label": "운송 예상 견적",
          "placeholder": "어디서 어디로, 무엇을 언제 보내시나요",
          "hint": "출발·도착지와 화물을 알려 주시면 스케줄과 물류비를 찾아 드립니다.",
          "opener": "어디서 어디로 보내시나요? 출발지와 도착지를 알려 주세요.",
