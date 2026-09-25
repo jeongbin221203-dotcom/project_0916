@@ -200,3 +200,11 @@
 .src_state a { margin-left: 6px; font-size: 11.5px; font-weight: 800; color: var(--blue); }
 @media (max-width: 760px) { .src_row { grid-template-columns: 1fr; gap: 3px; }
   .src_state { text-align: left; } }
+
+/* 제출 전 점검 — 제대로 적힌 값은 접어 둡니다.
+   문제 있는 것만 펼쳐야 고칠 곳이 바로 보입니다. 전부 펼치면 패킹리스트만
+   20줄이라, 정작 빈 칸 한 줄이 그 사이에 묻힙니다. */
+.check_filled { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.check_filled > summary { cursor: pointer; font-size: 13px; font-weight: 800; color: var(--muted); }
+.check_filled > summary::marker { color: var(--muted); }
+.check_filled[open] > summary { margin-bottom: 10px; }

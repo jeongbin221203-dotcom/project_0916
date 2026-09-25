@@ -243,6 +243,12 @@ def center(shipment_id: str):
         documents=document_service.list_documents(shipment),
         validation=document_service.check_documents(shipment),
         origin_certificate=document_service.origin_certificate_guide(shipment),
+        # "제출 전 점검" 칸이 쓰는 값. 적은 내용·품목·빈 칸·올린 서류가 한 번에 옵니다.
+        # 관세사 전달용 화면이 쓰던 것과 **같은 함수**입니다. 두 화면이 다른 것을
+        # 세면 어느 쪽을 믿어야 할지 알 수 없습니다.
+        # (requirement_service.requirements_for()는 부르지 않습니다. 그쪽은 HS부호마다
+        #  관세청을 때려서, 서류 센터를 열 때마다 기관을 부르게 됩니다)
+        sheet=customs_filing_service.filing_sheet(shipment),
     )
 
 

@@ -132,43 +132,7 @@
     {% else %}
       <div class="upload_list">
         {% for doc in check.uploads %}
-          <article class="upload_card status_{{ doc.review_status }}">
-            <div class="row_between wrap">
-              <div>
-                <b>{{ doc.filename }}</b>
-                <span class="muted small">{{ doc.requirement_title }} ·
-                  {{ '{:,.0f}'.format(doc.size_bytes / 1024) }} KB ·
-                  {{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</span>
-              </div>
-              <span class="badge review_{{ doc.review_status }}">{{ doc.review_label }}</span>
-            </div>
-
-            {% if doc.review_summary %}
-              <p class="upload_summary">{{ doc.review_summary }}</p>
-            {% endif %}
-
-            {% if doc.review_findings %}
-              <ul class="finding_list">
-                {% for finding in doc.review_findings %}
-                  <li class="verdict_{{ finding.verdict }}">
-                    <b>{{ finding.label }}</b>
-                    <span>{{ finding.detail }}</span>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-
-            <div class="button_row">
-              <form method="post"
-                    action="{{ url_for('document.analyze_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
-                <button class="button small ghost">다시 분석</button>
-              </form>
-              <form method="post"
-                    action="{{ url_for('document.delete_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
-                <button class="button small ghost danger">삭제</button>
-              </form>
-            </div>
-          </article>
+          {% include "document/_upload_card.html" %}
         {% endfor %}
       </div>
     {% endif %}

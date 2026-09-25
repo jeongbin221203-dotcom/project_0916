@@ -57,34 +57,108 @@
       다시 검증해야 확정됩니다.</p>
   </section>
 
+  {# ── 제출 전 점검 ───────────────────────────────────────────────
+     관세사에게 넘기기 전에 봐야 하는 셋을 한자리에 모읍니다.
+       ① 채워야 할 것   적은 내용의 빈 칸 + 서류의 빈 필수칸
+       ② 서로 다른 값   서류끼리·기준값과 어긋난 것
+       ③ 올린 서류      증빙을 올렸는지
+     예전에는 ①이 [관세사 전달용] 화면에, ③이 [수출요건 확인] 화면에 있어
+     화면을 두 번 떠났다 와야 "보내도 되는가"를 알 수 있었습니다.
+     그 사이에 하나를 빠뜨리면 통관에서 되돌아옵니다. (2026-09-26)
+
+     문제 있는 것만 펼쳐 둡니다. 멀쩡한 값까지 펼치면 패킹리스트만 20줄이라
+     정작 고쳐야 할 줄이 묻힙니다. #}
   <section class="card" id="validation">
-    <h2>Document Validation</h2>
-    {% if not validation %}
-      <p class="muted">작성된 문서가 없습니다.</p>
-    {% elif validation.status == 'passed' %}
-      <div class="alert ok">✓ 검사한 {{ validation.checked_documents|length }}개 문서의 {{ validation.checked_fields|join(', ') }} 값이
-        서로 일치하고, Shipment 기준값과도 같습니다.</div>
+    {%- set findings = validation.findings if validation else [] -%}
+    {%- set blanks = findings | selectattr("kind", "equalto", "missing") | list -%}
+    {%- set clashes = findings | rejectattr("kind", "equalto", "missing") | list -%}
+    {%- set papers = sheet.papers if sheet else [] -%}
+    {%- set todo = (sheet.missing | length if sheet else 0) + (blanks | length) -%}
+
+    <div class="row_between wrap">
+      <h2>제출 전 점검</h2>
+      <a class="button ghost" href="{{ url_for('document.customs_filing', shipment_id=shipment.shipment_id) }}">
+        관세사 전달용 신고자료 →</a>
+    </div>
+
+    {% if not validation and not todo %}
+      <p class="muted">작성된 문서가 없습니다. 위의 <b>문서 자동 작성</b>을 먼저 눌러 주세요.</p>
+    {% elif not todo and not clashes %}
+      <div class="alert ok">✓ 채워야 할 칸도, 서로 다른 값도 없습니다.
+        {% if papers %}증빙 {{ papers|length }}건을 올려 두셨습니다.{% endif %}
+        관세사에게 넘기셔도 됩니다.</div>
     {% else %}
-      <div class="alert warn">{{ validation.findings|length }}건을 확인해 주세요.</div>
-      <table class="table">
-        <thead><tr><th>문서</th><th>항목</th><th>확인할 내용</th><th>적힌 값</th><th>맞대어 본 값</th></tr></thead>
-        <tbody>
-          {% for f in validation.findings %}
-            <tr>
-              <td><a href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=f.document, edit=1) }}">{{ f.document_label }}</a></td>
-              <td>{{ f.field_label }}</td>
-              <td>
-                {{ f.message }}
-                <span class="badge muted_badge">{{ '서류끼리' if f.kind == 'cross' else '기준값' }}</span>
-              </td>
-              <td class="mono">{{ f.actual if f.actual is not none else '(비어 있음)' }}</td>
-              <td class="mono">{{ f.expected if f.expected is not none else '—' }}</td>
-            </tr>
+
+      {# ① 채워야 할 것 #}
+      {% if todo %}
+        <h3 class="filing_section_title">① 채워야 할 것 {{ todo }}</h3>
+        <div class="filing_rows">
+          {% for label in sheet.missing %}
+            <div class="blank"><dt>신고 자료</dt><dd>{{ label }}</dd></div>
           {% endfor %}
-        </tbody>
-      </table>
-      <p class="muted small">“기준값”은 Shipment에 저장된 값과 맞댄 것이고,
-        “서류끼리”는 서류들끼리 맞댄 것입니다. Shipment에 값이 없어도 서류끼리는 같아야 합니다.</p>
+          {% for f in blanks %}
+            <div class="blank">
+              <dt>{{ f.document_label }}</dt>
+              <dd><a href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=f.document, edit=1) }}">{{ f.field_label }}</a>
+                <small>비어 있습니다</small></dd>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {# ② 서로 다른 값 #}
+      {% if clashes %}
+        <h3 class="filing_section_title">② 서로 다른 값 {{ clashes|length }}</h3>
+        <table class="table">
+          <thead><tr><th>문서</th><th>항목</th><th>확인할 내용</th><th>적힌 값</th><th>맞대어 본 값</th></tr></thead>
+          <tbody>
+            {% for f in clashes %}
+              <tr>
+                <td><a href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=f.document, edit=1) }}">{{ f.document_label }}</a></td>
+                <td>{{ f.field_label }}</td>
+                <td>{{ f.message }}
+                  {# 세 가지를 갈라 적습니다. 예전에는 cross가 아니면 전부 "기준값"이라
+                     찍어서, 빈 칸까지 "기준값과 다름"으로 나왔습니다. 고치는 방법이 다릅니다. #}
+                  <span class="badge muted_badge">{{ '서류끼리' if f.kind == 'cross' else '기준값' }}</span></td>
+                <td class="mono">{{ f.actual if f.actual is not none else '(비어 있음)' }}</td>
+                <td class="mono">{{ f.expected if f.expected is not none else '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="muted small">“기준값”은 Shipment에 저장된 값과 맞댄 것이고,
+          “서류끼리”는 서류들끼리 맞댄 것입니다. Shipment에 값이 없어도 서류끼리는 같아야 합니다.</p>
+      {% endif %}
+    {% endif %}
+
+    {# ③ 올린 서류 — 문제가 없어도 몇 건인지는 늘 보여 줍니다. #}
+    <h3 class="filing_section_title">③ 올린 증빙 서류 {{ papers|length }}건</h3>
+    {% if not papers %}
+      <p class="muted small">아직 올린 것이 없습니다.
+        <a href="{{ url_for('document.requirements', shipment_id=shipment.shipment_id) }}">수출요건 확인</a>에서
+        이 품목에 걸리는 서류를 보고 올릴 수 있습니다.</p>
+    {% else %}
+      <div class="filing_papers">
+        {% for paper in papers %}
+          <div>📎 <b>{{ paper.filename }}</b>
+            <span class="muted small">{{ paper.note or paper.key }} · {{ paper.status }}</span></div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {# 제대로 적힌 값은 접어 둡니다. 확인하고 싶을 때만 펼칩니다. #}
+    {% if sheet %}
+      <details class="check_filled">
+        <summary>제대로 적힌 값 보기</summary>
+        {% for section in sheet.sections %}
+          <h3 class="filing_section_title">{{ section.title }}</h3>
+          <div class="filing_rows">
+            {% for row in section.rows if row.value %}
+              <div><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </details>
     {% endif %}
   </section>
 
@@ -180,35 +254,7 @@
       {% if origin_certificate.uploads %}
         <div class="upload_list">
           {% for doc in origin_certificate.uploads %}
-            <article class="upload_card status_{{ doc.review_status }}">
-              <div class="row_between wrap">
-                <div>
-                  <b>{{ doc.filename }}</b>
-                  <span class="muted small">{{ doc.agreement or '협정 미지정' }} ·
-                    {{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</span>
-                </div>
-                <span class="badge review_{{ doc.review_status }}">{{ doc.review_label }}</span>
-              </div>
-              {% if doc.review_summary %}<p class="upload_summary">{{ doc.review_summary }}</p>{% endif %}
-              {% if doc.review_findings %}
-                <ul class="finding_list">
-                  {% for finding in doc.review_findings %}
-                    <li class="verdict_{{ finding.verdict }}">
-                      <b>{{ finding.label }}</b><span>{{ finding.detail }}</span></li>
-                  {% endfor %}
-                </ul>
-              {% endif %}
-              <div class="button_row">
-                <form method="post"
-                      action="{{ url_for('document.analyze_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
-                  <button class="button small ghost">다시 분석</button>
-                </form>
-                <form method="post"
-                      action="{{ url_for('document.delete_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
-                  <button class="button small ghost danger">삭제</button>
-                </form>
-              </div>
-            </article>
+            {% include "document/_upload_card.html" %}
           {% endfor %}
         </div>
       {% endif %}
