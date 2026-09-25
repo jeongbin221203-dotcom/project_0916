@@ -247,6 +247,49 @@ def _faq_context(hits) -> str:
             "자료에 없는 내용은 지어내지 말고 확인처를 안내하세요.\n\n" + "\n\n".join(blocks))
 
 
+def _write_answer(bundle: dict, text: str, history: list | None, *,
+                  brief: bool = False, memory: str = "") -> dict:
+    """체인의 마지막 단계. 앞 단계가 모아 둔 근거로 답을 씁니다.
+
+    bundle에는 체인이 지나온 것이 다 들어 있습니다(plan·documents·evidence).
+    여기서 하는 일은 그걸 AI가 읽을 글로 바꿔 ai_client에 넘기는 것뿐입니다.
+    """
+
+    plan, evidence, route = bundle["plan"], bundle["evidence"], bundle["plan"]["route"]
+    faq_note = _faq_context(plan["candidates"]) if plan["candidates"] and route in (
+        "faq_context", "external_lookup") else ""
+    evidence_note = _evidence_note(evidence) if evidence else ""
+
+    messages = [{"role": "system", "content": BRIEF_SYSTEM_PROMPT if brief else SYSTEM_PROMPT},
+                {"role": "system", "content": _incoterms_reference()}]
+    if faq_note:
+        messages.append({"role": "system", "content": faq_note})
+    if evidence_note:
+        messages.append({"role": "system", "content": evidence_note})
+    # 오래된 대화는 요약으로 들고 옵니다. 원문 전체를 보내면 토큰만 쓰고 답이 흐려집니다.
+    if memory.strip():
+        messages.append({"role": "system",
+                         "content": "지난 상담 요약입니다. 이어서 답하세요.\n"
+                                    + _hide_bank(memory)})
+    for turn in (history or [])[-MAX_HISTORY:]:
+        role = turn.get("role")
+        content = _hide_bank(str(turn.get("content") or "").strip()[:MAX_QUESTION])
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": text})
+
+    if brief:
+        return ai_client.chat(messages, max_tokens=BRIEF_ANSWER_TOKENS)
+    # 메인 '무역 상담'만 데이터 도구를 씁니다. 오른쪽 아래 짧은 상담 창은 표를 그리지 않습니다.
+    from app.services import trade_insight_service
+
+    messages.insert(2, {"role": "system", "content": _today_note()})
+    return ai_client.chat(messages, max_tokens=MAX_ANSWER_TOKENS,
+                          tools=trade_insight_service.TOOLS,
+                          run_tool=trade_insight_service.run_tool,
+                          force_tool=wants_data(text))
+
+
 def ask(question: str, history: list | None = None, *, brief: bool = False,
         memory: str = "") -> dict:
     """질문 하나에 답합니다. history는 [{role, content}] 형태입니다.
@@ -278,7 +321,7 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     normalized = faq_index.normalize(text)
     version = faq_cache.knowledge_version()
     may_cache = faq_cache.cacheable(text, history, memory)
-    conditions = consult_chain.read_conditions(text, history)
+    conditions = consult_chain.conditions_for(text, history)
     fresh = consult_chain.needs_fresh_lookup(text)
     # 최신 확인이 필요한 질문은 캐시를 건너뜁니다. 오래된 답이 규정 확인을 가로막으면 안 됩니다.
     if may_cache and not fresh:
@@ -286,11 +329,19 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
         if cached is not None:
             return {"success": True, "source": "cache", "data": dict(cached)}
 
-    outcome = consult_chain.run(text, history)
+    # 답을 쓰는 일은 체인의 마지막 단계에서 일어납니다. 어떤 말투로·얼마나 길게·어떤
+    # 도구를 쓸지는 화면마다 달라서 그 부분만 여기서 만들어 체인에 넘깁니다.
+    def write(bundle: dict) -> dict:
+        return _write_answer(bundle, text, history, brief=brief, memory=memory)
+
+    outcome = consult_chain.run(text, history, write=write)
     plan, evidence = outcome["plan"], outcome["evidence"]
     route = plan["route"]
     trace = {"route": route, "retrieval_ms": outcome["retrieval_ms"],
+             "stages": outcome.get("stages", {}), "intent": plan.get("intent", ""),
+             "core_question": plan.get("core_question", ""),
              "conditions": conditions, "needs_fresh": fresh,
+             "langchain": outcome.get("langchain", {}),
              "evidence": outcome["evidence_summary"], "reasons": plan["reasons"]}
 
     if route == "faq_direct":
@@ -315,41 +366,11 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
                 "missing": missing}
         return {"success": True, "source": "clarification", "data": data}
 
-    faq_note = _faq_context(plan["candidates"]) if plan["candidates"] and route in (
-        "faq_context", "external_lookup") else ""
-    evidence_note = _evidence_note(evidence) if evidence else ""
-
-    messages = [{"role": "system", "content": BRIEF_SYSTEM_PROMPT if brief else SYSTEM_PROMPT},
-                {"role": "system", "content": _incoterms_reference()}]
-    if faq_note:
-        messages.append({"role": "system", "content": faq_note})
-    if evidence_note:
-        messages.append({"role": "system", "content": evidence_note})
-    # 오래된 대화는 요약으로 들고 옵니다. 원문 전체를 보내면 토큰만 쓰고 답이 흐려집니다.
-    if memory.strip():
-        messages.append({"role": "system",
-                         "content": "지난 상담 요약입니다. 이어서 답하세요.\n"
-                                    + _hide_bank(memory)})
-    for turn in (history or [])[-MAX_HISTORY:]:
-        role = turn.get("role")
-        content = _hide_bank(str(turn.get("content") or "").strip()[:MAX_QUESTION])
-        if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": content})
-    messages.append({"role": "user", "content": text})
-
-    if brief:
-        result = ai_client.chat(messages, max_tokens=BRIEF_ANSWER_TOKENS)
-    else:
-        # 메인 '무역 상담'만 데이터 도구를 씁니다. 오른쪽 아래 짧은 상담 창은 표를 그리지 않습니다.
-        from app.services import trade_insight_service
-
-        messages.insert(2, {"role": "system", "content": _today_note()})
-        result = ai_client.chat(messages, max_tokens=MAX_ANSWER_TOKENS,
-                                tools=trade_insight_service.TOOLS,
-                                run_tool=trade_insight_service.run_tool,
-                                force_tool=wants_data(text))
+    result = outcome["answer"] or {"success": False, "message": "답을 만들지 못했습니다.",
+                                   "source": "internal"}
     if not result["success"]:
-        return {"success": False, "message": result["message"], "source": result["source"]}
+        return {"success": False, "message": result["message"], "source": result["source"],
+                "trace": trace}
     data = {"answer": result["data"]}
     # 어떤 공공데이터로 답했는지. 화면이 답 아래에 근거를 표시합니다.
     used = [label for call in result.get("tools_used") or [] if call.get("success")

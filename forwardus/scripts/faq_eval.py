@@ -35,7 +35,8 @@ from app.services import faq_cache, faq_index, support_chat_service  # noqa: E40
 
 EVAL_DIR = ROOT / "data" / "faq" / "eval"
 # 어떤 평가 파일을 쓸지. 기본은 150문항(회귀), --set final 이면 최종 독립 60문항.
-EVAL_SETS = {"regression": "eval_*.jsonl", "final": "final_v2.jsonl"}
+EVAL_SETS = {"regression": "eval_*.jsonl", "final": "final_v2.jsonl",
+             "final3": "final_v3.jsonl"}
 RESULT_DIR = EVAL_DIR / "results"
 STUB_ANSWER = ("(stub) 질문을 받았습니다. 조건에 따라 달라질 수 있으니 관세사·세관에 확인하세요.")
 
@@ -208,6 +209,7 @@ def summarize(result: dict) -> dict:
 
     # 평가 파일마다 경로 이름이 조금 다릅니다(옛 세트: ask_more/live_lookup/out_of_scope).
     ALIAS = {"llm": {"llm", "faq_context", "general_guidance", "out_of_scope"},
+             "faq_direct": {"faq_direct"},
              "faq_context": {"llm", "faq_context", "general_guidance"},
              "general_guidance": {"llm", "general_guidance", "out_of_scope"},
              "clarification": {"clarification", "ask_more"},

@@ -39,16 +39,23 @@ _store: "OrderedDict[str, dict]" = OrderedDict()
 _stats = {"hit": 0, "miss": 0, "store": 0, "skip": 0}
 
 
-def knowledge_version() -> str:
-    """캐시 열쇠에 들어가는 지식 버전. FAQ 내용(kb_version) + 승인 상태(approval_version).
+# 답을 만드는 방식이 바뀌면 예전 답도 버려야 합니다. 프롬프트·모델·도구를 고치면 올리세요.
+PROMPT_VERSION = "3"
 
-    승인을 취소하면 approval_version이 올라가고, 그 승인으로 만들어 둔 답은 저절로 버려집니다.
+
+def knowledge_version() -> str:
+    """캐시 열쇠에 들어가는 버전.
+
+    FAQ 내용(kb_version) + 승인 상태(approval_version) + 답변 설정(모델·프롬프트).
+    셋 중 하나만 바뀌어도 예전 답은 쓰이지 않습니다.
     """
 
+    from app.collectors import ai_client
     from app.services import faq_index
 
     meta = faq_index.load().get("meta", {})
-    return f"{meta.get('kb_version', '0')}.{meta.get('approval_version', '0')}"
+    return (f"{meta.get('kb_version', '0')}.{meta.get('approval_version', '0')}"
+            f".{PROMPT_VERSION}.{ai_client.MODEL}")
 
 
 def _key(question_norm: str, brief: bool, kb_version: str, conditions: dict | None = None) -> str:

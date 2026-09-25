@@ -45,6 +45,7 @@ OUT_OF_SCOPE = [
 
 
 PARAPHRASE_PATH = faq_index.DATA_DIR / "tuning" / "paraphrases.jsonl"
+TUNING_V2_PATH = faq_index.DATA_DIR / "tuning" / "tuning_v2.jsonl"
 
 
 def tuning_pairs() -> list[tuple[str, str]]:
@@ -60,6 +61,16 @@ def tuning_pairs() -> list[tuple[str, str]]:
     for row in rows:
         for variant in row.get("question_variants") or []:
             pairs.append((variant, row["id"]))
+    # 긴 자연어·오탈자·대조쌍이 들어 있는 튜닝 세트. 실제 사용자 말투에 가깝습니다.
+    if TUNING_V2_PATH.exists():
+        for line in TUNING_V2_PATH.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            # 바로 답해도 되는 질문만 양성으로 씁니다. (조건이 얽힌 것은 원래 AI로 가야 합니다)
+            if item.get("gold_faq_id") in known and item.get("expect_route") in (
+                    "faq_direct", "faq_context"):
+                pairs.append((item["question"], item["gold_faq_id"]))
     if PARAPHRASE_PATH.exists():
         for line in PARAPHRASE_PATH.read_text(encoding="utf-8").splitlines():
             if not line.strip():
@@ -142,12 +153,28 @@ def evaluate(limits: dict, pairs, negatives) -> dict:
             "false_direct_rate": false_direct / max(1, len(negatives))}
 
 
+def extra_negatives() -> list[str]:
+    """지식베이스에 답이 없는 질문. 여기에 FAQ를 들이대면 안 됩니다."""
+
+    rows = []
+    if TUNING_V2_PATH.exists():
+        for line in TUNING_V2_PATH.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            if item.get("kind") == "no_answer" and not item.get("gold_faq_id"):
+                rows.append(item["question"])
+    return rows
+
+
 def main() -> int:
     pairs = tuning_pairs()
     if not pairs:
         print("FAQ가 없습니다. 먼저 python -m scripts.faq_build 를 돌리세요.")
         return 1
-    print(f"튜닝 표본: 양성 {len(pairs)}개(유사질문) · 음성 {len(OUT_OF_SCOPE)}개")
+    negatives = OUT_OF_SCOPE + extra_negatives()
+    print(f"튜닝 표본: 양성 {len(pairs)}개 · 음성 {len(negatives)}개 "
+          f"(범위 밖 {len(OUT_OF_SCOPE)} + 지식베이스에 없음 {len(extra_negatives())})")
 
     best = None
     for direct in [round(0.30 + 0.02 * i, 2) for i in range(26)]:          # 0.30~0.80
@@ -158,7 +185,7 @@ def main() -> int:
                 limits = {"direct": direct, "direct_high_risk": round(direct + extra, 2),
                           "margin": margin, "coverage": coverage, "similarity": similarity,
                           "context": 0.25}
-                score = evaluate(limits, pairs, OUT_OF_SCOPE)
+                score = evaluate(limits, pairs, negatives)
                 if score["direct_wrong"] > MAX_WRONG:
                     continue
                 if score["false_direct_out_of_scope"] > MAX_FALSE_DIRECT:
@@ -177,7 +204,7 @@ def main() -> int:
     for coverage in (0.15, 0.20, 0.25, 0.30, 0.35, 0.40):
         for similarity in (0.35, 0.40, 0.45, 0.50, 0.55):
             trial = {**limits, "context_coverage": coverage, "context_similarity": similarity}
-            outcome = evaluate_context(trial, pairs, OUT_OF_SCOPE)
+            outcome = evaluate_context(trial, pairs, negatives)
             # 근거를 붙이는 것 자체는 위험하지 않습니다(AI가 걸러 답합니다). 다만 범위 밖
             # 질문에 자꾸 붙으면 토큰만 씁니다. 20건 중 2건까지만 봐줍니다.
             if outcome["attached_out_of_scope"] > MAX_CONTEXT_FALSE:
@@ -200,7 +227,7 @@ def main() -> int:
         return 0
     meta = json.loads(META_PATH.read_text(encoding="utf-8"))
     meta["thresholds"] = limits
-    meta["tuning"] = {"positives": len(pairs), "negatives": len(OUT_OF_SCOPE),
+    meta["tuning"] = {"positives": len(pairs), "negatives": len(negatives),
                       "direct_right": round(score["direct_right"], 4),
                       "direct_wrong": round(score["direct_wrong"], 4),
                       "false_direct_out_of_scope": score["false_direct_out_of_scope"],

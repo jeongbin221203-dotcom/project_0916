@@ -344,6 +344,12 @@ def search(question: str, k: int = 5) -> tuple:
 
 
 def decide(question: str, k: int = 5) -> dict:
+    """이 질문을 어떻게 다룰지 정합니다. (검색까지 여기서 합니다)"""
+
+    return decide_with_hits(question, search(question, k))
+
+
+def decide_with_hits(question: str, hits: tuple) -> dict:
     """이 질문을 어떻게 다룰지 정합니다.
 
     route
@@ -352,7 +358,6 @@ def decide(question: str, k: int = 5) -> dict:
       llm         FAQ를 붙이지 않고 평소대로 AI에게 넘깁니다.
     """
 
-    hits = search(question, k)
     limits = thresholds()
     result = {"route": "llm", "faq": None, "score": 0.0, "coverage": 0.0, "similarity": 0.0,
               "candidates": hits, "reasons": [], "kb_version": kb_version()}

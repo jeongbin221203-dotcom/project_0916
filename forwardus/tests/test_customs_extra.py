@@ -37,29 +37,46 @@ def keyed(app, monkeypatch):
     return app
 
 
-def test_export_requirement_laws_reads_the_customs_answer(keyed):
-    """세관장확인대상은 응답 태그가 대문자로 시작합니다. (CcctLworCdQryRsltVo)"""
+def test_export_requirement_laws_reads_the_customs_answer(keyed, monkeypatch):
+    """세관장확인대상은 공공데이터포털에서 옵니다. (UNI-PASS가 아니라 apis.data.go.kr)
 
-    xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
-    <CcctLworCdQryRtnVo><ntceInfo/><tCnt>1</tCnt>
-      <CcctLworCdQryRsltVo>
-        <hsSgn>3307902000</hsSgn><reqApreIttCd>243</reqApreIttCd><aplyEndDt/>
-        <dcerCfrmLworNm>화장품법</dcerCfrmLworNm>
-        <reqCfrmIstmNm>표준통관예정보고서(화장품)</reqCfrmIstmNm>
-        <aplyStrtDt>20140101</aplyStrtDt>
+    응답은 <items><item> 모양이고, 적용시작일은 YYYYMMDD로 옵니다.
+    2026-09-24에 실제 응답으로 확인한 모양입니다.
+    """
+
+    xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <response><header><resultCode>00</resultCode><resultMsg>정상서비스.</resultMsg></header>
+      <body><items><item>
+        <aplyStrtDt>20140101</aplyStrtDt><bfhnAffcRtmTpcd>2</bfhnAffcRtmTpcd>
+        <dcerCfrmLworCd>15</dcerCfrmLworCd><dcerCfrmLworNm>화장품법</dcerCfrmLworNm>
+        <hsSgn>3307902000</hsSgn><reqApreIttCd>243</reqApreIttCd>
         <reqApreIttNm>한국의약품수출입협회</reqApreIttNm>
-        <dcerCrmLworCd/>
-      </CcctLworCdQryRsltVo></CcctLworCdQryRtnVo>"""
-    with patch("httpx.request", side_effect=_reply(xml)):
-        result = extra.export_requirement_laws("3307902000")
+        <reqCfrmIstmNm>표준통관예정보고서(화장품)</reqCfrmIstmNm>
+      </item></items></body></response>"""
+
+    monkeypatch.setattr(extra, "get_config",
+                        lambda name, default="": "test-key"
+                        if name == "CUSTOMS_CONFIRM_API_KEY" else default)
+    seen = {}
+
+    def fake_request(method, url, **kwargs):
+        seen["url"] = url
+        seen["params"] = kwargs.get("params") or {}
+        return {"success": True, "source": "api", "data": xml}
+
+    monkeypatch.setattr(extra, "request_text", fake_request)
+    result = extra.export_requirement_laws("3307902000")
 
     assert result["success"] and result["source"] == "api"
+    assert seen["url"] == extra.CUSTOMS_CONFIRM_URL
+    assert seen["params"]["hsSgn"] == "3307902000" and seen["params"]["imexTpcd"] == "1"
     law = result["data"][0]
     assert law["law_name"] == "화장품법"
     assert law["agency"] == "한국의약품수출입협회"
     assert law["document"] == "표준통관예정보고서(화장품)"
     assert law["start_date"] == "2014-01-01"
-    assert law["end_date"] == ""          # 빈 칸은 빈 채로 둡니다.
+    assert law["timing_code"] == "2"
+    assert law["end_date"] == ""
 
 
 def test_clearance_code_is_read_from_the_business_number(keyed):

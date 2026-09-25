@@ -96,9 +96,60 @@ def test_최신_확인이_필요한_질문은_FAQ로_건너뛰지_않는다(kb):
 
 
 def test_조건이_모자라면_되묻는다(kb):
+    """영향이 큰 것부터 묻습니다. HSK 10자리를 먼저 요구하지 않습니다.
+
+    품명도 모르는 사람에게 10자리 세번부터 물으면 대화가 거기서 멈춥니다.
+    """
+
     plan = consult_chain.decide("우리 제품 수출요건이 궁금한데 올해 규정이 어떻게 되나요")
     assert plan["route"] == "clarification"
-    assert any("HSK" in item or "HS" in item for item in plan["missing"])
+    assert plan["intent"] == "regulation"
+    assert any("나라" in item for item in plan["missing"])
+    assert len(plan["missing"]) <= 3
+
+
+def test_의도마다_묻는_것이_다르다(kb):
+    """규정·운송·결제·서류는 필요한 조건이 다릅니다. 같은 것을 묻지 않습니다."""
+
+    shipping = consult_chain.decide("운송은 뭐로 하는 게 제일 나을까요?")
+    assert shipping["route"] == "clarification" and shipping["intent"] == "shipping_quote"
+    assert any("출발지" in item for item in shipping["missing"])
+
+    payment = consult_chain.decide("수출하고 대금을 못 받고 있는데 어떻게 해야 하나요?")
+    assert payment["route"] == "clarification" and payment["intent"] == "payment_risk"
+    assert any("결제 조건" in item for item in payment["missing"])
+
+
+def test_용어_뜻을_묻는_질문에는_되묻지_않는다(kb):
+    plan = consult_chain.decide("FOB와 CIF 차이가 뭔가요")
+    assert plan["intent"] == "term_definition"
+    assert plan["route"] != "clarification" and plan["missing"] == []
+
+
+def test_이미_조회할_수_있으면_되묻지_않는다(kb):
+    """HSK 10자리가 있으면 바로 조회합니다. 있는 것을 또 묻지 않습니다."""
+
+    plan = consult_chain.decide("HS 3004909900 의약품 수입 요건 알려주세요")
+    assert plan["route"] == "external_lookup" and plan["missing"] == []
+
+
+def test_수입국_규정은_되묻지_않고_확인처를_안내한다(kb):
+    """상대국 규정은 우리 조회로 답할 수 없습니다. 조건을 더 받아도 마찬가지입니다."""
+
+    plan = consult_chain.decide(
+        "화장품(HS 3304.99)을 중국에 수출하려는데 지금 위생허가가 어떻게 되나요")
+    assert plan["route"] == "general_guidance"
+    assert any("창구" in reason for reason in plan["reasons"])
+
+
+def test_수출_수입_방향을_질문에서_읽는다(kb):
+    """같은 HS라도 수출 요건과 수입 요건이 다릅니다. 방향을 틀리면 빈 결과가 나와
+    '걸리는 법령 없음'으로 오해하게 됩니다. (의약품은 수입만 걸립니다)"""
+
+    assert consult_chain._direction_of("의약품 수입 통관 세관장확인대상인가요") == "2"
+    assert consult_chain._direction_of("인삼 수출할 때 요건 있나요") == "1"
+    plan = consult_chain.decide("HS 3004909900 의약품 수입할 때 요건이 뭔가요")
+    assert plan["tool_calls"][0]["args"]["direction"] == "2"
 
 
 def test_HS6만으로는_한국_수출요건을_조회하지_않는다(kb):
@@ -113,7 +164,7 @@ def test_조회_결과가_비어도_규제_없음이_아니다(kb, monkeypatch):
     from app.collectors import customs_extra_client
 
     monkeypatch.setattr(customs_extra_client, "export_requirement_laws",
-                        lambda hs: {"success": True, "source": "api", "data": []})
+                        lambda hs, direction="1": {"success": True, "source": "api", "data": []})
     evidence = consult_tools.korea_export_requirements("3304991000")
     assert evidence["status"] == consult_tools.NOT_FOUND
     # 비어 있음을 '규제 없음'으로 읽지 말라고 못 박아 둡니다.
@@ -121,13 +172,71 @@ def test_조회_결과가_비어도_규제_없음이_아니다(kb, monkeypatch):
     assert consult_tools.summarize([evidence])["may_conclude"] is False
 
 
+def test_세관장확인대상은_공공데이터포털_주소와_파라미터로_부른다(kb, monkeypatch):
+    """주소·파라미터 이름이 바뀌면 조용히 빈 결과가 됩니다. 여기서 못을 박아 둡니다.
+
+    2026-09-24에 실제 응답을 확인한 조합입니다:
+      GET apis.data.go.kr/1220000/retrieveCcctLworCd/getRetrieveCcctLworCd
+          serviceKey · hsSgn(10자리) · imexTpcd(1 수출 · 2 수입)
+    """
+
+    from app.collectors import customs_extra_client
+
+    seen = {}
+
+    def fake_request(method, url, **kwargs):
+        seen["url"] = url
+        seen["params"] = kwargs.get("params") or {}
+        return {"success": True, "source": "api", "data":
+                "<response><header><resultCode>00</resultCode></header><body><items>"
+                "<item><hsSgn>3004909900</hsSgn><dcerCfrmLworNm>약사법</dcerCfrmLworNm>"
+                "<reqApreIttNm>한국의약품수출입협회</reqApreIttNm>"
+                "<reqCfrmIstmNm>표준통관예정보고서(의약품등)</reqCfrmIstmNm>"
+                "<bfhnAffcRtmTpcd>2</bfhnAffcRtmTpcd>"
+                "<aplyStrtDt>20200406</aplyStrtDt></item></items></body></response>"}
+
+    monkeypatch.setattr(customs_extra_client, "request_text", fake_request)
+    monkeypatch.setattr(customs_extra_client, "get_config",
+                        lambda name, default="": "test-key" if name == "CUSTOMS_CONFIRM_API_KEY"
+                        else default)
+
+    result = customs_extra_client.export_requirement_laws("3004909900", "2")
+
+    assert seen["url"] == customs_extra_client.CUSTOMS_CONFIRM_URL
+    assert "apis.data.go.kr/1220000/retrieveCcctLworCd/getRetrieveCcctLworCd" in seen["url"]
+    assert seen["params"]["hsSgn"] == "3004909900"
+    assert seen["params"]["imexTpcd"] == "2"        # imexTp가 아니라 imexTpcd 입니다
+    assert result["success"]
+    row = result["data"][0]
+    assert row["law_name"] == "약사법" and row["agency"] == "한국의약품수출입협회"
+    assert row["document"] == "표준통관예정보고서(의약품등)"
+    assert row["start_date"] == "2020-04-06"        # YYYYMMDD → ISO
+    assert row["timing_code"] == "2"                # 1 사전 · 2 사후 · 3 실시간
+    assert row["end_date"] == ""                    # 이 서비스는 종료일을 주지 않습니다
+
+
+def test_포털이_200으로_실패를_알려도_성공으로_넘기지_않는다(kb, monkeypatch):
+    from app.collectors import customs_extra_client
+
+    monkeypatch.setattr(customs_extra_client, "request_text",
+                        lambda method, url, **kw: {"success": True, "source": "api", "data":
+                                                   "<response><header><resultCode>99</resultCode>"
+                                                   "<resultMsg>필수 요청변수가 누락되었습니다.</resultMsg>"
+                                                   "</header><body/></response>"})
+    monkeypatch.setattr(customs_extra_client, "get_config",
+                        lambda name, default="": "test-key" if name == "CUSTOMS_CONFIRM_API_KEY"
+                        else default)
+    result = customs_extra_client.export_requirement_laws("3004909900")
+    assert result["success"] is False
+
+
 def test_인증_실패는_미지원으로_표시하고_단정하지_않는다(kb, monkeypatch):
     from app.collectors import customs_extra_client
 
     monkeypatch.setattr(customs_extra_client, "export_requirement_laws",
-                        lambda hs: {"success": False, "source": "api",
-                                    "error_code": "API_AUTH_FAILED",
-                                    "message": "요청하신 API와 인증키상의 API가 불일치합니다."})
+                        lambda hs, direction="1": {"success": False, "source": "api",
+                                                 "error_code": "API_AUTH_FAILED",
+                                                 "message": "인증키가 없습니다."})
     evidence = consult_tools.korea_export_requirements("3304991000")
     assert evidence["status"] == consult_tools.UNSUPPORTED
     assert consult_tools.summarize([evidence])["may_conclude"] is False
@@ -154,8 +263,9 @@ def test_바깥_문서의_지시는_규칙이_되지_않는다(kb, monkeypatch):
 
     # 조회는 인증 실패로 흉내 냅니다. (시험에서 바깥을 부르지 않습니다)
     monkeypatch.setattr(customs_extra_client, "export_requirement_laws",
-                        lambda hs: {"success": False, "source": "api",
-                                    "error_code": "API_AUTH_FAILED", "message": "인증키 불일치"})
+                        lambda hs, direction="1": {"success": False, "source": "api",
+                                                 "error_code": "API_AUTH_FAILED",
+                                                 "message": "인증키 없음"})
     seen = {}
 
     def fake_chat(messages, **kwargs):
@@ -230,8 +340,62 @@ def test_mock_규정자료는_상담_근거로_쓰지_않는다():
 
     assert "fetch_regulations" not in consult_chain.TOOLS_BY_NAME
     names = set(consult_chain.TOOLS_BY_NAME)
-    assert names == {"korea_export_requirements", "korea_refund_rate",
-                     "destination_tariff", "trade_statistics"}
+    assert names == {"korea_export_requirements", "korea_refund_rate", "destination_tariff",
+                     "us_classification_rulings", "us_fda_records", "trade_statistics"}
+
+
+# --- 체인: 말만이 아니라 실제로 지나가는가 -----------------------------------------
+
+def test_요청은_LangChain_체인을_지나간다(kb):
+    """'LangChain을 쓴다'가 설명이 아니라 사실인지 봅니다.
+
+    단계 시간은 LangChain 콜백에서만 나옵니다. 체인을 안 태우면 값이 비어 있습니다.
+    예전에는 체인 객체만 만들어 두고 실제로는 손으로 같은 일을 했습니다(호출 0회).
+    """
+
+    outcome = consult_chain.run("상업송장에 꼭 들어가야 하는 항목은 무엇인가요?")
+    marks = outcome["langchain"]
+    assert marks["step_names"] == ["analyze_question", "search_faq", "decide_route",
+                                   "official_lookup", "write_answer", "consult"]
+    assert marks["retriever_calls"] == 1          # 검색은 LangChain 검색기로 나갔다
+    assert set(outcome["stages"]) >= {"analyze_ms", "search_ms", "route_ms", "lookup_ms",
+                                      "chain_ms"}
+
+
+def test_FAQ_검색은_한_번만_돈다(kb, monkeypatch):
+    """예전에는 경로 판단에서 한 번, 근거를 붙이려고 또 한 번 찾았습니다."""
+
+    calls = []
+    original = consult_chain.search_for
+    monkeypatch.setattr(consult_chain, "search_for",
+                        lambda question, history=None, k=5: (calls.append(question),
+                                                             original(question, history, k))[1])
+    consult_chain.run("수출신고필증은 어떻게 보관하나요?")
+    assert len(calls) == 1
+
+
+def test_답쓰기는_체인의_마지막_단계다(kb):
+    """답을 쓰는 일도 체인 안에서 일어나야 '하나의 체인'이라고 말할 수 있습니다."""
+
+    seen = {}
+
+    def write(bundle):
+        seen.update(route=bundle["plan"]["route"], documents=len(bundle["documents"]))
+        return {"success": True, "data": "답"}
+
+    outcome = consult_chain.run("수출신고필증은 어떻게 보관하나요?", write=write)
+    assert outcome["answer"] == {"success": True, "data": "답"}
+    assert seen["route"] == "faq_context" and seen["documents"] >= 1
+    assert "llm_ms" in outcome["stages"]
+
+
+def test_되묻는_경로에서는_체인이_AI를_부르지_않는다(kb):
+    called = []
+    outcome = consult_chain.run("운송은 뭐로 하는 게 제일 나을까요?",
+                                write=lambda bundle: called.append(1))
+    assert outcome["plan"]["route"] == "clarification"
+    assert called == [] and outcome["answer"] is None
+    assert "llm_ms" not in outcome["stages"]
 
 
 def test_도구는_같은_호출을_되풀이하지_않는다(kb, monkeypatch):
@@ -241,9 +405,147 @@ def test_도구는_같은_호출을_되풀이하지_않는다(kb, monkeypatch):
         calls.append(hs_code)
         return consult_tools.evidence(status=consult_tools.FAILED, question_scope={})
 
+    # 체인이 실행 설정(config)을 도구까지 내려보냅니다. 가짜 도구도 그걸 받아야 합니다.
     monkeypatch.setitem(consult_chain.TOOLS_BY_NAME, "korea_export_requirements",
-                        type("T", (), {"invoke": staticmethod(lambda args: fake(**args))})())
+                        type("T", (), {"invoke": staticmethod(
+                            lambda args, config=None: fake(**args))})())
     plan = {"tool_calls": [{"tool": "korea_export_requirements", "args": {"hs_code": "3304991000"}},
                            {"tool": "korea_export_requirements", "args": {"hs_code": "3304991000"}}]}
     evidence = consult_chain._run_tools(plan)
     assert len(calls) == 1 and len(evidence) == 1
+
+
+# --- 캐시: 조건이 다르면 다른 답 ---------------------------------------------------
+
+def test_캐시_열쇠가_답을_바꾸는_조건을_모두_담는다(kb):
+    """나라·품목·HS·Incoterms·결제조건이 하나라도 다르면 다른 답으로 봅니다."""
+
+    version = faq_cache.knowledge_version()
+    base = {"countries": ["US"], "items": ["화장품"], "terms": ["fob"],
+            "payments": ["t/t"], "hs6": "330499"}
+    faq_cache.put("수출 절차", False, version, {"answer": "미국·화장품·FOB"}, "안정적 지식", base)
+
+    for changed in ({**base, "countries": ["VN"]}, {**base, "items": ["식품"]},
+                    {**base, "terms": ["cif"]}, {**base, "payments": ["l/c"]},
+                    {**base, "hs6": "090121"}):
+        assert faq_cache.get("수출 절차", False, version, changed) is None, changed
+    assert faq_cache.get("수출 절차", False, version, base)["answer"] == "미국·화장품·FOB"
+
+
+def test_답변_설정이_바뀌면_캐시가_버려진다(kb, monkeypatch):
+    version = faq_cache.knowledge_version()
+    faq_cache.put("상업송장 항목", False, version, {"answer": "옛 답"}, "안정적 지식")
+    assert faq_cache.get("상업송장 항목", False, version) is not None
+
+    monkeypatch.setattr(faq_cache, "PROMPT_VERSION", "99")      # 프롬프트를 고친 상황
+    assert faq_cache.get("상업송장 항목", False, faq_cache.knowledge_version()) is None
+
+
+def test_사용자_정정이_있으면_앞_조건을_덮는다(kb):
+    from app.services import consult_intent
+
+    history = [{"role": "user", "content": "미국에 화장품 FOB로 보내려고 합니다"}]
+    conditions = consult_intent.read_conditions("아니라 베트남으로 바뀌었어요. 달라지나요?", history)
+    assert conditions["countries"] == ["VN"] and conditions["corrected"] is True
+    assert "US" not in conditions["countries"]
+
+
+def test_최신_확인이_필요한_질문은_캐시를_지나친다(kb, monkeypatch):
+    """규정·세율 질문은 캐시가 있어도 다시 확인합니다."""
+
+    from app.services import support_chat_service
+
+    monkeypatch.setattr(support_chat_service.ai_client, "chat",
+                        lambda *a, **k: {"success": True, "source": "api", "data": "AI 답"})
+    question = "HS 3304991000 올해 수출요건 바뀌었나요"
+    version = faq_cache.knowledge_version()
+    from app.services import consult_chain, faq_index
+    conditions = consult_chain.conditions_for(question)
+    faq_cache.put(faq_index.normalize(question), False, version,
+                  {"answer": "예전에 만들어 둔 답"}, "안정적 지식", conditions)
+
+    answer = support_chat_service.ask(question)
+    assert answer["data"]["answer"] != "예전에 만들어 둔 답"
+
+
+def test_조회가_실패한_답은_캐시에_담지_않는다(kb, monkeypatch):
+    """실패한 조회 결과가 오래 재사용되면 '확인했다'는 착각을 만듭니다."""
+
+    from app.collectors import customs_extra_client
+    from app.services import support_chat_service
+
+    monkeypatch.setattr(customs_extra_client, "export_requirement_laws",
+                        lambda hs, direction="1": {"success": False, "source": "api",
+                                                   "error_code": "API_TIMEOUT",
+                                                   "message": "시간 초과"})
+    monkeypatch.setattr(support_chat_service.ai_client, "chat",
+                        lambda *a, **k: {"success": True, "source": "api", "data": "AI 답"})
+    question = "HS 3004909900 수입 요건 알려주세요"
+    support_chat_service.ask(question)
+
+    from app.services import consult_chain, faq_index
+    cached = faq_cache.get(faq_index.normalize(question), False,
+                           faq_cache.knowledge_version(),
+                           consult_chain.conditions_for(question))
+    assert cached is None
+
+
+# --- 새로 붙인 수입국 조회 창구 -------------------------------------------------------
+
+def test_영국_관세율도_조회한다(kb, monkeypatch):
+    from app.collectors import tariff_client
+
+    monkeypatch.setattr(tariff_client, "fetch_uk_heading",
+                        lambda hs4: {"success": True, "source": "api", "data": [
+                            {"code": "3304990000", "description": "Other", "general": "0.00 %"}]})
+    evidence = consult_tools.destination_tariff("GB", "330499")
+    assert evidence["status"] == consult_tools.CONFIRMED
+    assert "HMRC" in evidence["agency"] or "영국" in evidence["agency"]
+    # 제3국 세율과 FTA 특혜세율을 섞어 말하지 않습니다.
+    assert "특혜세율" in evidence["note"]
+
+
+def test_연결하지_않은_나라는_미지원으로_답한다(kb):
+    assert consult_tools.destination_tariff("VN", "330499")["status"] == consult_tools.UNSUPPORTED
+    assert consult_tools.destination_tariff("CN", "330499")["status"] == consult_tools.UNSUPPORTED
+
+
+def test_CBP_판례는_판정이_아니라고_밝힌다(kb, monkeypatch):
+    from app.collectors import base_client
+
+    monkeypatch.setattr(consult_tools, "HSK10", consult_tools.HSK10)
+    import app.collectors.base_client as bc
+
+    monkeypatch.setattr(bc, "request_text", lambda method, url, **kw: {
+        "success": True, "source": "api", "data": json.dumps({"rulings": [
+            {"rulingNumber": "N278162", "subject": "cosmetic cream", "rulingDate": "2016-08-12",
+             "tariffs": ["3304.99.5000"]}]})})
+    evidence = consult_tools.us_classification_rulings("cosmetic cream", "330499")
+    assert evidence["status"] == consult_tools.CONFIRMED
+    # 판례를 우리 물건의 분류 확정으로 쓰면 안 된다는 말이 반드시 붙습니다.
+    assert "확정하지 않습니다" in evidence["note"]
+    assert evidence["rows"][0]["ruling_no"] == "N278162"
+
+
+def test_FDA_기록은_규제_대상_판정이_아니라고_밝힌다(kb, monkeypatch):
+    import app.collectors.base_client as bc
+
+    monkeypatch.setattr(bc, "request_text", lambda method, url, **kw: {
+        "success": True, "source": "api", "data": json.dumps({"results": [
+            {"reason_for_recall": "Listeria", "product_description": "kimchi",
+             "classification": "Class I", "recall_initiation_date": "2024-01-05"}]})})
+    evidence = consult_tools.us_fda_records("kimchi", "food")
+    assert evidence["status"] == consult_tools.CONFIRMED
+    assert "규정 조문도" in evidence["note"] and "판정도 아닙니다" in evidence["note"]
+
+
+def test_FDA는_식품과_의료기기만_받는다(kb):
+    assert consult_tools.us_fda_records("자동차 부품", "vehicle")["status"] == \
+        consult_tools.UNSUPPORTED
+
+
+def test_절차_기한_질문에는_되묻지_않는다(kb):
+    """"수출신고 수리 후 선적은 언제까지" 에 출발지를 되묻던 잘못을 막습니다."""
+
+    plan = consult_chain.decide("수출신고 수리 후 선적은 언제까지 해야 하나요?")
+    assert plan["route"] != "clarification" and plan["missing"] == []

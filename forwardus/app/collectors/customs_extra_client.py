@@ -22,7 +22,8 @@ BASE = "https://unipass.customs.go.kr:38010/ext/rest/{svc}/{op}"
 
 # (환경변수 이름, 서비스, 오퍼레이션)
 SERVICES = {
-    "requirement_law": ("REQUIREMENT_APPROVAL", "ccctLworCdQry", "retrieveCcctLworCd"),
+    # (세관장확인대상은 공공데이터포털로 옮겼습니다 — 아래 export_requirement_laws 참고.
+    #  UNI-PASS의 ccctLworCdQry는 이 프로젝트 키로는 "인증키상의 API 불일치"가 납니다)
     "clearance_code": ("CUSTOMS_CLEARANCE_CODE", "ecmQry", "retrieveEcm"),
     "refund_rate": ("SIMPLE_REFUND_RATE", "simlXamrttXtrnUserQry", "retrieveSimlXamrttXtrnUser"),
     "refund_company": ("SIMPLE_REFUND_COMPANY", "simlFxamtAplyNnaplyEntsQry",
@@ -132,37 +133,75 @@ def _empty(root, label: str) -> dict:
         else ok([], "api")
 
 
-# --- 1. 세관장확인대상: 이 품목을 내보낼 때 걸리는 법령 -------------------------
+# --- 1. 세관장확인대상: 이 품목을 보낼 때 걸리는 법령 ---------------------------
+# 이 서비스만 UNI-PASS가 아니라 공공데이터포털(apis.data.go.kr)에 있습니다.
+#   관세청_세관장확인대상물품(GW) · https://www.data.go.kr/data/15101589/openapi.do
+#   GET /1220000/retrieveCcctLworCd/getRetrieveCcctLworCd
+#       serviceKey · hsSgn(HSK 10자리) · imexTpcd(1 수출 · 2 수입) · pageNo · numOfRows
+# 키는 .env의 UNIPASS_KEY_CUSTOMS 입니다. (이름만 UNIPASS_이고 실제로는 포털 키입니다)
 
-def export_requirement_laws(hs_code: str) -> dict:
-    """HS부호로 수출 요건확인 대상인지 봅니다.
+CUSTOMS_CONFIRM_URL = ("https://apis.data.go.kr/1220000/retrieveCcctLworCd/"
+                       "getRetrieveCcctLworCd")
+CUSTOMS_CONFIRM_SIGNUP = {
+    "label": "공공데이터포털 · 관세청 세관장확인대상물품(GW)",
+    "url": "https://www.data.go.kr/data/15101589/openapi.do",
+    "how": "위 주소에서 [활용신청]을 누르고 받은 인증키를 .env의 UNIPASS_KEY_CUSTOMS 에 넣습니다.",
+}
+EXPORT, IMPORT = "1", "2"
 
-    관세법 제226조에 따라 세관장이 확인하는 품목이면 어떤 법령에 걸리고 어느
-    기관이 승인하는지가 나옵니다. 우리가 류(類)로 짐작하던 것을 관세청 자료로
-    바꿀 수 있는 유일한 서비스입니다.
+
+def export_requirement_laws(hs_code: str, direction: str = EXPORT) -> dict:
+    """HSK 10자리로 세관장확인대상인지 봅니다. (관세법 제226조)
+
+    걸리는 법령·요건승인기관·요건확인서류·적용시작일이 나옵니다.
+    direction은 "1" 수출(기본) · "2" 수입입니다. 수입국 규제가 아니라 **한국** 기준입니다.
+
+    결과가 비어 있는 것은 "규제가 없다"가 아니라 "이 조회에서 걸리는 법령이 없다"입니다.
+    품목분류가 틀렸을 수도 있어 부르는 쪽에서 그렇게 안내합니다.
     """
 
     digits = "".join(ch for ch in (hs_code or "") if ch.isdigit())
     if len(digits) != 10:
         return fail("VALIDATION_ERROR", "api", "HS부호 10자리를 입력해주세요.")
+    key = get_config("CUSTOMS_CONFIRM_API_KEY", "")
+    if not key:
+        return fail("API_AUTH_FAILED", "api",
+                    "세관장확인대상물품 API 키가 없습니다. "
+                    f"{CUSTOMS_CONFIRM_SIGNUP['how']}")
 
-    result = _call("requirement_law", {"hsSgn": digits, "imexTp": "1"}, "세관장확인대상")
+    result = request_text("GET", CUSTOMS_CONFIRM_URL, timeout=25,
+                          params={"serviceKey": key, "hsSgn": digits,
+                                  "imexTpcd": direction if direction in (EXPORT, IMPORT) else EXPORT,
+                                  "pageNo": "1", "numOfRows": "50"})
     if not result["success"]:
         return result
-    root = result["data"]
+    try:
+        root = ET.fromstring(result["data"])
+    except ET.ParseError:
+        return fail("API_INVALID_RESPONSE", "api")
+
+    code = (root.findtext(".//resultCode") or "").strip()
+    message = (root.findtext(".//resultMsg") or "").strip()
+    if code and code != "00":
+        # 포털은 200으로 답하면서 본문에 실패를 적습니다. 성공으로 넘기면 안 됩니다.
+        return fail("API_NO_DATA" if code == "03" else "API_INVALID_RESPONSE", "api",
+                    message or "세관장확인대상물품 조회에 실패했습니다.")
 
     rows = [{
         "hs_code": _text(row, "hsSgn") or digits,
-        "law_code": _text(row, "dcerCrmLworCd") or _text(row, "dcerCfrmLworCd"),
-        "law_name": _text(row, "dcerCfrmLworNm") or _text(row, "dcerCrmLworNm"),
+        "law_code": _text(row, "dcerCfrmLworCd"),
+        "law_name": _text(row, "dcerCfrmLworNm"),
         "agency_code": _text(row, "reqApreIttCd"),
         "agency": _text(row, "reqApreIttNm"),
         "document": _text(row, "reqCfrmIstmNm"),
+        # 1 사전 · 2 사후 · 3 실시간. 통관 전에 갖춰야 하는지가 갈립니다.
+        "timing_code": _text(row, "bfhnAffcRtmTpcd"),
         "start_date": _iso(_text(row, "aplyStrtDt")),
-        "end_date": _iso(_text(row, "aplyEndDt")),
-    } for row in _rows(root, "CcctLworCdQryRsltVo", "ccctLworCdQryRsltVo", "ccctLworCdQryVo")]
+        # 이 서비스는 종료일을 주지 않습니다. 모르는 것을 지어내지 않고 비워 둡니다.
+        "end_date": "",
+    } for row in root.iter("item")]
     rows = [row for row in rows if row["law_name"] or row["agency"]]
-    return ok(rows, "api") if rows else _empty(root, "세관장확인대상")
+    return ok(rows, "api")
 
 
 # --- 2. 통관고유부호: 사업자등록번호로 찾습니다 ---------------------------------

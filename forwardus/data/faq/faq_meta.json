@@ -19,19 +19,17 @@
     "coverage": 0.6,
     "similarity": 0.7,
     "context": 0.25,
-    "context_coverage": 0.3,
+    "context_coverage": 0.4,
     "context_similarity": 0.5
   },
   "tuning": {
-    "positives": 420,
-    "negatives": 20,
-    "direct_right": 0.6619,
-    "direct_wrong": 0.0024,
+    "positives": 502,
+    "negatives": 30,
+    "direct_right": 0.5598,
+    "direct_wrong": 0.002,
     "false_direct_out_of_scope": 0,
     "max_wrong_allowed": 0.02,
-    "max_false_direct_allowed": 0,
-    "context_attached": 0.919,
-    "context_attached_out_of_scope": 2
+    "max_false_direct_allowed": 0
   },
   "approved": 0,
   "approval_version": "0"

@@ -71,7 +71,7 @@ context 0.25 · context_coverage 0.30 · context_similarity 0.50`
 | 관세청 UNI-PASS 간이정액환급률 | **성공** (HSK 3304991000 조회됨) |
 | 관세청 UNI-PASS 수출이행기간단축품목 | **성공** |
 | 관세청 UNI-PASS 항공사·포워더 부호 | **성공** |
-| 관세청 UNI-PASS **세관장확인대상(수출요건)** | **실패** — "요청하신 API와 인증키상의 API가 불일치합니다" (이 서비스용 인증키 필요) |
+| **세관장확인대상물품(관세법 제226조)** | **성공 (2026-09-24 연결)** — 공공데이터포털 `apis.data.go.kr/1220000/retrieveCcctLworCd/getRetrieveCcctLworCd`, 파라미터 `hsSgn`+`imexTpcd`. 예: HSK 3004909900 수입 → 약사법·의료기기법 4건, 적용시작일 2020-04-06. UNI-PASS의 같은 이름 서비스(ccctLworCdQry)는 이 프로젝트 키로 여전히 불가 |
 | 미국 USITC HTS | **성공** (330499 조회됨) |
 | 일본 관세청 실행관세율표 | **성공** (edition 2026-08-08) |
 | WITS(세계은행) | **실패** (요청 실패) |
