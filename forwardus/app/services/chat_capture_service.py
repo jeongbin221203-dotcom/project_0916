@@ -36,8 +36,19 @@ COUNT = re.compile(r"(\d[\d,]*)\s*(박스|상자|개|팔레트|파렛|카톤|ctn
 # "한 박스 12kg", "박스당 12kg", "개당 0.5t"
 PER_PACKAGE = re.compile(r"(?:한|1)?\s*(?:박스|상자|개|팔레트|파렛|carton|ctn|box|plt)\s*(?:당|에|은|는)?\s*"
                          r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|t|톤|ton)", re.I)
-# "총 6톤", "전체 3,000kg"
-TOTAL_WEIGHT = re.compile(r"(?:총|전체|합쳐서?)\s*(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|t|톤|ton)", re.I)
+# "총 6톤", "전체 3,000kg", "총 중량 6,000kg"
+TOTAL_WEIGHT = re.compile(r"(?:총|전체|합쳐서?)\s*(?:중량|무게)?\s*(?:은|는|:)?\s*"
+                          r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|t|톤|ton)", re.I)
+# "중량 12kg", "무게: 12 kg" — 한 포장 무게로 봅니다. (총 중량은 위에서 먼저 뗍니다)
+LABELLED_WEIGHT = re.compile(r"(?:중량|무게)\s*(?:\([^)]*\))?\s*(?:은|는|:|-)?\s*"
+                             r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|t|톤|ton)", re.I)
+# "품명 치약", "품목: 화장품", "치약 500박스"의 '치약'
+PRODUCT_LABELLED = re.compile(r"(?:품명|품목|제품|상품)\s*(?:은|는|:|-)?\s*"
+                              r"([가-힣A-Za-z][가-힣A-Za-z0-9 ./-]{0,40}?)\s*(?:[,\n·]|입니다|이고|$)")
+PRODUCT_BEFORE_COUNT = re.compile(r"([가-힣][가-힣A-Za-z0-9]{1,15})\s*(?:를|을)?\s*"
+                                  r"\d[\d,]*\s*(?:박스|상자|개|팔레트|파렛|카톤)")
+# 품명 자리에 들어오면 안 되는 말. (수량·포장 이야기지 물건 이름이 아닙니다)
+NOT_PRODUCT = ("총", "전체", "합계", "박스", "상자", "포장", "수량", "중량", "무게", "크기")
 # 항공 · 해상
 AIR_WORDS = ("항공", "비행기", "air", "awb")
 SEA_WORDS = ("해상", "배로", "선박", "컨테이너", "fcl", "lcl", "ocean", "sea")
@@ -118,13 +129,26 @@ def read(message: str) -> dict:
     count = COUNT.search(text)
     if count:
         item["quantity"] = count.group(1).replace(",", "")
-    per_package = PER_PACKAGE.search(rest)
+    # 총 중량은 먼저 떼어 냅니다. 안 그러면 "총 중량 6,000kg"의 6,000이
+    # 한 포장 무게로 잡힙니다.
+    total = TOTAL_WEIGHT.search(rest)
+    if total:
+        rest = rest[:total.start()] + " " + rest[total.end():]
+    per_package = PER_PACKAGE.search(rest) or LABELLED_WEIGHT.search(rest)
     if per_package:
         item["weight_per_package_kg"] = _kg(per_package.group(1), per_package.group(2))
-    elif TOTAL_WEIGHT.search(rest) and item.get("quantity"):
-        total = TOTAL_WEIGHT.search(rest)
+    elif total and item.get("quantity"):
         each = float(_kg(total.group(1), total.group(2))) / float(item["quantity"])
         item["weight_per_package_kg"] = f"{each:.3f}".rstrip("0").rstrip(".")
+
+    # 품명. "품명 치약"처럼 이름표가 붙은 것을 먼저 보고, 없으면 수량 앞의 말을 봅니다.
+    if not item.get("product_description"):
+        for pattern in (PRODUCT_LABELLED, PRODUCT_BEFORE_COUNT):
+            found_name = pattern.search(text)
+            name = found_name.group(1).strip() if found_name else ""
+            if name and not any(word in name for word in NOT_PRODUCT):
+                item["product_description"] = name
+                break
 
     if not fields and not item:
         return {}

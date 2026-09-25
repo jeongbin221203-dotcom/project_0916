@@ -123,8 +123,12 @@ ALIASES = {
                      "projectname", "quotename", "quotetitle", "documentname"),
 }
 DIMS = ("length_cm", "width_cm", "height_cm")
-# "40x30x25", "40 × 30 × 25cm", "40*30*25"
-DIMS_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*[x×X*]\s*(\d+(?:\.\d+)?)\s*[x×X*]\s*(\d+(?:\.\d+)?)")
+# "40x30x25", "40 × 30 × 25cm", "40*30*25", "40cm x 30cm x 25cm"
+# 숫자마다 단위가 붙어 있어도 읽습니다. 사람은 보통 "40cm x 30cm x 25cm"라고 적습니다.
+DIMS_PATTERN = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:cm|센티|mm)?\s*[x×X*]\s*"
+    r"(\d+(?:\.\d+)?)\s*(?:cm|센티|mm)?\s*[x×X*]\s*"
+    r"(\d+(?:\.\d+)?)", re.I)
 TEXT_KEYS = ("exporter_name", "exporter_address", "buyer_name", "buyer_address", "notify_party")
 # 채팅으로 받아 초안에 그대로 넣는 나머지 글자 칸. 이름이 서류 작성 화면의 input name과
 # 같아서(FORWARDUS_DOC_FILL) 합친 값이 그 화면의 칸까지 빈칸 없이 이어집니다.
