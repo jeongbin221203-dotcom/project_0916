@@ -313,8 +313,11 @@ def test_조회_메뉴는_사이드바에_있고_위쪽에는_없다(app, client
     # 운송 계획도 사이드바에서만 다닙니다.
     assert "운송 계획" in rail and "운송 계획" not in nav
 
+    # 서류 작성이 운송 계획보다 앞입니다. 서류에 적은 값이 운송 계획 칸을 미리 채우고,
+    # 시작 화면의 단추도 같은 순서입니다. 두 곳이 어긋나면 같은 일을 하는 자리를
+    # 화면마다 다른 곳에서 찾게 됩니다.
     keys = [row["key"] for row in sidebar.RAIL]
-    assert keys == ["home", "planning", "documents", "dashboard", "container", "lookup"]
+    assert keys == ["home", "documents", "planning", "dashboard", "container", "lookup"]
     # 지금 보는 화면이 사이드바에 표시됩니다.
     assert 'aria-current="page"' in re.search(
         r'<aside class="home_rail.*?</aside>', client.get("/lookup/").get_data(as_text=True), re.S).group(0)
