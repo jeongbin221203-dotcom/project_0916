@@ -799,7 +799,12 @@
   }
 
   async function loadOrigin(shipmentId) {
-    originEmpty.hidden = true;
+    // 고르는 칸은 계속 남겨 둡니다. 한 건을 보고 나서 다른 건을 바로 고를 수 있어야 합니다.
+    const note = originEmpty.querySelector(".doc_note");
+    if (note) {
+      note.innerHTML = "<b>" + escapeHtml(shipmentId) + "</b> 기준으로 찾았습니다. "
+        + "다른 건을 고르면 그 건으로 바꿔 봅니다.";
+    }
     originBody.hidden = false;
     originBody.innerHTML = `<p class="muted small">필요한 서류를 찾고 있습니다…
       <small>(관세청 요건 · 도착국 인증 · 협정)</small></p>`;
@@ -1164,26 +1169,46 @@
      어느 건의 값인지 알 수 없습니다. 채우기만 하고 만들지는 않습니다. */
   const sourcePick = document.querySelector("[data-doc-source]");
   const sourceStatus = document.querySelector("[data-doc-source-status]");
+  async function loadSource(picked, label) {
+    if (!picked || !config.sourceUrl) return false;
+    const [kind, id] = picked.split(/:(.*)/s);
+    if (sourceStatus) sourceStatus.textContent = "가져오는 중입니다…";
+    const response = await getJson(
+      config.sourceUrl.replace("__KIND__", encodeURIComponent(kind))
+                      .replace("__ID__", encodeURIComponent(id)));
+    if (!response.success) {
+      if (sourceStatus) sourceStatus.textContent = response.message || "가져오지 못했습니다.";
+      if (sourcePick) sourcePick.value = "";
+      return false;
+    }
+    clearForm();
+    window.FORWARDUS_DOC_FILL(response.data);
+    if (sourceStatus) {
+      sourceStatus.textContent = `${label || "고르신 건"}에서 가져왔습니다. 노란 칸이 가져온 값입니다.`;
+    }
+    return true;
+  }
+
   if (sourcePick && config.sourceUrl) {
-    sourcePick.addEventListener("change", async () => {
+    sourcePick.addEventListener("change", () => {
+      if (sourceStatus) sourceStatus.textContent = "";
       const picked = sourcePick.value;
-      sourceStatus.textContent = "";
       if (!picked) return;
-      const [kind, id] = picked.split(/:(.*)/s);
-      const label = sourcePick.options[sourcePick.selectedIndex].textContent.trim();
-      sourceStatus.textContent = "가져오는 중입니다…";
-      const response = await getJson(
-        config.sourceUrl.replace("__KIND__", encodeURIComponent(kind))
-                        .replace("__ID__", encodeURIComponent(id)));
-      if (!response.success) {
-        sourceStatus.textContent = response.message || "가져오지 못했습니다.";
-        sourcePick.value = "";
-        return;
-      }
-      clearForm();
-      window.FORWARDUS_DOC_FILL(response.data);
-      sourceStatus.textContent = `${label}에서 가져왔습니다. 노란 칸이 가져온 값입니다.`;
+      loadSource(picked, sourcePick.options[sourcePick.selectedIndex].textContent.trim());
     });
+  }
+
+  /* Shipment 화면(요약·서류·통관)에서 "서류 작성"으로 넘어온 경우.
+     주소에 ?source=shipment:EXP-... 가 붙어 옵니다. 그 건의 값으로 칸을 채워 두면
+     같은 내용을 두 번 적지 않아도 됩니다. (고르는 칸에도 그 건을 골라 둡니다) */
+  const askedSource = new URLSearchParams(location.search).get("source");
+  if (askedSource && config.sourceUrl) {
+    if (sourcePick) {
+      const found = Array.from(sourcePick.options).find((option) => option.value === askedSource);
+      if (found) sourcePick.value = askedSource;
+    }
+    loadSource(askedSource, sourcePick && sourcePick.value === askedSource
+      ? sourcePick.options[sourcePick.selectedIndex].textContent.trim() : "");
   }
 
   // 화면을 떠나는 순간에는 기다리지 않고 바로 저장합니다.

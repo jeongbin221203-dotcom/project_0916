@@ -17,6 +17,10 @@
   <nav class="sub_tabs" aria-label="Shipment 메뉴">
     <a href="{{ url_for('shipment.detail', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'detail' }}">요약</a>
     <a href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'document' }}">서류·통관</a>
+    {# 이 건의 값(바이어·품목·조건)을 그대로 들고 서류 작성 화면으로 갑니다.
+       같은 내용을 두 번 적지 않게 doc_form.js가 ?source= 를 읽어 칸을 채웁니다. #}
+    <a href="{{ url_for('document.new') }}?source=shipment:{{ shipment.shipment_id }}"
+       class="{{ 'active' if active == 'write' }}">서류 작성 →</a>
     <a href="{{ url_for('tracking.detail', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'tracking' }}">Tracking</a>
     <a href="{{ url_for('assistant.index', shipment_id=shipment.shipment_id) }}" class="{{ 'active' if active == 'assistant' }}">AI Assistant</a>
   </nav>

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -151,3 +152,22 @@ def test_올린_서류가_관세사_자료에_함께_들어간다(client, 미국
 
     html = client.get(f"/documents/{미국행.shipment_id}/customs-filing").get_data(as_text=True)
     assert "함께 보내는 서류" in html and "co.txt" in html
+
+
+def test_Shipment_화면에서_서류_작성으로_바로_간다(client, 미국행):
+    """요약·서류·통관 어디에서나 이 건 값을 들고 서류 작성으로 넘어갈 수 있어야 합니다.
+
+    예전에는 길이 없어서 사이드바로 나갔다가 값을 처음부터 다시 적어야 했습니다.
+    """
+
+    link = f"source=shipment:{미국행.shipment_id}"
+    for path in (f"/shipments/{미국행.shipment_id}",
+                 f"/documents/{미국행.shipment_id}",
+                 f"/documents/{미국행.shipment_id}/customs-filing"):
+        html = client.get(path, follow_redirects=True).get_data(as_text=True)
+        assert "서류 작성" in html and link in html, path
+
+    # 그 주소로 들어가면 화면이 열리고, 화면 코드가 ?source= 를 읽습니다.
+    assert client.get(f"/documents/new?{link}").status_code == 200
+    form_js = (Path(__file__).parent.parent / "app/static/js/doc_form.js").read_text(encoding="utf-8")
+    assert 'URLSearchParams(location.search).get("source")' in form_js
