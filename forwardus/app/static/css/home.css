@@ -854,3 +854,20 @@ body.home_talking .support_panel { display: none !important; }
 .doc_score:focus-visible { outline: 3px solid rgba(43,102,246,.45); outline-offset: 2px; }
 .doc_score.is_full { border-color: #86efac; background: #f0fdf4; }
 .doc_score.is_full b { color: #15803d; }
+
+/* 적어 주신 화물의 CBM·운임톤과 LCL/FCL. 계산한 값이라 답과 구분해 둡니다. */
+.answer_cargo { margin: 14px 0 4px; padding: 12px 14px; border: 1px solid #bfdbfe;
+  border-radius: 13px; background: #f5f9ff; }
+.answer_cargo p { margin: 0; }
+.answer_cargo_head { font-size: 14.5px; line-height: 1.7; }
+.answer_cargo_head b { font-weight: 800; }
+.answer_cargo_head .cargo_mode { padding: 1px 9px; border-radius: 999px;
+  background: var(--navy); color: #fff; font-size: 13px; }
+.answer_cargo_why { margin-top: 6px; color: var(--ink); font-size: 13px; line-height: 1.65; }
+.answer_cargo_detail { margin-top: 6px; color: var(--muted); font-size: 12.5px; }
+.answer_cargo_detail a { margin-left: 8px; font-weight: 700; }
+
+/* 어느 구간 기준으로 답했는지. 답 맨 위에 한 줄로 둡니다. */
+.answer_route { margin: 0 0 10px; padding: 7px 12px; border-radius: 10px;
+  background: #f1f5f9; color: var(--muted); font-size: 12.5px; }
+.answer_route b { color: var(--ink); }

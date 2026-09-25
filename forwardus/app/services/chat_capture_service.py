@@ -190,3 +190,44 @@ def capture(viewer, message: str) -> list[str]:
         labels += [ITEM_LABELS[key] for key in items[0] if key in ITEM_LABELS
                    and key not in known_item]
     return list(dict.fromkeys(labels))
+
+
+def cargo_summary(item: dict) -> dict | None:
+    """적어 주신 치수·수량으로 CBM과 운임톤을 계산하고 LCL·FCL을 판단합니다.
+
+    "수건 300박스, 한 박스 40x61x70cm에 50kg"이라고 적으면 사람은 그 다음에 꼭
+    "그래서 몇 CBM이고 LCL인가요 FCL인가요"를 묻습니다. 그건 계산이라 우리가 바로
+    답할 수 있습니다. AI에게 묻지 않습니다. (숫자를 지어내면 안 되는 자리입니다)
+
+    치수나 수량이 하나라도 빠지면 계산하지 않습니다. 반쪽 숫자가 더 위험합니다.
+    """
+
+    from app.processors import sea_mode_advisor
+
+    needed = ("length_cm", "width_cm", "height_cm", "quantity")
+    if not all(item.get(key) for key in needed):
+        return None
+    try:
+        length, width, height = (float(item[key]) for key in needed[:3])
+        count = float(item["quantity"])
+        per_package = float(item.get("weight_per_package_kg") or 0)
+    except (TypeError, ValueError):
+        return None
+    if min(length, width, height) <= 0 or count <= 0:
+        return None
+
+    one_cbm = length * width * height / 1_000_000       # cm³ → m³
+    total_cbm = round(one_cbm * count, 3)
+    total_weight = round(per_package * count, 2)
+    advice = sea_mode_advisor.recommend(total_cbm, total_weight)
+    return {
+        "per_package_cbm": round(one_cbm, 4),
+        "total_cbm": total_cbm,
+        "total_weight_kg": total_weight,
+        "revenue_ton": advice["revenue_ton"],
+        "mode": advice["mode"],
+        "container_type": advice.get("container_type", ""),
+        "containers": advice.get("containers", 0),
+        "reason": advice["reason"],
+        "confidence": advice["confidence"],
+    }

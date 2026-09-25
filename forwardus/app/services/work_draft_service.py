@@ -167,7 +167,7 @@ def planning_prefill(viewer) -> dict:
                  "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg", "amount")
     planning_fields = {key: first[key] for key in line_keys if first.get(key) and key != "amount"}
     carried = ("project_name", "exporter_name", "exporter_address", "buyer_name",
-               "buyer_country", "currency", "buyer_required_date")
+               "buyer_country", "buyer_address", "currency", "buyer_required_date")
     planning_fields.update({key: fields[key] for key in carried if fields.get(key)})
     if _total(items):
         planning_fields["invoice_value"] = _total(items)

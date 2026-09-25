@@ -229,12 +229,35 @@ def lookup(question: str) -> dict | None:
     named = country_export_guide.find_country(str(question or ""))
     if not named:
         return entry
+    code, place = named
     if entry:
-        name = _compact(named[1])
+        name = _compact(place)
         about_country = any(name in word for word in entry["_match"] + entry["_must"])
         if about_country:
             return entry
+
+    # 그 나라 전용 글이 따로 있고, 인증·규제를 묻는 말이면 그 글을 냅니다.
+    # "터키인증"처럼 나라 이름이 두 글자면 점수가 모자라 find()가 놓칩니다. 그렇다고
+    # 일반 안내를 내면 "터키 수출하기"만 나와, 물어본 인증 이야기가 빠집니다.
+    detail = _country_detail(code)
+    if detail and any(word in str(question) for word in CERT_WORDS):
+        return detail
     return country(question) or entry
+
+
+# 나라 이름과 함께 나오면 "그 나라 인증 이야기"입니다.
+CERT_WORDS = ("인증", "규제", "인허가", "라벨", "표시", "통관", "요건", "등록", "검사", "마크")
+
+
+def _country_detail(code: str) -> dict | None:
+    """그 나라 전용 글(cert-*.md). 나라 표에 적어 둔 이름으로 찾습니다."""
+
+    from app.processors import country_export_guide
+
+    note = country_export_guide.NOTES.get((code or "").upper())
+    if not note and (code or "").upper() in country_export_guide._eu_members():
+        note = country_export_guide.EU_NOTE
+    return get(note.get("knowledge", "")) if note else None
 
 
 def reference(question: str) -> str:

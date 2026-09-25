@@ -106,9 +106,20 @@
     const last = logEl.lastElementChild;
     // 같은 탭을 다시 눌렀고 그 인사가 아직 맨 아래에 있으면 그대로 둡니다.
     if (last && last.dataset.greeting === action.key) return;
+
+    /* 앞 탭의 인사말을 지우면 그 높이만큼 아래 글이 위로 딸려 올라갑니다.
+       읽던 자리가 사라지는 것처럼 보입니다. 지우기 전후의 문서 높이를 재어
+       그 차이만큼 스크롤을 되돌려, 보던 자리가 그대로 있게 합니다. */
+    const keepTop = window.scrollY;
+    const heightBefore = document.documentElement.scrollHeight;
+
     logEl.querySelectorAll("[data-greeting]").forEach((row) => row.remove());
-    say("bot", action.opener).dataset.greeting = action.key;
+    // 탭만 바꾼 것은 답이 아닙니다. 보던 자리를 그대로 두고 인사만 아래에 답니다.
+    say("bot", action.opener, { pin: false }).dataset.greeting = action.key;
     chat.replaceGreeting({ text: action.opener, mode: action.key }, SOURCE);
+
+    const shift = document.documentElement.scrollHeight - heightBefore;
+    if (shift) window.scrollTo({ top: Math.max(0, keepTop + shift), behavior: "instant" });
   }
 
   // 탭을 고릅니다. 서류를 올리면 사람이 누르지 않아도 서류 작성으로 넘어갑니다(greet 없이).
@@ -180,9 +191,19 @@
   });
 
   /* ----- 적은 글로 서류 초안 채우기 ----- */
+  let lastFilled = 0;          // 방금 몇 칸을 채웠는지. 빈 칸으로 다시 눌렀을 때 씁니다.
+
   async function fillDocDraft() {
     const text = input.value.trim();
     if (text.length < 5) {
+      // 채우고 나면 적는 칸을 비웁니다. 그래서 다시 누르면 빈 칸입니다. 그때
+      // "적어 주세요"라고만 하면 방금 한 일이 취소된 줄 압니다.
+      if (lastFilled) {
+        say("note", `방금 적어 주신 내용으로 **칸 ${lastFilled}개**를 채워 두었습니다. `
+          + "위의 **서류 작성 화면에서 확인하기**를 눌러 보세요.\n\n"
+          + "더 적으실 것이 있으면 아래에 적고 다시 눌러 주세요. 적은 것만 덧붙입니다.");
+        return;
+      }
       say("bad", "보내실 화물을 적어 주세요. 어디서 어디로, 무엇을 몇 개 보내는지요.");
       return;
     }
@@ -211,14 +232,21 @@
     }
 
     // 무엇을 채웠고 무엇이 비었는지 말해 줍니다. 조용히 채우면 확인을 안 합니다.
-    const filled = response.data.filled.length;
+    const rows = response.data.filled || [];
+    const filled = rows.length;
+    lastFilled = filled;
+    // 무엇이 어떤 값으로 들어갔는지 그대로 보여 줍니다. 개수만 알려 주면
+    // 사람은 "정말 들어갔나" 싶어 다시 누르고, 빈 칸이라 또 되묻게 됩니다.
+    const what = rows.length
+      ? "\n\n" + rows.map((row) => `- ${row.label}: **${row.value}**`).join("\n")
+      : "";
     const notes = response.data.notes.length
       ? "\n\n확인해 주세요\n" + response.data.notes.map((note) => `- ${note}`).join("\n")
       : "";
     // 화면을 대신 넘기지 않습니다. 넘기면 이 안내가 가려져서, 무엇이 확인이
     // 필요한 값인지 모른 채 그대로 서류가 만들어집니다.
-    say("bot", `칸 ${filled}개를 채웠습니다.` + notes);
-    record("assistant", `칸 ${filled}개를 채웠습니다.` + notes, "note");
+    say("bot", `칸 ${filled}개를 채웠습니다.` + what + notes);
+    record("assistant", `칸 ${filled}개를 채웠습니다.` + what + notes, "note");
     const link = say("bot", "");
     link.innerHTML = `<a class="button primary" href="${escapeHtml(config.docFormUrl)}">`
       + "서류 작성 화면에서 확인하기 →</a>";
@@ -337,7 +365,7 @@
     }).join("");
   }
 
-  function say(kind, text, { restoring = false } = {}) {
+  function say(kind, text, { restoring = false, pin = true } = {}) {
     const row = document.createElement("div");
     row.className = `home_msg ${kind}`;
     if (kind === "bot") {
@@ -356,7 +384,7 @@
     if (kind === "me") {
       lastQuestion = row;
       pinToTop(row);
-    } else if (kind !== "bot wait") {
+    } else if (kind !== "bot wait" && pin) {
       // 답(또는 안내)이 붙은 뒤 다시 한 번 붙여 줍니다. 이 그림 프레임은 지금 한 묶음의
       // 일이 끝난 뒤 돕니다. 그래서 답 아래의 출처·링크까지 다 그려진 다음에 잽니다.
       requestAnimationFrame(pinQuestion);
@@ -436,6 +464,10 @@
       window.ForwardusIncotermWidget.attach(row, guessIncoterm(question));
     }
     appendLinks(row, response.data.links);
+    // 치수와 수량을 적어 주셨으면 CBM·운임톤과 LCL/FCL을 바로 알려 드립니다.
+    // 이건 계산이라 AI를 기다리지 않습니다. (숫자를 지어내면 안 되는 자리입니다)
+    if (response.data.assumed_route) appendRoute(row, response.data.assumed_route);
+    if (response.data.cargo) appendCargo(row, response.data.cargo);
     // 대화에 적은 화물 정보를 담아 두었으면 한 줄 알립니다. 어디에 쓰이는지까지.
     if ((response.data.captured || []).length) {
       const note = document.createElement("p");
@@ -453,6 +485,36 @@
   function guessIncoterm(question) {
     const upper = String(question || "").toUpperCase();
     return INCOTERM_CODES.find((code) => upper.includes(code)) || "";
+  }
+
+  /* ----- 어느 구간 기준인지 밝히기 -----
+     이번 말에 출발·도착지가 없으면 앞서 알려 주신 구간으로 답합니다. 그 사실을
+     밝히지 않으면, 엉뚱한 구간의 기간과 운임을 그대로 믿게 됩니다. */
+  function appendRoute(row, route) {
+    const note = document.createElement("p");
+    note.className = "answer_route";
+    note.innerHTML = `📍 <b>${escapeHtml(route.origin)} → ${escapeHtml(route.destination)}</b>`
+      + " 기준으로 답했습니다. 다른 구간이면 알려 주세요.";
+    row.prepend(note);
+  }
+
+  /* ----- 적어 주신 화물의 CBM·LCL/FCL -----
+     "수건 300박스, 한 박스 40x61x70cm에 50kg"이라고 적으면 사람은 그 다음에 꼭
+     "몇 CBM인가요, LCL인가요 FCL인가요"를 묻습니다. 계산이라 우리가 바로 답합니다. */
+  function appendCargo(row, cargo) {
+    const box = document.createElement("div");
+    box.className = "answer_cargo";
+    const containers = cargo.containers
+      ? ` · ${cargo.containers}대 (${escapeHtml(cargo.container_type)})` : "";
+    box.innerHTML = `
+      <p class="answer_cargo_head">📦 적어 주신 화물로 계산하면
+        <b>${cargo.total_cbm} CBM</b> · 운임톤 <b>${cargo.revenue_ton} R/T</b>
+        → <b class="cargo_mode">${escapeHtml(cargo.mode)}</b>${containers}</p>
+      <p class="answer_cargo_why">${escapeHtml(cargo.reason)}</p>
+      <p class="answer_cargo_detail">한 포장 ${cargo.per_package_cbm} CBM
+        · 총 중량 ${cargo.total_weight_kg.toLocaleString()} kg
+        <a href="/planning/new">운송 예상 견적에서 운임 보기 →</a></p>`;
+    row.appendChild(box);
   }
 
   /* ----- 답 아래의 관련 링크 -----

@@ -37,24 +37,28 @@ def test_서류에_적은_값이_운송_예상_견적_칸으로_그대로_간다
     browser = _member(app)
     browser.put("/api/work-draft", json=DOC)
 
+    # 운송 예상 견적 화면이 쓰는 임시저장 모양으로 옵니다. (planning.js와 같은 모양)
     draft = browser.get("/api/work-draft/planning").get_json()["data"]
-    fields = draft["fields"]
 
-    # 자리를 바꿔 넣으면 안 되는 것들
-    assert fields["origin_code"] == "KRPUS" and fields["destination_code"] == "TRIST"
+    # 출발지와 도착지가 뒤바뀌지 않았는지가 가장 중요합니다.
+    assert draft["origin"]["code"] == "KRPUS" and draft["origin"]["name"] == "부산항"
+    # 이름은 우리 항구 목록의 표준 이름으로 바뀔 수 있습니다. 코드가 맞는 것이 중요합니다.
+    assert draft["destination"]["code"] == "TRIST" and draft["destination"]["name"]
+    assert draft["incoterms"] == "CIF"
+    assert draft["departure_date"] == "2026-11-02"
+    assert draft["transport_mode"] == "SEA" and draft["sea_mode"] == "FCL"
+
+    fields = draft["fields"]
     assert fields["exporter_name"] == "FORWARD CO., LTD"
     assert fields["buyer_name"] == "BESTEKS DIS TICARET"
     assert fields["buyer_address"] == "Istanbul, Turkiye"      # 주소도 따라옵니다
-    assert fields["incoterms"] == "CIF" and fields["currency"] == "USD"
-    assert fields["requested_departure_date"] == "2026-11-02"
-    # 출발지와 도착지가 뒤바뀌지 않았는지 한 번 더
-    assert fields["origin_name"] == "부산항" and fields["destination_name"] == "이스탄불항"
-
-    item = draft["items"][0]
-    assert item["product_description"] == "Ball Chain" and item["hs_code"] == "7117190000"
-    assert item["quantity"] == "100" and item["weight_per_package_kg"] == "350"
-    # 단가와 금액을 서로 바꿔 넣지 않습니다.
-    assert item["unit_price"] == "6.14" and item["amount"] == "614"
+    assert fields["currency"] == "USD"
+    # 첫 품목은 화면 칸으로 펴서 옵니다.
+    assert fields["product_description"] == "Ball Chain" and fields["hs_code"] == "7117190000"
+    assert fields["quantity"] == "100" and fields["weight_per_package_kg"] == "350"
+    # 금액은 합계로 따로 갑니다. 단가 자리에 금액이 들어가면 안 됩니다.
+    assert fields["invoice_value"] == "614"
+    assert "unit_price" not in fields
 
 
 def test_연락처는_서버에_가지_않는다(app):
@@ -93,7 +97,30 @@ def test_서류에_찍히는_값도_같은_자리다(app, create_shipment):
     shipment = create_shipment()
     reference = document_service.build_reference(shipment)
 
-    assert reference["pol"].startswith(shipment.origin_code[:2])
-    assert reference["pod"].startswith(shipment.destination_code[:2])
-    assert reference["exporter_name"] == shipment.exporter_name
+    # 서류에는 "이름 (코드)" 모양으로 찍힙니다. 코드가 제자리에 있는지 봅니다.
+    assert shipment.origin_code in reference["pol"]
+    assert shipment.destination_code in reference["pod"]
+    assert reference["pol"] != reference["pod"]
+    # 서류의 칸 이름은 exporter·consignee입니다. 값이 그 자리에 들어가야 합니다.
+    assert reference["exporter"] == shipment.exporter_name
+    assert reference["exporter_address"] == shipment.exporter_address
     assert reference["incoterms"] == shipment.incoterms
+    if shipment.buyer:
+        assert reference["consignee"] == shipment.buyer.name
+        # 수출자 주소가 수하인 주소 칸으로 가면 안 됩니다.
+        assert reference["consignee_address"] != reference["exporter_address"]
+
+
+def test_탭만_바꿀_때는_화면을_끌어올리지_않는다():
+    """질문에 답이 오면 그 질문을 맨 위에 붙입니다. 하지만 탭만 바꾼 것은 답이 아닙니다.
+
+    보던 자리를 그대로 둬야 읽던 글을 이어서 읽습니다.
+    """
+
+    from pathlib import Path
+
+    js = (Path(__file__).parent.parent / "app/static/js/home.js").read_text(encoding="utf-8")
+    assert "function say(kind, text, { restoring = false, pin = true } = {})" in js
+    assert 'say("bot", action.opener, { pin: false })' in js
+    # 진짜 답에는 그대로 붙입니다.
+    assert 'kind !== "bot wait" && pin' in js

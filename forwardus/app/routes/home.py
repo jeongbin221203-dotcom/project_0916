@@ -8,10 +8,10 @@ from flask import Blueprint, jsonify, render_template, request, url_for
 
 from app.routes import error_response
 from app.routes.auth import current_user
-from app.services import (ServiceError, agent_service, attachment_service, chat_capture_service,
-                          chat_memory_service,
+from app.services import (ServiceError, agent_service, attachment_service,
+                          chat_capture_service, chat_memory_service,
                           document_extract_service, document_pipeline_service,
-                          intake_service, support_chat_service)
+                          intake_service, support_chat_service, work_draft_service)
 from app.validators import ValidationError
 
 home_bp = Blueprint("home", __name__)
@@ -51,7 +51,7 @@ def quick_actions() -> list[dict]:
                    "올려 주세요. 읽은 값으로 서류를 만들고, 빠진 것만 여쭤봅니다.",
          # 적은 글에서 값을 뽑아 서류 작성 화면의 칸을 채웁니다.
          # (서류 올리기는 칩이 아니라 세 탭이 같이 쓰는 적는 칸의 + 단추입니다)
-         "fill_label": "📄 적은 내용으로 칸 채우기",
+         "fill_label": "✨ 서류 칸 자동 입력",
          "examples": ["패킹리스트만 만들어줘", "상업송장만 작성해줘"],
          # 빈 서식 PDF를 그대로 내려받는 자리. 대화를 시작하는 칩과 성격이
          # 달라 따로 둡니다. (/documents/blank/<kind>.pdf)
@@ -211,4 +211,22 @@ def api_support_chat():
         kept_fields = chat_capture_service.capture(viewer, question)
         if kept_fields:
             result["data"]["captured"] = kept_fields
+    # CBM·운임톤과 LCL/FCL은 계산입니다. 로그인하지 않아도 바로 알려 드립니다.
+    # (적어 주신 치수·수량이 다 있을 때만. 반쪽 숫자는 더 위험합니다)
+    if result.get("success"):
+        read_values = chat_capture_service.read(question)
+        first = (read_values.get("items") or [{}])[0] if read_values else {}
+        summary = chat_capture_service.cargo_summary(first) if first else None
+        if summary:
+            result["data"]["cargo"] = summary
+        # 이번 말에 경로가 없으면 앞서 알려 주신 구간으로 답합니다. 그때는 **어느 구간
+        # 기준인지 밝힙니다.** 밝히지 않으면 엉뚱한 구간의 기간·운임을 그대로 믿게 됩니다.
+        told = read_values.get("fields") or {}
+        if viewer is not None and not (told.get("origin_code") and told.get("destination_code")):
+            kept = (work_draft_service.load(viewer) or {}).get("fields") or {}
+            if kept.get("origin_name") and kept.get("destination_name"):
+                result["data"]["assumed_route"] = {
+                    "origin": kept["origin_name"], "destination": kept["destination_name"],
+                    "from_now": bool(told.get("origin_code") or told.get("destination_code")),
+                }
     return jsonify(result), (200 if result["success"] else 502)
