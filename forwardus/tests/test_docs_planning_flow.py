@@ -110,15 +110,22 @@ def test_서류에_적은_값이_운송_계획_모양으로_나온다(app):
     assert data["savedAt"] > 0
 
 
-def test_바이어_주소_연락처와_계좌는_서버에_남기지_않는다(app):
+def test_연락처와_계좌는_서버에_남기지_않는다(app):
+    """주소는 남기고 연락처·계좌는 남기지 않습니다.
+
+    주소는 다시 적다가 나는 오타가 B/L에 그대로 찍혀 손해가 큽니다. 반면 이메일·담당자는
+    서류에 꼭 필요하지 않고, 계좌번호는 어떤 경우에도 서버에 두지 않습니다.
+    """
+
     from app.models import WorkDraft
 
     browser = _member(app)
     browser.put("/api/work-draft", json=DOC_VALUES)
     stored = str(WorkDraft.query.one().data)
-    for secret in ("1 Secret Ave", "buyer@abc.com", "SAME AS CONSIGNEE", "100-200-300400", "Shinhan"):
+    for secret in ("buyer@abc.com", "SAME AS CONSIGNEE", "100-200-300400", "Shinhan"):
         assert secret not in stored, secret
     assert "ABC BEAUTY" in stored          # 바이어 회사명은 뒤 서류에 필요해 남깁니다.
+    assert "1 Secret Ave" in stored        # 주소도 남깁니다. (2026-09 결정)
 
 
 def test_나중에_적은_값만_덮고_빈_값으로_지우지_않는다(app):

@@ -212,7 +212,10 @@
     </div>`;
   }
 
-  function renderCalendar() {
+  /* 달을 넘길 때 두 달이 한 번에 툭 바뀌면 어디가 바뀐 건지 눈이 못 따라갑니다.
+     넘어간 방향으로 살짝 밀어 주면 "다음 달로 갔다"는 것이 보입니다.
+     움직임을 줄여 달라고 설정한 분께는 그냥 바뀝니다. (prefers-reduced-motion) */
+  function renderCalendar(slide = "") {
     const canGoBack = viewMonth > new Date(today.getFullYear(), today.getMonth(), 1);
     calendarEl.innerHTML = `
       <div class="cal_head">
@@ -229,14 +232,23 @@
       <p class="cal_hint">다음 선택: <b>${pickTarget === "departure" ? "Seller 발송 예상일" : "Buyer 요청 도착일"}</b>
         · 날짜를 누를 때마다 Seller 발송 예상일 → Buyer 요청일 순서로 지정되고,
         Seller 발송 예상일을 다시 고르면 Buyer 요청일은 지워집니다.</p>`;
+    if (slide) {
+      const months = calendarEl.querySelector(".cal_months");
+      if (months) months.classList.add(`cal_${slide}`);
+    }
   }
 
   calendarEl.addEventListener("click", (event) => {
     const target = event.target.closest("button");
     if (!target || target.disabled) return;
-    if (target.hasAttribute("data-cal-prev")) viewMonth.setMonth(viewMonth.getMonth() - 1);
-    else if (target.hasAttribute("data-cal-next")) viewMonth.setMonth(viewMonth.getMonth() + 1);
-    else if (target.dataset.date) {
+    let slide = "";
+    if (target.hasAttribute("data-cal-prev")) {
+      viewMonth.setMonth(viewMonth.getMonth() - 1);
+      slide = "back";                       // 지난 달 → 오른쪽에서 들어옵니다
+    } else if (target.hasAttribute("data-cal-next")) {
+      viewMonth.setMonth(viewMonth.getMonth() + 1);
+      slide = "forward";                    // 다음 달 → 왼쪽에서 들어옵니다
+    } else if (target.dataset.date) {
       const iso = target.dataset.date;
       const buyerInput = form.elements.buyer_required_date;
       if (pickTarget === "departure") {
@@ -258,7 +270,7 @@
       saveDraftSoon();
       return;
     }
-    renderCalendar();
+    renderCalendar(slide);
   });
   renderCalendar();
 

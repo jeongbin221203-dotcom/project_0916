@@ -5,10 +5,13 @@
 미리 채웁니다. (planning.js가 쓰는 임시저장 모양으로 돌려줍니다)
 
 서버에 두는 것은 SHARED_FIELDS · ITEM_FIELDS뿐입니다.
-은행 계좌·SWIFT, 바이어 주소·이메일·담당자, Notify Party, 결제 조건은 저장하지 않습니다.
-(사용자 결정: 은행·바이어 주소·연락처는 서버에 남기지 않음. 바이어 회사명은 남김)
-그 값들은 브라우저의 sessionStorage에만 두고, 같은 탭에서 운송 계획으로 넘어갈 때
-브라우저가 직접 채웁니다. (work_draft.js)
+**은행 계좌·SWIFT는 어떤 경우에도 저장하지 않습니다.** 칸에 섞여 들어와도 지웁니다.
+바이어 이메일·담당자·Notify Party·결제 조건도 저장하지 않습니다.
+
+바이어 주소는 저장합니다. (2026-09 사용자 결정) 같은 바이어에게 다시 보낼 때마다
+주소를 처음부터 다시 적게 하면 오타가 나고, 그 오타가 B/L과 송장에 그대로 찍힙니다.
+연락처(이메일·담당자)는 여전히 브라우저의 sessionStorage에만 두고, 같은 탭에서
+운송 계획으로 넘어갈 때 브라우저가 직접 채웁니다. (work_draft.js)
 """
 
 from __future__ import annotations
@@ -23,7 +26,8 @@ SHARED_FIELDS = (
     "transport_mode", "sea_mode",
     "project_name",                             # 견적명 — 대시보드에서 이 건을 부르는 이름
     "exporter_name", "exporter_address",        # 송하인(수출자, 우리 회사)
-    "buyer_name", "buyer_country",              # 수하인 회사명·나라 (주소·연락처는 제외)
+    "buyer_name", "buyer_country", "buyer_address",   # 수하인 회사명·나라·주소
+                                                # (이메일·담당자는 저장하지 않습니다)
     "origin_code", "origin_name", "destination_code", "destination_name",   # POL / POD
     "incoterms", "currency", "requested_departure_date", "buyer_required_date",
     # 신용장 조건. 운송 계획에서 "이 배로 실으면 L/C 마감을 넘는지" 보는 데 씁니다.

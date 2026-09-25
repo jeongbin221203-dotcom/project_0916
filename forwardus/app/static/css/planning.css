@@ -306,3 +306,18 @@
 .sea_advice small { color: inherit; opacity: .85; }
 .sea_advice .link_button { color: inherit; text-decoration: underline; font-weight: 800; }
 .sea_advice_same { font-style: normal; opacity: .75; }
+
+/* ----- 달을 넘길 때 -----
+   두 달이 한 번에 툭 바뀌면 무엇이 바뀐 건지 눈이 못 따라갑니다. 넘어간 방향으로
+   살짝 밀어 주면 "다음 달로 갔다"가 보입니다. 날짜 칸을 다시 그리는 것은 그대로이고
+   들어오는 움직임만 얹습니다. 움직임을 줄여 달라고 설정한 분께는 얹지 않습니다. */
+@keyframes cal_in_from_right { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes cal_in_from_left  { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+.cal_months.cal_forward { animation: cal_in_from_right .22s ease-out; }
+.cal_months.cal_back { animation: cal_in_from_left .22s ease-out; }
+/* 날짜를 누를 때도 색이 툭 바뀌지 않게 합니다. */
+.cal_grid button { transition: background-color .15s ease, color .15s ease, box-shadow .15s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .cal_months.cal_forward, .cal_months.cal_back { animation: none; }
+  .cal_grid button { transition: none; }
+}

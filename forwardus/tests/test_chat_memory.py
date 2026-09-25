@@ -156,14 +156,35 @@ def test_서류_계획은_대화_원문이_아니라_값만_저장한다(app):
     assert ChatMessage.query.count() == 0
 
 
-@pytest.mark.parametrize("field", ["buyer_address", "buyer_email", "notify_party"])
+@pytest.mark.parametrize("field", ["buyer_email", "notify_party", "attention"])
 def test_State에는_바이어_연락처를_두지_않는다(app, field):
+    """연락처는 서버에 남기지 않습니다. (주소는 2026-09부터 남깁니다 — 아래 테스트)"""
+
     browser = _member(app)
     browser.put("/api/work-draft", json={"source": "document",
                                          "fields": {"exporter_name": "A", field: "비밀 값"},
                                          "items": []})
 
     assert "비밀 값" not in str(WorkDraft.query.one().data)
+
+
+def test_바이어_주소는_남깁니다(app):
+    """같은 바이어에게 다시 보낼 때 주소를 또 적게 하면 오타가 납니다.
+
+    그 오타는 B/L과 송장에 그대로 찍히고, 도착지에서 화물을 못 찾는 일로 이어집니다.
+    (2026-09 사용자 결정 — 계좌번호·SWIFT는 여전히 어디에도 남기지 않습니다)
+    """
+
+    browser = _member(app)
+    browser.put("/api/work-draft", json={
+        "source": "document",
+        "fields": {"buyer_name": "ABC", "buyer_address": "1 Secret Ave, Istanbul",
+                   "buyer_email": "a@b.com"},
+        "items": []})
+
+    stored = str(WorkDraft.query.one().data)
+    assert "1 Secret Ave, Istanbul" in stored      # 주소는 남습니다
+    assert "a@b.com" not in stored                 # 연락처는 남기지 않습니다
 
 
 # --- 대화에 적은 화물 정보 담아 두기 (State) ---------------------------------------------

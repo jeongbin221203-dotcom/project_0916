@@ -5,14 +5,16 @@
    planningPrefill()      운송 계획 화면이 칸을 미리 채울 값. 서버 값 + 이 탭에만 둔 값.
 
    서버에는 정해진 칸만 갑니다(work_draft_service.SHARED_FIELDS). 바이어 주소·이메일·
-   담당자·Notify Party는 이 탭의 sessionStorage에만 두고 서버로 보내지 않습니다. */
+   이메일·담당자·Notify Party는 이 탭의 sessionStorage에만 두고 서버로 보내지 않습니다.
+   바이어 주소는 서버에도 담습니다. 은행 계좌·SWIFT는 어디에도 담지 않습니다. */
 (function () {
   "use strict";
 
   const config = window.FORWARDUS_WORK_DRAFT;
   const PRIVATE_KEY = window.ForwardusStore.key("forwardus:work-private");
-  const PRIVATE_FIELDS = ["buyer_address", "buyer_email", "notify_party", "attention",
-                          "consignee_city_zip"];
+  // 서버로 보내지 않고 이 탭에만 두는 칸. 바이어 주소는 2026-09부터 서버에도 담습니다.
+  // (같은 바이어에게 다시 보낼 때 주소를 또 적다가 나는 오타가 B/L에 그대로 찍힙니다)
+  const PRIVATE_FIELDS = ["buyer_email", "notify_party", "attention", "consignee_city_zip"];
   const DELAY_MS = 700;
   let timer = null;
   let pending = null;
@@ -162,7 +164,7 @@
     if (!response.success || !response.data || !response.data.savedAt) return null;
     const draft = response.data;
     const kept = readPrivate();
-    ["buyer_address", "buyer_email", "notify_party"].forEach((name) => {
+    ["buyer_email", "notify_party", "attention", "consignee_city_zip"].forEach((name) => {
       if (kept[name] && !draft.fields[name]) draft.fields[name] = kept[name];
     });
     return draft;

@@ -61,12 +61,63 @@ def sources() -> list[dict]:
 
 # --- 1. 관세청 선박회사 등록부 ------------------------------------------------
 
+# 관세청 등록부는 **한글 상호만** 받습니다. 그런데 실무에서 부르는 이름은 영문입니다.
+# ("HMM", "Maersk", "MSC") 그래서 영문으로 적으면 한글 상호로 바꿔 찾습니다.
+# 여기 없는 선사는 부호(4글자)로 찾거나 한글 상호를 적으라고 안내합니다.
+ENGLISH_NAMES = {
+    "HMM": "에이치엠엠", "HYUNDAI MERCHANT MARINE": "에이치엠엠",
+    "MAERSK": "머스크", "MAERSK LINE": "머스크", "MSC": "엠에스씨",
+    "MEDITERRANEAN SHIPPING": "엠에스씨",
+    "CMA CGM": "씨엠에이씨지엠", "CMACGM": "씨엠에이씨지엠",
+    "COSCO": "코스코", "ONE": "오션네트워크익스프레스",
+    "OCEAN NETWORK EXPRESS": "오션네트워크익스프레스",
+    "EVERGREEN": "에버그린", "HAPAG-LLOYD": "하파그로이드", "HAPAG LLOYD": "하파그로이드",
+    "YANG MING": "양밍", "YANGMING": "양밍", "ZIM": "짐",
+    "OOCL": "오오씨엘", "WAN HAI": "완하이", "WANHAI": "완하이",
+    "PIL": "퍼시픽인터내셔널라인", "SM LINE": "에스엠상선", "SMLINE": "에스엠상선",
+    "KMTC": "고려해운", "KOREA MARINE TRANSPORT": "고려해운",
+    "SINOKOR": "장금상선", "NAMSUNG": "남성해운", "HEUNG-A": "흥아라인", "HEUNGA": "흥아라인",
+    "PAN OCEAN": "팬오션", "PANOCEAN": "팬오션", "POLARIS": "폴라리스쉬핑",
+    "TS LINES": "티에스라인", "DONGJIN": "동진상선", "CK LINE": "천경해운",
+}
+
+
+def korean_name_of(name: str) -> str:
+    """영문 상호를 한글 상호로 바꿉니다. 모르면 빈 글자입니다."""
+
+    query = " ".join((name or "").upper().split())
+    if query in ENGLISH_NAMES:
+        return ENGLISH_NAMES[query]
+    # "MAERSK LINE A/S"처럼 뒤에 법인 형태가 붙어도 찾습니다.
+    for english, korean in ENGLISH_NAMES.items():
+        if query.startswith(english + " ") or query == english:
+            return korean
+    return ""
+
+
 def search_shipping_companies(name: str) -> dict:
-    """등록된 선사를 한글 상호로 찾습니다. (영문 상호로는 조회되지 않습니다)"""
+    """등록된 선사를 찾습니다.
+
+    관세청 등록부는 한글 상호만 받습니다. 영문으로 적으면 우리 표에서 한글 상호로
+    바꿔 찾고, 네 글자 영문(MAEU·HMM 같은 선사부호)이면 부호 조회로 넘깁니다.
+    """
 
     query = (name or "").strip()
     if not query:
         return fail("VALIDATION_ERROR", "api", "선사명을 입력해주세요.")
+
+    if not any("가" <= ch <= "힣" for ch in query):
+        korean = korean_name_of(query)
+        if korean:
+            query = korean
+        elif query.isalpha() and len(query) == 4:
+            # 부호처럼 생겼습니다. 부호 조회로 바로 넘깁니다.
+            return shipping_company(query)
+        else:
+            return fail("NOT_FOUND", "api",
+                        f"'{query}'는 한글 상호로 바꿀 수 없습니다. "
+                        "관세청 등록부는 한글 상호로만 찾습니다. "
+                        "한글 상호나 네 글자 선사부호(예: MAEU)로 다시 찾아 주세요.")
     key = _unipass_key("SHIPPING_COMPANY_LIST")
     if not key:
         return fail("API_AUTH_FAILED", "api", "선박회사목록 API 키가 없습니다.")

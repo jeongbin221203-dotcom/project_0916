@@ -22,8 +22,8 @@ HEALTH_TIMEOUT = 20
 LOOKUPS = {
     "shipping_company": {
         "label": "선사",
-        "hint": "한글 상호로 찾습니다. (영문 상호로는 조회되지 않습니다)",
-        "example": "에이치엠엠",
+        "hint": "한글 상호·영문 상호·선사부호(4글자) 모두 됩니다. (예: HMM · 머스크 · MAEU)",
+        "example": "HMM",
         "field": "선사명",
         "about": "B/L과 수출신고서에 쓰는 공식 선사부호를 확인합니다.",
     },
