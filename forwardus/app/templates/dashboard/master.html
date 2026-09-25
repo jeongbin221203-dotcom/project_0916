@@ -27,12 +27,13 @@
 
   <section class="card">
     <div class="row_between dash_table_head">
-      <h2>전체 Shipments <span class="muted small">{{ shipments|length }}건</span></h2>
-      <a class="button ghost" href="{{ url_for('dashboard.admin_export', **request.args) }}"
-         download>⬇ 엑셀(CSV) 내려받기</a>
+      <h2>전체 Shipments <span class="muted small">{{ page.total }}건</span></h2>
+      {# 내려받기는 지금 보는 쪽이 아니라 거른 목록 **전체**입니다. #}
+      <a class="button ghost" href="{{ url_for('dashboard.admin_export', **filters) }}"
+         download>⬇ 엑셀(CSV) 내려받기 <span class="muted small">(전체 {{ page.total }}건)</span></a>
     </div>
     {% include "dashboard/_filters.html" %}
-    {% if shipments %}
+    {% if page.rows %}
       <div class="table_scroll">
         <table class="table">
           <thead>
@@ -40,7 +41,7 @@
                 <th>ETD</th><th>ETA</th><th>상태 (바로 변경)</th></tr>
           </thead>
           <tbody>
-            {% for s in shipments %}
+            {% for s in page.rows %}
               <tr>
                 <td><a class="mono" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">{{ s.shipment_id }}</a></td>
                 <td class="small">{{ owners.get(s.user_id) or '(작성자 없음)' }}</td>
@@ -67,6 +68,7 @@
           </tbody>
         </table>
       </div>
+      {% include "dashboard/_pager.html" %}
     {% else %}
       <p class="muted">조건에 맞는 Shipment가 없습니다.</p>
     {% endif %}

@@ -9,13 +9,18 @@ from __future__ import annotations
 from flask import request, url_for
 
 # key는 "지금 어디에 있나"를 가릴 때 씁니다. blueprints가 그 항목에 속한 화면들입니다.
+#
+# 순서: 홈 → 서류 작성 → 운송 계획 → Dashboard → 조회 두 가지.
+# 서류 작성이 운송 계획보다 앞입니다. 서류에 적은 값이 운송 계획 칸을 미리 채우기
+# 때문입니다(work_draft_service). 시작 화면의 단추 순서(routes/home.py)와도 같습니다.
+# 두 곳의 순서가 다르면 같은 일을 하는 자리를 화면마다 다른 곳에서 찾게 됩니다.
 RAIL = [
     {"key": "home", "icon": "🏠", "tone": "", "label": "홈", "endpoint": "home.index",
      "note": "대화로 묻고 서류를 만듭니다", "blueprints": ("home",)},
-    {"key": "planning", "icon": "📦", "tone": "blue", "label": "운송 계획", "endpoint": "planning.new",
-     "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다", "blueprints": ("planning",)},
     {"key": "documents", "icon": "📄", "tone": "green", "label": "서류 작성", "endpoint": "document.new",
      "note": "상업송장·포장명세서를 Shipment 데이터로 자동 작성합니다", "blueprints": ("document",)},
+    {"key": "planning", "icon": "📦", "tone": "blue", "label": "운송 계획", "endpoint": "planning.new",
+     "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다", "blueprints": ("planning",)},
     # Shipment 상세·추적·AI 도우미 화면은 Dashboard 아래에 있습니다.
     {"key": "dashboard", "icon": "📊", "tone": "violet", "label": "Dashboard", "endpoint": "dashboard.index",
      "note": "내 Shipment 현황 (마스터는 전체)",

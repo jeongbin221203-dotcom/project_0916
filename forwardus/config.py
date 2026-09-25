@@ -118,6 +118,15 @@ class Config:
 
     UNIPASS_API_KEYS = {name: os.getenv(f"UNIPASS_KEY_{name}", "") for name in UNIPASS_SERVICES}
 
+    # 세관장확인대상물품(관세법 제226조)은 UNI-PASS가 아니라 공공데이터포털에서 받습니다.
+    # (UNI-PASS 키는 26자, 이 키는 64자로 서로 다른 체계입니다)
+    #   신청: https://www.data.go.kr/data/15101589/openapi.do
+    #
+    # 이름이 둘입니다. 포털 키라는 게 드러나는 DATA_PORTAL_KEY_CUSTOMS 를 먼저 보고,
+    # 없으면 예전 이름(UNIPASS_KEY_CUSTOMS)을 씁니다. .env를 고치지 않아도 계속 돌아갑니다.
+    CUSTOMS_CONFIRM_API_KEY = (os.getenv("DATA_PORTAL_KEY_CUSTOMS", "").strip()
+                               or os.getenv("UNIPASS_KEY_CUSTOMS", "").strip())
+
 
     # 시작 화면을 잠급니다.
     #

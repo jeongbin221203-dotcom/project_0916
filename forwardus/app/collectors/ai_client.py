@@ -15,7 +15,11 @@ import json
 from app.collectors.base_client import fail, get_config, ok, request_text
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_EMBED_URL = "https://api.openai.com/v1/embeddings"
 MODEL = "gpt-4o-mini"
+# FAQ 검색에 쓰는 임베딩. 말이 달라도 뜻이 비슷하면 찾으라고 씁니다.
+# ("배에 실은 다음부터 누가 책임지나요" ↔ "FOB 위험 이전 시점")
+EMBED_MODEL = "text-embedding-3-small"
 MAX_TEXT_CHARS = 12_000
 
 SYSTEM_PROMPT = """당신은 한국 수출 실무 담당자를 돕는 서류 검토자입니다.
@@ -47,6 +51,27 @@ status는 어긋난 것이 없으면 ok, 확인이 더 필요하면 check,
 
 def available() -> bool:
     return bool(get_config("AI_API_KEY", ""))
+
+
+def embed(texts: list[str], *, timeout: float = 20) -> dict:
+    """글 여러 개를 벡터로. 실패하면 부르는 쪽이 낱말 검색으로 돌아갑니다."""
+
+    key = get_config("AI_API_KEY", "")
+    if not key:
+        return fail("API_AUTH_FAILED", "api", "AI 키(AI_API_KEY)가 없습니다.")
+    if not texts:
+        return ok([], "api")
+    result = request_text("POST", OPENAI_EMBED_URL, timeout=timeout,
+                          headers={"Authorization": f"Bearer {key}",
+                                   "Content-Type": "application/json"},
+                          json={"model": EMBED_MODEL, "input": texts})
+    if not result["success"]:
+        return result
+    try:
+        rows = json.loads(result["data"])["data"]
+        return ok([row["embedding"] for row in sorted(rows, key=lambda row: row["index"])], "api")
+    except (ValueError, KeyError, TypeError):
+        return fail("API_INVALID_RESPONSE", "api", "임베딩 응답을 해석하지 못했습니다.")
 
 
 def structured_chat(messages: list[dict], schema: dict, *, name: str,

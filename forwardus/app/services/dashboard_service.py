@@ -33,6 +33,9 @@ STATUS_GROUPS = OrderedDict([
 # 지금 움직이고 있는 화물. (작성 중·완료·취소 제외)
 ACTIVE_STATUSES = ("quoted", "booked", "departed", "in_transit", "arrived")
 MAX_QUERY = 100
+# 한 쪽에 보여 줄 Shipment 수. 마스터 화면은 전체 사용자 것을 모으므로 금방 수백 줄이 됩니다.
+PAGE_SIZE = 20
+PAGE_SIZES = (20, 50, 100)
 RECENT_DOCUMENTS = 6
 RECENT_SCHEDULES = 5
 # 확정 전 서류 초안. 목록이 길어지면 진행 중인 화물이 밀려납니다.
@@ -92,6 +95,49 @@ def search(viewer, *, status: str | None = None, q: str = "", owner: str = "",
         return any(needle in str(word or "").lower() for word in words)
 
     return [shipment for shipment in shipments if hit(shipment)]
+
+
+def paginate(rows: list, page: int = 1, per_page: int = PAGE_SIZE) -> dict:
+    """목록을 쪽으로 나눕니다.
+
+    **세는 것은 전체, 그리는 것만 한 쪽입니다.** 통계 칸과 CSV 내려받기는 거른 목록
+    전체를 그대로 씁니다. 쪽을 넘긴다고 합계가 달라지면 관리자가 숫자를 못 믿습니다.
+
+    쪽 번호가 범위를 벗어나면(주소를 직접 고쳤거나, 거르고 나서 결과가 줄었거나)
+    빈 화면 대신 가장 가까운 쪽을 보여 줍니다.
+    """
+
+    per_page = per_page if per_page in PAGE_SIZES else PAGE_SIZE
+    total = len(rows)
+    pages = max(1, -(-total // per_page))          # 올림 나눗셈
+    page = max(1, min(page, pages))
+    start = (page - 1) * per_page
+    items = rows[start:start + per_page]
+    # 열쇠 이름이 "rows"인 이유: 화면(Jinja)에서 page.items라고 쓰면 dict의 items() 메서드가
+    # 먼저 잡혀 목록 대신 함수가 옵니다. 이름만 바꿔 그 함정을 없앱니다.
+    return {"rows": items, "page": page, "pages": pages, "per_page": per_page,
+            "total": total, "start": start + 1 if items else 0, "end": start + len(items),
+            "has_prev": page > 1, "has_next": page < pages,
+            "prev_page": page - 1, "next_page": page + 1,
+            "numbers": page_numbers(page, pages)}
+
+
+def page_numbers(page: int, pages: int, window: int = 2) -> list:
+    """쪽 번호 줄. 사이가 끊기는 자리는 None으로 둡니다(화면에서 '…'로 그립니다).
+
+    쪽이 아무리 늘어도 줄이 넘치지 않게 처음·끝과 지금 쪽 둘레만 남깁니다.
+    """
+
+    if pages <= 7:
+        return list(range(1, pages + 1))
+    keep = {1, pages} | {n for n in range(page - window, page + window + 1) if 1 <= n <= pages}
+    ordered = sorted(keep)
+    numbers: list = []
+    for index, number in enumerate(ordered):
+        if index and number - ordered[index - 1] > 1:
+            numbers.append(None)
+        numbers.append(number)
+    return numbers
 
 
 def status_cards(shipments) -> list[dict]:

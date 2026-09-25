@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app import create_app
+from tests._fuzz_app import build_app
 from app.services import ServiceError
 from app.validators import ValidationError
 
@@ -139,8 +139,7 @@ def block_outbound() -> None:
 
 def main(rounds: int) -> int:
     block_outbound()
-    app = create_app()
-    app.config["TESTING"] = True
+    app = build_app()          # 버리는 메모리 DB 위에서만 돕니다
     client = app.test_client()
     rng = random.Random(20260920)
 
