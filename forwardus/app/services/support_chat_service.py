@@ -408,8 +408,6 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     if used:
         data["sources"] = list(dict.fromkeys(used))
         data["basis"] = _basis(result.get("tools_used") or [])
-    # 답에 맞는 화면·기관 링크. 주소는 우리 표에서만 꺼냅니다. (AI가 만들지 않습니다)
-    data["links"] = answer_links.pick(text, data["answer"])
     if plan["candidates"]:
         # 어떤 FAQ를 참고했는지 남깁니다. 평가에서 검색이 맞았는지 볼 때도 씁니다.
         data["faq_context"] = [faq["id"] for faq, *_ in plan["candidates"][:FAQ_CONTEXT_TOP]]
@@ -421,6 +419,9 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
             (data.get("sources") or []) + [item["agency"] for item in evidence
                                            if item.get("agency") and
                                            item["status"] == consult_tools.CONFIRMED]))
+    # 답에 맞는 화면·기관 링크. 주소는 우리 표에서만 꺼냅니다. (AI가 만들지 않습니다)
+    # 캐시에 담기 전에 붙입니다. 나중에 붙이면 캐시로 답한 건에만 링크가 빠집니다.
+    data["links"] = answer_links.pick(text, data["answer"])
     # 최신 확인이 필요했던 질문과 조회가 실패한 답은 캐시에 담지 않습니다.
     safe_to_cache = may_cache and not fresh and outcome["evidence_summary"]["failed"] == 0
     if safe_to_cache:

@@ -72,3 +72,19 @@ a.kpi_card.link:hover { border-color: #c7d7fd; box-shadow: 0 0 0 1px #c7d7fd; }
 .dash_fold > summary h2::before { content: "▸ "; color: var(--muted); }
 .dash_fold[open] > summary h2::before { content: "▾ "; }
 .dash_fold[open] > summary { margin-bottom: 14px; }
+
+/* 쪽 넘김. 표 아래 한 줄로 두고, 좁은 화면에서는 세 덩어리가 각각 줄바꿈합니다. */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+         flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pager_count { margin: 0; }
+.pager_pages { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pager_pages .button.small { min-width: 34px; justify-content: center; padding: 0 9px; }
+/* 지금 보고 있는 쪽. 번호만 굵게 하면 어디 있는지 한눈에 안 보입니다. */
+.pager_pages .is_now { background: var(--brand, #1f4fd8); border-color: var(--brand, #1f4fd8);
+                       color: #fff; cursor: default; }
+/* 더 갈 곳이 없는 화살표. 지우지 않고 흐리게 둡니다 — 자리가 움직이면 잘못 누릅니다. */
+.pager_pages .is_off { opacity: .4; pointer-events: none; }
+.pager_gap { padding: 0 2px; color: var(--muted); }
+.pager_size { display: flex; align-items: center; gap: 6px; margin: 0; }
+.pager_size select { min-height: 34px; padding: 0 8px; font-size: 13px; }
+@media (max-width: 720px) { .pager { justify-content: center; text-align: center; } }

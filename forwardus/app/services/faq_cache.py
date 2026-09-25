@@ -12,10 +12,17 @@
 언제 버리나
   freshness가 `실시간 확인 필요`면 담지 않습니다. `정기 확인 필요`는 짧게,
   `안정적 지식`은 길게 둡니다. 관세율·운임처럼 움직이는 값은 캐시가 독입니다.
+
+담을 때와 꺼낼 때 반드시 복사합니다
+  예전에는 부르는 쪽이 넘긴 dict를 그대로 들고 있었습니다. 그런데 답을 받은 쪽이
+  그 dict에 값을 더 붙이면(라우트가 로그인한 사람의 화물 정보를 `captured`로 붙입니다)
+  그 값이 캐시 안으로 따라 들어가, **다음 사람이 남의 정보를 받게 됩니다.**
+  담을 때 한 벌 복사해 두고, 꺼낼 때도 복사해 줍니다. (2026-09-25 실제로 그랬습니다)
 """
 
 from __future__ import annotations
 
+import copy
 import re
 import threading
 import time
@@ -97,7 +104,8 @@ def get(question_norm: str, brief: bool, kb_version: str, conditions: dict | Non
             return None
         _store.move_to_end(key)
         _stats["hit"] += 1
-        return entry["payload"]
+        # 꺼낼 때도 복사합니다. 받은 쪽이 손대도 캐시 안의 답은 그대로여야 합니다.
+        return copy.deepcopy(entry["payload"])
 
 
 # 사람마다 다른 값. 캐시는 질문으로만 찾으므로, 이런 값이 섞이면 **남의 값이 보입니다.**
@@ -121,7 +129,8 @@ def put(question_norm: str, brief: bool, kb_version: str, payload: dict,
         return
     key = _key(question_norm, brief, kb_version, conditions)
     with _lock:
-        _store[key] = {"expires_at": time.time() + ttl, "payload": payload}
+        # 복사해서 담습니다. 부르는 쪽이 이 dict에 나중에 무엇을 붙이든 캐시는 모릅니다.
+        _store[key] = {"expires_at": time.time() + ttl, "payload": copy.deepcopy(payload)}
         _store.move_to_end(key)
         while len(_store) > MAX_ENTRIES:
             _store.popitem(last=False)

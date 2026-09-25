@@ -312,6 +312,30 @@ def test_캐시는_조건이_다르면_다른_답으로_본다(kb):
     assert faq_cache.get("화장품 수출 절차", False, version, {"countries": ["VN"]}) == payload_vn
 
 
+def test_캐시에_담은_뒤_붙인_값은_다음_사람에게_가지_않는다(kb):
+    """답을 받은 쪽이 dict에 무엇을 더 붙여도 캐시 안의 답은 그대로여야 합니다.
+
+    실제로 이랬습니다: 라우트가 로그인한 사람의 화물 정보를 `captured`로 붙였는데,
+    캐시가 그 dict를 그대로 들고 있어서 **다음 사람이 남의 출발지·수량을 받았습니다.**
+    """
+
+    version = faq_cache.knowledge_version()
+    answer = {"answer": "화장품 수출 절차는 ...", "sources": ["관세청"]}
+    faq_cache.put("화장품 수출 절차", False, version, answer, "안정적 지식")
+
+    # 답을 받은 쪽(라우트)이 이 사람 것만 덧붙입니다.
+    answer["captured"] = ["출발지", "수량"]
+    answer["sources"].append("이 사람 화면")
+
+    kept = faq_cache.get("화장품 수출 절차", False, version)
+    assert "captured" not in kept
+    assert kept["sources"] == ["관세청"]
+
+    # 꺼내 간 쪽이 손대도 캐시 안의 답은 그대로입니다.
+    kept["captured"] = ["도착지"]
+    assert "captured" not in faq_cache.get("화장품 수출 절차", False, version)
+
+
 def test_승인이_바뀌면_지식버전이_바뀌어_캐시가_버려진다(kb, tmp_path, monkeypatch):
     version = faq_cache.knowledge_version()
     faq_cache.put("상업송장 항목", False, version, {"answer": "옛 답"}, "안정적 지식")

@@ -254,3 +254,89 @@ def test_HS_창은_화면_85퍼센트까지이고_결과_목록만_스크롤된�
     assert "position: sticky" in pinned
     results = css[css.index(".hs_modal_body .ac_list {"):].split("}", 1)[0]
     assert "overflow-y: auto" in results and "scroll-behavior: smooth" in results
+
+
+# --- 쪽 나누기 -----------------------------------------------------------------------
+#
+# 마스터 화면은 전체 사용자 Shipment를 모으므로 금방 수백 줄이 됩니다. 표만 쪽으로
+# 나누고, **세는 것(통계 칸·CSV)은 거른 목록 전체**를 그대로 씁니다.
+
+def _many(create_shipment, count: int) -> list:
+    return [create_shipment(project_name=f"쪽나누기 {index:03}") for index in range(count)]
+
+
+def test_쪽나누기_경계값(app):
+    from app.services import dashboard_service as ds
+
+    rows = list(range(157))
+    first = ds.paginate(rows, 1)
+    assert len(first["rows"]) == 20 and first["pages"] == 8
+    assert (first["start"], first["end"], first["total"]) == (1, 20, 157)
+
+    last = ds.paginate(rows, 8)
+    assert len(last["rows"]) == 17 and last["rows"][0] == 140 and not last["has_next"]
+
+    # 주소를 직접 고쳐 범위를 벗어나도 빈 화면 대신 가장 가까운 쪽을 보여 줍니다.
+    assert ds.paginate(rows, 99)["page"] == 8
+    assert ds.paginate(rows, 0)["page"] == 1
+    # 목록에 없는 쪽 크기는 기본값으로 돌립니다.
+    assert ds.paginate(rows, 1, 999)["per_page"] == ds.PAGE_SIZE
+    # 아무것도 없을 때도 터지지 않습니다.
+    empty = ds.paginate([], 3)
+    assert empty["rows"] == [] and empty["pages"] == 1 and empty["start"] == 0
+
+
+def test_쪽_번호줄은_길어져도_넘치지_않는다(app):
+    from app.services import dashboard_service as ds
+
+    assert ds.page_numbers(1, 5) == [1, 2, 3, 4, 5]          # 적으면 다 보여 줍니다
+    assert ds.page_numbers(10, 20) == [1, None, 8, 9, 10, 11, 12, None, 20]
+    assert ds.page_numbers(1, 20)[0] == 1 and ds.page_numbers(1, 20)[-1] == 20
+
+
+def test_마스터_표는_한_쪽에_20건까지만_그린다(client, create_shipment):
+    _many(create_shipment, 25)
+    table = _table(client.get("/dashboard").get_data(as_text=True))
+
+    assert table.count('<td><a class="mono"') == 20
+    assert "전체 25건 중" in table and "1/2쪽" in table
+    # 제목의 건수는 쪽이 아니라 전체입니다.
+    assert "전체 Shipments <span class=\"muted small\">25건</span>" in table
+
+
+def test_다음_쪽에_나머지가_나온다(client, create_shipment):
+    made = _many(create_shipment, 25)
+    ids = {shipment.shipment_id for shipment in made}
+
+    first = _table(client.get("/dashboard").get_data(as_text=True))
+    second = _table(client.get("/dashboard?page=2").get_data(as_text=True))
+
+    on_first = {sid for sid in ids if sid in first}
+    on_second = {sid for sid in ids if sid in second}
+    assert len(on_first) == 20 and len(on_second) == 5
+    assert not (on_first & on_second)            # 같은 건이 두 쪽에 겹쳐 나오지 않습니다
+    assert on_first | on_second == ids           # 빠지는 건도 없습니다
+
+
+def test_쪽을_넘겨도_거르기_조건이_풀리지_않는다(client, two_members, create_shipment):
+    _many(create_shipment, 25)                   # 주인 없는 건을 섞어 둡니다
+    html = client.get("/dashboard?owner=bob@").get_data(as_text=True)
+
+    assert 'href="/dashboard?page=1&amp;owner=bob%40"' in html or "1/1쪽" in html
+    table = _table(html)
+    assert "쪽나누기" not in table               # 거른 결과만 쪽에 담깁니다
+
+
+def test_이상한_쪽_번호로도_화면이_열린다(client, create_shipment):
+    _many(create_shipment, 25)
+    for query in ("?page=abc", "?page=-3", "?page=999", "?size=7", "?size=abc"):
+        response = client.get(f"/dashboard{query}")
+        assert response.status_code == 200, query
+
+
+def test_CSV는_보고_있는_쪽이_아니라_전체를_내려준다(client, create_shipment):
+    made = _many(create_shipment, 25)
+    body = client.get("/dashboard/admin/export.csv?page=2").get_data(as_text=True)
+
+    for shipment in made:
+        assert shipment.shipment_id in body      # 2쪽을 보고 있어도 25건 모두
