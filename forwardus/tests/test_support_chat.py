@@ -8,6 +8,21 @@ from app.services import ServiceError, support_chat_service
 from app.collectors import ai_client
 
 
+@pytest.fixture(autouse=True)
+def _빈_캐시():
+    """같은 질문을 여러 테스트가 쓰므로 앞 테스트의 답이 남아 있으면 안 됩니다.
+
+    상담은 같은 질문에 캐시로 답합니다(faq_cache). 그 자체는 맞는 동작이지만,
+    테스트끼리 답이 새어 들어오면 무엇을 보고 있는지 알 수 없습니다.
+    """
+
+    from app.services import faq_cache
+
+    faq_cache.clear()
+    yield
+    faq_cache.clear()
+
+
 def test_widget_appears_on_every_page(client):
     """상담 버튼은 시작 화면을 포함해 어디서나 떠 있어야 합니다.
 
@@ -43,7 +58,7 @@ def test_incoterms_are_quoted_from_our_own_data_not_the_model(app, monkeypatch):
 
     monkeypatch.setattr(support_chat_service.ai_client, "chat", fake_chat)
     with app.app_context():
-        support_chat_service.ask("바이어가 자꾸 선적을 미룹니다. 어떻게 할까요?")
+        support_chat_service.ask("바이어와 첫 거래인데 계약서에 뭘 더 넣을까요")
 
     reference = "\n".join(m["content"] for m in sent["messages"] if m["role"] == "system")
     assert "Free On Board" in reference and "본선 인도" in reference
@@ -62,8 +77,8 @@ def test_widget_gets_brief_prompt_and_home_gets_template(client, monkeypatch):
         return {"success": True, "source": "api", "data": "답변"}
 
     monkeypatch.setattr(support_chat_service.ai_client, "chat", fake_chat)
-    client.post("/api/support-chat", json={"question": "바이어가 답이 없습니다", "style": "brief"})
-    client.post("/api/support-chat", json={"question": "바이어가 답이 없습니다"})
+    client.post("/api/support-chat", json={"question": "바이어와 첫 거래인데 계약서에 뭘 더 넣을까요", "style": "brief"})
+    client.post("/api/support-chat", json={"question": "바이어와 첫 거래인데 계약서에 뭘 더 넣을까요"})
 
     (widget_prompt, widget_tokens), (home_prompt, home_tokens) = sent
     assert widget_prompt == support_chat_service.BRIEF_SYSTEM_PROMPT
@@ -103,7 +118,7 @@ def test_offline_when_no_key(app, monkeypatch):
         assert intro["available"] is False
         assert "AI_API_KEY" in intro["offline_note"]
 
-        result = support_chat_service.ask("바이어가 자꾸 선적을 미룹니다. 어떻게 할까요?")
+        result = support_chat_service.ask("바이어와 첫 거래인데 계약서에 뭘 더 넣을까요")
         assert result["success"] is False
         assert "AI_API_KEY" in result["message"]
 
@@ -112,7 +127,7 @@ def test_endpoint_returns_the_answer(client, monkeypatch):
     monkeypatch.setattr(support_chat_service.ai_client, "chat",
                         lambda messages, **kw: {"success": True, "source": "api",
                                                 "data": "FOB는 본선 인도입니다."})
-    response = client.post("/api/support-chat", json={"question": "바이어가 답이 없습니다"})
+    response = client.post("/api/support-chat", json={"question": "바이어와 첫 거래인데 계약서에 뭘 더 넣을까요"})
     assert response.status_code == 200
     body = response.get_json()
     assert body["success"] is True
