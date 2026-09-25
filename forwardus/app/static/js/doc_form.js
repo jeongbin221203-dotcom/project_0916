@@ -794,9 +794,56 @@
   });
 
   function openOrigin() {
-    // 방금 만든 건이 있으면 그것부터 보여 줍니다.
+    // 방금 만든 건이 있으면 그것부터 보여 줍니다. 없으면 적어 둔 HS부호로 미리 봅니다.
     if (madeShipment) loadOrigin(madeShipment);
+    else previewRequiredDocs();
   }
+
+  /* ----- HS부호만으로 미리 보기 -----
+     건을 만든 뒤에 "인증이 필요합니다"라고 알려 주면 이미 늦습니다. 인증은 몇 주에서
+     몇 달이 걸립니다. 그래서 품목 칸에 HS부호를 적는 순간 무엇이 필요한지 보여 줍니다.
+     (협정 원산지증명서는 건이 있어야 세율을 볼 수 있어 그때 더해집니다) */
+  let previewKey = "";
+
+  function previewRequiredDocs() {
+    if (!config.requiredDocsPreviewUrl || madeShipment) return;
+    const codes = itemValues().map((row) => (row.hs_code || "").trim()).filter(Boolean);
+    const names = itemValues().map((row) => (row.product_description || "").trim()).filter(Boolean);
+    const country = (form.elements.destination_code?.value || "").slice(0, 2).toUpperCase();
+    const key = `${codes.join(",")}|${names.join(",")}|${country}`;
+    if (!codes.length && !names.length) return;
+    if (key === previewKey) return;
+    previewKey = key;
+
+    const query = new URLSearchParams();
+    codes.forEach((code) => query.append("hs", code));
+    names.forEach((name) => query.append("product", name));
+    if (country) query.append("country", country);
+    const place = panel.querySelector("[data-doc-place=\"destination\"] [data-place-search]");
+    if (place && place.value.trim()) query.append("country_name", place.value.trim());
+
+    originEmpty.hidden = false;
+    originBody.hidden = false;
+    originBody.innerHTML = `<p class="muted small">HS부호로 필요한 서류를 찾고 있습니다…</p>`;
+    getJson(`${config.requiredDocsPreviewUrl}?${query.toString()}`).then((response) => {
+      if (!response.success) {
+        originBody.innerHTML = `<p class="doc_error_line">${escapeHtml(response.message)}</p>`;
+        return;
+      }
+      originBody.innerHTML = requiredDocsHtml({
+        ...response.data,
+        destination: response.data.country || "",
+      });
+    });
+  }
+
+  // 품목 칸을 고치면 다시 찾아봅니다. (적는 동안 매번 부르지 않게 잠깐 기다립니다)
+  const previewSoon = debounce(previewRequiredDocs, 900);
+  form.addEventListener("input", (event) => {
+    if (event.target.name === "item_hs_code" || event.target.name === "item_product_description") {
+      previewSoon();
+    }
+  });
 
   async function loadOrigin(shipmentId) {
     // 고르는 칸은 계속 남겨 둡니다. 한 건을 보고 나서 다른 건을 바로 고를 수 있어야 합니다.

@@ -171,3 +171,46 @@ def test_Shipment_화면에서_서류_작성으로_바로_간다(client, 미국�
     assert client.get(f"/documents/new?{link}").status_code == 200
     form_js = (Path(__file__).parent.parent / "app/static/js/doc_form.js").read_text(encoding="utf-8")
     assert 'URLSearchParams(location.search).get("source")' in form_js
+
+
+class TestHS부호만으로_미리보기:
+    """건을 만들기 전에도 HS부호만 적으면 필요한 서류가 보여야 합니다.
+
+    인증은 몇 주에서 몇 달이 걸립니다. 건을 만들고 선적을 잡은 뒤에 알려 주면
+    이미 늦습니다.
+    """
+
+    def test_HS부호만으로_목록이_나온다(self, app, monkeypatch):
+        _키없음(monkeypatch)
+        data = required_docs_service.preview(["3306100000"], "TR", "이스탄불항", ["치약"])
+        assert data["total"] > 0
+        titles = [row["title"] for row in data["documents"]]
+        assert any("화장품" in title for title in titles)        # 우리 규칙표
+        assert any("TAREKS" in title or "TSE" in title for title in titles)  # 도착국 인증
+
+    def test_건이_없으니_협정_원산지증명서는_빠진다(self, app, monkeypatch):
+        _키없음(monkeypatch)
+        data = required_docs_service.preview(["3306100000"], "TR")
+        assert all(row["source"] != "fta" for row in data["documents"])
+
+    def test_위험물이면_그_서류도_함께_나온다(self, app, monkeypatch):
+        _키없음(monkeypatch)
+        data = required_docs_service.preview(["8507600000"], "US", products=["리튬배터리"],
+                                             dangerous=True)
+        titles = " ".join(row["title"] for row in data["documents"])
+        assert "위험물" in titles or "MSDS" in titles
+
+    def test_창구가_HS부호로_답한다(self, client):
+        response = client.get("/documents/api/required-docs?hs=3306100000&country=TR&ai=0")
+        assert response.status_code == 200
+        data = response.get_json()["data"]
+        assert data["documents"] and data["hs_codes"] == ["3306100000"]
+
+    def test_HS부호도_품명도_없으면_되묻는다(self, client):
+        response = client.get("/documents/api/required-docs?ai=0")
+        assert response.status_code == 400
+
+    def test_화면이_HS부호를_적을_때_찾아본다(self):
+        form = (Path(__file__).parent.parent / "app/static/js/doc_form.js").read_text(encoding="utf-8")
+        assert "requiredDocsPreviewUrl" in form
+        assert 'event.target.name === "item_hs_code"' in form

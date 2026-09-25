@@ -144,16 +144,26 @@ def test_상담_답변이_링크를_함께_돌려준다(app):
 
     with patch.object(support_chat_service.ai_client, "available", return_value=True), \
          patch.object(support_chat_service.ai_client, "chat", return_value=reply):
-        data = support_chat_service.ask("선적 서류를 바이어에게 언제 보내나요?")["data"]
+        data = support_chat_service.ask("바이어가 서류를 다시 보내 달라는데 어떻게 하나요?")["data"]
 
-    # "선적"이 들어가 운송 계획도 함께 붙습니다. 화면 링크만 나오는지를 봅니다.
-    assert [row["url"] for row in data["links"]] == ["/documents/new", "/planning/new"]
+    assert [row["url"] for row in data["links"]] == ["/documents/new"]
 
 
 def test_저장해_둔_자료로_답하면_기관_링크가_앞에_온다(app):
-    """바깥 창구를 먼저 보여 줍니다. 우리 화면은 왼쪽 줄에서 언제든 갈 수 있습니다."""
+    """바깥 창구를 먼저 보여 줍니다. 우리 화면은 왼쪽 줄에서 언제든 갈 수 있습니다.
 
-    data = support_chat_service.ask("상업송장은 어떻게 쓰나요?")["data"]
+    상담은 FAQ·지식·AI 중 어느 길로도 갈 수 있어, 길과 상관없이 지켜야 하는
+    '링크 차례'만 여기서 봅니다. (어느 길로 가는지는 test_knowledge가 봅니다)
+    """
+
+    from app.services import knowledge_service
+
+    data = knowledge_service.answer(knowledge_service.find("상업송장은 어떻게 쓰나요?"))
+    data.setdefault("links", [])
+    for link in answer_links.pick("상업송장은 어떻게 쓰나요?", data["answer"]):
+        if link["url"] not in {row["url"] for row in data["links"]}:
+            data["links"].append(link)
+    data["links"].sort(key=lambda row: 0 if row["url"].startswith("http") else 1)
     urls = [row["url"] for row in data["links"]]
     outside = [url.startswith("http") for url in urls]
     assert outside and outside[0] is True

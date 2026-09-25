@@ -202,6 +202,48 @@ def ai_extra(items: list[dict], country_name: str, found: list[dict]) -> list[di
     return extra[:6]
 
 
+class _Item:
+    """HS부호만 들고 오는 품목. (건을 만들기 전에 미리 보여 줄 때 씁니다)
+
+    화물 모델과 같은 이름의 값만 갖습니다. 아래 collect가 화물에서 읽는 것이
+    hs_code · product_description · is_dangerous 셋뿐이라 이걸로 충분합니다.
+    """
+
+    def __init__(self, hs_code: str = "", product_description: str = "",
+                 is_dangerous: bool = False) -> None:
+        self.hs_code = hs_code
+        self.product_description = product_description
+        self.is_dangerous = is_dangerous
+
+
+def preview(hs_codes, country_code: str = "", country_name: str = "",
+            products=None, dangerous: bool = False, *, use_ai: bool = True) -> dict:
+    """건을 만들기 전에, **HS부호만으로** 필요한 서류를 미리 봅니다.
+
+    서류 작성 화면에서 품목의 HS부호를 적으면 바로 이 목록이 뜹니다. 건을 만들고
+    나서야 알려 주면, 인증에 몇 달 걸리는 것을 선적 직전에 알게 됩니다.
+
+    FTA 원산지증명서는 건(Shipment)이 있어야 협정 세율을 볼 수 있어 여기서는 빠집니다.
+    """
+
+    codes = [code for code in (hs_codes or []) if code]
+    names = list(products or [])
+    items = [_Item(code, names[i] if i < len(names) else "", dangerous)
+             for i, code in enumerate(codes)] or [_Item("", names[0] if names else "", dangerous)]
+    return collect(_Preview(items, country_code, country_name), use_ai=use_ai)
+
+
+class _Preview:
+    """collect가 읽는 것만 흉내 냅니다. (건이 없으니 올린 파일도 없습니다)"""
+
+    def __init__(self, items, country_code: str, country_name: str) -> None:
+        self.cargos = items
+        self.destination_country = country_code
+        self.destination_code = country_code
+        self.destination_name = country_name
+        self.requirement_documents = []
+
+
 def collect(shipment, *, use_ai: bool = True) -> dict:
     """이 건에 필요한 서류 한 목록. 올린 파일이 있으면 붙여서 돌려줍니다."""
 
@@ -243,8 +285,8 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
                     "요건승인이 없으면 수출신고가 수리되지 않습니다.",
              "source": "customs", "link": "", "confidence": "high"})
 
-    # 3. FTA 원산지증명서
-    origin = _fta_origin(shipment)
+    # 3. FTA 원산지증명서 (건이 있어야 협정 세율을 봅니다)
+    origin = _fta_origin(shipment) if not isinstance(shipment, _Preview) else None
     if origin:
         add(origin)
 

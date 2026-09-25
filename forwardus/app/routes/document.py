@@ -249,6 +249,33 @@ def origin_guide(shipment_id: str):
     }})
 
 
+@document_bp.get("/api/required-docs")
+@login_required
+def api_required_docs():
+    """HS부호만으로 필요한 서류를 미리 봅니다. (건을 만들기 전)
+
+    서류 작성 화면에서 품목의 HS부호를 적으면 바로 이 목록이 뜹니다. 인증은 몇 주에서
+    몇 달이 걸리는 것이라, 건을 만든 뒤에 알려 주면 이미 늦습니다.
+    """
+
+    from app.services import required_docs_service
+
+    codes = [code for code in request.args.getlist("hs") if code.strip()]
+    products = [name for name in request.args.getlist("product") if name.strip()]
+    country = (request.args.get("country") or "").strip().upper()[:2]
+    if not codes and not products:
+        return error_response(ServiceError("HS부호나 품명을 알려주세요.",
+                                           "VALIDATION_ERROR"))
+    data = required_docs_service.preview(
+        codes, country, request.args.get("country_name", ""), products,
+        dangerous=request.args.get("dangerous") == "1",
+        use_ai=request.args.get("ai", "1") != "0")
+    return jsonify({"success": True, "data": {
+        **data, "hs_codes": codes, "country": country,
+        "upload_url": "", "filing_url": "",
+    }})
+
+
 @document_bp.get("/<shipment_id>/required-docs")
 def required_docs(shipment_id: str):
     """이 건에 필요한 서류 한 목록. 서류 작성 화면의 '기타 필수 서류'가 씁니다.

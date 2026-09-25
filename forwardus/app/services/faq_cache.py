@@ -100,8 +100,20 @@ def get(question_norm: str, brief: bool, kb_version: str, conditions: dict | Non
         return entry["payload"]
 
 
+# 사람마다 다른 값. 캐시는 질문으로만 찾으므로, 이런 값이 섞이면 **남의 값이 보입니다.**
+# (captured = 그 사람 대화에서 담아 둔 화물정보)
+PERSONAL_KEYS = ("captured", "kept", "draft", "work_draft")
+
+
+def strip_personal(payload: dict) -> dict:
+    """캐시에 담기 전에 사람별 값을 떼어 냅니다."""
+
+    return {key: value for key, value in payload.items() if key not in PERSONAL_KEYS}
+
+
 def put(question_norm: str, brief: bool, kb_version: str, payload: dict,
         freshness: str = "", conditions: dict | None = None) -> None:
+    payload = strip_personal(payload)
     ttl = TTL_BY_FRESHNESS.get(freshness, DEFAULT_TTL)
     if ttl <= 0:
         with _lock:

@@ -222,3 +222,27 @@ def test_담아_둔_값에는_대화_원문이_없다(app):
 
     saved = str(WorkDraft.query.one().data)
     assert "보냅니다" not in saved and "결제입니다" not in saved
+
+
+def test_캐시가_남의_화물정보를_흘리지_않는다(app, anon_client):
+    """캐시는 질문으로만 찾습니다. 사람별 값이 담기면 다음 사람에게 그대로 보입니다.
+
+    회원이 "부산에서 LA로 …"라고 적으면 그 값이 담기고(captured), 같은 질문을 한
+    로그인하지 않은 사람에게 캐시가 그 답을 돌려줍니다. 그때 담아 둔 값까지 따라가면
+    남의 화물 내용이 새어 나갑니다.
+    """
+
+    from app.services import faq_cache
+
+    browser = _member(app)
+    mine = _ask(browser, CARGO_TALK).get_json()
+    assert mine["data"].get("captured"), "회원 답에는 담아 둔 값이 붙어야 합니다"
+
+    # 같은 질문을 로그인하지 않은 사람이 합니다. (캐시에서 나올 수 있습니다)
+    with patch.object(support_chat_service.ai_client, "available", return_value=True), \
+         patch.object(support_chat_service.ai_client, "chat", return_value=ANSWER):
+        response = anon_client.post("/api/support-chat", json={"question": CARGO_TALK})
+
+    assert "captured" not in response.get_json()["data"]
+    # 캐시에 담긴 내용 자체에도 없어야 합니다.
+    assert all("captured" not in row["payload"] for row in faq_cache._store.values())
