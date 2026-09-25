@@ -1,0 +1,222 @@
+"""수출 서류를 **어디서 어떻게** 받는지. 이름만 알려 주고 끝내지 않기 위한 표입니다.
+
+왜 필요한가
+  상담이 "위생증명서·성분분석서·COA 등이 필요할 수 있습니다"까지만 답하고 있었습니다.
+  이름을 알아도 처음 수출하는 사람은 **어디로 가야 하는지**를 모릅니다. 검색하면
+  대행업체 광고가 먼저 나오고, 정작 공식 창구는 한참 뒤에 있습니다.
+
+  그래서 서류마다 발급기관·신청 방법·걸리는 시간·주소를 함께 둡니다.
+
+무엇을 지키나
+  - **주소는 이 표에서만 꺼냅니다.** AI가 주소를 지어내면 없는 창구로 보내게 됩니다.
+  - 공식 기관만 적습니다. 대행업체는 넣지 않습니다.
+  - 걸리는 시간은 "보통 이 정도"입니다. 기관 사정과 품목에 따라 달라집니다.
+  - 모르는 것은 비워 둡니다. 수수료는 품목·건수마다 달라 대부분 적지 않았습니다.
+
+찾는 방법
+  서류 이름은 서식마다 다르게 적힙니다(위생증명서 / Health Certificate / 보건증).
+  그래서 이름이 정확히 같은지 보지 않고, `keywords` 가운데 하나라도 들어 있으면
+  같은 서류로 봅니다.
+"""
+
+from __future__ import annotations
+
+# 각 줄: 무엇을 · 어디서 · 어떻게 · 얼마나 걸리나 · 주소
+#
+# "how"는 **처음 하는 사람이 그대로 따라 할 수 있게** 적습니다. "신청하세요"가 아니라
+# 어느 시스템에 들어가 무엇을 먼저 해야 하는지까지 적습니다.
+ISSUERS = [
+    {
+        "key": "origin",
+        "title": "원산지증명서 (C/O)",
+        "keywords": ("원산지증명", "C/O", "CO 발급", "origin certificate"),
+        "agency": "관세청(세관) 또는 대한상공회의소",
+        "how": "협정이 기관발급이면 둘 중 한 곳에서 받습니다. 자율발급 협정(한·미 FTA 등)은 "
+               "수출자가 협정 서식에 직접 적고 서명합니다. 어느 쪽인지는 협정마다 다릅니다.",
+        "lead_time": "기관발급 1~3 영업일",
+        "url": "https://cert.korcham.net",
+        "extra": [
+            ("관세청 FTA 포털 · 협정별 서식", "https://www.customs.go.kr/ftaportalkor/main.do"),
+            ("FTA-PASS 원산지관리시스템 (무료)", "https://www.ftapass.or.kr"),
+        ],
+        "caution": "사후 검증이 5년 뒤에 옵니다. 원산지소명서·BOM·제조공정도를 함께 보관하세요.",
+    },
+    {
+        "key": "health",
+        "title": "위생증명서 (Health Certificate)",
+        "keywords": ("위생증명", "health certificate", "보건증명"),
+        "agency": "식품의약품안전처 · 지방식품의약품안전청",
+        "how": "식품안전나라 또는 관할 지방식약청에 신청합니다. 제조업 등록과 "
+               "품목제조보고가 먼저 되어 있어야 합니다.",
+        "lead_time": "3~7 영업일",
+        "url": "https://www.mfds.go.kr",
+        "extra": [("식품안전나라", "https://www.foodsafetykorea.go.kr")],
+        "caution": "수입국이 요구하는 서식이 따로 있는 경우가 많습니다. 바이어에게 서식을 먼저 받으세요.",
+    },
+    {
+        "key": "cfs",
+        "title": "자유판매증명서 (CFS)",
+        "keywords": ("자유판매", "CFS", "free sale"),
+        "agency": "식품의약품안전처 (화장품은 대한화장품협회도 발급)",
+        "how": "국내에서 정상 유통되고 있음을 증명하는 서류입니다. 화장품은 "
+               "대한화장품협회가, 식품·의약품은 식약처가 발급합니다.",
+        "lead_time": "3~5 영업일",
+        "url": "https://www.mfds.go.kr",
+        "extra": [("대한화장품협회", "https://www.kcia.or.kr")],
+        "caution": "영사확인(아포스티유)을 함께 요구하는 나라가 많습니다. 시간이 더 걸립니다.",
+    },
+    {
+        "key": "coa",
+        "title": "성분분석서 · 시험성적서 (COA)",
+        "keywords": ("성분분석", "COA", "시험성적", "분석성적", "certificate of analysis"),
+        "agency": "공인시험기관 (KTR · KTL · KCL 등)",
+        "how": "시료를 보내고 수입국이 요구하는 항목으로 시험을 신청합니다. "
+               "어떤 항목을 시험할지는 수입국 규제가 정합니다. 바이어에게 기준을 먼저 받으세요.",
+        "lead_time": "품목에 따라 5~20 영업일",
+        "url": "https://www.ktr.or.kr",
+        "extra": [
+            ("한국산업기술시험원 KTL", "https://www.ktl.re.kr"),
+            ("한국건설생활환경시험연구원 KCL", "https://www.kcl.re.kr"),
+        ],
+        "caution": "제조사가 자체 발행한 COA를 안 받아 주는 나라가 있습니다. 공인기관 성적서인지 확인하세요.",
+    },
+    {
+        "key": "msds",
+        "title": "물질안전보건자료 (MSDS/SDS)",
+        "keywords": ("MSDS", "SDS", "물질안전보건"),
+        "agency": "제조사가 작성 · 안전보건공단에 제출",
+        "how": "화학물질을 만든 곳이 작성합니다. 사 오는 원료면 공급사에 요청하세요. "
+               "국내 유통용은 안전보건공단 제출 대상입니다.",
+        "lead_time": "보유하고 있으면 바로",
+        "url": "https://msds.kosha.or.kr",
+        "extra": [],
+        "caution": "위험물 신고서의 정식운송품명(PSN)은 MSDS 14번 항목에서 그대로 옮겨 적습니다.",
+    },
+    {
+        "key": "dg",
+        "title": "위험물 신고서 (Shipper's Declaration)",
+        "keywords": ("위험물 신고", "shipper's declaration", "DGD", "위험물신고"),
+        "agency": "수출자가 작성 · 선사/항공사가 접수",
+        "how": "해상은 IMDG, 항공은 IATA 서식으로 씁니다. UN번호·급·포장등급·정식운송품명이 "
+               "모두 맞아야 하며, 항공은 교육 이수자가 서명해야 접수됩니다.",
+        "lead_time": "부킹과 함께",
+        "url": "https://www.komdi.or.kr",
+        "extra": [],
+        "caution": "한 글자만 틀려도 반송됩니다. 포장 성적서(UN 표시)도 함께 요구합니다.",
+    },
+    {
+        "key": "strategic",
+        "title": "전략물자 판정서 · 수출허가",
+        "keywords": ("전략물자", "수출허가", "yestrade"),
+        "agency": "전략물자관리원 · 산업통상자원부",
+        "how": "YesTrade에서 자가판정을 먼저 하고, 해당되면 허가를 신청합니다. "
+               "해당 안 되어도 판정서를 받아 두면 통관에서 묻지 않습니다.",
+        "lead_time": "판정 즉시~5일 · 허가 15일 이상",
+        "url": "https://www.yestrade.go.kr",
+        "extra": [],
+        "caution": "허가 없이 보내면 형사처벌 대상입니다. 전자·기계·화학은 꼭 판정하세요.",
+    },
+    {
+        "key": "quarantine",
+        "title": "검역증명서 (식물·동물·수산물)",
+        "keywords": ("검역증", "식물검역", "동물검역", "수산물", "phytosanitary"),
+        "agency": "농림축산검역본부 (식물·동물) · 국립수산물품질관리원 (수산물)",
+        "how": "선적 전에 검역 신청을 하고 현장 검사를 받습니다. 수입국이 요구하는 "
+               "검역 조건을 미리 확인해야 재검사를 피합니다.",
+        "lead_time": "신청 후 1~3 영업일",
+        "url": "https://www.qia.go.kr",
+        "extra": [("국립수산물품질관리원", "https://www.nfqs.go.kr")],
+        "caution": "목재 포장재(팔레트·나무상자)를 쓰면 IPPC 소독 마크가 따로 필요합니다.",
+    },
+    {
+        "key": "customs_requirement",
+        "title": "세관장확인 요건승인",
+        "keywords": ("세관장확인", "요건승인", "요건확인"),
+        "agency": "품목별 요건확인기관 (식약처·환경부·산업부 등)",
+        "how": "관세법 제226조 대상 품목은 수출신고 전에 해당 기관의 승인을 받아야 합니다. "
+               "어느 기관인지는 HS부호로 정해집니다.",
+        "lead_time": "기관마다 다름",
+        "url": "https://unipass.customs.go.kr",
+        "extra": [("관세청 세관장확인대상 조회", "https://www.data.go.kr/data/15101589/openapi.do")],
+        "caution": "요건승인이 없으면 수출신고가 수리되지 않습니다.",
+    },
+    {
+        "key": "ce",
+        "title": "CE 마킹 (EU)",
+        "keywords": ("CE 마킹", "CE 인증", "CE마크"),
+        "agency": "EU 인증기관(Notified Body) · 품목에 따라 자가선언",
+        "how": "해당 지침을 찾아 적합성 평가를 받고 적합성선언서(DoC)를 만듭니다. "
+               "위험도가 낮은 품목은 자가선언이 가능합니다.",
+        "lead_time": "품목에 따라 수 주~수 개월",
+        "url": "https://ec.europa.eu/growth/tools-databases/nando/",
+        "extra": [],
+        "caution": "EU 역내 책임 경제운영자(대리인)가 없으면 판매할 수 없습니다. DoC와 기술문서는 10년 보관합니다.",
+    },
+    {
+        "key": "fda",
+        "title": "FDA 등록 · 신고 (미국)",
+        "keywords": ("FDA",),
+        "agency": "미국 식품의약국 (FDA)",
+        "how": "식품·화장품·의료기기는 시설 등록과 품목 신고가 필요합니다. "
+               "식품은 선적마다 Prior Notice를 따로 보내야 합니다.",
+        "lead_time": "등록은 즉시~수 일 · Prior Notice는 도착 전",
+        "url": "https://www.fda.gov/industry",
+        "extra": [],
+        "caution": "미국 내 대리인(U.S. Agent)이 있어야 등록됩니다.",
+    },
+    {
+        "key": "fcc",
+        "title": "FCC 인증 (미국 · 무선/전자)",
+        "keywords": ("FCC",),
+        "agency": "미국 연방통신위원회 (FCC) 인정 시험소",
+        "how": "무선기기는 Certification, 일반 전자기기는 SDoC입니다. "
+               "FCC 인정 시험소에서 시험한 뒤 등록합니다.",
+        "lead_time": "2~8 주",
+        "url": "https://www.fcc.gov/oet/ea",
+        "extra": [],
+        "caution": "FCC Covered List에 오른 부품이 들어가면 수입 자체가 막힙니다.",
+    },
+]
+
+
+def find(name: str) -> dict | None:
+    """서류 이름으로 발급 안내를 찾습니다. 없으면 None (지어내지 않습니다)."""
+
+    text = str(name or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    for row in ISSUERS:
+        if any(word.lower() in lowered for word in row["keywords"]):
+            return row
+    return None
+
+
+def describe(row: dict) -> str:
+    """한 서류의 발급 안내를 사람이 읽는 여러 줄로."""
+
+    if not row:
+        return ""
+    lines = [f"**{row['title']}**",
+             f"- 발급처: {row['agency']}",
+             f"- 받는 법: {row['how']}"]
+    if row.get("lead_time"):
+        lines.append(f"- 걸리는 시간: {row['lead_time']}")
+    if row.get("url"):
+        lines.append(f"- 신청: {row['url']}")
+    for label, url in row.get("extra", []):
+        lines.append(f"- {label}: {url}")
+    if row.get("caution"):
+        lines.append(f"- ⚠ {row['caution']}")
+    return "\n".join(lines)
+
+
+def links_for(name: str) -> list[dict]:
+    """그 서류를 받는 공식 창구. 화면의 링크 줄에 씁니다."""
+
+    row = find(name)
+    if not row:
+        return []
+    links = [{"label": row["agency"], "url": row["url"]}] if row.get("url") else []
+    links += [{"label": label, "url": url} for label, url in row.get("extra", [])]
+    return links
