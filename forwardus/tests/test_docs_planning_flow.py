@@ -29,7 +29,7 @@ def _member(app, email="kim@example.com"):
 def test_서류_작성_탭이_운송_계획보다_앞이다(app):
     with app.test_request_context():
         labels = [row["label"] for row in home.quick_actions()]
-    assert labels == ["무역 상담", "서류 작성", "운송 계획"]
+    assert labels == ["무역 상담", "서류 작성", "운송 예상 견적"]
 
 
 def test_예시_칩을_누르면_바로_보낸다(app):
