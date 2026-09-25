@@ -45,7 +45,10 @@ def test_서류에_적은_값이_운송_예상_견적_칸으로_그대로_간다
     # 이름은 우리 항구 목록의 표준 이름으로 바뀔 수 있습니다. 코드가 맞는 것이 중요합니다.
     assert draft["destination"]["code"] == "TRIST" and draft["destination"]["name"]
     assert draft["incoterms"] == "CIF"
-    assert draft["departure_date"] == "2026-11-02"
+    # 발송 예상일은 넘기지 않습니다. (2026-09-26)
+    # 운송 계획 화면은 달력에서 날짜를 고르는 것으로 시작하는데, 미리 골라 두면
+    # 들어오자마자 선택된 상태라 "다음 선택: Seller 발송 예상일" 안내와 어긋납니다.
+    assert draft["departure_date"] is None
     assert draft["transport_mode"] == "SEA" and draft["sea_mode"] == "FCL"
 
     fields = draft["fields"]

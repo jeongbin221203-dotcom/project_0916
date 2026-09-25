@@ -296,7 +296,11 @@ html:has(.home_center.talking) { scroll-padding-bottom: calc(var(--composer_h, 1
   background: linear-gradient(to bottom, rgba(244, 247, 251, 0), var(--surface));
   pointer-events: none;
 }
+/* 적는 칸·단추·복원 안내는 **같은 폭**이어야 합니다.
+   복원 안내가 이 목록에서 빠져 있어, 대화 중에는 혼자 화면 끝까지 늘어났습니다.
+   "이어서 보기 / 새로 시작"이 적는 칸 바깥으로 튀어나와 보였습니다. */
 .home_center.talking .home_box,
+.home_center.talking .home_kept,
 .home_center.talking .home_actions { width: min(720px, 100%); margin-inline: auto; }
 
 /* 대화 중에는 답 글자가 탭 줄 바로 위까지 이어지게 합니다.
@@ -891,18 +895,18 @@ body.home_talking .support_panel { display: none !important; }
 /* 한 줄로 눕힙니다. 줄바꿈하면 안내가 두세 줄을 차지해 대화가 밀려 내려갑니다.
    다만 좁은 화면에서는 넘치느니 접히는 편이 낫습니다(wrap). */
 .home_kept { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 6px 12px; margin: 8px 0 0; padding: 5px 14px;
-  /* 폭은 정하지 않습니다. 적는 칸(.home_box)과 같은 부모 안에 있으므로
-     그냥 두면 저절로 같은 폭이 됩니다. 따로 정하면 어긋납니다. */
+  gap: 6px 12px; margin: 8px auto 0; padding: 4px 12px;
+  /* 대화 중에는 위의 .talking 규칙이 720px로 맞춥니다. 그 전에는 적는 칸과
+     같은 부모라 그냥 두면 같은 폭이 됩니다. */
   border: 1px solid #bfdbfe; border-radius: 14px; background: #f5f9ff; }
-.home_kept_text { margin: 0; font-size: 12.5px; line-height: 1.45; }
+.home_kept_text { margin: 0; font-size: 12px; line-height: 1.4; }
 /* 날짜를 같은 줄에 둡니다. block이면 한 줄을 더 먹어, 그만큼 대화가 덜 보입니다.
    "9월 / 26일"로 갈라지지 않게 날짜는 통째로 붙여 둡니다. */
 .home_kept_text small { margin-left: 6px; color: var(--muted); font-size: 12px;
   white-space: nowrap; }
 .home_kept_text { flex: 1 1 auto; min-width: 0; }
 .home_kept_buttons { display: flex; gap: 8px; }
-.home_kept_buttons .button { padding: 4px 12px; font-size: 12px; }
+.home_kept_buttons .button { padding: 3px 10px; font-size: 11.5px; }
 
 /* Shipment에서 서류 작성으로 넘어왔을 때 돌아가는 줄.
    화면 맨 위, 제목보다 앞에 둡니다. 칸을 다 채우고 나서야 "어떻게 돌아가지?"를
