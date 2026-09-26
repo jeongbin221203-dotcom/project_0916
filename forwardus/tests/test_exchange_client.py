@@ -116,3 +116,64 @@ def test_missing_usd_is_an_error(with_key, monkeypatch):
     monkeypatch.setattr(exchange_client, "request_text",
                         lambda *args, **kwargs: {"success": True, "data": xml, "source": "api"})
     assert exchange_client.fetch_unipass_rates()["error_code"] == "API_MISSING_FIELD"
+
+
+# --- 받아 온 환율 표 거르기 ----------------------------------------------------------
+#
+# 환율은 견적 금액에 그대로 곱해집니다. 기관이 자릿수를 하나 틀리면 견적이
+# 1,000배 틀립니다. 예전에는 받아 온 표를 아무 검사 없이 썼습니다. (2026-09-26)
+
+@pytest.mark.parametrize("rates,why", [
+    ({"USD": 1.3805, "KRW": 1.0}, "달러가 1,000배 작음 (달러 기준 표를 잘못 읽은 모양)"),
+    ({"USD": 1380500.0, "KRW": 1.0}, "달러가 1,000배 큼"),
+    ({"USD": 0, "KRW": 1.0}, "달러가 0"),
+    ({"USD": -1380.5, "KRW": 1.0}, "달러가 음수"),
+    ({"USD": "1380.5", "KRW": 1.0}, "달러가 글자"),
+    ({"USD": None, "KRW": 1.0}, "달러가 없음"),
+    ({"USD": True, "KRW": 1.0}, "달러가 참/거짓"),
+    ({}, "빈 표"),
+    ({"KRW": 1.0}, "달러가 아예 빠짐"),
+    (None, "표가 아님"),
+])
+def test_못_믿을_환율_표는_쓰지_않는다(rates, why):
+    assert exchange_client.sound_rates(rates) is None, why
+
+
+def test_원화는_표가_뭐라_하든_1이다():
+    """KRW 가 1이 아니면 모든 환산이 그 배수만큼 틀립니다."""
+
+    got = exchange_client.sound_rates({"USD": 1380.5, "KRW": 1000.0})
+    assert got["KRW"] == 1.0
+
+
+def test_이상한_통화만_버리고_나머지는_살린다():
+    """표 하나가 이상하다고 멀쩡한 통화까지 버리면 견적을 못 냅니다."""
+
+    got = exchange_client.sound_rates({
+        "USD": 1380.5, "EUR": 1495.2, "VND": 0.055, "KWD": 4500.0,   # 정상
+        "JPY": 0.0072,      # 1달러 기준 값이 섞여 들어옴 — 너무 작습니다
+        "CNY": -190.3, "GBP": "1760", "AUD": None,
+        "XAU": 3_000_000.0,   # 금 — 통화가 아닙니다 (ISO 4217 의 X 계열)
+    })
+    # 모르는 통화라도 모양이 맞으면 남깁니다. 버리면 관세청이 새로 실어 준
+    # 진짜 통화가 조용히 사라집니다.
+    assert set(got) == {"USD", "EUR", "VND", "KWD", "KRW"}
+
+
+def test_못_믿을_표가_오면_다음_단계로_내려간다(app, monkeypatch):
+    """틀린 숫자를 진짜처럼 보여 주느니 '예시 환율'이라고 적는 편이 낫습니다."""
+
+    monkeypatch.setattr(exchange_client, "fetch_unipass_rates",
+                        lambda *a, **k: {"success": True, "data": {"USD": 1.38},
+                                         "applied_date": "2026-09-26", "source": "api"})
+    monkeypatch.setattr(exchange_client, "_from_open_exchange_rates", lambda: None)
+    monkeypatch.setattr(exchange_client, "_last_good", lambda: None)
+    exchange_client.clear_cache()
+    try:
+        got = exchange_client.fetch_krw_rates()
+    finally:
+        exchange_client.clear_cache()
+    assert got["source"] == "mock"
+    assert not exchange_client.rate_is_real(got)
+    assert "예시" in exchange_client.rate_basis(got)
+    assert 300 <= got["data"]["USD"] <= 5000

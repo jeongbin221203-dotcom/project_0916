@@ -153,6 +153,53 @@ RATE_SOURCES = {
 }
 
 
+# --- 받아 온 환율 표를 거릅니다 ------------------------------------------------------
+#
+# 왜 필요한가
+#   환율은 견적 금액에 **그대로 곱해집니다.** 기관이 자릿수를 하나 틀리거나
+#   응답 모양이 바뀌면 견적이 통째로 틀립니다. 그런데 받아 온 표를 아무 검사
+#   없이 쓰고 있었습니다. 넣어 본 값이 전부 그대로 통과했습니다.
+#     USD 1.3805  (1,000배 작음 — 달러 기준 표를 잘못 읽은 모양)
+#     USD -1380.5 · USD "1380.5"(글자) · USD None
+#     KRW 1000    (원화가 1이 아니면 모든 환산이 1,000배 틀립니다)
+#     빈 표       (success 는 참인데 값이 없음)
+#   이런 값이 오면 **그 출처를 실패로 보고 다음 단계로 내려갑니다.** 끝까지 가면
+#   예시 환율이 나오는데, 예시는 화면에 "실제 거래에 쓰지 마세요"라고 적힙니다.
+#   틀린 숫자를 진짜처럼 보여 주는 것보다 낫습니다. (2026-09-26)
+
+# 달러가 이 밖이면 그 표는 믿지 않습니다. 원/달러는 1997년에도 2,000원 아래였고
+# 1990년대에도 700원 위였습니다. 넉넉히 잡아도 이 밖은 자릿수 실수입니다.
+USD_KRW_BAND = (300.0, 5_000.0)
+# 통화 하나가 이 밖이면 그 통화만 버립니다. 가장 싼 통화(VND 약 0.055원)와
+# 가장 비싼 통화(KWD 약 4,500원)를 넉넉히 감쌉니다.
+RATE_BAND = (0.01, 100_000.0)
+
+
+def sound_rates(rates) -> dict | None:
+    """쓸 수 있는 환율만 남깁니다. 표 자체를 못 믿겠으면 None."""
+
+    if not isinstance(rates, dict):
+        return None
+    kept = {}
+    for code, value in rates.items():
+        code = str(code or "").upper()
+        if code == "KRW" or not is_currency_code(code):
+            continue
+        # bool 은 int 의 자식이라 따로 막습니다. True 가 1.0원이 되면 곤란합니다.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        value = float(value)
+        if not RATE_BAND[0] <= value <= RATE_BAND[1]:
+            continue
+        kept[code] = value
+    usd = kept.get("USD")
+    if usd is None or not USD_KRW_BAND[0] <= usd <= USD_KRW_BAND[1]:
+        return None
+    # 원화는 언제나 1입니다. 받아 온 표가 뭐라고 하든 여기서 못 박습니다.
+    kept["KRW"] = 1.0
+    return kept
+
+
 def rate_is_real(result: dict) -> bool:
     """지어낸 값이 아닌지. 예시 고정 환율만 거짓입니다."""
 
@@ -274,22 +321,26 @@ def _read_krw_rates() -> tuple[dict, float]:
     """
 
     result = fetch_unipass_rates()
-    if result["success"]:
-        _save_last_good(result["data"], result.get("applied_date", ""), "customs")
-        return result, LIVE_TTL
+    sound = sound_rates(result["data"]) if result["success"] else None
+    if sound:
+        _save_last_good(sound, result.get("applied_date", ""), "customs")
+        return {**result, "data": sound}, LIVE_TTL
 
     market = _from_open_exchange_rates()
-    if market:
-        _save_last_good(market["data"], market.get("applied_date", ""), "market")
-        return market, LIVE_TTL
+    sound = sound_rates(market["data"]) if market else None
+    if sound:
+        _save_last_good(sound, market.get("applied_date", ""), "market")
+        return {**market, "data": sound}, LIVE_TTL
 
     stored = _last_good()
-    if stored:
-        return stored, FAILED_TTL
+    sound = sound_rates(stored["data"]) if stored else None
+    if sound:
+        return {**stored, "data": sound}, FAILED_TTL
 
     rates = dict(load_mock("exchange_rates")["krw_per_unit"])
     rates["USD"] = float(get_config("EXCHANGE_RATE_USD_KRW", rates["USD"]))
-    rates["KRW"] = 1.0
+    # 설정으로 넣은 값도 거릅니다. 오타 하나로 견적이 1,000배 틀립니다.
+    rates = sound_rates(rates) or {**load_mock("exchange_rates")["krw_per_unit"], "KRW": 1.0}
     # 예시 환율로 답하는 동안에도 기관이 살아났는지 이따금 다시 봅니다.
     return {**ok(rates, "mock"), "applied_date": ""}, FAILED_TTL
 

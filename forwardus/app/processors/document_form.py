@@ -58,11 +58,20 @@ def money_text(value) -> str:
 FONT_CANDIDATES = (
     "C:/Windows/Fonts/malgun.ttf",
     "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+    # 리눅스·도커에 노토가 깔리는 자리는 배포판마다 다릅니다. 여기 빠지면
+    # 글꼴을 못 찾은 것으로 보고 서류를 안 만들게 되므로 넉넉히 적어 둡니다.
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJKkr-Regular.otf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf",
     "/System/Library/Fonts/AppleSDGothicNeo.ttc",
 )
 BOLD_CANDIDATES = ("C:/Windows/Fonts/malgunbd.ttf",
-                   "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf")
+                   "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+                   "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+                   "/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc")
 
 
 def _font(size: int, bold: bool = False):
@@ -76,9 +85,34 @@ def _font(size: int, bold: bool = False):
 
 
 def fonts_ready() -> bool:
-    """한글 글꼴을 찾았는지. 못 찾으면 화면에서 알려 줍니다."""
+    """한글 글꼴을 찾았는지."""
 
     return any(Path(path).exists() for path in FONT_CANDIDATES)
+
+
+# 글꼴을 못 찾으면 Pillow 기본 글꼴로 내려갑니다. 그 글꼴에는 **한글이 없습니다.**
+# 없는 글자는 오류를 내지 않고 네모(두부) 하나로 찍힙니다. 확인해 보니
+# 서로 다른 한글 15자가 전부 같은 그림 하나로 나오는데, PDF 는 86KB 로 멀쩡히
+# 만들어졌습니다. 서식의 라벨(⑦수출자·㉕품명)까지 한글이라 **모든 서류가
+# 통째로 네모**가 됩니다.
+#
+# 이용자는 알 수 없습니다. 내려받아 은행·세관에 내고서야 반송으로 압니다.
+# 그러니 네모 서류를 내주지 않고, 무엇을 깔아야 하는지 알려 주고 멈춥니다.
+# (fonts_ready() 는 진작 있었지만 아무 데서도 부르지 않았습니다. 2026-09-26)
+FONT_MISSING = (
+    "서류를 그릴 한글 글꼴을 서버에서 찾지 못했습니다. "
+    "이대로 만들면 한글이 모두 네모로 찍혀 은행·세관에서 반송됩니다. "
+    "서버에 한글 글꼴을 설치해 주세요. "
+    "(리눅스: fonts-nanum 또는 fonts-noto-cjk, 윈도우: 맑은 고딕)")
+
+
+def require_fonts() -> None:
+    """한글 글꼴이 없으면 서류를 만들지 않습니다."""
+
+    if not fonts_ready():
+        from app.services import ServiceError
+
+        raise ServiceError(FONT_MISSING, "FONT_MISSING", 503)
 
 
 # --- 서식 ------------------------------------------------------------------------
@@ -334,6 +368,7 @@ def draw_form(kind: str, data: dict, columns: list[dict], note: str = DRAFT_NOTE
     """서식 한 장을 그립니다. note는 맨 아래 작은 글씨입니다. (초안 / 빈 서식)"""
 
     layout = LAYOUTS[kind]
+    require_fonts()
     fonts = {"title": _font(30, bold=True), "label": _font(13),
              "body": _font(16), "small": _font(12)}
 
