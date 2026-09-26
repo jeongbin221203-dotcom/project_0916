@@ -45,7 +45,11 @@ def test_see가_가리키는_주제가_실제로_있다():
 
 @pytest.mark.parametrize("question, key", [
     ("인코텀즈는 어떻게 고르나요?", "incoterms-2020"),
-    ("FOB랑 CIF는 어떻게 다른가요?", "incoterms-2020"),
+    # 두 조건을 **견주는** 질문은 비교 항목으로 갑니다. 일반 설명이 아니라
+    # "무엇이 다르고 어느 쪽을 고르면 뭐가 이득인가"를 답해야 합니다.
+    ("FOB랑 CIF는 어떻게 다른가요?", "incoterms-compare"),
+    ("CFR이랑 CIF 차이", "incoterms-compare"),
+    ("FCA랑 FOB 뭐가 달라요", "incoterms-compare"),
     ("수출신고는 어디서 하나요?", "export-declaration"),
     ("적재의무기한이 뭔가요", "export-declaration"),
     ("LCL FCL 기준이 뭔가요", "lcl-fcl-cbm"),

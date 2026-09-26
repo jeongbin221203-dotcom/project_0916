@@ -198,6 +198,12 @@ def api_create_shipment():
         "success": True,
         "data": {
             "shipment_id": shipment.shipment_id,
-            "url": url_for("shipment.detail", shipment_id=shipment.shipment_id),
+            # 견적을 마치면 **서류·통관**으로 보냅니다. (2026-09-26)
+            #
+            # 예전에는 요약(shipment.detail)으로 보냈습니다. 그런데 견적이 끝난
+            # 사람이 다음에 할 일은 "방금 정한 것을 다시 읽는 것"이 아니라
+            # **서류를 만드는 것**입니다. 요약에 떨어지면 거기서 탭을 한 번 더
+            # 눌러야 하고, 무엇을 해야 하는지도 화면이 말해 주지 않습니다.
+            "url": url_for("document.center", shipment_id=shipment.shipment_id),
         },
     }), 201

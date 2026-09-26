@@ -446,10 +446,18 @@
     }
   }
 
+  /* 적던 값을 **모두** 지웁니다.
+     LOCAL_KEY 만 지우면 대화에서 넘어온 초안(DOC_DRAFT_KEY)이 남아, 새로 고친 뒤
+     칸이 다시 채워집니다. "비우고 새로 시작"을 눌렀는데 값이 그대로면 그 단추가
+     무슨 뜻인지 알 수 없게 됩니다. 되살아날 수 있는 자리를 한 곳에 모아 둡니다.
+     (서버에 저장된 것과 이 탭의 비공개 칸은 ForwardusWorkDraft.clear()가 지웁니다) */
   function forgetLocal() {
-    try {
-      window.sessionStorage.removeItem(LOCAL_KEY);
-    } catch (error) { /* 무시 */ }
+    [LOCAL_KEY, DOC_DRAFT_KEY].forEach((key) => {
+      try {
+        window.sessionStorage.removeItem(key);
+        window.localStorage.removeItem(key);
+      } catch (error) { /* 무시 */ }
+    });
   }
 
   const saveSoon = debounce(() => { syncWorkDraft(); saveLocal(); }, 400);
@@ -510,6 +518,11 @@
     panel.prepend(note);
     note.querySelector("[data-doc-clear]").addEventListener("click", async () => {
       forgetLocal();
+      // 대화가 들고 있는 서류 초안도 비웁니다. 이걸 두면 홈에 갔다 오는 순간
+      // 칸이 다시 채워져, 방금 비운 것이 헛일이 됩니다.
+      if (window.ForwardusChat && window.ForwardusChat.clearDocDraft) {
+        window.ForwardusChat.clearDocDraft();
+      }
       if (window.ForwardusWorkDraft) await window.ForwardusWorkDraft.clear();
       window.location.reload();
     });

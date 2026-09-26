@@ -251,8 +251,13 @@ html.modal_open, html.modal_open body { overflow: hidden; }
 .flow_marks { position: absolute; left: 14px; right: 14px; top: 0; bottom: 0;
   pointer-events: none; z-index: 0; }
 .flow_marks[hidden] { display: none; }
+/* 선을 **자리 위에 가운데로** 긋습니다.
+   아래 막대의 검은 선(.fmark::before)이 left:-1.5px 로 가운데를 잡습니다.
+   여기서 테두리를 왼쪽 끝에 그리면 둘이 2~3px 어긋나 보입니다. 같은 방식으로 맞춥니다. */
 .tmark { position: absolute; top: 34px; bottom: 0; left: calc(var(--at) / 8 * 100%);
-  width: 0; border-left: 2px dashed currentColor; opacity: .5; }
+  width: 0; opacity: .55; }
+.tmark::before { content: ""; position: absolute; top: 0; bottom: 0; left: -1px;
+  border-left: 2px dashed currentColor; }
 .tmark.m_cost { color: var(--f_cost); }
 .tmark.m_risk { color: var(--f_risk); }
 /* 아이콘·글자는 선 위에 옵니다. */

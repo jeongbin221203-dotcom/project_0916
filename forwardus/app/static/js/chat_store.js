@@ -140,6 +140,24 @@
       return state.messages;
     },
 
+    /* 대화가 들고 있는 **서류 초안만** 비웁니다. 대화 내용은 그대로 둡니다.
+
+       서류 작성 화면에서 "비우고 새로 시작"을 누를 때 씁니다. 그때 칸만 비우고
+       이걸 두면, 홈에 갔다 오는 순간 칸이 다시 채워져 방금 비운 것이 헛일이 됩니다.
+       대화까지 지우지는 않습니다 - 사람이 비우려는 것은 **적던 서류**이지
+       나눈 이야기가 아닙니다. */
+    clearDocDraft() {
+      const state = read();
+      write({ ...state, docDraft: {} });
+      try {
+        const kept = readKept();
+        if (kept) {
+          window.localStorage.setItem(KEEP_KEY,
+                                      JSON.stringify({ ...kept, docDraft: {} }));
+        }
+      } catch (error) { /* 보관함을 못 고쳐도 지금 것은 비웠습니다. */ }
+    },
+
     /* 보관함을 "질문 하나 + 그 답들"의 묶음으로 나눠 돌려줍니다. 고르는 화면이 씁니다. */
     keptTurns() {
       const kept = readKept();
