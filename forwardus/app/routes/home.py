@@ -6,7 +6,7 @@ import json
 
 from flask import Blueprint, jsonify, render_template, request, url_for
 
-from app.routes import error_response, json_body
+from app.routes import collector_response, error_response, json_body
 from app.routes.auth import current_user
 from app.services import (ServiceError, agent_service, attachment_service,
                           chat_capture_service, chat_memory_service,
@@ -326,4 +326,4 @@ def api_support_chat():
                 assumed["mode"] = "항공" if fields["transport_mode"] == "AIR" else "해상"
             if assumed:
                 result["data"]["assumed"] = assumed
-    return jsonify(result), (200 if result["success"] else 502)
+    return collector_response(result)

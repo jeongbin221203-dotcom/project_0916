@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template, request, url_for
 
-from app.routes import error_response, json_body
+from app.routes import collector_response, error_response, json_body
 from app.routes.auth import current_user, login_required
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
@@ -43,7 +43,7 @@ def api_locations():
     if near:
         result = planning_service.related_locations(near, request.args.get("mode", "SEA"),
                                                     request.args.get("role"))
-        return jsonify(result), (200 if result["success"] else 502)
+        return collector_response(result)
     result = planning_service.search_locations(
         request.args.get("q", ""),
         request.args.get("mode", "SEA"),
@@ -51,13 +51,13 @@ def api_locations():
         request.args.get("country"),
         request.args.get("origin"),
     )
-    return jsonify(result), (200 if result["success"] else 502)
+    return collector_response(result)
 
 
 @planning_bp.get("/api/countries")
 def api_countries():
     result = planning_service.list_countries(request.args.get("mode", "SEA"), request.args.get("role"))
-    return jsonify(result), (200 if result["success"] else 502)
+    return collector_response(result)
 
 
 @planning_bp.get("/api/unlocode")
@@ -70,7 +70,7 @@ def api_unlocode():
         request.args.get("country"),
         request.args.get("mode", "SEA"),
     )
-    return jsonify(result), (200 if result["success"] else 502)
+    return collector_response(result)
 
 
 @planning_bp.get("/api/hs-codes")
@@ -78,7 +78,7 @@ def api_hs_codes():
     result = planning_service.search_hs_codes(request.args.get("q", ""), compare_navigation=True,
                                              country=request.args.get("country", ""),
                                              order=request.args.get("order", "frequency"))
-    return jsonify(result), (200 if result["success"] else 502)
+    return collector_response(result)
 
 
 @planning_bp.get("/api/exchange-rate")

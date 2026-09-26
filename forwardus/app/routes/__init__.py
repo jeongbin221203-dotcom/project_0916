@@ -20,6 +20,29 @@ def error_response(exc: Exception):
     raise exc
 
 
+def collector_response(result: dict):
+    """기관 조회 결과를 응답으로. **실패 사유에 맞는 상태코드를 줍니다.**
+
+    왜 필요한가
+      여태 `200 if result["success"] else 502` 라고 적었습니다. 그래서 **적은
+      번호가 잘못된 것**(우리 잘못)도 502(기관 장애)로 나갔습니다. 화면과
+      감시 도구는 그걸 "관세청이 죽었다"로 읽습니다. 관세청은 멀쩡한데
+      우리가 잘못 적은 것입니다. 고쳐야 할 곳을 엉뚱한 데서 찾게 됩니다.
+      전 화면을 그려 보다 /customs-filing/clearance-code 에서 찾았고,
+      같은 자리가 7곳이라 한 곳에서 막습니다. (2026-09-26)
+
+        VALIDATION_ERROR   400  우리가 잘못 적었습니다
+        API_AUTH_FAILED    503  우리 쪽 키가 없거나 막혔습니다 (기관은 멀쩡)
+        그 밖                502  기관이 응답하지 않습니다
+    """
+
+    if result.get("success"):
+        return jsonify(result), 200
+    code = result.get("error_code") or ""
+    status = {"VALIDATION_ERROR": 400, "API_AUTH_FAILED": 503}.get(code, 502)
+    return jsonify(result), status
+
+
 def json_body() -> dict:
     """보내 온 JSON 본문을 **반드시 dict 로** 돌려줍니다.
 

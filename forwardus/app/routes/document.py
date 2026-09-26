@@ -8,7 +8,7 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
 from app.extensions import db
-from app.routes import error_response, load_shipment, json_body
+from app.routes import collector_response, error_response, load_shipment, json_body
 from app.routes.auth import current_user, login_required
 from app.services import (ServiceError, customs_filing_service, document_draft_service,
                           document_extract_service, document_service, document_source_service,
@@ -445,7 +445,10 @@ def api_clearance_code(shipment_id: str):
 
     load_shipment(shipment_id)
     result = customs_filing_service.lookup_clearance_code(request.args.get("business_no", ""))
-    return jsonify(result), (200 if result["success"] else 502)
+    # 실패 사유마다 상태코드가 달라야 합니다. 적은 번호가 잘못된 것(입력 잘못)을
+    # 502(기관 장애)로 답하면, 화면·감시 도구가 "관세청이 죽었다"고 읽습니다.
+    # 관세청은 멀쩡한데 우리가 잘못 적은 것입니다. (2026-09-26)
+    return collector_response(result)
 
 
 @document_bp.post("/<shipment_id>/customs-filing/translate")
