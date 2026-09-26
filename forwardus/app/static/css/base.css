@@ -524,3 +524,28 @@ body.hs_modal_open { overflow: hidden; }
   color: var(--blue_dark); font-size: 12.5px; font-weight: 700; text-decoration: none; }
 .answer_link:hover { border-color: var(--blue); background: var(--blue_soft); text-decoration: none; }
 .answer_link.is_outside { color: #475569; }
+
+/* ===== 인쇄 =====
+   서류를 인쇄하면 종이는 거래처와 세관으로 갑니다. 화면을 쓰라고 띄워 둔 것은
+   거기 찍히면 안 됩니다. 고래 상담창이 Packing List 위에 찍혀 나온 적이 있습니다.
+
+   이 규칙을 base.css에 두는 이유: 고래·사이드바·알림은 base.html이 **모든 화면**에
+   붙입니다. document.css에만 적으면 서류 화면에서만 사라지고, Shipment 상세나
+   Dashboard를 인쇄할 때는 그대로 찍힙니다. 띄워 두는 것을 만들면 여기에 같이 적으세요. */
+@media print {
+  /* 오른쪽 아래 고래 상담 단추와 그 대화창 */
+  .support_fab, .support_panel,
+  /* 임시저장 실패 알림 · 화물 설명 말풍선 · HS 검색 창 · 환율 창 */
+  .draft_alert, .cargo_tip_popup, .hs_modal, .fx_modal,
+  /* 왼쪽 사이드바와 위쪽 머리·바닥글, 알림 줄 */
+  .home_rail, .site_header, .site_footer, .flash_stack,
+  /* 화면에서만 쓰는 단추를 단 곳 */
+  .no_print {
+    display: none !important;
+  }
+  /* 사이드바가 빠진 자리를 내용이 넘겨받습니다. 왼쪽에 60px 흰 기둥이 남으면
+     서류가 종이 가운데에서 비켜 앉습니다. */
+  .app_shell { display: block; background: none; min-height: 0; }
+  .app_stage { width: 100%; }
+  html, body { background: #fff; }
+}
