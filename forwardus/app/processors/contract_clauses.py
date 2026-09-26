@@ -59,7 +59,11 @@ The Seller shall sell and the Buyer shall purchase the goods specified below
 this Contract. Any deviation shall require the Seller's prior written consent.
   Commodity / HS Code / Specification / Quantity / Unit : as per Annex 1""",
     text_ko="품명·HS부호·규격·수량·단위를 **별지로 붙이고, 별지가 계약의 일부**임을 적습니다.",
-    detect=[r"description of goods", r"\bcommodity\b", r"물품\s*명세", r"\bspecification"],
+    # "Annex 1: Specification (attached)" 한 줄에도 걸리던 것을 좁혔습니다.
+    # 별지 제목만 있는 것은 물품 명세 조항이 아닙니다. (2026-09-26)
+    detect=[r"description of goods", r"\bcommodity\b",
+            r"specifications?\b.{0,20}(set (out|forth)|of the goods|shall (be|form))",
+            r"물품\s*의?\s*명세", r"품명[^.]{0,30}(규격|수량|HS)"],
 )
 
 _clause(
@@ -278,7 +282,10 @@ The Seller shall indemnify the Buyer against any and all losses, damages and
 expenses of whatever nature, including loss of profit, without limitation.""",
     text_ko="without limitation · any and all · loss of profit 이 함께 나오면 이 조항입니다.",
     detect=[r"without limitation", r"any and all (losses|damages)",
-            r"unlimited liability", r"무제한\s*(배상|책임)"],
+            r"unlimited liability",
+            r"무제한\s*(으로)?[^.]{0,6}(배상|책임)",
+            r"(한도|상한|제한)[^.]{0,3}없이[^.]{0,30}배상",
+            r"배상[^.]{0,15}(한도|상한)[^.]{0,6}없"],
     fix="책임 한도(Limitation of Liability) 조항을 넣어 **송장 금액 상한**과 **간접손해 배제**로 바꿔 달라고 하세요.",
 )
 
@@ -291,7 +298,9 @@ The Buyer may terminate this Contract at any time for convenience upon written
 notice, without liability.""",
     text_ko="for convenience · at any time · without liability 가 붙어 있으면 이 조항입니다.",
     detect=[r"terminate.{0,60}for convenience", r"at any time.{0,40}without (liability|cause)",
-            r"일방적으로\s*해지"],
+            r"일방적으로\s*해지", r"사유[^.]{0,10}불문[^.]{0,40}해지",
+            r"언제든지[^.]{0,40}해지", r"이유\s*없이[^.]{0,30}해지",
+            r"임의\s*로[^.]{0,20}해지"],
     fix="해지에 **사유와 예고기간**을 붙이고, 생산 착수 뒤에는 **취소 수수료**를 물도록 바꿉니다.",
 )
 
@@ -303,7 +312,8 @@ _clause(
 The courts of <BUYER'S COUNTRY> shall have exclusive jurisdiction over any
 dispute arising out of this Contract.""",
     text_ko="exclusive jurisdiction 과 상대국 이름이 함께 나오면 이 조항입니다. 중재 조항과 **같이** 있으면 서로 모순됩니다.",
-    detect=[r"exclusive jurisdiction", r"courts? of .{0,40}shall have", r"전속\s*관할"],
+    detect=[r"exclusive jurisdiction", r"courts? of .{0,40}shall have",
+            r"전속\s*적?[^.]{0,4}관할", r"관할\s*법원[^.]{0,30}(매수인|바이어)"],
     fix="**중재(KCAB, 서울)** 로 바꾸거나, 최소한 **제3국 중재**로 바꿔 달라고 하세요.",
 )
 
@@ -316,7 +326,9 @@ Payment shall be made within 30 days after the Buyer receives payment from its
 end customer.""",
     text_ko="after the Buyer receives payment · upon resale 이 나오면 이 조항입니다.",
     detect=[r"after the buyer .{0,20}receive[sd]? payment", r"upon resale",
-            r"from its (end )?customer", r"재판매\s*(대금|후)"],
+            r"from its (end )?customer",
+            r"재판매[^.]{0,30}(대금|수령|지급)",
+            r"최종\s*(고객|수요자|구매자)[^.]{0,30}(대금|수령|지급)"],
     fix="**선적일 또는 B/L일 기준**으로 기한을 바꾸고, 안 되면 L/C나 수출보험으로 막으세요.",
 )
 
@@ -354,7 +366,9 @@ the Goods are delivered to the Buyer's warehouse.""",
     text_ko="notwithstanding the trade term · regardless of Incoterms 가 보이면 그 뒤를 꼭 읽으세요.",
     detect=[r"notwithstanding .{0,40}(trade term|incoterms)",
             r"regardless of .{0,30}incoterms",
-            r"bear all risks? and costs? until"],
+            r"bear all risks? and costs? until",
+            r"인코텀즈[^.]{0,30}불구하고", r"(가격|거래)\s*조건[^.]{0,20}불구하고",
+            r"목적지[^.]{0,20}인도[^.]{0,40}(위험|비용)[^.]{0,20}부담"],
     fix="인코텀즈 조건과 **같은 뜻**이 되게 고치거나, 아예 그 조건으로 가격을 다시 매기세요.",
 )
 
@@ -379,7 +393,10 @@ The Seller shall not sell the Goods to any third party at a price lower than
 that offered to the Buyer, and shall refund the difference if it does so.""",
     text_ko="most favoured · no less favourable · price lower than 이 나오면 이 조항입니다.",
     detect=[r"most favou?red", r"no less favou?rable",
-            r"price lower than that (offered|charged)"],
+            r"price lower than that (offered|charged)",
+            r"최혜[^.]{0,10}(대우|가격|조건)",
+            r"불리하지\s*아니?하?[^.]{0,20}(가격|조건)",
+            r"다른[^.]{0,20}(고객|거래처)[^.]{0,30}(보다|가격)[^.]{0,20}(유리|낮)"],
     fix="적용 **기간·물량·시장**을 좁히거나, 소급 환불 부분을 빼 달라고 하세요.",
 )
 
@@ -391,7 +408,9 @@ _clause(
 If any part of the shipment fails inspection, the Buyer may reject the entire
 shipment and the Seller shall bear all return freight, duties and storage.""",
     text_ko="reject the entire shipment 과 return freight 이 함께 나오면 이 조항입니다.",
-    detect=[r"reject the entire", r"return freight", r"전량\s*반품"],
+    detect=[r"reject the entire", r"return freight",
+            r"전량[^.]{0,6}반품", r"전부[^.]{0,6}반품",
+            r"반송\s*(운임|비용)[^.]{0,30}매도인"],
     fix="**불량분만 교체·감액**으로 바꾸고, 불합격 판정은 **선적지 검사기관**이 하도록 하세요.",
 )
 
@@ -412,6 +431,27 @@ def applies_to(row: dict, incoterms: str = "") -> bool:
     return (incoterms or "").upper() in row["applies"]
 
 
+# 쪽 번호·머리글·바닥글. 계약서는 여러 쪽이라 **문장 한가운데** 이런 줄이 끼어듭니다.
+#   "…at a price lower than"  /  "- 16 -"  /  "that offered to the Buyer…"
+# 그러면 "price lower than that offered" 를 찾는 규칙이 끊깁니다. 흔들어 보니
+# 최혜대우(MFN) 조항을 1만 부 중 36부에서 놓쳤습니다. 이런 줄은 계약 내용일
+# 수가 없으므로 걷어 내고 봅니다. **줄 전체가** 이 모양일 때만 지웁니다.
+# (2026-09-26)
+_PAGE_FURNITURE = re.compile(
+    r"""^\s*(?:
+          [-–—]?\s*\d{1,4}\s*[-–—]?            # - 16 -   ·   16
+        | (?:page|쪽|페이지)\s*\d{1,4}(?:\s*(?:of|/)\s*\d{1,4})?   # Page 3 of 12
+        | \d{1,4}\s*(?:of|/)\s*\d{1,4}         # 3 / 12
+        | .{0,60}\((?:cont(?:'|’)?d|continued|계속)\)   # SALES CONTRACT (cont'd)
+    )\s*$""",
+    re.I | re.X)
+
+
+def _drop_page_furniture(text: str) -> str:
+    return "\n".join(line for line in text.split("\n")
+                     if not _PAGE_FURNITURE.match(line))
+
+
 def find_in(text: str) -> set[str]:
     """올린 계약서에서 **보이는** 조항의 key.
 
@@ -425,7 +465,18 @@ def find_in(text: str) -> set[str]:
     # PDF에서 읽은 계약서는 줄이 꺾여 있어 "than"과 "that" 사이에 줄바꿈이
     # 들어갑니다. 그러면 한 칸(space)을 찾는 규칙이 안 맞아, **실제 계약서에서만
     # 못 잡습니다.** 시험에서는 한 줄로 넣어 잘 잡혔습니다. (2026-09-26)
-    body = re.sub(r"\s+", " ", str(text or ""))
+    body = _drop_page_furniture(str(text or ""))
+    # **줄 끝에서 하이픈으로 갈린 낱말을 도로 붙입니다.**
+    #
+    # PDF 는 제 폭대로 줄을 꺾으면서 긴 낱말을 "interrup-\ntion" 처럼 자릅니다.
+    # 그대로 두면 "interruption" 을 찾는 규칙이 안 맞습니다. 흔들어 본 결과
+    # 다른 왜곡(줄 다시 꺾기·쪽 머리글·대소문자)은 모두 0%인데 이것만
+    # 4.5%에서 조항을 놓쳤습니다. (2026-09-26)
+    #
+    # 낱말이 갈린 경우에만 붙입니다. 뒤가 소문자로 이어질 때만 보므로
+    # "CIF-\nBasis" 같은 진짜 붙임표는 그대로 둡니다.
+    body = re.sub(r"(?<=[A-Za-z])-\s*\n\s*(?=[a-z])", "", body)
+    body = re.sub(r"\s+", " ", body)
     if not body.strip():
         return set()
     found = set()

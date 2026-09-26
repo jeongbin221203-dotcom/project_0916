@@ -37,6 +37,37 @@ SAFETY_DAYS = {"SEA": 3, "AIR": 1}
 # 선적 마감까지 최소한 이만큼은 남아 있어야 준비가 됩니다. (아래 prep_days 계산)
 LATE_LEVELS = ("late", "tight")
 
+# --- 휴일 ---------------------------------------------------------------------------
+#
+# 왜 보아야 하는가
+#   무작위 5,000건을 돌려 보니 **약 29%**에서 선적 마감·권하는 선적일·서류 제시일이
+#   토·일에 떨어졌습니다. 그런데 안내에 '주말'이라는 말이 한 번도 없었습니다.
+#   선사는 주말에 서류마감을 받지 않고, 은행은 문을 닫습니다.
+#
+# 규칙은 방향이 서로 다릅니다. 헷갈리면 돈이 걸립니다. (UCP 600 제29조)
+#   (a) **유효기일·서류 제시 마지막 날**이 은행 휴무일이면 → 다음 영업일까지 **늘어납니다.**
+#   (c) **최종선적일**은 휴일이어도 → **늘어나지 않습니다.**
+#
+# 그래서 날짜를 우리 마음대로 뒤로 미루지 않습니다. 늘어나는 쪽으로 옮기면
+# 우리 잘못으로 마감을 넘길 수 있습니다. **알려만 주고 날은 그대로 둡니다.**
+#
+# 나라별 공휴일은 여기서 보지 않습니다. 개설은행 소재지 기준이라 나라마다 다르고,
+# 우리가 틀린 달력으로 단정하면 그게 더 위험합니다. 토·일만 보고, 공휴일은
+# 확인하라고 적습니다. (2026-09-26)
+SATURDAY = 5
+
+
+def is_weekend(day: date) -> bool:
+    return day.weekday() >= SATURDAY
+
+
+def _weekday_before(day: date) -> date:
+    """그 날 앞의 가장 가까운 평일."""
+
+    while is_weekend(day):
+        day -= timedelta(days=1)
+    return day
+
 
 def _mode(transport_mode: str | None) -> str:
     return "AIR" if str(transport_mode or "").upper() == "AIR" else "SEA"
@@ -136,6 +167,7 @@ def plan(*, latest_shipment: date | None = None, expiry: date | None = None,
         presentation_by = expiry
     notes.append(f"선적 후 {days}일 안에, 늦어도 {presentation_by.isoformat()}까지 "
                  "은행에 서류를 내야 합니다.")
+    notes.extend(_holiday_notes(deadline, recommended, presentation_by, expiry))
 
     # 도착 예상. 구간 소요일(최소~최대)을 알면 권하는 선적일에 더해 봅니다.
     eta_from = eta_to = None
@@ -164,6 +196,41 @@ def plan(*, latest_shipment: date | None = None, expiry: date | None = None,
         "transport_mode": mode,
         "notes": notes,
     }
+
+
+def _holiday_notes(deadline: date, recommended: date, presentation_by: date,
+                   expiry: date | None) -> list[str]:
+    """날이 주말에 걸렸을 때 해 줄 말. **날짜는 고치지 않습니다.**"""
+
+    notes = []
+    if is_weekend(deadline):
+        before = _weekday_before(deadline)
+        notes.append(f"선적 마감 {deadline.isoformat()}은 {_day_name(deadline)}입니다. "
+                     f"최종선적일은 휴일이어도 늘어나지 않습니다(UCP 600 제29조 (c)). "
+                     f"선사 서류마감을 생각하면 {before.isoformat()}({_day_name(before)})까지 "
+                     "마쳐 두셔야 합니다.")
+    elif is_weekend(recommended):
+        before = _weekday_before(recommended)
+        notes.append(f"권해 드린 선적일 {recommended.isoformat()}은 {_day_name(recommended)}입니다. "
+                     f"선사는 주말에 서류마감을 받지 않으니 {before.isoformat()}"
+                     f"({_day_name(before)})까지 넘기세요.")
+    if expiry and is_weekend(expiry):
+        notes.append(f"유효기일 {expiry.isoformat()}은 {_day_name(expiry)}입니다. "
+                     "은행 휴무일이면 다음 영업일까지 늘어납니다(UCP 600 제29조 (a)). "
+                     "다만 개설은행 소재지 기준이라 그 나라 공휴일을 함께 확인하세요. "
+                     "여기서는 늘어나지 않는다고 보고 잡았습니다.")
+    elif is_weekend(presentation_by):
+        notes.append(f"서류 제시 마감 {presentation_by.isoformat()}은 "
+                     f"{_day_name(presentation_by)}입니다. 은행 휴무일이면 다음 영업일까지 "
+                     "늘어나지만(UCP 600 제29조 (a)), 그 전 영업일에 내는 편이 안전합니다.")
+    return notes
+
+
+DAY_NAMES = ("월", "화", "수", "목", "금", "토", "일")
+
+
+def _day_name(day: date) -> str:
+    return f"{DAY_NAMES[day.weekday()]}요일"
 
 
 def as_text(result: dict | None) -> dict | None:

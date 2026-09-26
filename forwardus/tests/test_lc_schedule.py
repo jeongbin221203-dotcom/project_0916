@@ -245,3 +245,52 @@ def test_스케줄_카드가_마감_초과를_표시한다():
     assert "${lcBadge(s.etd)}" in js
     upload = (Path(__file__).parent.parent / "app/static/js/doc_upload.js").read_text(encoding="utf-8")
     assert "upload_lc" in upload and "L/C 선적 마감" in upload
+
+
+# --- 휴일 (UCP 600 제29조) ----------------------------------------------------------
+#
+# 무작위 5,000건에서 약 29%가 선적 마감·선적일·서류 제시일이 토·일에 떨어졌는데
+# 안내에 '주말'이라는 말이 한 번도 없었습니다. 선사는 주말에 서류마감을 받지
+# 않고, 은행은 문을 닫습니다. (2026-09-26)
+
+def test_최종선적일이_주말이면_늘어나지_않는다고_알린다():
+    """(c) 최종선적일은 휴일이어도 연장되지 않습니다. 그 전에 실어야 합니다."""
+
+    got = lc_schedule.plan(latest_shipment=date(2026, 11, 21),   # 토요일
+                           expiry=date(2026, 12, 24),            # 목요일
+                           presentation="21", today=date(2026, 9, 26))
+    notes = " ".join(got["notes"])
+    assert "토요일" in notes and "제29조 (c)" in notes
+    assert "2026-11-20" in notes, "그 전 영업일(금)을 알려 주어야 합니다"
+    # **날짜 자체는 건드리지 않습니다.** 뒤로 미루면 우리 잘못으로 마감을 넘깁니다.
+    assert got["deadline"] == date(2026, 11, 21)
+
+
+def test_유효기일이_주말이면_다음_영업일로_늘어난다고_알린다():
+    """(a) 유효기일·제시 마감은 은행 휴무일이면 다음 영업일까지 늘어납니다."""
+
+    got = lc_schedule.plan(latest_shipment=date(2026, 11, 20),   # 금요일
+                           expiry=date(2026, 12, 26),            # 토요일
+                           presentation="21", today=date(2026, 9, 26))
+    notes = " ".join(got["notes"])
+    assert "제29조 (a)" in notes
+    assert "공휴일" in notes, "나라별 공휴일은 우리가 단정하지 않습니다"
+    assert got["expiry"] == date(2026, 12, 26)
+
+
+def test_평일만_걸리면_주말_이야기를_하지_않는다():
+    got = lc_schedule.plan(latest_shipment=date(2026, 11, 20),   # 금요일
+                           expiry=date(2026, 12, 24),            # 목요일
+                           presentation="21", today=date(2026, 9, 26))
+    notes = " ".join(got["notes"])
+    assert "요일" not in notes
+
+
+@pytest.mark.parametrize("day,weekend", [
+    (date(2026, 11, 20), False),   # 금
+    (date(2026, 11, 21), True),    # 토
+    (date(2026, 11, 22), True),    # 일
+    (date(2026, 11, 23), False),   # 월
+])
+def test_주말_판정(day, weekend):
+    assert lc_schedule.is_weekend(day) is weekend

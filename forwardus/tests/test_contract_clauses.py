@@ -214,3 +214,73 @@ def test_부호가_아닌_숫자는_되묻는다(app):
 
     with app.app_context():
         assert support_chat_service.ask("12345")["source"] == "clarification"
+
+
+# --- 한국어 계약서 · PDF 에서 읽은 모양 -------------------------------------------------
+#
+# 한국어 계약 문구 26개로 확인해 보니 8개가 안 잡혔고, 그중 **7개가 독소조항**이었습니다.
+# 한국어로 쓴 계약서는 무제한 손해배상·일방적 해지권·상대국 전속관할·최혜대우가
+# 그대로 통과했습니다. 규칙이 "물품 명세"처럼 토씨 없는 말만 찾고 있었기 때문입니다.
+# (2026-09-26)
+
+KO_CLAUSES = {
+    "goods": "제1조 (물품의 명세) 물품의 품명, HS부호, 규격 및 수량은 별지 1과 같다.",
+    "title": "제10조 (소유권 유보) 물품의 소유권은 대금이 전액 지급될 때까지 매도인에게 유보된다.",
+    "unlimited_damages": "제17조 매도인은 모든 직접·간접 손해를 한도 없이 배상한다.",
+    "termination_at_will": "제18조 매수인은 사유를 불문하고 언제든지 본 계약을 해지할 수 있다.",
+    "foreign_forum": "제19조 본 계약에 관한 소송은 매수인 소재지 법원을 전속적 관할법원으로 한다.",
+    "payment_on_resale": "제20조 매수인은 최종 고객에게 재판매하여 대금을 수령한 후 지급한다.",
+    "term_conflict": "제23조 인코텀즈 조건에도 불구하고 매도인은 최종 목적지 인도 시까지 "
+                     "모든 위험과 비용을 부담한다.",
+    "mfn_price": "제25조 매도인은 다른 어떠한 고객에게 제공하는 가격보다 불리하지 아니한 "
+                 "최혜 가격을 제공한다.",
+    "full_return": "제26조 불합격 시 매수인은 전량을 반품할 수 있으며, 반송 운임은 매도인이 부담한다.",
+}
+
+
+@pytest.mark.parametrize("key,text", sorted(KO_CLAUSES.items()))
+def test_한국어_계약서에서도_조항이_보인다(key, text):
+    assert key in contract_clauses.find_in(text)
+
+
+# 정상적으로 쓴 조항이 독소조항으로 찍히면, 이용자는 바이어에게 "이 문구를 빼 달라"고
+# 하고 바이어는 "그런 문구 없다"고 합니다. 한 번에 신뢰가 무너집니다.
+KO_NORMAL = [
+    "제13조 (책임 한도) 총 손해배상 한도는 송장금액을 초과하지 아니하며, "
+    "간접손해는 배상하지 아니한다.",
+    "제17조 (해지) 상대방이 계약을 중대하게 위반하고 30일 내 시정하지 아니한 경우 해지할 수 있다.",
+    "제18조 (관할) 소송이 필요한 경우 서울중앙지방법원을 관할법원으로 한다.",
+    "제19조 (반품) 하자가 확인된 수량에 한하여 반품할 수 있으며, 비용은 귀책 당사자가 부담한다.",
+    "제20조 (배상) 당사자는 자신의 귀책사유로 발생한 손해를 배상한다.",
+    "제21조 (가격) 단가는 별지 2의 가격표에 따르며, 연 1회 협의하여 조정할 수 있다.",
+]
+
+
+@pytest.mark.parametrize("text", KO_NORMAL)
+def test_정상_한국어_조항은_독소조항으로_찍히지_않는다(text):
+    toxic = {row["key"] for row in contract_clauses.CLAUSES if row["category"] == "toxic"}
+    assert not (contract_clauses.find_in(text) & toxic)
+
+
+def test_줄_끝에서_하이픈으로_갈린_낱말을_도로_붙인다():
+    """PDF 는 제 폭대로 줄을 꺾으며 긴 낱말을 자릅니다. 다른 왜곡은 다 견디는데
+    이것만 조항을 4.5%에서 놓쳤습니다."""
+
+    assert "uncapped_ld" in contract_clauses.find_in(
+        "The Seller shall pay liqui-\ndated damages of 1% for each day of delay.")
+
+
+def test_쪽_머리글이_문장_한가운데_끼어도_찾는다():
+    """계약서는 여러 쪽입니다. 쪽 번호·머리글이 문장을 끊습니다."""
+
+    paper = ("The Seller shall not sell the Goods to any third party at a price lower than\n"
+             "- 16 -\n"
+             "SALES CONTRACT (cont'd)\n"
+             "that offered to the Buyer, and shall refund the difference.")
+    assert "mfn_price" in contract_clauses.find_in(paper)
+
+
+def test_별지_제목만_있는_줄은_물품_명세가_아니다():
+    """'Annex 1: Specification (attached)' 한 줄에도 물품 명세가 있다고 했습니다."""
+
+    assert "goods" not in contract_clauses.find_in("Annex 1: Specification (attached)")
