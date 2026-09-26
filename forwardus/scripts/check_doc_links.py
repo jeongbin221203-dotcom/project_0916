@@ -34,6 +34,25 @@ BROWSER = {
 KNOWN_BLOCKERS = ("fda.gov", "fcc.gov", "mfds.go.kr", "foodsafetykorea.go.kr",
                   "komdi.or.kr", "unipass.customs.go.kr")
 
+# **기계로는 가릴 수 없는 곳.** 주소가 맞는지 아닌지 여기서는 알 수 없습니다.
+#
+# 2026-09-26에 60초를 주고 다시 두드려도 같았습니다.
+#   403 / 412  봇 차단 코드입니다. 사람이 브라우저로 열면 대개 열립니다.
+#   타임아웃    이 컴퓨터에서 길이 안 닿습니다. 나라·망에 따라 다를 수 있습니다.
+#
+# "열립니다"로 세지 않습니다. 확인한 적이 없으니까요.
+# "죽었습니다"로도 세지 않습니다. 그렇게 단정할 근거가 없으니까요.
+# 사람이 한 번 열어 보고, 열리면 이 목록에서 빼 주세요.
+UNVERIFIABLE = {
+    "cpsc.gov": "HTTP 403 봇 차단",
+    "echa.europa.eu": "HTTP 403 봇 차단",
+    "customs.gov.cn": "HTTP 412 봇 차단",
+    "most.gov.vn": "연결 시간 초과",
+    "acma.gov.au": "응답 시간 초과",
+    "agriculture.gov.au": "연결 끊김",
+    "canada.ca": "응답 시간 초과",
+}
+
 
 def collect() -> list[tuple[str, str]]:
     rows = []
@@ -50,7 +69,7 @@ def collect() -> list[tuple[str, str]]:
 
 def main() -> int:
     seen: set[str] = set()
-    alive = blocked = dead = 0
+    alive = blocked = dead = unknown = 0
     print(f"{'대상':<46}{'결과':<22}주소")
     print("-" * 110)
     for title, url in collect():
@@ -63,21 +82,33 @@ def main() -> int:
             mark = "열립니다" if ok else f"HTTP {response.status_code}"
         except Exception as error:                            # noqa: BLE001
             ok, mark = False, type(error).__name__
+
+        why = next((note for host, note in UNVERIFIABLE.items() if host in url), "")
         if ok:
             alive += 1
         elif any(host in url for host in KNOWN_BLOCKERS):
             blocked += 1
             mark = f"{mark} (기계 접속 차단)"
+        elif why:
+            unknown += 1
+            mark = f"사람이 봐야 함 · {why}"
         else:
             dead += 1
-            mark = f"★ {mark} — 사람이 확인해 주세요"
+            mark = f"★ {mark} — 주소가 바뀐 것 같습니다"
         print(f"{title[:44]:<46}{mark:<22}{url}")
 
     print("-" * 110)
-    print(f"열립니다 {alive} · 차단(주소는 맞음) {blocked} · 확인 필요 {dead}")
+    print(f"열립니다 {alive} · 차단(주소는 맞음) {blocked} · "
+          f"사람이 봐야 함 {unknown} · 주소 의심 {dead}")
     if dead:
-        print("\n★ 표시된 것만 보세요. 브라우저로 열어 보고 주소가 바뀌었으면 "
-              "app/processors/document_issuers.py 를 고칩니다.")
+        print()
+        print("★ 표시된 것만 보세요. 브라우저로 열어 보고 주소가 바뀌었으면")
+        print("  app/processors/document_issuers.py 를 고칩니다.")
+    if unknown:
+        print()
+        print(f"※ '사람이 봐야 함' {unknown}곳은 기계 접속을 막거나 이 컴퓨터에서")
+        print("  길이 안 닿는 곳입니다. 맞는지 틀렸는지 여기서는 알 수 없습니다.")
+        print("  브라우저로 열어 보시고, 열리면 이 파일의 UNVERIFIABLE 에서 빼 주세요.")
     return 0
 
 
