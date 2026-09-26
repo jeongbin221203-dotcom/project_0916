@@ -41,11 +41,23 @@ from config import Config                                   # noqa: E402
 #   통화를 틀림           USD 계약인데 송장에 EUR
 #   항구를 바꿔 적음      POL/POD를 거꾸로
 #   빈칸으로 둠           옮기다 빠뜨림
+def _swap_last(value):
+    text = str(value or "")
+    if not text:
+        return "X"
+    return text[:-1] + ("Y" if text[-1].upper() == "X" else "X")
+
+
+
 BREAKERS = {
     "숫자_자릿수": lambda v: _digits(v, 10),
     "숫자_조금": lambda v: _digits(v, 1.15),
     "빈칸": lambda v: "",
-    "글자_바꿈": lambda v: (str(v)[:-1] + "X") if str(v) else "X",
+    # 마지막 글자를 바꿉니다. **정말 달라지게** 바꿔야 합니다.
+    # 예전에는 늘 "X"로 바꿔서, 품명이 "x" 한 글자인 건은 "X"가 되어
+    # 대소문자만 달라진 채로 "안 잡혔다"고 세었습니다. 검증기는 대소문자를
+    # 같게 보므로 잡을 것이 없었던 것입니다. (2026-09-26)
+    "글자_바꿈": _swap_last,
     "통화_바꿈": lambda v: "EUR" if str(v).upper() != "EUR" else "USD",
 }
 

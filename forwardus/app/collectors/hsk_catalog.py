@@ -152,17 +152,25 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[dict] | None:
     if digits.isdigit():
         return [_row(catalog, digits)] if digits in catalog["codes"] else []
     korean = any("가" <= ch <= "힣" for ch in text)
-    if len(text) < (MIN_KOREAN_LENGTH if korean else MIN_ENGLISH_LENGTH):
-        return []
 
-    words = [_plain(word) for word in text.split() if word.strip()]
-    rows = _match(catalog, words, korean, limit)
-    if rows:
-        return rows
-    # 못 찾았으면 일상어 사전을 한 번 봅니다. ("양주" → 위스키·브랜디·보드카)
-    for word in EVERYDAY.get(_plain(text), ()):
+    # 일상어 사전을 **먼저** 봅니다.
+    #
+    # 예전에는 "한 건도 못 찾았을 때만" 봤습니다. 그런데 "사탕"은 사탕무·사탕수수가,
+    # "와인"은 와인딩 기계가 먼저 걸려 한 건이 나오니, 사전이 아예 안 쓰였습니다.
+    # 사전은 **사람이 확인해 둔 말**이고 걸려 나온 것은 우연입니다. 확인해 둔
+    # 쪽을 앞에 놓고, 우연히 걸린 것은 뒤에 붙입니다.
+    # (한 글자 말 "쌀"·"김"도 길이 문턱 앞에서 봐야 합니다) (2026-09-26)
+    hint = EVERYDAY.get(_plain(text), ())
+    rows: list[dict] = []
+    for word in hint:
         rows += [row for row in _match(catalog, [_plain(word)], True, limit)
                  if row not in rows]
+
+    if len(text) < (MIN_KOREAN_LENGTH if korean else MIN_ENGLISH_LENGTH):
+        return rows[:limit]
+
+    words = [_plain(word) for word in text.split() if word.strip()]
+    rows += [row for row in _match(catalog, words, korean, limit) if row not in rows]
     return rows[:limit]
 
 
@@ -193,9 +201,15 @@ def _match(catalog, words, korean, limit) -> list[dict]:
         #    "맥주"로 찾으면 "맥주보리"보다 "맥주"가 먼저 나와야 합니다.
         #  - 상위 이름으로 걸린 줄(rank 1)은 이름 길이가 뜻이 없습니다
         #    (죄다 "기타"·"끈"입니다). 품목표 차례대로 둡니다.
+        # "선글라스용"처럼 **그 물건에 쓰는 부속·재료** 줄은 한 등급 뒤로 보냅니다.
+        # 등급 안에서만 뒤로 밀면, 상위 이름으로 걸린 본품(rank 1)보다 여전히
+        # 앞에 섭니다. "선글라스"를 찾는 사람은 선글라스용 유리를 찾는 것이
+        # 아닙니다. (2026-09-26)
+        for_use = _for_use(words, leaf)
+        rank = min(rank + for_use, 2)
         scored.append((rank,
                        1 if _plain(name) in GENERIC else 0,
-                       _for_use(words, leaf),
+                       for_use,
                        _glued(words, leaf_spaced),
                        len(name) if rank == 0 else 0, code))
     scored.sort()
@@ -286,11 +300,45 @@ EVERYDAY = {
     "운동화": ("스포츠용 신발류",),
     "장난감": ("완구",),
     "기초화장품": ("기초화장용",),
-    "스킨로션": ("기초화장용",),
     "조미김": ("해초",),
     "랩탑": ("휴대용 자동자료처리기계",),
     "노트북컴퓨터": ("휴대용 자동자료처리기계",),
     "전기자전거": ("자전거",),
+    # --- 2026-09-26 추가 ---------------------------------------------------
+    # 무역을 모르는 분이 아는 말로 찾을 수 있어야 합니다. 일상어 64개로 재어
+    # 보니 13개가 **한 건도 안 나왔습니다**(속옷·구두·쌀·김·사탕·와인…).
+    # 품목표는 "팬티·브리프", "멥쌀", "설탕과자"처럼 적혀 있기 때문입니다.
+    # 아래는 모두 품목표에서 실제로 찾아지는지 확인한 말입니다.
+    "속옷": ("브리프", "팬티"),
+    "내의": ("브리프", "팬티"),
+    "구두": ("바깥 바닥",),
+    "신발": ("바깥 바닥",),
+    "안경테": ("고글",),
+    "시계": ("회중시계",),
+    "손목시계": ("회중시계",),
+    "소파": ("의자",),
+    "배터리": ("축전지", "일차전지"),
+    "건전지": ("일차전지",),
+    "사탕": ("설탕과자",),
+    "캔디": ("설탕과자",),
+    "와인": ("포도주",),
+    "쌀": ("멥쌀", "현미"),
+    "김": ("해초",),
+    "우산": ("산류",),
+    "지갑": ("핸드백",),
+    "장갑": ("장갑류",),
+    "인형": ("완구",),
+    "노트북컴퓨터": ("휴대용 자동자료처리기계",),
+    "모자": ("헤어네트", "운동모"),
+    "벨트": ("코트류",),
+    "수건": ("토일렛린넨", "베드린넨"),
+    "타월": ("토일렛린넨",),
+    "베개": ("매트리스 서포트", "침낭"),
+    "이불": ("매트리스 서포트",),
+    "선글라스": ("고글", "시력교정용 안경"),
+    "화장품": ("기초화장용", "메이크업용 제품류"),
+    "스킨": ("기초화장용",),
+    "로션": ("기초화장용",),
 }
 
 

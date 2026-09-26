@@ -7,9 +7,18 @@ import math
 from app.validators import ValidationError
 from app.validators.cargo_validator import validate_cargo_input
 
-# IATA standard volume factor (1 CBM = 166.67 kg, i.e. 6,000 cm3/kg).
-# Carriers may apply different factors, so it is kept configurable.
-AIR_VOLUME_FACTOR = 166.67
+# 항공 용적중량 환산 계수. **나누어 씁니다 — 반올림한 값을 쓰지 않습니다.**
+#
+# 업계 기준은 "가로×세로×높이(cm) ÷ 6,000"입니다. 1CBM을 kg으로 바꾸면
+# 1,000,000 ÷ 6,000 = 166.666… 인데, 예전에는 166.67로 적어 두었습니다.
+# 항공 운임은 **kg당** 매겨지므로 이 0.002%가 그대로 돈이 됩니다.
+#   354 CBM  →  59,001.18 kg (166.67)  vs  59,000.00 kg (정확)   +1.18 kg
+#   9,999박스 큰 건  →  +78 kg
+# 늘 **위로** 치우쳐 청구가 부풀었습니다. 나누기로 바꿉니다. (2026-09-26)
+#
+# 항공사가 다른 계수를 쓰면 volume_factor 인자로 넘깁니다.
+AIR_VOLUME_DIVISOR_CM3 = 6_000
+AIR_VOLUME_FACTOR = 1_000_000 / AIR_VOLUME_DIVISOR_CM3
 
 # Minimum billable unit for LCL freight.
 LCL_MIN_REVENUE_TON = 1.0

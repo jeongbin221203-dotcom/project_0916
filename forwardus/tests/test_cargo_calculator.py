@@ -42,10 +42,15 @@ def test_lcl_billable_minimum_is_one_rt():
 
 
 def test_air_chargeable_weight():
-    # 2 CBM × 166.67 = 333.34 kg < 1200 kg actual → actual weight wins.
+    # 용적중량 = 가로×세로×높이(cm) ÷ 6,000. 1 CBM이면 1,000,000/6,000 = 166.666…kg.
+    # **반올림한 166.67을 쓰지 않습니다.** 항공 운임은 kg당 매겨져 그 0.002%가
+    # 그대로 돈이 되고, 늘 위로 치우쳐 청구가 부풀었습니다. (2026-09-26)
+    # 2 CBM = 333.33 kg < 1,200 kg 실중량 → 실중량이 이깁니다.
     assert calculate_cargo_metrics(BASE)["chargeable_weight_kg"] == 1200.0
-    # Light, bulky cargo → volume weight wins.
-    assert calculate_chargeable_weight(100, 2.0) == pytest.approx(333.34)
+    # 가볍고 부피가 큰 화물 → 용적중량이 이깁니다.
+    assert calculate_chargeable_weight(100, 2.0) == pytest.approx(333.3333, abs=0.001)
+    # 큰 건에서 반올림 상수와 벌어지는 폭. (354 CBM이면 1.18kg)
+    assert calculate_chargeable_weight(1000, 354.0) == pytest.approx(59000.0, abs=0.01)
 
 
 def test_container_quantity_by_volume_and_weight():
