@@ -147,23 +147,92 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[dict] | None:
         return []
 
     words = [_plain(word) for word in text.split() if word.strip()]
+    rows = _match(catalog, words, korean, limit)
+    if rows:
+        return rows
+    # 못 찾았으면 일상어 사전을 한 번 봅니다. ("양주" → 위스키·브랜디·보드카)
+    for word in EVERYDAY.get(_plain(text), ()):
+        rows += [row for row in _match(catalog, [_plain(word)], True, limit)
+                 if row not in rows]
+    return rows[:limit]
+
+
+def _match(catalog, words, korean, limit) -> list[dict]:
     levels = catalog.get("levels") or {}
     scored = []
     for code, (name, english) in catalog["codes"].items():
-        leaf = _plain(name)
-        above = _plain(" ".join(levels[code[:n]][0] for n in LEVEL_LENGTHS if code[:n] in levels))
+        leaf, leaf_spaced = _plain(name), _spaced(name)
+        above_text = " ".join(levels[code[:n]][0] for n in LEVEL_LENGTHS if code[:n] in levels)
+        above, above_spaced = _plain(above_text), _spaced(above_text)
         english = english.lower()
-        if all(word in leaf for word in words):
+        if all(_hit(word, leaf_spaced, leaf) for word in words):
             rank = 0
-        elif all(word in leaf or word in above for word in words):
+        elif all(_hit(word, leaf_spaced, leaf) or _hit(word, above_spaced, above)
+                 for word in words):
             rank = 1
         elif not korean and all(word in english for word in words):
             rank = 2
         else:
             continue
-        scored.append((rank, code))
+        # 같은 등급 안의 순서.
+        #  - 이름이 "기타"뿐인 줄은 뒤로 미룹니다. 먼저 보여 줘도 알 수가 없습니다.
+        #  - 이름에서 직접 찾은 줄(rank 0)은 **이름이 짧은 것**이 먼저입니다.
+        #    "맥주"로 찾으면 "맥주보리"보다 "맥주"가 먼저 나와야 합니다.
+        #  - 상위 이름으로 걸린 줄(rank 1)은 이름 길이가 뜻이 없습니다
+        #    (죄다 "기타"·"끈"입니다). 품목표 차례대로 둡니다.
+        scored.append((rank, 1 if _plain(name) in GENERIC else 0,
+                       len(name) if rank == 0 else 0, code))
     scored.sort()
-    return [_row(catalog, code) for _, code in scored[:limit]]
+    return [_row(catalog, code) for *_, code in scored[:limit]]
+
+
+# 이름만 봐서는 무엇인지 알 수 없는 줄. 찾은 것 맨 앞에 두면 도움이 안 됩니다.
+GENERIC = {"기타", "그밖의것", "그밖의물품", "그밖의것들"}
+
+
+# 띄어쓰기를 지운 자리에서 찾아도 되는 가장 짧은 길이.
+#
+# 사람은 "과실젤리"처럼 띄어쓰기를 빼먹습니다. 그래서 지운 자리에서도 찾습니다.
+# 그런데 짧은 말은 **서로 다른 두 낱말이 붙은 자리**에 우연히 걸립니다.
+#   "소주"  → "채소 주스" → "채소주스"  ← 채소 주스가 소주로 나왔습니다
+#   "신발"  → "신발용이나 가죽용 광택제"
+# 네 글자부터는 그런 우연이 거의 없습니다. 짧은 말은 띄어쓰기를 지키게 합니다.
+LOOSE_MIN = 4
+
+
+def _hit(word: str, spaced: str, plain: str) -> bool:
+    """찾는 말이 이름 안에 있는가. 짧은 말은 띄어쓰기를 넘지 않습니다."""
+
+    if word in spaced:
+        return True
+    return len(word) >= LOOSE_MIN and word in plain
+
+
+# 사람이 쓰는 말과 품목표에 적힌 말이 다릅니다. 품목표는 "위스키"라고 적지
+# "양주"라고 적지 않습니다. 못 찾았을 때만 이 말로 바꿔 한 번 더 찾습니다.
+#
+# **분류를 정해 주는 표가 아닙니다.** 찾는 말만 바꿉니다. 어느 호에 들어가는지는
+# 그대로 품목표가 정합니다. 여기 있는 말은 모두 품목표에서 실제로 찾아지는지
+# 확인한 것입니다. (2026-09-26)
+EVERYDAY = {
+    "양주": ("위스키", "브랜디", "보드카"),
+    "막걸리": ("탁주",),
+    "핸드폰": ("스마트폰",),
+    "휴대폰": ("스마트폰",),
+    "휴대전화": ("스마트폰",),
+    "티비": ("텔레비전",),
+    "티브이": ("텔레비전",),
+    "에어컨": ("공기조절기",),
+    "냉방기": ("공기조절기",),
+    "운동화": ("스포츠용 신발류",),
+    "장난감": ("완구",),
+    "기초화장품": ("기초화장용",),
+    "스킨로션": ("기초화장용",),
+    "조미김": ("해초",),
+    "랩탑": ("휴대용 자동자료처리기계",),
+    "노트북컴퓨터": ("휴대용 자동자료처리기계",),
+    "전기자전거": ("자전거",),
+}
 
 
 # 가운뎃점은 **나열 구분자**입니다. 앞뒤는 서로 다른 항목이라 한 단어로 붙이면 안 됩니다.
@@ -180,7 +249,13 @@ def _plain(text: str) -> str:
     나열된 두 항목에 걸친 우연한 일치가 생기지 않습니다.
     """
 
-    text = (text or "").lower().replace(" ", "")
+    return _spaced(text).replace(" ", "")
+
+
+def _spaced(text: str) -> str:
+    """가운뎃점만 칸막이로 바꾸고 **띄어쓰기는 그대로 둡니다.**"""
+
+    text = (text or "").lower()
     for mark in ("ㆍ", "·", ",", "，", ";", "/"):
         text = text.replace(mark, BREAK)
     return text

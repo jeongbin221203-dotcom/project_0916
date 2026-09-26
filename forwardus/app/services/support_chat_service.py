@@ -272,28 +272,35 @@ def _write_answer(bundle: dict, text: str, history: list | None, *,
         messages.append({"role": "system",
                          "content": "지난 상담 요약입니다. 이어서 답하세요.\n"
                                     + _hide_bank(memory)})
-    # 지금 작성 중인 건. **지난 요약보다 뒤에** 둡니다.
-    #
-    # 왜 필요한가
-    #   화면에는 "Busan -> Istanbul 기준으로 답했습니다"라고 띄우면서, 정작
-    #   답은 "로스앤젤레스로 수출", "미국 FDA"라고 나온 적이 있습니다. 지난
-    #   대화 요약에 미국 건이 들어 있었고 AI는 그것을 집었습니다. 머리글과
-    #   본문이 다른 나라를 가리키면 어느 쪽을 믿어야 할지 알 수 없습니다.
-    #
-    #   그 머리글은 이 값으로 만듭니다. 같은 값을 AI에게도 줘야 둘이 맞습니다.
-    if current:
-        facts = " / ".join(f"{name} {value}" for name, value in current.items() if value)
-        if facts:
-            messages.append({"role": "system",
-                             "content": "지금 작성 중인 건입니다: " + facts + ". "
-                                        "이것이 기준입니다. 지난 대화에 다른 구간/나라/품목이 "
-                                        "나오더라도 이 건으로 답하세요. 사용자가 이번 말에서 "
-                                        "다른 구간을 적었다면 그 말을 따르세요."})
     for turn in (history or [])[-MAX_HISTORY:]:
         role = turn.get("role")
         content = _hide_bank(str(turn.get("content") or "").strip()[:MAX_QUESTION])
         if role in ("user", "assistant") and content:
             messages.append({"role": role, "content": content})
+    # 지금 작성 중인 건. **대화 기록보다 뒤, 이번 질문 바로 앞에** 둡니다.
+    #
+    # 왜 이 자리인가
+    #   화면에는 "부산항 → Istanbul 기준으로 답했습니다"라고 띄우면서, 정작
+    #   답은 "부산에서 로스앤젤레스로"라고 나왔습니다. 머리글과 본문이 다른
+    #   나라를 가리키면 어느 쪽을 믿어야 할지 알 수 없습니다.
+    #
+    #   예전에는 이 글을 지난 요약 바로 뒤에 두었는데, 그 **뒤로** 지난 대화가
+    #   통째로 붙었습니다. 지난 답변들이 로스앤젤레스를 말하고 있으니, 앞에서
+    #   한 번 일러둔 것보다 뒤에 쌓인 그 말들이 이겼습니다. 마지막에 읽는 것이
+    #   기준이 되도록 이번 질문 바로 앞으로 옮깁니다. (2026-09-26)
+    #
+    #   머리글도 같은 값(work_draft)으로 만듭니다. 같은 값을 AI에게도 줘야 둘이 맞습니다.
+    if current:
+        facts = " / ".join(f"{name} {value}" for name, value in current.items() if value)
+        if facts:
+            messages.append({"role": "system",
+                             "content": "지금 작성 중인 건입니다: " + facts + ". "
+                                        "**이것이 기준입니다.** 위 대화나 요약에 다른 "
+                                        "구간·나라·품목이 나오더라도 그것은 지난 건이므로 "
+                                        "쓰지 마세요. 특히 구간은 위에 적힌 것만 쓰고, "
+                                        "다른 항구 이름을 답에 적지 마세요. "
+                                        "사용자가 이번 말에서 다른 구간을 적었다면 그 말을 "
+                                        "따르고, 그때는 그렇게 바뀌었다고 밝히세요."})
     messages.append({"role": "user", "content": text})
 
     if brief:
