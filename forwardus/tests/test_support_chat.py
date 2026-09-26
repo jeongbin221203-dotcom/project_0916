@@ -186,3 +186,41 @@ def test_assistant_falls_back_when_the_key_is_missing(app, create_shipment, monk
     assert result["source"] == "rule"
     assert result["lines"]
     assert "AI_API_KEY" in result["note"]
+
+
+def test_대화에서_말한_구간이_저장된_지난_건을_이긴다(app, client, monkeypatch):
+    """방금 적은 말보다 더 새로운 값은 없습니다.
+
+    "부산에서 로스앤젤레스로 보냅니다"라고 적은 뒤 "치약 500박스…"를 물었더니
+    머리글에 엉뚱하게 "Busan → Kaohsiung · 담배"가 붙었습니다. 저장해 둔 지난
+    건(대만 담배)을 보고 있었고, 대화로는 그 값을 **고칠 수가 없었습니다.**
+    """
+
+    from app.models import User
+    from app.services import support_chat_service, work_draft_service
+
+    monkeypatch.setattr(support_chat_service.ai_client, "chat",
+                        lambda messages, **kw: {"success": True, "source": "api", "data": "답"})
+    with app.app_context():
+        viewer = User.query.filter_by(email=app.config["MASTER_EMAIL"]).one()
+        work_draft_service.save(viewer, {
+            "fields": {"origin_name": "부산항 (KRPUS)", "origin_code": "KRPUS",
+                       "destination_name": "Kaohsiung (TWKHH)", "destination_code": "TWKHH",
+                       "transport_mode": "SEA"},
+            "items": [{"product_description": "담배"}]})
+
+    client.post("/api/support-chat",
+                json={"question": "부산에서 로스앤젤레스로 11월 초에 항공으로 보냅니다"})
+    answer = client.post("/api/support-chat",
+                         json={"question": "치약 500박스, 한 박스 40x30x25cm에 12kg입니다"})
+    assumed = answer.get_json()["data"]["assumed"]
+    assert "로스앤젤레스" in assumed["route"]
+    assert "Kaohsiung" not in assumed["route"]
+    assert assumed["mode"] == "항공"
+
+    with app.app_context():
+        kept = work_draft_service.load(User.query.filter_by(
+            email=app.config["MASTER_EMAIL"]).one()) or {}
+    # 품목이 바뀌었으면 지난 품목의 치수·무게는 따라오지 않습니다.
+    assert kept["items"][0]["product_description"] == "치약"
+    assert kept["fields"]["destination_code"] == "LAX"

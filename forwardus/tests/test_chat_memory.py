@@ -211,16 +211,30 @@ def test_대화에_적은_화물_정보를_담아_둔다(app):
     assert chat_capture_service.read("안녕하세요") == {}
 
 
-def test_이미_담아_둔_값은_대화가_덮지_않는다(app):
+def test_대화가_말한_것만_덮고_나머지는_그대로_둔다(app):
+    """**방금 말한 것이 이깁니다.** 다만 말하지 않은 칸은 건드리지 않습니다.
+
+    예전에는 "이미 담아 둔 값은 대화가 덮지 않는다"였습니다. 화면에서 적은 값을
+    지키려던 것인데, 그러면 대화로는 아무것도 **고칠 수가 없었습니다.**
+    "부산에서 로스앤젤레스로 보냅니다"라고 적어도 지난 건이 그대로 남아,
+    다음 질문의 머리글에 엉뚱한 구간이 붙었습니다. 사람이 방금 적은 말보다
+    더 새로운 값은 없습니다. (2026-09-26)
+    """
+
     browser = _member(app)
-    browser.put("/api/work-draft", json={"source": "document", "items": [],
-                                         "fields": {"origin_code": "KRINC", "incoterms": "CIF"}})
+    browser.put("/api/work-draft", json={
+        "source": "document", "items": [],
+        "fields": {"origin_code": "KRINC", "incoterms": "CIF", "buyer_name": "OLD BUYER"}})
 
     _ask(browser, CARGO_TALK)
 
     fields = browser.get("/api/work-draft").get_json()["data"]["fields"]
-    assert fields["origin_code"] == "KRINC" and fields["incoterms"] == "CIF"   # 화면에서 적은 값 유지
-    assert fields["destination_code"] == "USLAX"                               # 비어 있던 칸만 채움
+    # 대화에서 말한 것 — 덮습니다.
+    assert fields["origin_code"] == "KRPUS"
+    assert fields["incoterms"] == "FOB"
+    assert fields["destination_code"] == "USLAX"
+    # 대화에 없던 것 — 그대로 둡니다.
+    assert fields["buyer_name"] == "OLD BUYER"
 
 
 def test_로그인_전에는_담지_않는다(app, anon_client):

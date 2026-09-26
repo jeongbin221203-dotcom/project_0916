@@ -68,19 +68,28 @@
 
   /* 판은 fixed라 자리를 여기서 잡아 줍니다. (왜 fixed인지는 shell.css 참고 —
      레일 안쪽 판이 overflow-x: hidden이라 absolute로는 잘려 안 보였습니다) */
+  const EDGE = 8;        // 화면 가장자리에서 띄우는 간격
+  const LEAST = 180;     // 이보다 낮아지면 목록이 한 줄도 안 보입니다
+
   function place(box) {
     const flyout = box.querySelector(".rail_flyout");
     const rect = box.querySelector("button").getBoundingClientRect();
     const wide = window.innerWidth > 860;
+    // 자연스러운 높이를 먼저 잽니다. 앞서 걸어 둔 한도가 남아 있으면 잘못 잽니다.
+    flyout.style.maxHeight = "";
     const width = flyout.offsetWidth || 310;
     const height = flyout.offsetHeight || 0;
     let left = wide ? rect.right + 10 : rect.right - width;
-    let top = wide ? rect.top : rect.bottom + 8;
+    let top = wide ? rect.top : rect.bottom + EDGE;
     // 화면 밖으로 나가지 않게 안으로 당깁니다.
-    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
-    top = Math.max(8, Math.min(top, window.innerHeight - height - 8));
+    left = Math.max(EDGE, Math.min(left, window.innerWidth - width - EDGE));
+    top = Math.max(EDGE, Math.min(top, window.innerHeight - height - EDGE));
     flyout.style.left = `${left}px`;
     flyout.style.top = `${top}px`;
+    // **남은 자리**만큼만 높이를 줍니다. 화면 높이(100vh)로 잡아 두었더니,
+    // 판이 화면 가운데쯤에서 시작할 때 아래가 잘리고 굴릴 수도 없었습니다.
+    // 최근 Shipment가 세 건째부터 안 보였습니다. (2026-09-26)
+    flyout.style.maxHeight = `${Math.max(LEAST, window.innerHeight - top - EDGE)}px`;
   }
 
   function setFlyout(box, open) {

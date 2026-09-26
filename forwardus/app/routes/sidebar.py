@@ -20,10 +20,13 @@ RAIL = [
     # 서류를 먼저 두었습니다. 대부분 서류를 만들다가 운임을 궁금해합니다.
     {"key": "documents", "icon": "📄", "tone": "green", "label": "수출 서류 작성", "endpoint": "document.new",
      "note": "상업송장·포장명세서를 Shipment 데이터로 자동 작성합니다", "blueprints": ("document",)},
-    {"key": "planning", "icon": "📦", "tone": "blue", "label": "운송 예상 견적", "endpoint": "planning.new",
+    # 배(🚢)는 **나르는 일**이고 상자(📦)는 **컨테이너**입니다. 뜻에 맞게 둡니다.
+    {"key": "planning", "icon": "🚢", "tone": "blue", "label": "운송 예상 견적", "endpoint": "planning.new",
      "note": "출발·도착지와 화물을 넣으면 스케줄과 물류비를 봅니다", "blueprints": ("planning",)},
     # 위쪽 메뉴에 있던 조회 두 가지를 이리로 옮겼습니다. 조회는 어느 화면에서나 자주 씁니다.
-    {"key": "container", "icon": "🔎", "tone": "blue", "label": "컨테이너 조회",
+    # 돋보기(🔎)는 시작 화면의 **HS CODE 조회** 단추가 씁니다. 둘 다 돋보기면
+    # 어느 쪽이 무엇인지 아이콘으로는 가릴 수가 없습니다. (2026-09-26 사용자 결정)
+    {"key": "container", "icon": "📦", "tone": "blue", "label": "컨테이너 조회",
      "endpoint": "tracking.container_lookup",
      "note": "컨테이너 번호로 화물 위치를 봅니다", "blueprints": ()},
     {"key": "lookup", "icon": "🏛", "tone": "green", "label": "관세청 조회", "endpoint": "lookup.index",

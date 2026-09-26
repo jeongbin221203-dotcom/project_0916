@@ -110,12 +110,21 @@ html.rail_expanded .rail_inner [data-tip]:not(.rail_toggle)::after { display: no
 .rail_flyout {
   /* 화면 아래에 붙는 적는 칸(z-index 25)보다 위에 있어야 가려지지 않습니다. */
   position: fixed; z-index: 70;
-  max-height: calc(100vh - 24px); overflow-y: auto;
+  /* 높이 한도는 sidebar.js가 **남은 자리**로 정합니다. 여기서 100vh로 잡으면
+     판이 화면 가운데쯤에서 시작할 때 아래가 잘립니다. */
+  overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
   width: 310px; padding: 16px; text-align: left;
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--white); box-shadow: 0 12px 36px rgba(15, 23, 42, .14);
 }
-.rail_flyout > .row_between { margin-bottom: 10px; }
+.rail_flyout::-webkit-scrollbar { width: 8px; }
+.rail_flyout::-webkit-scrollbar-thumb { border-radius: 999px; background: #cbd5e1; }
+.rail_flyout::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.rail_flyout::-webkit-scrollbar-track { background: transparent; }
+/* 머리글은 굴러도 늘 보이게 붙여 둡니다. 어느 목록인지 잃지 않습니다. */
+.rail_flyout > .row_between { position: sticky; top: -16px; z-index: 1; margin-bottom: 10px;
+  padding: 4px 0 8px; background: var(--white); }
 .rail_flyout > .row_between b { font-size: 14px; }
 .rail_flyout > .row_between a { font-size: 12.5px; }
 .rail_ship {

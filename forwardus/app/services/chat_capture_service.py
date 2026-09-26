@@ -174,15 +174,25 @@ def capture(viewer, message: str) -> list[str]:
     known_fields = (kept.get("fields") or {})
     known_item = (kept.get("items") or [{}])[0] if kept.get("items") else {}
 
-    # 이미 담아 둔 값은 덮지 않습니다. 화면에서 고친 값이 우선입니다.
+    # **방금 말한 것이 이깁니다.**
+    #
+    # 예전에는 "이미 담아 둔 값은 덮지 않습니다"였습니다. 화면에서 고친 값을
+    # 지키려던 것인데, 그러면 대화로는 아무것도 **고칠 수가 없습니다.**
+    # "부산에서 로스앤젤레스로 보냅니다"라고 적어도 지난 건(대만 가오슝)이
+    # 그대로 남아, 다음 질문의 머리글에 "Busan → Kaohsiung"이 붙었습니다.
+    # 사람이 방금 적은 말보다 더 새로운 값은 없습니다. (2026-09-26)
     fields = {key: value for key, value in read_values["fields"].items()
-              if key in work_draft_service.SHARED_FIELDS and not known_fields.get(key)}
+              if key in work_draft_service.SHARED_FIELDS and value}
     items = []
     if read_values["items"]:
         item = {key: value for key, value in read_values["items"][0].items()
-                if key in work_draft_service.ITEM_FIELDS and not known_item.get(key)}
+                if key in work_draft_service.ITEM_FIELDS and value}
         if item:
-            items = [{**known_item, **item}]
+            # 품목이 바뀌었으면 지난 품목의 치수·무게는 함께 버립니다.
+            # 담배 치수에 치약 이름이 붙으면 CBM이 통째로 틀립니다.
+            changed = (item.get("product_description")
+                       and item["product_description"] != known_item.get("product_description"))
+            items = [item if changed else {**known_item, **item}]
     if not fields and not items:
         return []
 
