@@ -359,5 +359,17 @@ def _fetch_currency_names_now() -> dict[str, str]:
     return names
 
 
-def convert(amount: float, from_currency: str, to_currency: str, rates: dict) -> float:
-    return amount * rates[from_currency] / rates[to_currency]
+def convert(amount: float, from_currency: str, to_currency: str, rates: dict):
+    """환산합니다. 환율표에 없는 통화면 **None**입니다. (지어내지 않습니다)
+
+    예전에는 없는 통화를 물으면 KeyError로 터졌습니다. 화면에서 고를 수 있는
+    통화는 어느 단계의 환율표에도 다 들어 있어 실제로는 안 터졌지만,
+    저장해 둔 환율이 잘린 채로 돌아오면 그대로 500이 났습니다.
+    모르면 모른다고 하는 편이 낫습니다. (2026-09-26)
+    """
+
+    one = rates.get(str(from_currency or "").upper())
+    other = rates.get(str(to_currency or "").upper())
+    if not one or not other:
+        return None
+    return amount * one / other

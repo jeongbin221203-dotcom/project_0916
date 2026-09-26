@@ -1237,7 +1237,13 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
                                      field="buyer_required_date")
     rates_result = exchange_client.fetch_krw_rates()
     rates = rates_result["data"]
-    invoice_value_usd = exchange_client.convert(terms["invoice_value"], terms["currency"], "USD", rates)
+    invoice_value_usd = exchange_client.convert(terms["invoice_value"], terms["currency"],
+                                                "USD", rates)
+    if invoice_value_usd is None:
+        # 환율표에 그 통화가 없습니다. 보험료·관세를 지어내지 않고 멈춥니다.
+        raise ServiceError(
+            f"{terms['currency']} 환율을 받지 못해 물류비를 낼 수 없습니다. "
+            "잠시 뒤 다시 해 주시거나 통화를 바꿔 주세요.", "EXCHANGE_UNAVAILABLE")
 
     costs = calculate_logistics_cost(
         transport_mode=route["transport_mode"],
