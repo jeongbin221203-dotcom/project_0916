@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+from app.processors import korean
+
 import re
 
 # 한국과 FTA가 발효된 나라 (양자 협정). 지역 협정은 아래 blocs에서 옵니다.
@@ -207,6 +209,48 @@ def agreements(code: str) -> list[str]:
     return list(dict.fromkeys(found))
 
 
+# --- 도착국 세번(HS) -------------------------------------------------------------
+#
+# HS 6자리는 세계 공통입니다. **그 뒤는 나라마다 다릅니다.** 6자리만 들고 견적을
+# 내면, 정작 세율과 수입요건이 갈리는 자리를 못 봅니다. 미국은 10자리, 대만은
+# 11자리, 중국은 신고할 때 13자리를 씁니다.
+#
+# 우리 쪽 HSK 10자리를 그대로 도착국에 쓸 수 없습니다. 앞 6자리만 같습니다.
+#
+# 자릿수와 조회처는 2026-09-26에 하나씩 확인했습니다. 모르는 나라는 비워 둡니다.
+ASEAN_TARIFF = ("8자리 AHTN (아세안 공통)", "https://www.tradenavi.or.kr")
+EAEU_TARIFF = ("10자리 TN VED (유라시아경제연합 공통)", "https://eec.eaeunion.org/en/")
+
+TARIFF_CODES = {
+    "US": ("10자리 HTSUS", "https://hts.usitc.gov/"),
+    "EU": ("10자리 TARIC (신고는 8자리 CN)",
+           "https://ec.europa.eu/taxation_customs/dds2/taric/taric_consultation.jsp?Lang=en"),
+    "GB": ("10자리 UK Global Tariff", "https://www.trade-tariff.service.gov.uk/"),
+    "JP": ("9자리 실행관세율표", "https://www.customs.go.jp/english/tariff/"),
+    "CN": ("13자리 (세칙 8 + 감독관리 2 + 검사검역 3)",
+           "http://www.customs.gov.cn/customs/302427/302442/jckszcx/index.html"),
+    "TW": ("11자리 CCC", "https://fbfh.trade.gov.tw/fh/ap/listCCCf.do"),
+    "CA": ("10자리", "https://www.cbsa-asfc.gc.ca/trade-commerce/tariff-tarif/menu-eng.html"),
+    "AU": ("8자리 Working Tariff",
+           "https://www.abf.gov.au/importing-exporting-and-manufacturing/tariff-classification"),
+    "IN": ("8자리 ITC(HS)", "https://www.icegate.gov.in/"),
+    "RU": EAEU_TARIFF,
+    "BY": EAEU_TARIFF, "KZ": EAEU_TARIFF, "KG": EAEU_TARIFF, "AM": EAEU_TARIFF,
+    "VN": ASEAN_TARIFF, "TH": ASEAN_TARIFF, "MY": ASEAN_TARIFF, "PH": ASEAN_TARIFF,
+    "ID": ASEAN_TARIFF, "SG": ASEAN_TARIFF, "BN": ASEAN_TARIFF, "KH": ASEAN_TARIFF,
+    "LA": ASEAN_TARIFF, "MM": ASEAN_TARIFF,
+}
+
+
+def tariff_code(code: str) -> tuple[str, str] | None:
+    """그 나라 세번 자릿수와 관세율표 조회처. 모르면 None (지어내지 않습니다)."""
+
+    code = str(code or "").strip().upper()
+    if code in TARIFF_CODES:
+        return TARIFF_CODES[code]
+    return TARIFF_CODES["EU"] if code == "EU" or code in _eu_members() else None
+
+
 def guide(code: str, name: str) -> str:
     """그 나라로 수출하는 법 한 장. (마크다운)"""
 
@@ -227,12 +271,29 @@ def guide(code: str, name: str) -> str:
         lines.append(f"적용해 볼 수 있는 협정: **{' · '.join(deals)}**")
         lines.append("")
         lines.append("협정이 둘 이상이면 **세율이 낮은 쪽을 골라** 원산지증명서를 받으면 됩니다. "
-                     "협정마다 원산지 기준과 서식이 다르니 FTA 강국 KOREA에서 HS 6자리로 확인하세요.")
+                     "협정마다 원산지 기준과 서식이 다르니 [FTA 강국 KOREA](https://www.fta.go.kr)에서 HS 6자리로 확인하세요.")
     else:
-        lines.append(f"{name}와(과)는 한국이 맺은 FTA가 확인되지 않습니다. **일반세율(MFN)**이 "
-                     "적용될 가능성이 큽니다. 협정 발효 상황은 바뀌므로 FTA 강국 KOREA에서 "
-                     "다시 확인하세요.")
+        # 나라 이름은 우리가 들고 있는 말이라 조사를 정확히 고를 수 있습니다.
+        # "남아프리카공화국와(과)는"처럼 나오면 읽는 사람이 먼저 걸립니다.
+        lines.append(f"{korean.josa(name, '와')}는 한국이 맺은 FTA가 확인되지 않습니다. **일반세율(MFN)**이 "
+                     "적용될 가능성이 큽니다. 협정 발효 상황은 바뀌므로 "
+                     "[FTA 강국 KOREA](https://www.fta.go.kr)에서 다시 확인하세요.")
     lines.append("")
+
+    # HS 6자리만 알고 끝내면, 정작 세율이 갈리는 자리를 못 봅니다.
+    found_code = tariff_code(code)
+    lines += ["### 도착국 세번(HS)", "",
+              "HS **앞 6자리는 세계 공통**입니다. 그 뒤는 나라마다 다릅니다. "
+              "우리 쪽 HSK 10자리를 그대로 쓸 수 없고, 앞 6자리만 같습니다."]
+    if found_code:
+        digits, url = found_code
+        lines.append(f"- {name}: **{digits}** — [그 나라 관세율표에서 찾기]({url})")
+    else:
+        lines.append(f"- {name}의 자릿수는 우리가 들고 있지 않습니다. "
+                     f"[TradeNAVI](https://www.tradenavi.or.kr)에 HS 6자리와 나라를 "
+                     "넣으면 그 나라 세번과 세율이 나옵니다.")
+    lines += ["- 우리 쪽(수출신고)은 **HSK 10자리**입니다 — "
+              "[관세청 품목분류](https://unipass.customs.go.kr/clip/index.do)", ""]
 
     lines += ["### 도착국 규제·인증", ""]
     if note.get("certs"):
@@ -250,10 +311,13 @@ def guide(code: str, name: str) -> str:
         lines += [f"- {row}" for row in note["watch"]]
         lines.append("")
 
+    # 이름만 굵게 적어 두면 사람은 또 검색해야 합니다. 주소를 바로 겁니다. (2026-09-26)
     lines += ["### 어디서 확인하나", "",
-              "- **KOTRA 해외시장뉴스 국가·지역정보** — 나라별 통관·인증·시장 자료",
-              "- **TradeNAVI** — HS 부호를 넣으면 나라별 관세·수입요건을 모아 보여 줍니다",
-              "- **FTA 강국 KOREA** — 협정별 세율과 원산지 기준",
+              "- [**KOTRA 해외시장뉴스** 국가·지역정보](https://dream.kotra.or.kr/kotranews/index.do)"
+              " — 나라별 통관·인증·시장 자료",
+              "- [**TradeNAVI**](https://www.tradenavi.or.kr)"
+              " — HS 부호를 넣으면 나라별 관세·수입요건을 모아 보여 줍니다",
+              "- [**FTA 강국 KOREA**](https://www.fta.go.kr) — 협정별 세율과 원산지 기준",
               "- 인증이 걸리면 KTR·KTL·KTC 같은 국내 시험인증기관에 품목·사양을 주고 "
               "먼저 견적과 기간을 받아 보세요. **인증은 몇 주에서 몇 달**이 걸립니다. "
               "계약 납기를 정하기 전에 확인하셔야 합니다."]
@@ -263,16 +327,23 @@ def guide(code: str, name: str) -> str:
 
 
 def links(code: str, name: str) -> list[dict]:
-    """나라별로 바로 열 수 있는 창구. 주소는 우리가 들고 있는 것만 씁니다."""
+    """나라별로 바로 열 수 있는 창구. 주소는 우리가 들고 있는 것만 씁니다.
 
-    from urllib.parse import quote
+    예전에는 `] if not quote else []` 로 끝나 **늘 빈 목록**을 돌려주었습니다.
+    quote는 불러 온 함수라 언제나 참이어서, 이 함수가 하는 일이 없었습니다.
+    (2026-09-26)
+    """
 
-    return [
+    rows = [
         {"label": f"KOTRA 해외시장뉴스 · {name}", "url": "https://dream.kotra.or.kr/kotranews/index.do"},
         {"label": "TradeNAVI (품목별 나라 관세·요건)", "url": "https://www.tradenavi.or.kr"},
         {"label": "FTA 강국, KOREA (협정 세율·원산지 기준)", "url": "https://www.fta.go.kr"},
         {"label": "관세청 (수출통관·요건)", "url": "https://www.customs.go.kr"},
-    ] if not quote else []
+    ]
+    found = tariff_code(code)
+    if found:
+        rows.insert(1, {"label": f"{name} 관세율표 ({found[0]})", "url": found[1]})
+    return rows
 
 
 def answer(question: str) -> dict | None:

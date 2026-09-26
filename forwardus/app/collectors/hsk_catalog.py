@@ -166,7 +166,21 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[dict] | None:
     return [_row(catalog, code) for _, code in scored[:limit]]
 
 
-def _plain(text: str) -> str:
-    """띄어쓰기·가운뎃점 차이로 못 찾는 일이 없게 맞춥니다. ("과실 젤리" = "과실젤리")"""
+# 가운뎃점은 **나열 구분자**입니다. 앞뒤는 서로 다른 항목이라 한 단어로 붙이면 안 됩니다.
+# 지워 버렸더니 3401.11 약용비누의 "케이크 모양ㆍ주형 모양"이 "모양주형"이 되어,
+# **"양주"로 검색하면 비누가 나왔습니다.** 띄어쓰기는 사람이 빼먹을 수 있으니
+# 그대로 지우고, 가운뎃점 자리에는 넘을 수 없는 칸막이를 둡니다. (2026-09-26)
+BREAK = ""
 
-    return (text or "").lower().replace(" ", "").replace("ㆍ", "").replace("·", "")
+
+def _plain(text: str) -> str:
+    """띄어쓰기 차이로 못 찾는 일이 없게 맞춥니다. ("과실 젤리" = "과실젤리")
+
+    가운뎃점·쉼표는 칸막이로 바꿉니다. 찾는 말에는 이 글자가 없으므로,
+    나열된 두 항목에 걸친 우연한 일치가 생기지 않습니다.
+    """
+
+    text = (text or "").lower().replace(" ", "")
+    for mark in ("ㆍ", "·", ",", "，", ";", "/"):
+        text = text.replace(mark, BREAK)
+    return text

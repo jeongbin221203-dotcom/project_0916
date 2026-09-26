@@ -52,25 +52,32 @@ KNOWN_BLOCKERS = ("fda.gov", "fcc.gov", "mfds.go.kr", "foodsafetykorea.go.kr",
 # 어느 쪽도 "열립니다"로 세지 않습니다 — 이 도구가 연 것이 아니니까요.
 # 어느 쪽도 "주소 의심"으로 세지 않습니다 — 그렇게 볼 근거가 없으니까요.
 UNVERIFIABLE = {
-    "cpsc.gov": "확인됨 · 열립니다 (이 컴퓨터에서만 403)",
-    "canada.ca": "확인됨 · 열립니다 (이 컴퓨터에서만 연결 끊김)",
-    "echa.europa.eu": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
-    "customs.gov.cn": "미확인 · HTTP 504 · 주소는 공식",
-    "acma.gov.au": "미확인 · 시간 초과 · 주소는 공식(검색 확인)",
-    "agriculture.gov.au": "미확인 · 시간 초과 · 주소는 공식(검색 확인)",
-    "tcvn.gov.vn": "미확인 · 인증서 체인 불완전 · STAMEQ 공식 주소",
-    # 2026-09-26에 8개국을 새로 넣으며 하나씩 두드려 본 결과입니다.
+    # --- 확인됨: 주소가 그 기관의 것임을 실제로 확인했습니다 -------------------
+    # TLS 인증서를 읽어, 서버가 **그 호스트 이름으로 발급된 공인 인증서**를
+    # 내미는 것을 보았습니다(2026-09-26). 죽었거나 틀린 주소는 그럴 수 없습니다.
+    "echa.europa.eu": "확인됨 · 인증서 *.echa.europa.eu (Telia) · 403은 봇 차단",
+    "ncc.gov.tw": "확인됨 · 인증서 ncc.gov.tw (Google Trust) · 403은 봇 차단",
+    "ntc.gov.ph": "확인됨 · 인증서 *.ntc.gov.ph (GoDaddy) · 403은 봇 차단",
+    "nbtc.go.th": "확인됨 · 인증서 *.nbtc.go.th (GlobalSign) · 403은 봇 차단",
+    "moh.gov.my": "확인됨 · 인증서 www.moh.gov.my (Let's Encrypt) · 403은 봇 차단",
+    "customs.gov.my": "확인됨 · 인증서 www.customs.gov.my (GlobalSign)",
+    "tcvn.gov.vn": "확인됨 · 인증서 *.tcvn.gov.vn (GlobalSign) · 체인만 불완전",
+    "acma.gov.au": "확인됨 · 인증서 www.acma.gov.au (Let's Encrypt)",
+    "agriculture.gov.au": "확인됨 · 인증서 각 호스트 이름 (Let's Encrypt · DigiCert)",
     "bsmi.gov.tw": "확인됨 · 열립니다 (이 컴퓨터에서만 인증서 오류)",
     "web.customs.gov.tw": "확인됨 · 열립니다 (이 컴퓨터에서만 인증서 오류)",
     "sirim-qas.com.my": "확인됨 · 공식 (이 컴퓨터에서만 인증서 오류)",
     "bps.dti.gov.ph": "확인됨 · 공식 BPS 포털 (이 컴퓨터에서만 시간 초과)",
-    "ncc.gov.tw": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
-    "ntc.gov.ph": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
-    "nbtc.go.th": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
-    "moh.gov.my": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
-    "customs.gov.my": "미확인 · 인증서 체인 불완전 · 왕립관세청 공식 주소",
-    "rst.gov.ru": "미확인 · 시간 초과(지역 차단으로 보임) · 주소는 공식",
-    "customs.gov.ru": "미확인 · 시간 초과(지역 차단으로 보임) · 주소는 공식",
+    "cpsc.gov": "확인됨 · 열립니다 (이 컴퓨터에서만 403)",
+    "canada.ca": "확인됨 · 열립니다 (이 컴퓨터에서만 연결 끊김)",
+    # 러시아 두 곳은 443이 아예 안 열립니다(지역 차단으로 보입니다). 인증서를
+    # 볼 수 없어 검색으로 확인했습니다 — 두 기관의 공식 주소가 맞습니다.
+    "rst.gov.ru": "확인됨(검색) · 지역 차단으로 보임 · Rosstandart 공식 주소",
+    "customs.gov.ru": "확인됨(검색) · 지역 차단으로 보임 · 연방관세청 공식 주소",
+
+    # --- 미확인: 여기서는 맞는지 틀린지 알 수 없습니다 -------------------------
+    # 서버가 제 이름의 인증서를 안 내밀어(CDN 기본 인증서) 확인이 막혔습니다.
+    "jckspj.customs.gov.cn": "미확인 · HTTP 412 (Knownsec WAF) · 해관총서 하위 도메인",
 }
 
 
@@ -95,7 +102,7 @@ def main() -> int:
     except (AttributeError, OSError):
         pass
     seen: set[str] = set()
-    alive = blocked = dead = unknown = 0
+    alive = blocked = dead = unknown = verified = 0
     print(f"{'대상':<46}{'결과':<22}주소")
     print("-" * 110)
     for title, url in collect():
@@ -115,6 +122,11 @@ def main() -> int:
         elif any(host in url for host in KNOWN_BLOCKERS):
             blocked += 1
             mark = f"{mark} (기계 접속 차단)"
+        elif why.startswith("확인됨"):
+            # 이 도구로는 못 열었지만, 다른 경로로 주소가 맞다는 것을 확인한 곳입니다.
+            # "사람이 봐야 함"으로 세면 볼 것이 없는데도 계속 숙제로 남습니다.
+            verified += 1
+            mark = f"확인됨(기계 차단) · {why}"
         elif why:
             unknown += 1
             mark = f"사람이 봐야 함 · {why}"
@@ -125,7 +137,7 @@ def main() -> int:
 
     print("-" * 110)
     print(f"열립니다 {alive} · 차단(주소는 맞음) {blocked} · "
-          f"사람이 봐야 함 {unknown} · 주소 의심 {dead}")
+          f"확인됨(기계 차단) {verified} · 사람이 봐야 함 {unknown} · 주소 의심 {dead}")
     if dead:
         print()
         print("★ 표시된 것만 보세요. 브라우저로 열어 보고 주소가 바뀌었으면")

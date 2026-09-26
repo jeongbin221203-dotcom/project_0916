@@ -289,8 +289,13 @@ COUNTRY_AGENCIES = {
     "CN": [
         {"label": "SAMR · 국가시장감독관리총국", "url": "https://www.samr.gov.cn",
          "note": "CCC 강제인증을 관장합니다."},
-        {"label": "중국 해관총서 (통관·검역)", "url": "http://www.customs.gov.cn",
+        # 중국어 대문(www.customs.gov.cn)은 CDN(Knownsec)이 바깥 접속을 막아
+        # 기계로는 열리지 않습니다. 영문 포털은 그대로 열립니다. (2026-09-26 확인)
+        {"label": "중국 해관총서 GACC (통관·검역)", "url": "http://english.customs.gov.cn/",
          "note": "식품 수출자는 해관총서 등록(GACC)이 되어 있어야 합니다."},
+        {"label": "수입식품 해외생산기업 등록 (GACC 등록)", "url": "http://jckspj.customs.gov.cn/",
+         "note": "식품을 중국에 보내려면 여기에 생산기업이 먼저 등록되어 있어야 합니다. "
+                 "등록번호를 상업송장과 포장에 적습니다."},
     ],
     "JP": [
         {"label": "경제산업성 (전기용품 PSE)", "url": "https://www.meti.go.jp",
