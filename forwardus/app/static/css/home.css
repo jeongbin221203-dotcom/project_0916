@@ -40,22 +40,23 @@
 .home_actions button.active { border-color: var(--navy); background: var(--navy); color: #fff; }
 
 /* ----- 적는 칸 -----
-   예전보다 3/4 높이로 줄였습니다. (2줄 + 아래 단추 줄) 칸이 크면 답을 읽을 자리가 좁아집니다. */
+   칸이 크면 답을 읽을 자리가 좁아집니다. 절반보다 조금 큰 높이로 둡니다.
+   (빈 상자가 화면 위쪽을 차지하고 있어, 정작 답은 아래로 밀렸습니다) */
 .home_box {
-  padding: 19px 24px 14px; border: 1px solid var(--line); border-radius: 26px;
+  padding: 13px 22px 10px; border: 1px solid var(--line); border-radius: 22px;
   background: var(--white); box-shadow: var(--shadow); text-align: left;
   transition: border-color .15s, box-shadow .15s;
 }
 .home_box:focus-within { border-color: #a9c4fd; box-shadow: 0 10px 34px rgba(43, 102, 246, .13); }
 .home_box textarea {
-  display: block; width: 100%; min-height: 72px; max-height: 312px;
+  display: block; width: 100%; min-height: 44px; max-height: 312px;
   border: 0; outline: none; background: none; resize: none;
   font-size: 18px; line-height: 1.65;
 }
 .home_box textarea::placeholder { color: #94a3b8; }
 /* 칩 줄이 상자 모서리를 넘지 않게 안쪽으로 조금 들입니다.
    넘치면 둥근 모서리에 칩이 걸쳐 보입니다. */
-.home_box_foot { display: flex; align-items: center; gap: 12px; margin-top: 10px;
+.home_box_foot { display: flex; align-items: center; gap: 10px; margin-top: 6px;
   padding-left: 2px; }
 
 /* 자주 묻는 질문은 한 줄로 늘어놓습니다. 줄바꿈되면 칸이 위아래로 커져
@@ -63,19 +64,21 @@
 .home_chips {
   display: flex; flex-wrap: nowrap; gap: 7px;
   flex: 1 1 auto; min-width: 0; overflow-x: auto;
-  padding-bottom: 6px;
+  padding-bottom: 3px;
   /* 막대를 보여 줍니다. 숨기면 옆으로 더 있다는 걸 알 수가 없습니다. */
   scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
   overscroll-behavior-x: contain;
 }
-.home_chips::-webkit-scrollbar { height: 6px; }
+.home_chips::-webkit-scrollbar { height: 4px; }
 .home_chips::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 .home_chips::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .home_chips::-webkit-scrollbar-track { background: transparent; }
+/* 절반 두께로 얇게. 칩은 거들 뿐이고, 읽어야 하는 것은 답입니다. */
 .home_chips button {
-  flex: 0 0 auto; margin: 2px 0;
-  padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 600;
+  flex: 0 0 auto; margin: 1px 0;
+  padding: 3px 12px; border: 1px solid var(--line); border-radius: 999px;
+  line-height: 1.55;
+  background: var(--surface); color: var(--muted); font-size: 12.5px; font-weight: 600;
   max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .home_chips button:hover { border-color: #c7d7fd; color: var(--blue_dark); background: var(--blue_soft); }
@@ -317,8 +320,8 @@ html:has(.home_center.talking) { scroll-padding-bottom: calc(var(--composer_h, 1
   min-height: 48px; max-height: 168px; font-size: 15px; line-height: 1.6;
 }
 .home_center.talking .home_box_foot { margin-top: 4px; gap: 8px; }
-.home_center.talking .home_chips { padding-bottom: 4px; }
-.home_center.talking .home_chips button { padding: 5px 11px; font-size: 12px; }
+.home_center.talking .home_chips { padding-bottom: 2px; }
+.home_center.talking .home_chips button { padding: 2px 10px; font-size: 12px; }
 .home_center.talking .home_send { width: 34px; height: 34px; font-size: 16px; }
 /* 안내 문구는 처음 한 번 읽으면 됩니다. 대화 중에는 자리만 차지합니다. */
 .home_center.talking .home_hint { display: none; }

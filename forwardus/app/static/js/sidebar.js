@@ -66,8 +66,27 @@
   // (환율은 옆으로 펼치지 않고 환율 센터 창을 엽니다. fx_center.js)
   const flyouts = Array.from(document.querySelectorAll("[data-rail-flyout]"));
 
+  /* 판은 fixed라 자리를 여기서 잡아 줍니다. (왜 fixed인지는 shell.css 참고 —
+     레일 안쪽 판이 overflow-x: hidden이라 absolute로는 잘려 안 보였습니다) */
+  function place(box) {
+    const flyout = box.querySelector(".rail_flyout");
+    const rect = box.querySelector("button").getBoundingClientRect();
+    const wide = window.innerWidth > 860;
+    const width = flyout.offsetWidth || 310;
+    const height = flyout.offsetHeight || 0;
+    let left = wide ? rect.right + 10 : rect.right - width;
+    let top = wide ? rect.top : rect.bottom + 8;
+    // 화면 밖으로 나가지 않게 안으로 당깁니다.
+    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    top = Math.max(8, Math.min(top, window.innerHeight - height - 8));
+    flyout.style.left = `${left}px`;
+    flyout.style.top = `${top}px`;
+  }
+
   function setFlyout(box, open) {
-    box.querySelector(".rail_flyout").hidden = !open;
+    const flyout = box.querySelector(".rail_flyout");
+    flyout.hidden = !open;
+    if (open) place(box);
     box.querySelector("button").setAttribute("aria-expanded", open ? "true" : "false");
   }
 
@@ -85,4 +104,10 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") flyouts.forEach((box) => setFlyout(box, false));
   });
+  // 화면이 바뀌면 열려 있는 판의 자리를 다시 잡습니다. fixed라 따라오지 않습니다.
+  const replace = () => flyouts.forEach((box) => {
+    if (!box.querySelector(".rail_flyout").hidden) place(box);
+  });
+  window.addEventListener("resize", replace);
+  window.addEventListener("scroll", replace, { passive: true });
 })();

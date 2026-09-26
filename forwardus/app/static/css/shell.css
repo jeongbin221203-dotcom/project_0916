@@ -100,10 +100,17 @@ html.rail_expanded .rail_label {
 }
 html.rail_expanded .rail_inner [data-tip]:not(.rail_toggle)::after { display: none; }
 
-/* 최근 Shipment는 내용이 있어 옆으로 펼칩니다. 줄 안에 넣기엔 넓습니다. */
+/* 최근 Shipment는 내용이 있어 옆으로 펼칩니다. 줄 안에 넣기엔 넓습니다.
+
+   **fixed로 둡니다.** absolute로 두었더니 판이 통째로 안 보였습니다.
+   감싸는 .rail_inner가 overflow-x: hidden이라(가로 막대를 없애려고 넣은 것입니다),
+   레일 바깥으로 10px 나가 있는 이 판이 잘려 나갔습니다. 눌러도 아무 일이
+   없는 것처럼 보였습니다. 자리는 sidebar.js가 단추 위치를 재어 잡아 줍니다.
+   (2026-09-26) */
 .rail_flyout {
   /* 화면 아래에 붙는 적는 칸(z-index 25)보다 위에 있어야 가려지지 않습니다. */
-  position: absolute; left: calc(100% + 10px); top: 0; z-index: 70;
+  position: fixed; z-index: 70;
+  max-height: calc(100vh - 24px); overflow-y: auto;
   width: 310px; padding: 16px; text-align: left;
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--white); box-shadow: 0 12px 36px rgba(15, 23, 42, .14);
@@ -149,7 +156,7 @@ html.rail_expanded .rail_inner [data-tip]:not(.rail_toggle)::after { display: no
     max-width: none; margin-left: 0; opacity: 1; font-size: 11.5px;
   }
   .rail_toggle, .rail_inner [data-tip]::after { display: none; }
-  .rail_flyout { left: auto; right: 0; top: calc(100% + 8px); width: min(310px, 90vw); }
+  .rail_flyout { width: min(310px, 90vw); }
 }
 
 /* ----- 실시간 환율 센터 (사이드바 💱, fx_center.js) ----- */
