@@ -1,0 +1,323 @@
+/* Stepper */
+.stepper { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 0 0 20px; padding: 0; }
+.stepper li { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--line); color: var(--muted); font-weight: 800; font-size: 14px; }
+.stepper li span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: #f1f5f9; font-size: 12px; }
+.stepper li.active { border-color: var(--blue); color: var(--blue_dark); }
+.stepper li.active span { background: var(--blue); color: #fff; }
+.stepper li { cursor: pointer; }
+.stepper li:hover { border-color: #b7cbfb; }
+.stepper li.done { color: var(--ink); }
+.stepper li.done span { background: var(--green_soft); color: var(--green); }
+
+.step_actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+/* Route setup: calendar left, fields right */
+.route_layout { display: grid; grid-template-columns: minmax(420px, 460px) minmax(0, 1fr); gap: 32px; }
+.calendar { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 6px; }
+.cal_head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.cal_head button { border: 0; background: #f1f5f9; width: 32px; height: 32px; border-radius: 10px; font-size: 18px; }
+.cal_months { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cal_title { text-align: center; font-size: 13px; font-weight: 800; color: var(--muted); margin-bottom: 6px; }
+.cal_legend { display: flex; gap: 14px; margin: 12px 0 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.cal_legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.cal_legend .legend_departure::before { background: var(--blue); }
+.cal_legend .legend_buyer::before { background: #f5c518; }
+.cal_legend .legend_range::before { background: #bae6fd; }
+.cal_hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.cal_head button:disabled { opacity: .3; cursor: default; }
+.cal_week, .cal_grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.cal_week span { font-size: 11px; color: var(--muted); font-weight: 700; padding: 2px 0; }
+.cal_grid button { aspect-ratio: 1; border: 0; background: transparent; border-radius: 9px; font-weight: 700; font-size: 13px; }
+.cal_grid button:hover:not(:disabled) { background: var(--blue_soft); }
+.cal_grid button:disabled { color: #cbd5e1; cursor: default; }
+.cal_grid button.today { box-shadow: inset 0 0 0 1px var(--blue); }
+.cal_grid button.selected { background: var(--blue); color: #fff; }
+.cal_grid button.buyer { background: #fde68a; color: #7c4a03; font-weight: 900; }
+/* Seller 예상일과 Buyer 요청일 사이(예상 운송 기간) */
+.cal_grid button.in_range { background: #e0f2fe; color: #0369a1; }
+.cal_grid button.blocked { color: #cbd5e1; text-decoration: line-through; }
+.cal_grid button.buyer.selected { background: var(--blue); color: #fff; box-shadow: inset 0 0 0 2px #f5c518; }
+.selected_date { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.selected_date .date_item { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.selected_date .date_item i { width: 7px; height: 7px; border-radius: 2px; }
+.selected_date .departure { background: var(--blue_soft); color: var(--blue_dark); }
+.selected_date .departure i { background: var(--blue); }
+.selected_date .buyer { background: #fef3c7; color: #7c4a03; }
+.selected_date .buyer i { background: #f5c518; }
+
+/* Autocomplete · HS 후보 목록은 base.css로 옮겼습니다. (HS CODE 간편 검색 창과 같이 씁니다) */
+
+/* Cargo */
+/* minmax(0, ...)이 있어야 안쪽의 넓은 표가 입력칸 너비를 밀어내지 않습니다. */
+.cargo_layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+.calc_panel { position: sticky; top: 80px; padding: 18px; border-radius: 16px; background: #f8fafc; border: 1px solid var(--line); }
+.calc_panel dl { margin: 10px 0; display: grid; gap: 8px; }
+.calc_panel dl > div { display: flex; justify-content: space-between; gap: 8px; }
+.calc_panel dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+.calc_panel dd { margin: 0; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+/* Schedules */
+.schedule_list { display: grid; gap: 12px; }
+.schedule_card { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; cursor: pointer; transition: .15s; }
+.schedule_card input { position: absolute; opacity: 0; }
+.schedule_card:hover { border-color: #b7cbfb; }
+.schedule_card.selected { border-color: var(--blue); background: #f7faff; box-shadow: 0 0 0 2px rgba(43,102,246,.18); }
+.schedule_price { display: grid; align-content: center; justify-items: end; border-left: 1px dashed var(--line); padding-left: 16px; }
+.schedule_price small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.schedule_price b { font-size: 20px; color: var(--blue_dark); }
+
+.summary_list dd.missing { color: var(--red); }
+
+@media (max-width: 900px) {
+  .route_layout, .cargo_layout { grid-template-columns: 1fr; }
+  .cal_months { grid-template-columns: 1fr; }
+  .calc_panel { position: static; }
+  .stepper { grid-template-columns: repeat(5, auto); overflow-x: auto; }
+}
+@media (max-width: 640px) {
+  .stepper li { font-size: 0; gap: 0; padding: 8px; justify-content: center; }
+  .stepper li span { font-size: 12px; }
+  .schedule_card { grid-template-columns: 1fr; }
+  .schedule_price { border-left: 0; border-top: 1px dashed var(--line); padding: 10px 0 0; justify-items: start; }
+}
+
+/* Country filter and direct input */
+.link_button.inline { font-size: 12px; margin-left: 6px; padding: 0; }
+.autocomplete select[data-country-filter] { margin-bottom: 6px; }
+.ac_list .ac_note { margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: var(--blue_soft); color: var(--blue_dark); font-size: 11px; font-style: normal; font-weight: 800; }
+.custom_box { display: grid; grid-template-columns: 110px 1fr 130px auto; gap: 6px; align-items: center; margin-top: 6px; padding: 10px; border: 1px dashed var(--line); border-radius: 12px; background: #f8fafc; }
+.custom_box input, .custom_box select { min-height: 36px; font-size: 13px; padding: 0 9px; border-radius: 10px; }
+.custom_country { font-size: 13px; font-weight: 700; color: var(--muted); }
+.ac_list .ac_note.direct { background: var(--green_soft); color: #07694f; }
+.ac_list .ac_note.cargo { background: #fff1e6; color: #b45309; }
+.ac_list .ac_via { grid-column: 1 / -1; color: var(--blue_dark); font-size: 12px; font-weight: 700; }
+.custom_search { position: relative; }
+.custom_search .ac_list { top: calc(100% + 2px); }
+@media (max-width: 640px) { .custom_box { grid-template-columns: 1fr 1fr; } }
+
+/* 달력 아래 예상 일정: 해상·항공 소요시간과 납기 여유 */
+.outlook { margin-top: 10px; display: grid; gap: 5px; }
+.outlook_head { display: flex; align-items: center; gap: 8px; margin: 0 0 2px; font-size: 12.5px; font-weight: 800; color: var(--ink); }
+.outlook_head em { margin-left: auto; font-style: normal; font-size: 10.5px; font-weight: 800; color: #b45309; background: #fff1e6; padding: 2px 7px; border-radius: 999px; }
+/* 오른쪽 입력 칸과 줄 높이를 맞추기 위해 한 줄로 이어지게 둡니다. */
+.outlook_row { position: relative; display: grid; grid-template-columns: 78px 60px 1fr auto; gap: 2px 8px;
+  align-items: center; padding: 7px 11px; border-radius: 11px; font-size: 12px; font-weight: 700; }
+.outlook_mode { font-weight: 800; white-space: nowrap; }
+.outlook_days { white-space: nowrap; }
+.outlook_eta { color: inherit; opacity: .8; font-weight: 600; font-size: 11px; white-space: nowrap; }
+.outlook_margin { display: flex; align-items: baseline; gap: 6px; justify-content: flex-end; font-weight: 800; white-space: nowrap; font-size: 11.5px; }
+.outlook_margin b { font-size: 10.5px; font-weight: 800; opacity: .85; }
+.outlook_pick { position: absolute; top: -7px; left: 10px; font-size: 10px; font-weight: 800; letter-spacing: .02em;
+  color: #fff; background: var(--ink); padding: 1px 7px; border-radius: 999px; }
+.outlook_row.is_selected { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* FCL / LCL을 고르면 무엇이 달라지는지 */
+.outlook_diff { margin-top: 4px; padding: 10px 12px; border-radius: 11px; background: #f1f5f9; color: var(--ink); }
+.outlook_diff .diff_head { margin: 0 0 5px; font-size: 12px; font-weight: 800; }
+.outlook_diff ul { margin: 0; padding-left: 16px; display: grid; gap: 3px; }
+.outlook_diff li { font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
+.outlook_diff .diff_gap { margin: 7px 0 0; font-size: 11.5px; font-weight: 700; color: var(--blue_dark); }
+.outlook_note { grid-column: 1 / -1; margin-top: 2px; font-size: 11px; font-weight: 600; opacity: .8; line-height: 1.5; }
+.outlook_note:empty { display: none; }
+.outlook_row.level_ok { background: var(--green_soft); color: #07694f; }
+.outlook_row.level_caution { background: #e8f3ff; color: var(--blue_dark); }
+.outlook_row.level_tight { background: var(--amber_soft); color: #8a4f00; }
+.outlook_row.level_late { background: var(--red_soft); color: var(--red); }
+.outlook_row.level_none { background: #f1f5f9; color: var(--muted); }
+
+/* 항공 배지 설명 */
+.badge_guide { margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; background: #f8fafc; border: 1px solid var(--line); }
+.badge_guide p { margin: 0 0 8px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.badge_guide p:last-child { margin-bottom: 0; }
+.badge_guide .ac_note { margin-right: 6px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-style: normal; font-weight: 800; background: var(--blue_soft); color: var(--blue_dark); }
+.badge_guide .ac_note.cargo { background: #fff1e6; color: #b45309; }
+.badge_guide .ac_note.direct { background: var(--green_soft); color: #07694f; }
+
+/* 입력칸 아래 작은 안내 */
+.field_hint { display: block; margin-top: 6px; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
+
+/* 도착국에 적용되는 협정·세율 */
+.tariff { margin-top: 4px; padding: 14px 16px; border-radius: 14px; background: var(--blue_soft); display: grid; gap: 6px; }
+.tariff_head { margin: 0 0 4px; font-size: 13px; font-weight: 800; color: var(--blue_dark); }
+.tariff_head .mono { margin-left: 6px; font-size: 12px; opacity: .8; }
+/* 협정 한 줄: 이름 · 세율 · 적용일 · ?(자세히). 설명은 ?에 올리면 나옵니다. */
+.tariff_row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 11px; background: #fff; }
+.tariff_name { flex: 1 1 auto; min-width: 0; font-size: 12.5px; font-weight: 800; color: var(--ink); }
+.tariff_rate { font-size: 14px; font-weight: 800; color: var(--blue); font-variant-numeric: tabular-nums; }
+.tariff_period { font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.tariff_head { display: flex; align-items: center; gap: 6px; }
+
+.tariff_proof { grid-column: 1 / -1; margin-top: 2px; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
+.tariff_plain { margin: 0; font-size: 12px; font-weight: 700; color: var(--blue_dark); }
+.tariff_note { margin: 2px 0 0; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--muted); }
+
+/* ETD·ETA 한글 설명과 원화 환산 */
+.schedule_route small i { font-style: normal; margin-left: 4px; font-size: 10.5px; font-weight: 700; opacity: .75; }
+.schedule_price small i { font-style: normal; margin-left: 4px; font-size: 10.5px; font-weight: 700; opacity: .75; }
+.schedule_price em { display: block; margin-top: 2px; font-style: normal; font-size: 11px; font-weight: 700; color: var(--muted); }
+/* 운임은 선사가 API로 주지 않아 늘 추정값입니다. 스케줄과 구분해 표시합니다. */
+.schedule_price em.est { margin-top: 3px; font-size: 10.5px; font-weight: 800; color: #b45309; }
+
+/* 원화 환산에 쓴 환율 기준 (운임 출처와 헷갈리지 않게 따로 적습니다) */
+.rate_basis { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.tariff_about { grid-column: 1 / -1; margin-top: 3px; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--ink); opacity: .85; }
+
+/* 추가 품목 — 첫 품목과 같은 양식을 카드로 반복합니다. */
+.cargo_lines .row_between { align-items: center; }
+.cargo_item { margin-top: 12px; padding: 16px 18px 2px; border: 1px solid var(--line); border-radius: 16px; background: #fcfdff; }
+.cargo_item_head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.cargo_item_head b { font-size: 13.5px; }
+.link_button.danger { color: var(--red); }
+
+/* 위험물 */
+.dg_box { display: grid; gap: 10px; padding: 14px 16px; border-radius: 14px;
+  background: #fffbeb; border: 1px solid #fde68a; margin-bottom: 14px; }
+.dg_check { display: grid; grid-template-columns: auto 1fr; gap: 2px 9px; align-items: center; cursor: pointer; }
+.dg_check input { width: 17px; height: 17px; accent-color: var(--amber); }
+.dg_check span { font-size: 13px; font-weight: 800; color: #92400e; }
+.dg_check small { grid-column: 2; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.dg_fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.dg_fields .field { margin-bottom: 0; }
+.dg_fields .field.span2 { grid-column: span 2; }
+.dg_warn { margin: 0; padding: 9px 12px; border-radius: 10px; background: #fee2e2; color: #b91c1c;
+  font-size: 12px; font-weight: 700; line-height: 1.6; }
+.dg_help { display: grid; gap: 8px; padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px dashed #fbbf24; }
+.dg_help .dg_line b { color: #92400e; }
+.dg_guide { display: grid; gap: 6px; padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px solid #fde68a; }
+.dg_head { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 13.5px; }
+.dg_status { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.dg_status.allowed { background: var(--green_soft); color: var(--green); }
+.dg_status.restricted { background: var(--amber_soft); color: #b45309; }
+.dg_status.forbidden { background: #fee2e2; color: #b91c1c; }
+.dg_line { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.65; color: var(--ink); }
+.dg_line b { margin-right: 6px; color: var(--muted); font-weight: 800; }
+.dg_sub { margin: 6px 0 0; font-size: 12px; font-weight: 800; color: #92400e; }
+.dg_steps { margin: 0; padding-left: 20px; display: grid; gap: 5px; font-size: 12px; font-weight: 600; line-height: 1.6; }
+.dg_refs { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; font-weight: 700; }
+.dg_refs a { color: var(--blue); }
+@media (max-width: 720px) { .dg_fields { grid-template-columns: 1fr; } }
+.tariff_where { grid-column: 1 / -1; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--blue_dark); }
+
+/* 도착국이 실제로 매기는 관세와 세분 부호 */
+.dest { margin-top: 6px; padding-top: 10px; border-top: 1px dashed rgba(43,102,246,.25); display: grid; gap: 6px; }
+.dest_rates { display: flex; flex-wrap: wrap; gap: 8px; }
+.dest_rate { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px; padding: 8px 12px; border-radius: 11px; background: #fff; font-size: 12px; font-weight: 700; color: var(--ink); }
+.dest_rate strong { font-size: 14px; font-weight: 800; color: var(--blue); }
+.dest_rate i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted); }
+.dest_sub { margin: 4px 0 0; font-size: 12.5px; font-weight: 800; color: var(--ink); }
+.dest_sub small { margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--muted); }
+/* 표가 길어도 화면 너비를 밀지 않도록 가로 스크롤 상자 안에 둡니다. */
+.dest_table_wrap { max-width: 100%; overflow-x: auto; border-radius: 11px; background: #fff; }
+.dest_table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 11px; overflow: hidden; font-size: 12px; }
+.dest_table th { padding: 7px 8px; text-align: left; font-size: 11px; font-weight: 800; color: var(--muted); background: rgba(43,102,246,.06); white-space: nowrap; }
+.dest_table td { padding: 7px 8px; border-top: 1px solid var(--line); font-weight: 600; vertical-align: top; }
+.dest_table td.mono { white-space: nowrap; font-weight: 800; }
+.dest_link { display: inline-flex; align-items: baseline; gap: 6px; align-self: start; margin-top: 2px;
+  padding: 9px 14px; border-radius: 11px; border: 1px solid var(--blue); background: #fff;
+  font-size: 12.5px; font-weight: 800; color: var(--blue); text-decoration: none; }
+.dest_link small { font-size: 11px; font-weight: 600; color: var(--muted); }
+.dest_link:hover { background: var(--blue); color: #fff; text-decoration: none; }
+.dest_link:hover small { color: rgba(255,255,255,.8); }
+
+/* 협정을 쓰는 게 유리한지 알려주는 한 줄 */
+.dest_advice { margin: 2px 0 0; padding: 9px 12px; border-radius: 11px; font-size: 12px;
+  font-weight: 700; line-height: 1.6; }
+.dest_advice.use_fta { background: rgba(16,185,129,.12); color: #047857; }
+.dest_advice.use_mfn { background: rgba(245,158,11,.14); color: #b45309; }
+.dest_advice.same { background: #fff; color: var(--muted); }
+
+/* HS 후보별 도착국 협정 요약 */
+.ac_tariff { display: block; margin-top: 4px; font-size: 11.5px; font-weight: 800; }
+.ac_tariff.agreement { color: var(--green); }
+.ac_tariff.none { color: var(--muted); }
+.ac_tariff.unknown { color: var(--muted); font-weight: 600; }
+
+/* 품목별 자동 계산 (품목이 둘 이상일 때만) */
+.calc_lines { display: grid; gap: 8px; margin: 10px 0 4px; }
+.calc_line { padding: 9px 11px; border-radius: 11px; background: #fff; border: 1px solid var(--line); }
+.calc_line_title { margin: 0 0 5px; font-size: 12px; font-weight: 800; color: var(--blue_dark); }
+.calc_line_title small { margin-left: 5px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.calc_line dl { margin: 0; display: grid; gap: 4px; }
+.calc_line dt { font-size: 11.5px; }
+.calc_line dd { font-size: 12.5px; }
+.calc_total_title { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line);
+  font-size: 12px; font-weight: 800; color: var(--ink); }
+
+/* 5단계: 수출자 / Buyer / Notify Party 를 블록으로 나눕니다. */
+.party_block { padding: 18px; margin-bottom: 16px; border: 1px solid var(--line);
+  border-radius: 16px; background: #fff; }
+.party_block:last-of-type { margin-bottom: 4px; }
+.party_title { margin: 0 0 4px; font-size: 15px; font-weight: 900; color: var(--blue_dark); }
+.party_title small { margin-left: 6px; font-size: 12px; font-weight: 700; }
+.party_note { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+.party_block .form_grid { margin-bottom: 0; }
+.party_block .field:last-child { margin-bottom: 0; }
+.party_same { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 14px;
+  padding: 8px 13px; border-radius: 11px; background: var(--blue_soft); cursor: pointer; }
+.party_same input { width: 17px; height: 17px; accent-color: var(--blue); }
+.party_same span { font-size: 13px; font-weight: 800; color: var(--blue_dark); }
+
+/* 품목별 도착국 관세 (품목이 둘 이상일 때 제목이 붙습니다) */
+.tariff_item + .tariff_item { margin-top: 16px; padding-top: 16px; border-top: 2px solid #c7d7fd; }
+.tariff_item_title { margin: 0 0 8px; font-size: 13px; font-weight: 900; color: var(--blue_dark); }
+.tariff_item_title small { margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+
+/* 막는 오류가 아니라 "한 번 더 확인"인 안내 */
+.form_error.is_confirm { background: var(--amber_soft); border-color: #fcd34d; color: #8a4f00; }
+
+[data-autocomplete="hs_code"] .ac_list li[data-index], [data-line-hs] .ac_list li[data-index] { padding: 3px; }
+.tariff_reference { order: 2; padding-top: 8px; border-top: 1px solid var(--line); }
+.tariff_reference summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.tariff_reference[open] summary { margin-bottom: 10px; }
+.tariff > .dest { border-top: 0; padding-top: 0; margin-top: 0; min-width: 0; }
+.dest_sub .info_tip { margin-left: 6px; }
+.national_picker { display: grid; gap: 5px; min-width: 0; font-size: 12px; color: var(--muted); }
+.national_picker select { width: 100%; min-width: 0; max-width: 100%; font-size: 12px; text-overflow: ellipsis; }
+.tariff_excerpt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 4px 0; }
+.dest_table td:first-child { width: 50%; min-width: 140px; }
+.dest_table td:not(:first-child) { min-width: 65px; }
+.dest_link { width: fit-content; }
+
+.handling_option { border-top: 1px solid #e2e8f0; padding-top: 12px; }
+.handling_option .dg_check { color: #334155; }
+.handling_option.cold .dg_check span { color: #036985; }
+.handling_option.special .dg_check span { color: #5b21b6; }
+.handling_option.cold input { accent-color: #0284c7; }
+.handling_option.special input { accent-color: #7c3aed; }
+.handling_detail { display: grid; grid-template-columns: auto minmax(140px, 1fr); gap: 6px 12px; align-items: center; padding: 12px 0 2px 26px; font-size: 12px; color: var(--muted); }
+.handling_detail[hidden] { display: none; }
+.handling_detail select { min-width: 0; min-height: 38px; font-size: 13px; }
+.handling_detail small { grid-column: 1 / -1; line-height: 1.5; }
+@media (max-width: 480px) { .handling_detail { grid-template-columns: 1fr; } }
+
+/* 운송 계획 화면 맨 위: 서류 작성에서 칸을 채웠다는 알림 (planning.js) */
+.prefill_note { margin-bottom: 14px; }
+
+/* 신용장(L/C) 선적 마감 안내 (planning.js) */
+.lc_note { display: block; margin-bottom: 14px; }
+.lc_note small { display: block; margin-top: 4px; font-weight: 600; opacity: .85; }
+
+/* 이 짐이면 LCL인가 FCL인가 (planning.js · processors/sea_mode_advisor) */
+.sea_advice { display: grid; gap: 4px; margin: 12px 0 0; padding: 11px 13px; border-radius: 12px;
+  border: 1px solid #c7d7fd; background: var(--blue_soft); color: var(--blue_dark); font-size: 13px; }
+.sea_advice.is_close { border-color: #fcd34d; background: var(--amber_soft); color: #8a4f00; }
+.sea_advice[hidden] { display: none; }
+.sea_advice b { font-size: 14px; }
+.sea_advice small { color: inherit; opacity: .85; }
+.sea_advice .link_button { color: inherit; text-decoration: underline; font-weight: 800; }
+.sea_advice_same { font-style: normal; opacity: .75; }
+
+/* ----- 달을 넘길 때 -----
+   두 달이 한 번에 툭 바뀌면 무엇이 바뀐 건지 눈이 못 따라갑니다. 넘어간 방향으로
+   살짝 밀어 주면 "다음 달로 갔다"가 보입니다. 날짜 칸을 다시 그리는 것은 그대로이고
+   들어오는 움직임만 얹습니다. 움직임을 줄여 달라고 설정한 분께는 얹지 않습니다. */
+@keyframes cal_in_from_right { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes cal_in_from_left  { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+.cal_months.cal_forward { animation: cal_in_from_right .22s ease-out; }
+.cal_months.cal_back { animation: cal_in_from_left .22s ease-out; }
+/* 날짜를 누를 때도 색이 툭 바뀌지 않게 합니다. */
+.cal_grid button { transition: background-color .15s ease, color .15s ease, box-shadow .15s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .cal_months.cal_forward, .cal_months.cal_back { animation: none; }
+  .cal_grid button { transition: none; }
+}

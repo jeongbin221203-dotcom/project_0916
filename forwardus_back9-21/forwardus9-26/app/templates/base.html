@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}ForwardUs{% endblock %} | 수출 운영 플랫폼</title>
+    {# 탭 아이콘도 로고 마크를 씁니다. 파일을 바꾸면 여기도 같이 바뀝니다. #}
+    <link rel="icon" type="image/svg+xml" href="{{ brand_mark }}">
+    <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
+    {% if not standalone %}
+      {# 사이드바·환율 창은 모든 화면이 같이 씁니다. (shell.css) #}
+      <link rel="stylesheet" href="{{ static_url('css/shell.css') }}">
+      {# 사이드바를 열어 둔 사람에게 접힌 모양이 한 번 번쩍이지 않게, 그리기 전에 상태를 먼저 붙입니다.
+         기본은 접힘(아이콘 레일)입니다. isSidebarExpanded가 "true"일 때만 펼칩니다. (sidebar.js)
+         화면을 옮겨도 같은 값을 읽으므로 접힘/펼침이 그대로 이어집니다. #}
+      <script>
+        try {
+          if (window.localStorage.getItem("isSidebarExpanded") === "true") {
+            document.documentElement.classList.add("rail_expanded");
+          }
+        } catch (error) { /* 저장 공간을 못 쓰면 기본(접힘)으로 둡니다. */ }
+      </script>
+    {% endif %}
+    {% block head %}{% endblock %}
+  </head>
+  <body class="{{ 'standalone' if standalone }} {% block body_class %}{% endblock %}">
+    {# 화면 하나에만 집중해야 하는 자리는 머리말·푸터·상담 단추를 뺍니다.
+       그 화면 템플릿에서 {% set standalone = true %} 를 적으면 됩니다.
+       대신 그 화면이 스스로 돌아갈 길을 내 줘야 합니다. 안 그러면 갇힙니다. #}
+    {% if not standalone %}
+    <header class="site_header">
+      <div class="header_inner">
+        {# 전체 로고를 올려 두면 그것만 쓰고, 없으면 마크 + 글자로 씁니다. #}
+        <a class="brand" href="{{ url_for('home.index') }}" aria-label="ForwardUs 홈" data-home-reset>
+          {% if brand_logo %}
+            <img class="brand_logo" src="{{ brand_logo }}" alt="ForwardUs">
+          {% else %}
+            <img class="brand_mark" src="{{ brand_mark }}" alt="">
+            <span>ForwardUs</span>
+          {% endif %}
+        </a>
+        <button class="nav_toggle" type="button" aria-label="메뉴 열기" aria-expanded="false" data-nav-toggle>☰</button>
+        {# 위쪽 메뉴에는 이름(로그인) 자리만 둡니다. 운송 계획·컨테이너 조회·관세청 조회는
+           왼쪽 사이드바로 옮겼습니다(routes/sidebar.py). #}
+        <nav class="main_nav" data-nav>
+          {% if current_user %}
+            {# 이름 메뉴: Dashboard와 로그아웃. 마스터는 모든 사람의 Dashboard를 봅니다. #}
+            <div class="user_menu" data-user-menu>
+              <button type="button" class="nav_user {{ 'active' if nav_active in ('dashboard', 'shipment', 'assistant') or (nav_active == 'tracking' and request.endpoint != 'tracking.container_lookup') }}"
+                      aria-haspopup="true" aria-expanded="false" data-user-menu-toggle>
+                {{ current_user.name or current_user.email }}님
+                {% if current_user.is_master %}<span class="badge master_badge">마스터</span>{% endif %}
+                <span class="caret" aria-hidden="true">▾</span>
+              </button>
+              <div class="user_menu_panel" data-user-menu-panel hidden>
+                {# 회원은 자기가 만든 건만, 마스터는 모든 회원 것을 봅니다. #}
+                <a href="{{ url_for('dashboard.index') }}" class="{{ 'active' if nav_active == 'dashboard' }}">{{ '전체 Dashboard' if current_user.is_master else '내 Dashboard' }}</a>
+                <form class="nav_logout" method="post" action="{{ url_for('auth.logout') }}">
+                  <button type="submit">로그아웃</button>
+                </form>
+              </div>
+            </div>
+          {% else %}
+            <a href="{{ url_for('auth.login', next=request.full_path.rstrip('?') if request.blueprint != 'auth' else None) }}" class="{{ 'active' if request.endpoint == 'auth.login' }}">로그인</a>
+            <a href="{{ url_for('auth.signup') }}" class="nav_signup {{ 'active' if request.endpoint == 'auth.signup' }}">회원가입</a>
+          {% endif %}
+        </nav>
+      </div>
+    </header>
+    {% endif %}
+
+    {# 루트 레이아웃: 왼쪽 사이드바는 모든 화면에 고정되고, 오른쪽 .app_stage 안의 내용만 화면마다 바뀝니다.
+       (React의 Layout + <Outlet/> 자리. 여기서는 {% block content %}가 그 자리입니다) #}
+    {% if not standalone %}
+    <div class="app_shell">
+      {% include "_sidebar.html" %}
+      <div class="app_stage">
+    {% endif %}
+    {# 같은 알림이 두 번 쌓이면 한 번만 보여 줍니다.
+       검증 단추를 두 번 누르면 "1건의 불일치가 발견되었습니다."가 나란히 두 줄
+       떴습니다. 같은 말이 두 번 있으면 두 가지 일이 일어난 줄 알게 됩니다. #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash_stack" role="status">
+          {% set shown = [] %}
+          {% for category, message in messages %}
+            {% if (category, message) not in shown %}
+              {% set _ = shown.append((category, message)) %}
+              <div class="flash flash_{{ category }}">{{ message }}</div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <main class="{% block main_class %}content_width page{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+    {% if not standalone %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not standalone %}
+    <footer class="site_footer">
+      <div class="content_width">
+        <b>ForwardUs</b> · Global Trade, Smarter Quotes
+        <span class="muted">화면의 "Data Source" 표기를 확인하세요.
+          <b>API</b>는 기관에서 받아온 실제 값,
+          <b>표준단가</b>는 시장 평균을 본 추정치(실제 청구액은 포워더 견적으로 확정),
+          <b>Calculated</b>는 입력값으로 계산한 값,
+          <b>Mock</b>은 API 키가 없어 보여 드리는 예시입니다.</span>
+      </div>
+    </footer>
+    {% endif %}
+    {# 고래 상담창은 어느 화면에나 둡니다. 시작 화면에서도 그대로 둡니다.
+       다만 시작 화면에서 대화(무역 상담 · 운송 계획 · 서류 작성)가 시작되면
+       같은 대화가 가운데에 크게 뜨므로 그동안만 숨깁니다(home.js · home.css).
+       다른 화면에서는 저절로 열려 그 대화를 이어 갑니다. #}
+    {% set show_whale = not standalone %}
+    {% if show_whale %}
+    {# 그림 하나만 둡니다. 글자를 빼서 화면을 덜 가립니다.
+       무엇인지는 그림의 alt로 알립니다. 읽어 주는 프로그램에는 그대로 들립니다.
+       시작 화면을 잠갔으면 상담 단추도 같이 막습니다. #}
+    <button type="button" class="support_fab" data-support-open aria-haspopup="dialog"
+            aria-label="고객 상담"
+            {{ 'disabled' if home_locked and request.endpoint == 'home.index' }}>
+      {% if support_icon %}
+        <img class="support_face" src="{{ support_icon }}" alt="">
+      {% else %}
+        {# 그림이 없을 때만 쓰는 예비 모양 #}
+        <span class="support_word"><span aria-hidden="true">💬</span> 고객 상담</span>
+      {% endif %}
+    </button>
+    <div class="support_panel" data-support-panel hidden role="dialog" aria-label="고객 상담">
+      <header class="support_head">
+        <div>
+          <b>AI 포포링</b>
+          <small>수출 절차를 물어보세요</small>
+        </div>
+        <div class="support_head_actions">
+          <button type="button" class="support_reset" data-support-reset
+                  title="지금까지의 대화를 지우고 새로 시작합니다">새 대화</button>
+          <button type="button" class="support_close" data-support-close aria-label="닫기">×</button>
+        </div>
+      </header>
+      <div class="support_log" data-support-log></div>
+      <div class="support_chips" data-support-chips></div>
+      <form class="support_form" data-support-form>
+        <input class="text_input" type="text" name="question" autocomplete="off"
+               maxlength="2000" placeholder="무엇이 궁금하신가요?">
+        <button class="button primary" type="submit">보내기</button>
+      </form>
+    </div>
+
+    {# HS CODE 간편 검색. 어느 화면에서나 [data-hs-open]을 누르면 이 창이 뜹니다.
+       검색은 운송 계획 [3. Cargo]의 HS 칸과 같은 창구·같은 코드(hs_search.js)를 씁니다. #}
+    {% include "_fx_center.html" %}
+
+    <div class="hs_modal" data-hs-modal hidden>
+      <div class="hs_modal_backdrop" data-hs-close></div>
+      <div class="hs_modal_box" role="dialog" aria-modal="true" aria-labelledby="hs_modal_title">
+        <header class="hs_modal_head">
+          <div>
+            <h2 id="hs_modal_title">🔎 HS CODE 간편 검색</h2>
+            <small>관세청 조회 · AI 적합도 · 품목란 건수 · 도착국 관세를 운송 계획 화면과 똑같이 비교합니다</small>
+          </div>
+          <button type="button" class="hs_modal_close" data-hs-close aria-label="닫기">×</button>
+        </header>
+        <p class="hs_modal_target" data-hs-target hidden></p>
+        <div class="hs_modal_body autocomplete" data-hs-ac>
+          <div class="hs_input_row">
+            <input class="text_input" type="text" autocomplete="off" maxlength="200"
+                   placeholder="립스틱, 샴푸 또는 HS부호 10자리" data-ac-input aria-label="품명 또는 HS부호">
+            <select class="hs_order" data-hs-order aria-label="HS 후보 정렬 기준 (적합도 다음)"
+                    title="적합도가 같은 후보끼리의 정렬 기준">
+              <option value="frequency">건수 많은 순</option>
+              <option value="tariff">관세 낮은 순</option>
+            </select>
+          </div>
+          <div class="hs_modal_row">
+            <select class="hs_country" data-hs-country aria-label="도착국 (관세 비교 기준)">
+              <option value="">도착국 관세 비교 안 함</option>
+            </select>
+            <div class="hs_modal_chips" data-hs-chips></div>
+          </div>
+          <ul class="ac_list" data-ac-list hidden></ul>
+          <small class="field_hint">후보를 누르면 작업 중인 칸에 넣거나, 그런 칸이 없으면 HS부호를 클립보드에 복사합니다.
+            AI 적합도는 확정 분류가 아닙니다. 최종 분류는 관세사와 확인하세요.</small>
+        </div>
+        <p class="hs_modal_status" data-hs-status role="status" hidden></p>
+      </div>
+    </div>
+
+    <script>
+      window.FORWARDUS_SUPPORT = {
+        url: "{{ url_for('home.api_support_chat') }}",
+        intro: {{ support_chat_intro|tojson }}
+      };
+      window.FORWARDUS_FX = { fxBoardUrl: "{{ url_for('planning.api_fx_board') }}" };
+      window.FORWARDUS_HS_MODAL = {
+        hsCodesUrl: "{{ url_for('planning.api_hs_codes') }}",
+        countriesUrl: "{{ url_for('planning.api_countries') }}"
+      };
+    </script>
+    {% endif %}
+    <script>
+      {# 브라우저에 남기는 값은 회원마다 따로 둡니다. 한 탭에서 A가 로그아웃하고
+         B가 로그인해도 A가 적은 바이어 주소·연락처가 B의 칸에 들어가면 안 됩니다.
+         standalone 화면(운송 계획 단독)도 planning.js가 초안을 남기므로 같이 씁니다. #}
+      window.FORWARDUS_SCOPE = {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }};
+    </script>
+    {% if not standalone %}
+    <script>
+      {# 대화도 같은 구분을 씁니다. #}
+      window.FORWARDUS_CHAT = { scope: window.FORWARDUS_SCOPE };
+      {# 서류 작성에서 적은 값을 운송 계획이 이어 씁니다. 로그인한 회원만. (work_draft.js) #}
+      {% if current_user %}
+      window.FORWARDUS_WORK_DRAFT = { url: "{{ url_for('work_draft.show') }}",
+                                      planningUrl: "{{ url_for('work_draft.planning') }}" };
+      {% endif %}
+    </script>
+    {% endif %}
+    {% if not standalone %}
+    <script>
+      {# 대화는 회원마다 따로 둡니다. 한 탭에서 계정을 바꿔도 섞이지 않게. #}
+      window.FORWARDUS_CHAT = { scope: {{ ('user-' ~ current_user.id if current_user else 'guest')|tojson }} };
+    </script>
+    {% endif %}
+    <script src="{{ static_url('js/base.js') }}"></script>
+    {# 운송 계획 화면도 이 파일의 HS 검색을 씁니다. standalone이어도 붙입니다. #}
+    <script src="{{ static_url('js/hs_search.js') }}"></script>
+    {% if not standalone %}
+      {# 시작 화면의 탭과 고래 상담창이 나눠 쓰는 대화. 둘보다 먼저 읽습니다. #}
+      <script src="{{ static_url('js/chat_store.js') }}"></script>
+      <script src="{{ static_url('js/work_draft.js') }}"></script>
+      <script src="{{ static_url('js/hs_modal.js') }}"></script>
+      <script src="{{ static_url('js/sidebar.js') }}"></script>
+      <script src="{{ static_url('js/fx_center.js') }}"></script>
+    {% endif %}
+    {% if show_whale %}<script src="{{ static_url('js/support_chat.js') }}"></script>{% endif %}
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

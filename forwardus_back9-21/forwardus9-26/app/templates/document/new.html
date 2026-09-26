@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}서류 작성{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ static_url('css/home.css') }}">
+{% endblock %}
+{% block content %}
+  {# Shipment에서 넘어왔으면 돌아갈 길을 화면 맨 위에 둡니다. 칸을 다 채우고
+     아래까지 내려간 뒤에야 "어떻게 돌아가지?"를 떠올리기 때문입니다. #}
+  {% if back %}
+    <p class="doc_back">
+      <a href="{{ back.url }}">← {{ back.shipment_id }} 로 돌아가기</a>
+      <span class="muted small">{{ back.project_name }}</span>
+    </p>
+  {% endif %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Trade Documents</p>
+      <h1>서류 작성</h1>
+      <p class="muted">상업송장과 포장명세서가 요구하는 칸을 직접 채웁니다.
+        말로 적어 만들고 싶으시면 <a href="{{ url_for('home.index') }}">시작 화면</a>에서
+        <b>서류 작성</b>을 눌러 대화로 하셔도 됩니다.</p>
+    </div>
+    {# 값이 비어 있는 표준 서식. 손으로 적거나 거래처에 양식으로 보낼 때 씁니다. #}
+    <div class="blank_forms" aria-label="빈 서식 PDF 내려받기">
+      <a class="button ghost" href="{{ url_for('document.blank_file', kind='commercial_invoice') }}"
+         download data-blank-form="commercial_invoice">⬇ 상업송장 빈 서식(PDF)</a>
+      <a class="button ghost" href="{{ url_for('document.blank_file', kind='packing_list_std') }}"
+         download data-blank-form="packing_list_std">⬇ 패킹리스트 빈 서식(PDF)</a>
+    </div>
+  </div>
+
+  {# 칸을 미리 채우는 두 가지 방법. 둘 다 "채우기만" 하고 만들지는 않습니다. #}
+  {% if sources %}
+    {# 같은 바이어에게 두 번째로 보내는 일이 흔합니다. 그때마다 주소·품목을
+       처음부터 다시 적게 하면 오타가 납니다. #}
+    <div class="doc_source_pick">
+      <label for="doc_source">이미 만든 건에서 가져오기</label>
+      <select id="doc_source" data-doc-source>
+        <option value="">고르지 않음</option>
+        {% for group, label in [('draft', '작성 중'), ('shipment', '지난 건')] %}
+          {% set rows = sources | selectattr('kind', 'equalto', group) | list %}
+          {% if rows %}
+            <optgroup label="{{ label }}">
+              {% for row in rows %}
+                <option value="{{ row.kind }}:{{ row.id }}">{{ row.title }} · {{ row.note }}</option>
+              {% endfor %}
+            </optgroup>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <span class="muted small" data-doc-source-status role="status"></span>
+    </div>
+  {% endif %}
+
+  {# 받아 둔 B/L·Offer Sheet가 있으면 올려서 칸을 채웁니다. 채운 뒤 확인은 아래 칸에서 합니다. #}
+  <div class="doc_upload_wrap">
+    <div data-doc-upload></div>
+    <div class="doc_upload_result" data-doc-upload-result hidden></div>
+  </div>
+
+  {% include "document/_form.html" %}
+{% endblock %}
+{% block scripts %}
+  <script>
+    window.FORWARDUS_DOC = {
+      locationsUrl: "{{ url_for('planning.api_locations') }}",
+      schedulesUrl: "{{ url_for('planning.api_schedules') }}",
+      startUrl: "{{ url_for('document.start') }}",
+      extractUrl: "{{ url_for('document.extract') }}",
+      suggestNameUrl: "{{ url_for('document.suggest_name') }}",
+      sourceUrl: "{{ url_for('document.source_values', kind='__KIND__', source_id='__ID__') }}",
+      originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}",
+      {# 기타 필수 서류: HS·도착국으로 찾은 목록 (원산지증명서·인증서·검역증 …) #}
+      requiredDocsUrl: "{{ url_for('document.required_docs', shipment_id='__ID__') }}",
+      {# HS부호만으로 미리 보는 목록. 건을 만들기 전에도 무엇이 필요한지 알려 줍니다. #}
+      requiredDocsPreviewUrl: "{{ url_for('document.api_required_docs') }}"
+    };
+  </script>
+  <script src="{{ static_url('js/doc_upload.js') }}"></script>
+  <script src="{{ static_url('js/doc_form.js') }}"></script>
+{% endblock %}

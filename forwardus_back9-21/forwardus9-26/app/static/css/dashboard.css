@@ -1,0 +1,90 @@
+.kpi_grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+.kpi_card { display: grid; gap: 4px; align-content: start; padding: 18px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.kpi_card small { color: var(--muted); font-weight: 800; font-size: 12px; }
+.kpi_card b { font-size: 22px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+.bar { display: inline-block; width: 60px; height: 8px; background: #f1f5f9; border-radius: 999px; overflow: hidden; margin-right: 6px; vertical-align: middle; }
+.bar span { display: block; height: 100%; background: var(--blue); border-radius: 999px; }
+
+@media (max-width: 900px) { .kpi_grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .kpi_grid { grid-template-columns: 1fr; } }
+
+/* ----- 권한별 Dashboard (master.html · personal.html) ----- */
+.kpi_grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpi_card.accent { border-color: #c7d7fd; background: var(--blue_soft); }
+a.kpi_card.link { color: inherit; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+a.kpi_card.link:hover { border-color: #c7d7fd; box-shadow: 0 0 0 1px #c7d7fd; }
+.dash_table_head { margin-bottom: 10px; }
+.dash_table_head h2 { margin: 0; }
+.dash_filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.dash_filters input[type=search] { flex: 1 1 220px; min-width: 0; }
+.dash_filters select { flex: 0 0 auto; width: auto; }
+/* 표가 넓으면 카드 안에서만 옆으로 넘깁니다. 화면 전체가 밀리지 않게. */
+.table_scroll { overflow-x: auto; }
+.dash_status { display: flex; gap: 6px; align-items: center; }
+.dash_status select { min-height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 13px; }
+.dash_list { list-style: none; margin: 0; padding: 0; }
+.dash_list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.dash_list li:first-child { border-top: 0; padding-top: 0; }
+.dash_list li > div { display: grid; gap: 3px; min-width: 0; }
+.dash_links { display: flex; gap: 10px; flex: 0 0 auto; font-size: 13px; white-space: nowrap; }
+.dash_analytics > summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; cursor: pointer; list-style: none; }
+.dash_analytics > summary::-webkit-details-marker { display: none; }
+.dash_analytics > summary h2 { margin: 0; }
+.dash_analytics > summary h2::before { content: "▸ "; color: var(--muted); }
+.dash_analytics[open] > summary { margin-bottom: 14px; }
+.dash_analytics[open] > summary h2::before { content: "▾ "; }
+@media (max-width: 900px) { .kpi_grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 표를 한 화면에 담습니다. 아래 가로 막대를 밀어 가며 보면, 오른쪽 끝의 상태·변경
+   단추가 보이지 않아 무엇을 할 수 있는지 모른 채 지나칩니다.
+
+   방법은 셋입니다.
+     1) 칸마다 폭을 정해 줍니다. (안 정하면 긴 견적명 하나가 표 전체를 늘립니다)
+     2) 번호·날짜처럼 쪼개지면 안 되는 것만 한 줄로 두고, 견적명·Buyer는 말줄임합니다.
+     3) 좁은 화면에서는 어쩔 수 없이 옆으로 넘기되, 그때만 막대를 냅니다. */
+.table_scroll .table { width: 100%; table-layout: fixed; }
+.table_scroll .table th, .table_scroll .table td {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 10px 10px;
+}
+/* Shipment ID · 작성자 · 견적명 · Route · Buyer · ETD · ETA · 상태 */
+.dash_table col.c_id { width: 13%; }
+.dash_table col.c_owner { width: 11%; }
+.dash_table col.c_name { width: 16%; }
+.dash_table col.c_route { width: 15%; }
+.dash_table col.c_buyer { width: 13%; }
+.dash_table col.c_date { width: 9.5%; }
+.dash_table col.c_status { width: 13%; }
+.table_scroll .table .dash_clip { max-width: none; }
+.dash_status { flex-wrap: nowrap; }
+.dash_status select { min-width: 0; flex: 1 1 auto; padding: 0 6px; font-size: 12.5px; }
+.dash_status .button.small { flex: 0 0 auto; padding: 0 9px; }
+.dash_sub { display: block; color: var(--muted); font-size: 11.5px; }
+/* 좁은 화면에서는 폭을 고정하지 않고 옆으로 넘깁니다. 억지로 담으면 글자가 다 잘립니다. */
+@media (max-width: 1100px) {
+  .table_scroll .table { table-layout: auto; min-width: 920px; }
+  .dash_table col { width: auto; }
+}
+
+/* 목록을 접었다 펼 수 있게. 아래 '비용·운송 분석'과 같은 모양으로 맞춥니다. */
+.dash_fold > summary { display: flex; cursor: pointer; list-style: none; align-items: center; }
+.dash_fold > summary::-webkit-details-marker { display: none; }
+.dash_fold > summary h2 { margin: 0; }
+.dash_fold > summary h2::before { content: "▸ "; color: var(--muted); }
+.dash_fold[open] > summary h2::before { content: "▾ "; }
+.dash_fold[open] > summary { margin-bottom: 14px; }
+
+/* 쪽 넘김. 표 아래 한 줄로 두고, 좁은 화면에서는 세 덩어리가 각각 줄바꿈합니다. */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+         flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pager_count { margin: 0; }
+.pager_pages { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pager_pages .button.small { min-width: 34px; justify-content: center; padding: 0 9px; }
+/* 지금 보고 있는 쪽. 번호만 굵게 하면 어디 있는지 한눈에 안 보입니다. */
+.pager_pages .is_now { background: var(--brand, #1f4fd8); border-color: var(--brand, #1f4fd8);
+                       color: #fff; cursor: default; }
+/* 더 갈 곳이 없는 화살표. 지우지 않고 흐리게 둡니다 — 자리가 움직이면 잘못 누릅니다. */
+.pager_pages .is_off { opacity: .4; pointer-events: none; }
+.pager_gap { padding: 0 2px; color: var(--muted); }
+.pager_size { display: flex; align-items: center; gap: 6px; margin: 0; }
+.pager_size select { min-height: 34px; padding: 0 8px; font-size: 13px; }
+@media (max-width: 720px) { .pager { justify-content: center; text-align: center; } }

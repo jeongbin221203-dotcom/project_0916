@@ -1,0 +1,74 @@
+{# 비용·운송 분석. 보는 사람의 범위(마스터=전체, 회원=내 것)로 집계한 값입니다. (analytics_service) #}
+<details class="card dash_analytics"{{ " open" if open_analytics }}>
+  <summary><h2>비용·운송 분석</h2><span class="muted small">취소·작성 중 Shipment는 제외 · 금액은 저장된 견적 기준</span></summary>
+  <section class="kpi_grid">
+    <div class="kpi_card"><small>Total Shipment</small><b>{{ kpi.total_shipments }}</b></div>
+    <div class="kpi_card"><small>Total Freight Cost</small><b>{{ kpi.total_freight_krw|won }}</b></div>
+    <div class="kpi_card"><small>Total Logistics Cost</small><b>{{ kpi.total_logistics_krw|won }}</b></div>
+    {# 부피·중량이 앞뒤가 안 맞는 건이 섞여 있으면 이 두 단가를 그대로 믿으면 안 됩니다.
+       숫자를 감추지는 않고, 몇 건 때문인지 함께 적습니다. #}
+    <div class="kpi_card"><small>Average Cost / CBM</small><b>{{ kpi.avg_cost_per_cbm|won }}</b>
+      <span class="muted small">{{ kpi.unit_cost_base }}건 기준{% if kpi.odd_density_count %}
+        · 화물 값이 이상한 {{ kpi.odd_density_count }}건 제외{% endif %}</span></div>
+    <div class="kpi_card"><small>Average Cost / KG</small><b>{{ kpi.avg_cost_per_kg|won }}</b>
+      <span class="muted small">{{ kpi.unit_cost_base }}건 기준{% if kpi.odd_density_count %}
+        · 화물 값이 이상한 {{ kpi.odd_density_count }}건 제외{% endif %}</span></div>
+    <div class="kpi_card"><small>Average Transit Time</small><b>{{ kpi.avg_transit_days|num(1) }}{% if kpi.avg_transit_days is not none %}일{% endif %}</b></div>
+    <div class="kpi_card"><small>Delay Rate</small><b>{% if kpi.delay_rate is not none %}{{ kpi.delay_rate|num(1) }}%{% else %}-{% endif %}</b><span class="muted small">표본 {{ kpi.delay_sample }}건 (도착 또는 지연 확인)</span></div>
+    <div class="kpi_card"><small>Customs Hold Rate</small><b>-</b><span class="muted small">통관 보류 이벤트 미수집</span></div>
+  </section>
+
+  {% if kpi.odd_density_count %}
+    <p class="muted small">
+      ⚠ 부피에 견주어 중량이 너무 큰 Shipment가 {{ kpi.odd_density_count }}건 있습니다
+      ({{ kpi.odd_density_ids|join(', ') }}{% if kpi.odd_density_count > kpi.odd_density_ids|length %} 외{% endif %}).
+      포장당 중량 칸에 전체 중량을 적었을 때 이렇게 됩니다.
+      <b>위 CBM·KG 단가는 이 건들을 빼고 낸 값입니다.</b> 섞어서 내면 단가가
+      실제보다 크게 부풀려져 아무도 그 숫자를 못 씁니다. 화물 값을 고치시면
+      자동으로 다시 들어갑니다.
+    </p>
+  {% endif %}
+
+  <div class="grid two">
+    <section class="card">
+      <h2>Route KPI</h2>
+      {% if routes %}
+        <table class="table compact">
+          <thead><tr><th>Route</th><th>Count</th><th class="num">Avg Freight</th><th class="num">Avg Transit</th><th class="num">Delay</th></tr></thead>
+          <tbody>
+            {% for r in routes %}
+              <tr>
+                <td><b>{{ r.route }}</b><br><span class="muted small">{{ r.mode }}</span></td>
+                <td><div class="bar"><span style="width: {{ (r.count / max_route_count * 100)|round }}%"></span></div>{{ r.count }}</td>
+                <td class="num">{{ r.avg_freight_krw|won }}</td>
+                <td class="num">{{ r.avg_transit_days|num(1) }}일</td>
+                <td class="num">{% if r.delay_rate is not none %}{{ r.delay_rate|num(0) }}%{% else %}-{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}<p class="muted">데이터가 없습니다.</p>{% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Buyer KPI</h2>
+      {% if buyers %}
+        <table class="table compact">
+          <thead><tr><th>Buyer</th><th>출하</th><th class="num">평균 물류비</th><th class="num">평균 운송</th><th>최근 Shipment</th></tr></thead>
+          <tbody>
+            {% for b in buyers %}
+              <tr>
+                <td>{{ b.buyer }}</td>
+                <td>{{ b.count }}</td>
+                <td class="num">{{ b.avg_cost_krw|won }}</td>
+                <td class="num">{{ b.avg_transit_days|num(1) }}일</td>
+                <td><a class="mono" href="{{ url_for('shipment.detail', shipment_id=b.latest_shipment.shipment_id) }}">{{ b.latest_shipment.shipment_id }}</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}<p class="muted">데이터가 없습니다.</p>{% endif %}
+    </section>
+  </div>
+
+</details>

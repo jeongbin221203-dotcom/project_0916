@@ -11,6 +11,10 @@
 <figure class="incoterm_flow" aria-labelledby="incoterm_flow_title">
   <figcaption id="incoterm_flow_title" class="sr_only">출발지에서 도착지까지의 운송 흐름 8단계</figcaption>
   <div class="flow_ends" aria-hidden="true"><span>판매자(Seller) 쪽</span><span>Buyer 쪽</span></div>
+  {# 비용·위험이 넘어가는 자리를 아이콘 줄에도 그립니다. 아래 막대의 세로선과
+     같은 위치라, 눈으로 이어 보면 어느 단계 뒤인지 바로 알 수 있습니다.
+     (incoterm_flow.js 가 --at 값을 넣습니다) #}
+  <div class="flow_marks" data-flow-marks aria-hidden="true"></div>
   <ol class="flow_track">
     {% for step in steps %}
       <li class="flow_step">

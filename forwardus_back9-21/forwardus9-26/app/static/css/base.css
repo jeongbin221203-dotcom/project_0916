@@ -1,0 +1,554 @@
+:root {
+  --blue: #2b66f6;
+  --blue_dark: #1c4fd0;
+  --blue_soft: #edf3ff;
+  --navy: #0b1530;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --surface: #f4f7fb;
+  --white: #fff;
+  --green: #0a9f78;
+  --green_soft: #e6f7f1;
+  --amber: #b86e00;
+  --amber_soft: #fff5e1;
+  --red: #d93b3b;
+  --red_soft: #fdecec;
+  --radius: 18px;
+  --shadow: 0 8px 28px rgba(15, 23, 42, .06);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+/* 화면 배율. 글자만 키우면 칸과 여백이 그대로라 빽빽해 보입니다.
+   zoom은 글자·칸·여백을 함께 키웁니다. 좁은 화면에서는 가로 스크롤이
+   생기지 않도록 배율을 낮춥니다. */
+:root { --ui_scale: 1.15; }
+@media (max-width: 1280px) { :root { --ui_scale: 1.08; } }
+@media (max-width: 900px) { :root { --ui_scale: 1; } }
+
+/* 화면 배경. 위는 흰빛으로 시작해 아래로 갈수록 옅은 하늘색이 차오릅니다.
+   body가 아니라 html에 두고 뷰포트에 고정(fixed)하는 이유가 둘 있습니다.
+     - body에는 zoom(--ui_scale)이 걸려 있어, 여기에 그라데이션을 두면
+       배율만큼 늘어나 색이 차는 지점이 화면마다 달라집니다.
+     - fixed로 두면 기준이 뷰포트라 내용이 길든 짧든 화면 아래가 늘 하늘색입니다.
+       (body에 두면 문서 전체 높이에 걸쳐 늘어나, 긴 화면에서는 하늘색이 안 보입니다)
+   --surface는 그대로 둡니다. 카드·칩·표 머리글이 그 색을 쓰고 있습니다. */
+html {
+  min-height: 100%;
+  background: linear-gradient(to bottom, #fff 0%, #fff 55%, #e0f2fe 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+body {
+  margin: 0; min-width: 320px; background: transparent; color: var(--ink);
+  font-family: Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  zoom: var(--ui_scale);
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+[hidden] { display: none !important; }
+/* 숫자 입력칸은 우리 코드가 숨기는 일이 없습니다. 바깥 스크립트가 hidden을 붙여도 보이게 둡니다. */
+input.text_input[data-number][hidden], .cargo_line input[data-number][hidden] { display: block !important; }
+h1, h2, h3 { letter-spacing: -.03em; line-height: 1.3; }
+h1 { font-size: clamp(24px, 3vw, 30px); margin: 4px 0; }
+h2 { font-size: 19px; margin: 0 0 12px; }
+h3 { font-size: 16px; margin: 0 0 10px; }
+p { margin: 0 0 10px; }
+.content_width { width: min(1160px, calc(100% - 32px)); margin-inline: auto; }
+.page { padding: 32px 0 64px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.eyebrow { margin: 0; color: var(--blue); font-size: 13px; font-weight: 800; letter-spacing: .02em; }
+.row_between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wrap { flex-wrap: wrap; }
+.stack { display: grid; gap: 14px; align-content: start; }
+.section_title { margin: 36px 0 16px; }
+.section_head { display: flex; align-items: baseline; justify-content: space-between; }
+
+/* Header */
+.site_header { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.92); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+.header_inner { width: min(1160px, calc(100% - 32px)); height: 62px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 900; font-size: 18px; letter-spacing: -.4px; }
+.brand:hover { text-decoration: none; }
+/* 마크는 그림 파일입니다. 바탕을 깔지 않습니다 — 올리신 로고가 어떤
+   모양이든 제 배경색이 뒤에 비치면 지저분해집니다. */
+.brand_mark { width: 34px; height: 34px; object-fit: contain; }
+/* 전체 로고를 올리면 글자까지 들어 있으므로 높이만 맞춥니다. */
+.brand_logo { height: 34px; width: auto; max-width: 240px; object-fit: contain; }
+.main_nav { display: flex; gap: 4px; }
+.main_nav a { padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; }
+.main_nav a:hover, .main_nav a.active { background: var(--blue_soft); color: var(--blue_dark); text-decoration: none; }
+.user_menu { position: relative; }
+.main_nav .nav_user { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 8px 12px; border-radius: 10px; color: var(--ink); font-weight: 800; font-size: 14px; white-space: nowrap; cursor: pointer; }
+.main_nav .nav_user:hover, .main_nav .nav_user.active, .main_nav .nav_user[aria-expanded="true"] { background: var(--blue_soft); color: var(--blue_dark); }
+.main_nav .nav_user .caret { font-size: 11px; }
+.master_badge { background: #fef3c7; color: #92400e; font-size: 11px; padding: 2px 7px; }
+.user_menu_panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 160px; display: grid; gap: 2px; padding: 6px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.user_menu_panel[hidden] { display: none; }
+.main_nav .user_menu_panel a { display: block; white-space: nowrap; }
+.main_nav .nav_auth_sep { width: 1px; margin: 6px 6px; background: var(--line); }
+.main_nav a.nav_signup { background: var(--blue); color: #fff; }
+.main_nav a.nav_signup:hover, .main_nav a.nav_signup.active { background: var(--blue_dark); color: #fff; }
+.main_nav .nav_logout { display: block; margin: 0; }
+.main_nav .nav_logout button { width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 12px; border-radius: 10px; color: var(--muted); font-weight: 700; font-size: 14px; cursor: pointer; }
+.main_nav .nav_logout button:hover { background: var(--blue_soft); color: var(--blue_dark); }
+
+/* 로그인 · 회원가입 */
+.auth_wrap { max-width: 420px; margin: 24px auto; }
+.auth_wrap h1 { margin-top: 0; }
+.auth_switch { margin: 16px 0 0; text-align: center; font-size: 14px; }
+
+.nav_toggle { display: none; border: 0; background: transparent; font-size: 22px; padding: 6px 10px; }
+
+.site_footer { border-top: 1px solid var(--line); background: #fff; padding: 22px 0; font-size: 13px; }
+.site_footer .content_width { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+
+/* Flash */
+.flash_stack { width: min(1160px, calc(100% - 32px)); margin: 16px auto 0; display: grid; gap: 8px; }
+.flash { padding: 12px 16px; border-radius: 12px; font-weight: 600; transition: opacity .6s; }
+.flash.fade { opacity: .55; }
+.flash_success { background: var(--green_soft); color: #07694f; }
+/* ─────────────────────────────────────────────────────────────────────────
+   색으로 말하는 규칙. 화면 전체에서 하나입니다.
+
+     빨강  #fee2e2 / #b91c1c   잘못됐습니다. 고쳐야 합니다.
+     진빨강 #dc2626 / #fff      꼭 챙기세요 (필수). 채워서 한눈에 들어오게.
+     연호박 #fef3c7 / #92400e  확인해 보세요. 잘못된 것은 아닙니다.
+     초록  green_soft / #07694f  됐습니다.
+     파랑  #e0f2fe / #0369a1   참고입니다.
+     회색  #f1f5f9 / #475569   아직 아무 일도 없습니다.
+
+   왜 적어 두나
+     "필수"가 "검증 실패"와 똑같은 빨강이었습니다. 정상 상태인데 오류로 보였고,
+     그런 것이 한 화면에 섞이면 사람이 빨강을 무시하게 됩니다. 그러면 진짜
+     오류도 지나칩니다.
+
+     새 표시를 만들 때 이 목록에서 고르세요. 여기 없는 뜻이면 목록에 먼저
+     추가하고 쓰세요. 모양(알약·크기)도 이미 있는 것과 맞춥니다.
+   ───────────────────────────────────────────────────────────────────────── */
+/* 오류는 빨강입니다. 예전에는 경고(.alert.warn)와 똑같은 호박색이었습니다.
+   flash("…", "error")를 쓰는 자리가 18곳인데 전부 "주의하세요" 정도로 보였습니다.
+   색으로 정하는 규칙은 화면 전체에서 하나입니다.
+     빨강   잘못됐습니다 (고쳐야 합니다)
+     호박   챙기세요·확인하세요 (잘못된 것은 아닙니다)
+     초록   됐습니다
+   (2026-09-26) */
+.flash_error { background: #fee2e2; color: #b91c1c; }
+/* 잘된 것도 잘못된 것도 아닌 알림. "확정한 서류는 그대로 두었습니다" 같은 것. */
+.flash_info { background: var(--blue_soft); color: var(--blue_dark); }
+
+/* 임시저장이 안 됐을 때만 뜹니다. (work_draft.js)
+   적는 일은 막지 않으므로 화면 구석에 두되, 스스로 사라지지는 않습니다.
+   조용히 없어지면 못 보고 지나칩니다. */
+.draft_alert {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60;
+  max-width: min(420px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 12px;
+  background: var(--amber_soft); color: #8a4f00;
+  box-shadow: var(--shadow); font-size: 14px; line-height: 1.5;
+}
+.draft_alert b { display: block; }
+.draft_alert button {
+  border: 1px solid #8a4f00; background: transparent; color: inherit;
+  padding: 6px 12px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.draft_alert button:hover { background: rgba(138, 79, 0, .1); }
+
+/* Cards & layout */
+.card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; min-width: 0; }
+.grid { display: grid; gap: 20px; }
+.grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid > .card { margin-bottom: 0; }
+.grid + .card, .grid + .grid { margin-top: 20px; }
+.page_head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.empty_state { text-align: center; padding: 56px 24px; }
+.empty_state .button { margin-top: 12px; }
+
+/* Buttons */
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 18px; border-radius: 12px; border: 1px solid transparent; font-weight: 800; font-size: 14px; transition: .15s ease; white-space: nowrap; }
+.button:hover { text-decoration: none; }
+.button.primary { background: var(--blue); color: #fff; box-shadow: 0 8px 20px rgba(43,102,246,.22); }
+.button.primary:hover { background: var(--blue_dark); }
+.button.ghost { background: #fff; border-color: var(--line); color: var(--ink); }
+.button.ghost:hover { border-color: var(--blue); color: var(--blue); }
+.button.danger { color: var(--red); }
+.button.small { min-height: 34px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.button.large { min-height: 52px; padding: 0 24px; font-size: 16px; }
+.button.block { width: 100%; }
+.button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.button_row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.button_row form { margin: 0; }
+.link_button { border: 0; background: none; color: var(--blue); font-weight: 700; padding: 6px 0; }
+.icon_button { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 2px 6px; }
+.icon_button:hover { color: var(--red); }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; background: #f1f5f9; color: #475569; }
+.badge.ok { background: var(--green_soft); color: #07694f; }
+.badge.warn { background: var(--amber_soft); color: #8a4f00; }
+.badge.bad { background: #fee2e2; color: #b91c1c; }
+.badge.muted_badge { background: #f1f5f9; color: #94a3b8; }
+.badge.source_mock { background: #fff1e6; color: #b45309; }
+.badge.source_api { background: var(--green_soft); color: #07694f; }
+.badge.source_manual { background: #f3e8ff; color: #7e22ce; }
+.badge.source_calculated { background: var(--blue_soft); color: var(--blue_dark); }
+.badge.source_imputed { background: #fef9c3; color: #854d0e; }
+.badge.status_quoted { background: var(--blue_soft); color: var(--blue_dark); }
+.badge.status_booked, .badge.status_departed, .badge.status_in_transit { background: #e0f2fe; color: #0369a1; }
+.badge.status_arrived, .badge.status_delivered { background: var(--green_soft); color: #07694f; }
+.badge.status_cancelled { background: var(--red_soft); color: var(--red); }
+.badge.doc_generated { background: var(--blue_soft); color: var(--blue_dark); }
+.badge.doc_validated { background: var(--green_soft); color: #07694f; }
+.badge.doc_final { background: var(--navy); color: #fff; }
+.pill { display: inline-flex; padding: 7px 13px; border-radius: 999px; background: var(--blue_soft); color: var(--blue_dark); font-size: 13px; font-weight: 800; }
+
+.alert { padding: 14px 18px; border-radius: 14px; margin-bottom: 20px; font-weight: 600; }
+.alert.ok { background: var(--green_soft); color: #07694f; }
+.alert.warn { background: var(--amber_soft); color: #8a4f00; }
+
+/* Forms */
+/* align-content: start가 없으면, 같은 줄의 옆 칸에 설명문이 붙어 줄이 높아질 때
+   이쪽 입력칸이 늘어나 옆 칸보다 커집니다. (수량 칸이 포장 유형보다 높던 문제) */
+.field { display: grid; gap: 6px; margin-bottom: 14px; min-width: 0; align-content: start; }
+.field_label { font-size: 13px; font-weight: 800; color: #334155; }
+/* 입력칸 모양. 타입 선택자에만 기대면 타입을 바꿀 때 스타일이 빠지므로
+   .text_input 클래스도 함께 받습니다. */
+input[type=text], input[type=number], input[type=date], input[type=email], input[type=password],
+input.text_input, select {
+  width: 100%; min-height: 44px; padding: 0 13px; border: 1px solid var(--line); border-radius: 12px; background: #fff; outline: none; transition: border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(43,102,246,.15); }
+.form_grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.form_grid .span2 { grid-column: span 2; }
+.input_group { display: grid; grid-template-columns: 96px 1fr; gap: 8px; }
+.form_error { padding: 12px 16px; border-radius: 12px; background: var(--red_soft); color: var(--red); font-weight: 700; margin-bottom: 16px; }
+.error_text { color: var(--red); font-weight: 700; }
+
+.segmented { display: inline-flex; padding: 4px; border-radius: 13px; background: #f1f5f9; gap: 4px; flex-wrap: wrap; }
+.segmented button { border: 0; background: transparent; padding: 9px 16px; border-radius: 10px; font-weight: 800; color: var(--muted); }
+.segmented button small { font-weight: 600; margin-left: 4px; }
+.segmented button.active { background: #fff; color: var(--blue_dark); box-shadow: 0 2px 8px rgba(15,23,42,.08); }
+.segmented.small button { padding: 6px 12px; font-size: 13px; }
+
+.chip_row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.chip { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--muted); font-weight: 700; font-size: 13px; }
+.chip.active, .chip:hover { border-color: var(--blue); color: var(--blue); text-decoration: none; }
+
+/* Tables */
+.table_card { padding: 0; overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.table th { color: var(--muted); font-size: 12px; font-weight: 800; background: #f8fafc; }
+.table tbody tr:hover { background: #fafcff; }
+.table.compact th, .table.compact td { padding: 8px 10px; }
+.card > .table { display: block; overflow-x: auto; }
+.cost_table .group_row th { background: #f8fafc; color: var(--ink); font-size: 13px; }
+.cost_table tfoot th { font-size: 15px; color: var(--ink); background: var(--blue_soft); }
+.table .neg { color: var(--red); }
+.table .pos { color: var(--green); }
+.exception_row { background: var(--amber_soft); }
+
+.summary_list { margin: 0; display: grid; }
+.summary_list > div { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+.summary_list > div:last-child { border-bottom: 0; }
+.summary_list dt { color: var(--muted); font-size: 13px; font-weight: 700; }
+.summary_list dd { margin: 0; font-weight: 600; word-break: break-word; }
+
+.status_list { list-style: none; margin: 0; padding: 0; }
+.status_list li { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+.status_list li:last-child { border-bottom: 0; }
+.big_status { font-size: 22px; font-weight: 900; margin: 6px 0 2px; }
+
+.sub_tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 22px; overflow-x: auto; }
+.sub_tabs a { padding: 10px 14px; color: var(--muted); font-weight: 800; border-bottom: 2px solid transparent; white-space: nowrap; }
+.sub_tabs a.active, .sub_tabs a:hover { color: var(--blue); border-color: var(--blue); text-decoration: none; }
+/* 서류 작성은 이 화면을 **떠나는** 길입니다. 다른 탭과 붙여 두면 같은 화면
+   안에서 오가는 것으로 오해합니다. 오른쪽 끝으로 밀어 떼어 놓습니다. */
+.sub_tabs .sub_tabs_last { margin-left: auto; }
+
+/* Schedule route (shared by planning & detail) */
+.schedule_route { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; margin: 10px 0; }
+.schedule_route > div:not(.line) { display: grid; }
+.schedule_route small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.schedule_route b { font-size: 16px; }
+.schedule_route .line { position: relative; height: 2px; background: linear-gradient(90deg, var(--blue), #6ee7c8); border-radius: 2px; }
+.schedule_route .line span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; padding: 2px 8px; font-size: 12px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.schedule_route.big b { font-size: 22px; }
+
+.kpi_row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 12px 0 18px; }
+.kpi_row > div { padding: 14px; border-radius: 14px; background: #f8fafc; }
+.kpi_row dt { font-size: 12px; color: var(--muted); font-weight: 800; }
+.kpi_row dd { margin: 4px 0 0; font-size: 19px; font-weight: 900; }
+.kpi_row .highlight { background: var(--blue_soft); }
+.kpi_row .highlight dd { color: var(--blue_dark); }
+
+/* Home */
+.hero { background: #fff; border-bottom: 1px solid var(--line); overflow: hidden; }
+.hero_inner { display: grid; grid-template-columns: 1.15fr .85fr; gap: 48px; align-items: center; padding: 72px 0 80px; }
+.hero h1 { font-size: clamp(34px, 4.6vw, 52px); line-height: 1.12; letter-spacing: -.05em; margin: 20px 0; }
+.hero h1 span { color: var(--blue); }
+.lead { font-size: 17px; color: var(--muted); max-width: 580px; margin-bottom: 28px; }
+.flow_card { list-style: none; counter-reset: flow; margin: 0; padding: 26px; border-radius: 24px; background: var(--navy); color: #e2e8f0; display: grid; gap: 4px; box-shadow: 0 24px 60px rgba(11,21,48,.25); }
+.flow_card li { counter-increment: flow; display: flex; align-items: center; gap: 12px; padding: 9px 4px; font-weight: 700; }
+.flow_card li::before { content: counter(flow); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: rgba(255,255,255,.1); color: #93c5fd; font-size: 12px; }
+.flow_card li:nth-child(-n+3)::before { background: var(--blue); color: #fff; }
+.feature { display: grid; gap: 8px; align-content: start; }
+.feature_no { color: var(--blue); font-weight: 900; font-size: 13px; }
+.feature p { color: var(--muted); }
+.assistant_banner { margin-top: 20px; background: linear-gradient(120deg, #fff, var(--blue_soft)); }
+.shipment_card { display: grid; gap: 6px; color: var(--ink); }
+.shipment_card:hover { border-color: var(--blue); text-decoration: none; }
+
+@media (max-width: 900px) {
+  .grid.two, .grid.three { grid-template-columns: 1fr; }
+  .hero_inner { grid-template-columns: 1fr; padding: 48px 0; }
+  .nav_toggle { display: block; }
+  .main_nav { display: none; position: absolute; top: 62px; left: 0; right: 0; flex-direction: column; background: #fff; padding: 10px 16px 16px; border-bottom: 1px solid var(--line); }
+  .main_nav.open { display: flex; }
+  .main_nav .nav_auth_sep { width: auto; height: 1px; margin: 6px 0; }
+  .main_nav .nav_user { width: 100%; }
+  .user_menu_panel { position: static; box-shadow: none; border: 0; padding: 0 0 0 12px; }
+}
+@media (max-width: 640px) {
+  .card { padding: 18px; border-radius: 16px; }
+  .form_grid { grid-template-columns: 1fr; }
+  .form_grid .span2 { grid-column: auto; }
+  .summary_list > div { grid-template-columns: 1fr; gap: 2px; }
+  .kpi_row { grid-template-columns: 1fr; }
+  .page { padding-top: 22px; }
+}
+/* 표준단가 표에서 뽑은 추정값. Mock(가짜)과 구분합니다. */
+.badge.source_tariff { background: #ede9fe; color: #6d28d9; }
+/* 자동으로 채워져 고칠 수 없는 칸 (Notify Party = Buyer와 동일 등) */
+.text_input.is_locked { background: #f1f5f9; color: var(--muted); }
+
+/* 고객 상담 — 화면 오른쪽 아래에 떠 있는 버튼과 상담창 */
+/* 고객 상담 단추. 고래 그림 하나만 둡니다.
+   바탕을 깔지 않습니다 — 투명한 그림 뒤에 색이 비치면 테두리가 각지게 보입니다.
+   그림자는 그림 모양을 따라가도록 filter로 줍니다. */
+.support_fab { position: fixed; right: 26px; bottom: 26px; z-index: 60;
+  display: grid; place-items: center;
+  width: 88px; height: 88px; padding: 0; border: 0; border-radius: 50%;
+  background: none; color: #fff; font-size: 15px; font-weight: 800;
+  filter: drop-shadow(0 10px 18px rgba(15,23,42,.24));
+  cursor: pointer; transition: transform .2s ease-out, filter .2s ease-out; }
+/* 그림이 없을 때만 쓰는 예비 모양 */
+.support_fab:has(.support_word) { width: auto; height: auto; padding: 15px 26px;
+  border-radius: 999px; background: var(--blue);
+  box-shadow: 0 12px 30px rgba(43,102,246,.35); filter: none; }
+.support_fab:hover { transform: translateY(-3px) scale(1.08);
+  filter: drop-shadow(0 16px 26px rgba(15,23,42,.34)); }
+.support_fab.is_open { transform: scale(.92); }
+
+/* 고래가 물 위에 떠서 제자리에서 첨벙이는 움직임.
+   위아래로 오르내리면서 좌우로 살짝 기웁니다.
+
+   움직임은 단추(.support_fab)가 아니라 그림(.support_face)에 겁니다.
+   단추의 transform은 hover(커지기)와 is_open(줄어들기)이 이미 쓰고 있어서,
+   같은 자리에 애니메이션을 걸면 둘이 서로 덮어 hover가 먹지 않습니다.
+   안쪽 그림에 걸면 두 움직임이 겹쳐 자연스럽게 같이 납니다. */
+@keyframes support_bob {
+  0%   { transform: translateY(0)    rotate(-2.5deg); }
+  25%  { transform: translateY(-5px) rotate(0deg); }
+  50%  { transform: translateY(-8px) rotate(2.5deg); }
+  75%  { transform: translateY(-5px) rotate(0deg); }
+  100% { transform: translateY(0)    rotate(-2.5deg); }
+}
+.support_face { width: 88px; height: 88px; object-fit: contain;
+  animation: support_bob 3.6s ease-in-out infinite; will-change: transform; }
+/* 상담창이 열려 있는 동안에는 멈춥니다. 바로 옆에서 계속 움직이면 글을 읽기 어렵습니다. */
+.support_fab.is_open .support_face { animation-play-state: paused; }
+/* 움직임을 줄여 달라고 설정해 둔 분께는 걸지 않습니다.
+   끝없이 되풀이되는 움직임은 어지럼을 일으킬 수 있습니다. */
+@media (prefers-reduced-motion: reduce) {
+  .support_face { animation: none; }
+  .support_fab { transition: none; }
+}
+
+.support_panel { position: fixed; right: 26px; bottom: 96px; z-index: 61;
+  display: flex; flex-direction: column; width: 380px; max-width: calc(100vw - 32px);
+  height: 540px; max-height: min(calc(85vh / var(--ui_scale, 1)), calc(100vh / var(--ui_scale, 1) - 140px));
+  border-radius: 20px; background: #fff; border: 1px solid var(--line);
+  box-shadow: 0 26px 60px rgba(15,23,42,.24); overflow: hidden; }
+.support_head { flex: none; display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 18px; background: var(--blue); color: #fff; }
+.support_head b { display: block; font-size: 15px; }
+.support_head small { display: block; margin-top: 2px; font-size: 12px; opacity: .85; }
+.support_close { border: 0; background: rgba(255,255,255,.18); color: #fff;
+  width: 30px; height: 30px; border-radius: 9px; font-size: 20px; line-height: 1; cursor: pointer; }
+.support_close:hover { background: rgba(255,255,255,.3); }
+.support_head_actions { display: flex; align-items: center; gap: 6px; }
+.support_reset { border: 0; background: rgba(255,255,255,.18); color: #fff; border-radius: 8px;
+  padding: 5px 9px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.support_reset:hover { background: rgba(255,255,255,.3); }
+/* 어느 탭에서 나눈 말인지 바뀌는 자리 */
+.support_divider { align-self: center; font-size: 11px; font-weight: 800; color: var(--muted);
+  padding: 2px 10px; border-radius: 999px; background: #eef2f7; }
+/* 시작 화면 탭에서 온 답은 서식(굵게·목록)을 살려 그립니다. */
+.support_rich p { margin: 0 0 8px; }
+.support_rich > :last-child { margin-bottom: 0; }
+.support_rich ul, .support_rich ol { margin: 0 0 8px; padding-left: 18px; }
+.support_rich h4 { margin: 0 0 6px; font-size: 14px; }
+.support_rich em.need { color: var(--red); font-style: normal; font-weight: 700; }
+.support_note { background: #f8fafc; color: #475569; font-size: 13px; }
+.support_note p { margin: 0; }
+
+.support_log { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; display: flex;
+  flex-direction: column; gap: 10px; background: #f8fafc; }
+.support_msg { max-width: 86%; padding: 11px 14px; border-radius: 14px;
+  font-size: 13.5px; line-height: 1.7; word-break: break-word; }
+.support_bot { align-self: flex-start; background: #fff; border: 1px solid var(--line); }
+.support_user { align-self: flex-end; background: var(--blue); color: #fff; font-weight: 600; }
+.support_waiting { color: var(--muted); font-style: italic; }
+.support_offline { background: var(--amber_soft); border-color: #fcd34d; color: #8a4f00; }
+
+.support_chips { flex: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; background: #f8fafc; }
+.support_chips:empty { display: none; }
+.support_chip { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: #fff; font-size: 12px; font-weight: 700; color: var(--blue_dark); cursor: pointer; }
+.support_chip:hover { border-color: var(--blue); background: var(--blue_soft); }
+
+.support_form { flex: none; display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.support_form .text_input { flex: 1; min-width: 0; }
+.support_form button { white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .support_fab { right: 16px; bottom: 16px; width: 70px; height: 70px; }
+  .support_face { width: 70px; height: 70px; }
+  .support_panel { right: 16px; left: 16px; bottom: 80px; width: auto; }
+}
+
+/* 단독으로 연 화면에서 돌아가는 길. 위쪽 메뉴가 없으니 이것뿐입니다. */
+.back_home { display: inline-block; margin-bottom: 6px; font-size: 13.5px; font-weight: 700; }
+/* 단독 화면은 머리말이 없으므로 위쪽 여백을 스스로 만듭니다. */
+body.standalone .page { padding-top: 28px; }
+
+/* Autocomplete — 운송 계획(planning.css)에서 옮겼습니다.
+   HS CODE 간편 검색 창이 어느 화면에서나 같은 모양으로 뜨게 하려는 것입니다. */
+/* Autocomplete */
+.autocomplete { position: relative; }
+.ac_list { position: absolute; z-index: 20; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 6px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(15,23,42,.12); max-height: 300px; overflow-y: auto; }
+.ac_list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 9px 11px; border-radius: 10px; cursor: pointer; align-items: baseline; }
+.ac_list .ac_title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ac_list li small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.ac_list li:hover { background: var(--blue_soft); }
+.ac_list li.empty { color: var(--muted); cursor: default; }
+/* HS 입력칸 오른쪽에 후보 정렬을 나란히 둡니다. 좁은 화면에서는 아래로 내려갑니다. */
+.hs_input_row { display: flex; gap: 8px; align-items: stretch; }
+.hs_input_row .text_input { flex: 1 1 auto; min-width: 0; }
+.hs_input_row .hs_order { flex: 0 0 auto; width: auto; min-width: 132px; font-size: 13px; }
+@media (max-width: 520px) {
+  .hs_input_row { flex-wrap: wrap; }
+  .hs_input_row .hs_order { flex: 1 1 100%; }
+}
+[data-autocomplete="hs_code"] .ac_list, [data-line-hs] .ac_list, .hs_modal .ac_list {
+  position: static; max-height: 580px; width: 100%; box-shadow: none; margin: 8px 0;
+}
+[data-autocomplete="hs_code"] .ac_list li, [data-line-hs] .ac_list li, .hs_modal .ac_list li { display: block; }
+[data-autocomplete="hs_code"] .ac_list small, [data-line-hs] .ac_list small, .hs_modal .ac_list small { display: block; margin-top: 4px; }
+.ac_list .hs_stats { color: var(--blue_dark); }
+.ac_list details summary { cursor: pointer; }
+.ac_list .ac_group { display: block; padding: 8px 11px 3px; color: var(--muted); font-size: 12px; font-weight: 800; cursor: default; background: none; }
+.ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #94a3b8; }
+.ac_list .ac_group_other small { font-weight: 600; margin-left: 6px; }
+
+/* HS CODE 간편 검색 창. 어느 화면에서나 [data-hs-open]으로 뜹니다. (hs_modal.js) */
+body.hs_modal_open { overflow: hidden; }
+.hs_modal { position: fixed; inset: 0; z-index: 80; display: grid; place-items: start center;
+  padding: 6vh 16px 16px; }
+.hs_modal[hidden] { display: none; }
+.hs_modal_backdrop { position: absolute; inset: 0; background: rgba(11,21,48,.45); }
+/* 창 높이는 화면의 85%까지. body에 zoom(--ui_scale)이 걸려 있어 vh를 배율로 나눠 씁니다.
+   제목·검색칸·거르기 줄은 위에 붙어 있고, 결과 목록(.ac_list)만 창 안에서 스크롤됩니다. */
+.hs_modal_box { position: relative; display: flex; flex-direction: column; gap: 12px;
+  width: min(760px, 100%); max-height: calc(85vh / var(--ui_scale, 1)); padding: 20px 22px; overflow: hidden;
+  border-radius: 20px; background: #fff; box-shadow: 0 30px 80px rgba(15,23,42,.35); }
+.hs_modal_head { flex: none; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.hs_modal_head h2 { margin: 0; font-size: 18px; }
+.hs_modal_head small { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
+.hs_modal_close { flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 10px;
+  background: var(--surface); font-size: 22px; line-height: 1; cursor: pointer; }
+.hs_modal_close:hover { background: var(--line); }
+.hs_modal_target { flex: none; margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--blue_soft);
+  color: var(--blue_dark); font-size: 13px; font-weight: 700; }
+.hs_modal_body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+/* 검색칸·도착국·칩 줄은 늘 보입니다(sticky). 스크롤되는 것은 그 아래 목록뿐입니다. */
+.hs_modal_body > .hs_input_row, .hs_modal_body > .hs_modal_row, .hs_modal_body > .field_hint {
+  flex: none; position: sticky; top: 0; z-index: 1; background: #fff; }
+.hs_modal_body .ac_list { flex: 1 1 auto; min-height: 0; max-height: none; margin: 0;
+  overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth;
+  scrollbar-gutter: stable; scrollbar-width: thin; }
+.hs_modal_body .ac_list::-webkit-scrollbar { width: 8px; }
+.hs_modal_body .ac_list::-webkit-scrollbar-thumb { border-radius: 999px; background: #cbd5e1; }
+.hs_modal_status { flex: none; }
+@media (prefers-reduced-motion: reduce) { .hs_modal_body .ac_list { scroll-behavior: auto; } }
+.hs_modal_row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hs_modal_row .hs_country { width: auto; min-width: 190px; font-size: 13px; }
+.hs_modal_chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hs_chip { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  color: var(--blue_dark); font-size: 12px; font-weight: 700; cursor: pointer; }
+.hs_chip:hover { border-color: var(--blue); background: var(--blue_soft); }
+.hs_modal_status { margin: 0; padding: 9px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; }
+.hs_modal_status.ok { background: var(--green_soft); color: #07694f; }
+.hs_modal_status.warn { background: var(--amber_soft); color: #8a4f00; }
+@media (max-width: 520px) {
+  .hs_modal { padding: 12px 8px; }
+  .hs_modal_box { padding: 16px; max-height: calc(92vh / var(--ui_scale, 1)); }
+  .hs_modal_row .hs_country { flex: 1 1 100%; }
+}
+
+/* ⓘ 설명과 HS 후보 카드. 운송 계획 Cargo와 HS CODE 간편 검색 창이 같이 씁니다. */
+/* ? 아이콘: 마우스를 올리거나 키보드·탭으로 고르면 자세한 설명을 띄웁니다. */
+.info_tip { position: relative; display: inline-flex; flex: 0 0 auto; }
+.info_tip > i { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(43,102,246,.12); color: var(--blue_dark); font-style: normal; font-size: 11px; font-weight: 900; cursor: help; }
+.info_tip:focus-visible { outline: none; }
+.info_tip:focus-visible > i { box-shadow: 0 0 0 2px var(--blue); }
+.info_tip_body { position: absolute; top: calc(100% + 8px); right: -8px; z-index: 30; width: 340px; max-width: 80vw;
+  padding: 12px 14px; border-radius: 12px; background: var(--ink); color: #e2e8f0; text-align: left;
+  font-size: 12px; font-weight: 600; line-height: 1.6; box-shadow: 0 18px 40px rgba(15,23,42,.28);
+  opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity .15s, transform .15s; }
+.info_tip.start .info_tip_body { right: auto; left: -8px; }
+.info_tip_body b { display: block; margin-bottom: 4px; color: #fff; font-size: 12.5px; }
+.info_tip_body p { margin: 0 0 6px; }
+.info_tip_body p:last-child { margin-bottom: 0; }
+.info_tip:hover .info_tip_body, .info_tip:focus-within .info_tip_body { opacity: 1; visibility: visible; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .info_tip_body { transition: none; } }
+/* Compact cargo lookup: color and text convey the same relevance grade. */
+.hs_candidate { --match: #64748b; --tint: #f1f5f9; padding: 10px 12px; border-left: 4px solid var(--match); border-radius: 9px; background: var(--tint); color: var(--ink); }
+.hs_candidate.match_high { --match: #15803d; --tint: #effaf2; }
+.hs_candidate.match_medium { --match: #a16207; --tint: #fffbeb; }
+.hs_candidate.match_low { --match: #b91c1c; --tint: #fff1f2; }
+.hs_candidate_head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.hs_candidate_head .info_tip { margin-left: auto; }
+.hs_match { padding: 2px 7px; border-radius: 6px; color: var(--match); background: #fff; font-size: 11px; font-weight: 800; }
+.hs_name { display: block; margin-top: 5px; font-size: 14px; }
+.hs_path { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.hs_metrics { margin-top: 5px; font-size: 11px; color: var(--muted); }
+.hs_summary > .info_tip { margin-left: 8px; }
+.hs_candidate:hover { box-shadow: inset 0 0 0 1px var(--match); }
+.info_tip .info_tip_body { display: none; }
+.cargo_tip_popup { position: fixed; z-index: 1000; width: min(360px, calc(100vw - 16px)); max-height: min(420px, calc(100dvh - 16px)); overflow-y: auto; box-sizing: border-box; padding: 14px 16px; border-radius: 12px; background: #17283f; color: #edf2fa; box-shadow: 0 12px 35px #0f172a40; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.cargo_tip_popup[hidden] { display: none; }
+.cargo_tip_popup b { color: #fff; }
+.cargo_tip_popup p { margin: 7px 0 0; }
+.hs_modal .ac_list li[data-index] { padding: 3px; }
+
+/* 답 아래의 관련 링크 (answer_links.py가 고르고, home.js·support_chat.js가 그립니다) */
+.answer_links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0;
+  padding-top: 8px; border-top: 1px solid var(--line); }
+.answer_links > span { color: var(--muted); font-size: 12px; font-weight: 800; margin-right: 2px; }
+.answer_link { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  color: var(--blue_dark); font-size: 12.5px; font-weight: 700; text-decoration: none; }
+.answer_link:hover { border-color: var(--blue); background: var(--blue_soft); text-decoration: none; }
+.answer_link.is_outside { color: #475569; }

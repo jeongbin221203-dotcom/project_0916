@@ -1,0 +1,20 @@
+Flask>=3.0,<4
+Flask-SQLAlchemy>=3.1,<4
+SQLAlchemy>=2.0,<3
+python-dotenv>=1.0
+httpx>=0.27,<1
+gunicorn>=21.2
+psycopg[binary]>=3.1; sys_platform != "win32"
+pytest>=8
+# 계산 불변식을 수천 가지 값으로 확인하는 데 씁니다. (tests/test_invariants.py)
+hypothesis>=6.100
+# 업로드한 증빙 서류에서 글자를 읽는 데 씁니다.
+pdfplumber>=0.11
+python-docx>=1.1
+# 사진·스캔 서류를 읽는 Tesseract OCR. 프로그램(Tesseract 5, kor·eng 언어)은 따로 설치합니다.
+pytesseract>=0.3.10
+# 서류 서식을 그리고(document_form) 계좌 정보를 가리는 데 씁니다. pdfplumber·pytesseract도 이걸 씁니다.
+Pillow>=10.0
+# 상담 경로(검색기·도구·체인)를 엮는 데 씁니다. (app/services/consult_chain.py)
+# langchain-openai는 쓰지 않습니다 — LLM 호출은 기존 ai_client(httpx)가 그대로 합니다.
+langchain-core>=1.6,<2

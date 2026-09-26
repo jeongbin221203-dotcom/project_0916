@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% from "_macros.html" import doc_status, shipment_tabs, shipment_header %}
+{% block title %}Document Center · {{ shipment.shipment_id }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
+{% block content %}
+  {{ shipment_header(shipment) }}
+  {{ shipment_tabs(shipment, 'document') }}
+
+
+  <section class="card">
+    <div class="row_between wrap">
+      <div>
+        <h2>Trade Document Center</h2>
+        <p class="muted">Shipment에 이미 입력된 Exporter·Consignee·Incoterms·POL/POD·품명·수량·중량·금액을 재사용해 작성합니다.</p>
+        <p class="muted small">수출자가 직접 작성해 내는 서류는 <b>Commercial Invoice</b>와
+          <b>Packing List</b> 두 개입니다. 나머지는 참고용이거나 선사·포워더 양식입니다.</p>
+      </div>
+      <div class="button_row">
+        <form method="post" action="{{ url_for('document.generate', shipment_id=shipment.shipment_id) }}">
+          <button class="button primary">문서 자동 작성</button>
+        </form>
+        <form method="post" action="{{ url_for('document.validate', shipment_id=shipment.shipment_id) }}">
+          <button class="button ghost">서류 간 검증</button>
+        </form>
+        <a class="button ghost" href="{{ url_for('document.requirements', shipment_id=shipment.shipment_id) }}">수출요건 확인</a>
+        <a class="button ghost" href="{{ url_for('document.customs_filing', shipment_id=shipment.shipment_id) }}">관세사 전달용 신고자료</a>
+      </div>
+    </div>
+
+    <div class="doc_grid">
+      {% for item in documents %}
+        <article class="doc_card {{ 'empty' if not item.document }}">
+          <div class="row_between">
+            <b>{{ item.title }}</b>
+            {% if item.document %}{{ doc_status(item.document.status) }}{% else %}<span class="badge muted_badge">미작성</span>{% endif %}
+          </div>
+          <span class="doc_role doc_role_{{ item.role }}">{{ item.role_label }}</span>
+          <p class="muted small doc_role_note">{{ item.role_note }}</p>
+          {% if item.document %}
+            <span class="muted small">{{ item.document.data.get('doc_no', '') }} · 수정 {{ item.document.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            <div class="button_row">
+              <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type) }}">보기</a>
+              {# 확정한 서류도 고칠 수 있습니다. 저장하면 확정이 풀리고 검증 대기로 돌아갑니다. #}
+              <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type, edit=1) }}"
+                 title="{{ '확정이 풀리고 검증 대기 상태로 돌아갑니다' if item.document.status == 'final' else '' }}">
+                {{ '수정하기' if item.document.status == 'final' else '수정' }}</a>
+            </div>
+          {% else %}
+            <span class="muted small">자동 작성 대기</span>
+            <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type) }}">작성</a>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+    <p class="muted small">Status: draft → generated → validated → final.
+      확정(final)한 뒤에도 <b>수정하기</b>로 언제든 고칠 수 있고, 저장하면 확정이 풀려
+      다시 검증해야 확정됩니다.</p>
+  </section>
+
+  <section class="card" id="validation">
+    <h2>Document Validation</h2>
+    {% if not validation %}
+      <p class="muted">작성된 문서가 없습니다.</p>
+    {% elif validation.status == 'passed' %}
+      <div class="alert ok">✓ 검사한 {{ validation.checked_documents|length }}개 문서의 {{ validation.checked_fields|join(', ') }} 값이
+        서로 일치하고, Shipment 기준값과도 같습니다.</div>
+    {% else %}
+      <div class="alert warn">{{ validation.findings|length }}건을 확인해 주세요.</div>
+      <table class="table">
+        <thead><tr><th>문서</th><th>항목</th><th>확인할 내용</th><th>적힌 값</th><th>맞대어 본 값</th></tr></thead>
+        <tbody>
+          {% for f in validation.findings %}
+            <tr>
+              <td><a href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=f.document, edit=1) }}">{{ f.document_label }}</a></td>
+              <td>{{ f.field_label }}</td>
+              <td>
+                {{ f.message }}
+                <span class="badge muted_badge">{{ '서류끼리' if f.kind == 'cross' else '기준값' }}</span>
+              </td>
+              <td class="mono">{{ f.actual if f.actual is not none else '(비어 있음)' }}</td>
+              <td class="mono">{{ f.expected if f.expected is not none else '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted small">“기준값”은 Shipment에 저장된 값과 맞댄 것이고,
+        “서류끼리”는 서류들끼리 맞댄 것입니다. Shipment에 값이 없어도 서류끼리는 같아야 합니다.</p>
+    {% endif %}
+  </section>
+
+  {# 원산지증명서는 맨 아래입니다. (2026-09-26 사용자 결정)
+     빼지 않는 이유: 관세사에게 넘길 때 함께 가는 서류이고, 발급받은 PDF를
+     올리는 자리가 여기입니다.
+     아래로 내린 이유: 협정마다 달라 설명이 길어 화면 맨 위를 다 차지했는데,
+     정작 매번 쓰는 것은 상업송장·패킹리스트입니다. #}
+  <section class="card origin_card">
+    <h2>원산지증명서 <small class="muted">수출국에 따라 쓰는 협정이 다릅니다</small></h2>
+    {% if origin_certificate.available %}
+      <p class="muted">{{ origin_certificate.country }}로 보낼 때
+        <b class="mono">{{ origin_certificate.hs_code }}</b> 품목에 쓸 수 있는 협정입니다.</p>
+      {% if origin_certificate.agreements %}
+        {% for row in origin_certificate.agreements %}
+          <div class="origin_row">
+            <div class="row_between wrap">
+              <b>{{ row.agreement }}</b>
+              <span class="origin_rate">협정세율 {{ row.rate }}%</span>
+            </div>
+            <p class="origin_about">{{ row.about }}</p>
+            {% if row.certificate %}
+              <dl class="origin_detail">
+                {% if row.steps.what %}<div><dt>무엇을</dt><dd>{{ row.steps.what }}</dd></div>{% endif %}
+                {% if row.steps.where %}<div class="wide"><dt>어디서</dt><dd>{{ row.steps.where }}</dd></div>{% endif %}
+                {% if row.certificate.issuer %}<div><dt>발급자</dt><dd>{{ row.certificate.issuer }}</dd></div>{% endif %}
+                {% if row.certificate.form %}<div><dt>어떤 서식으로</dt><dd>{{ row.certificate.form }}</dd></div>{% endif %}
+                {% if row.certificate.valid_for %}<div><dt>유효기간</dt><dd>{{ row.certificate.valid_for }}</dd></div>{% endif %}
+              </dl>
+              {% if row.steps.apply_links %}
+                <div class="origin_apply">
+                  <span class="origin_apply_label">신청하러 가기</span>
+                  {% for link in row.steps.apply_links %}
+                    <a class="button small ghost" href="{{ link.url }}"
+                       target="_blank" rel="noopener noreferrer"
+                       title="{{ link.note }}">{{ link.label }} ↗</a>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endif %}
+          </div>
+        {% endfor %}
+        <p class="muted small">{{ origin_certificate.note }}
+          <em>출처: {{ origin_certificate.source }}</em></p>
+      {% else %}
+        <p class="muted">{{ origin_certificate.country }}와(과) 발효된 FTA가 없어 원산지증명서로 받을 혜택이 없습니다.</p>
+      {% endif %}
+    {% else %}
+      <p class="muted">{{ origin_certificate.reason }}</p>
+    {% endif %}
+
+    {# 발급받은 원산지증명서를 바로 등록합니다. #}
+    <div class="origin_upload_box">
+      <div class="row_between wrap">
+        <b>발급받은 원산지증명서 등록</b>
+        <span class="muted small">{{ origin_certificate.uploads|length }}건</span>
+      </div>
+      <p class="muted small">세관이나 상공회의소에서 받은 PDF를 올리면 이 건의 품명·HS부호·수출자와
+        맞는지 대조합니다. 자율발급이라면 직접 만든 증명서를 올려도 됩니다.</p>
+
+      <div class="origin_apply">
+        <span class="origin_apply_label">신청 창구</span>
+        {% for link in origin_certificate.apply_links %}
+          <a class="button small ghost" href="{{ link.url }}" target="_blank"
+             rel="noopener noreferrer" title="{{ link.note }}">{{ link.label }} ↗</a>
+        {% endfor %}
+      </div>
+      <p class="muted small">{{ origin_certificate.non_preferential.about }}
+        <b>{{ origin_certificate.non_preferential.label }}</b>는
+        {{ origin_certificate.non_preferential.issuer }}에서 발급합니다.</p>
+
+      <form method="post" enctype="multipart/form-data" class="origin_upload_form"
+            action="{{ url_for('document.upload_requirement', shipment_id=shipment.shipment_id) }}">
+        <input type="hidden" name="requirement_key" value="origin">
+        <label class="field">
+          <span class="field_label">어느 협정으로 받았나요</span>
+          <input class="text_input" type="text" name="agreement" list="origin_agreements"
+                 placeholder="예: 한·EU FTA / 비특혜(일반) 원산지증명서" maxlength="120">
+          <datalist id="origin_agreements">
+            {% for name in origin_certificate.agreement_names %}
+              <option value="{{ name }}"></option>
+            {% endfor %}
+            <option value="비특혜(일반) 원산지증명서"></option>
+          </datalist>
+        </label>
+        <label class="field">
+          <span class="field_label">원산지증명서 파일</span>
+          <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.txt,.docx" required>
+        </label>
+        <button class="button primary">등록하고 확인</button>
+      </form>
+
+      {% if origin_certificate.uploads %}
+        <div class="upload_list">
+          {% for doc in origin_certificate.uploads %}
+            <article class="upload_card status_{{ doc.review_status }}">
+              <div class="row_between wrap">
+                <div>
+                  <b>{{ doc.filename }}</b>
+                  <span class="muted small">{{ doc.agreement or '협정 미지정' }} ·
+                    {{ doc.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </div>
+                <span class="badge review_{{ doc.review_status }}">{{ doc.review_label }}</span>
+              </div>
+              {% if doc.review_summary %}<p class="upload_summary">{{ doc.review_summary }}</p>{% endif %}
+              {% if doc.review_findings %}
+                <ul class="finding_list">
+                  {% for finding in doc.review_findings %}
+                    <li class="verdict_{{ finding.verdict }}">
+                      <b>{{ finding.label }}</b><span>{{ finding.detail }}</span></li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+              <div class="button_row">
+                <form method="post"
+                      action="{{ url_for('document.analyze_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
+                  <button class="button small ghost">다시 분석</button>
+                </form>
+                <form method="post"
+                      action="{{ url_for('document.delete_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
+                  <button class="button small ghost danger">삭제</button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+{% endblock %}

@@ -280,8 +280,12 @@ COUNTRY_AGENCIES = {
          "note": "식품은 수입신고(식품등수입신고서)가 따로 있습니다."},
     ],
     "VN": [
-        {"label": "베트남 과학기술부 (품질·CR 마크)", "url": "https://www.most.gov.vn",
-         "note": "품목별 적합성인증(CR) 대상이 넓습니다."},
+        # CR 마크를 실제로 주관하는 곳은 과학기술부(MOST)가 아니라 그 산하의
+        # STAMEQ(표준·계량·품질 총국)입니다. 부처 대문으로 보내면 거기서 다시
+        # 찾아 들어가야 합니다. (2026-09-26 확인)
+        {"label": "STAMEQ · 베트남 표준계량품질총국 (CR 마크)", "url": "https://tcvn.gov.vn/?lang=en",
+         "note": "품목별 적합성인증(CR)을 주관합니다. 대상 품목이 넓습니다. "
+                 "과학기술부(MOST) 산하 기관입니다."},
     ],
     "IN": [
         {"label": "BIS · 인도표준국", "url": "https://www.bis.gov.in",
@@ -314,8 +318,11 @@ COUNTRY_AGENCIES = {
     "AU": [
         {"label": "ACMA (무선·통신)", "url": "https://www.acma.gov.au",
          "note": "RCM 표시 대상입니다."},
-        {"label": "호주 농업부 (검역)", "url": "https://www.agriculture.gov.au",
+        {"label": "호주 농업부 DAFF (검역)", "url": "https://www.agriculture.gov.au",
          "note": "검역이 세계에서 가장 엄격한 축에 듭니다. 목재 포장재를 특히 봅니다."},
+        # 품목별 수입 조건을 실제로 찾아보는 곳. 부처 대문보다 이쪽이 바로 쓸모 있습니다.
+        {"label": "BICON · 품목별 수입 검역 조건 조회", "url": "https://bicon.agriculture.gov.au/",
+         "note": "식물·동물·광물 2만여 품목의 수입 조건을 품목명으로 찾습니다."},
     ],
     "CA": [
         {"label": "Health Canada (식품·화장품·의약품)", "url": "https://www.canada.ca/en/health-canada.html",

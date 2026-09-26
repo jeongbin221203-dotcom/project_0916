@@ -42,6 +42,8 @@
     const stepEls = scope.querySelectorAll(".flow_step");
     if (!bars) return;
     stepEls.forEach((el) => el.classList.remove("risk_edge", "cost_edge"));
+    const clearMarks = scope.querySelector("[data-flow-marks]");
+    if (clearMarks) { clearMarks.innerHTML = ""; clearMarks.hidden = true; }
     if (!term || !term.flow) {
       bars.hidden = true;
       if (legend) legend.hidden = true;
@@ -82,6 +84,17 @@
     // 이 표시가 유일한 단서입니다.
     // 끝에서 넘어가는 조건(DPU·DDP)은 그 다음 아이콘이 없으므로 **마지막 아이콘**에
     // 답니다. 예전에는 costEnd < steps 만 보아 DPU에는 아무 표시도 안 났습니다.
+    // 아이콘 줄에도 같은 자리에 선을 긋습니다. 막대의 세로선과 위아래로 이어져
+    // 보여야 "몇 번 뒤인지"를 눈으로 바로 알 수 있습니다.
+    const marksEl = scope.querySelector("[data-flow-marks]");
+    if (marksEl) {
+      const at = [[costEnd, "m_cost"], [riskFrom, "m_risk"]];
+      if (riskTo !== riskFrom) at.push([riskTo, "m_risk"]);
+      marksEl.innerHTML = at
+        .map(([index, kind]) => `<span class="tmark ${kind}" style="--at: ${index}"></span>`)
+        .join("");
+      marksEl.hidden = false;
+    }
     if (stepEls[riskFrom]) stepEls[riskFrom].classList.add("risk_edge");
     const costStep = stepEls[costEnd] || stepEls[steps - 1];
     if (costStep) costStep.classList.add("cost_edge");
