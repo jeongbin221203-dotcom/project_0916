@@ -132,7 +132,7 @@ def test_화면이_고른_건으로_칸을_비우고_다시_채운다():
     """
 
     js = (STATIC / "js/doc_form.js").read_text(encoding="utf-8")
-    block = js[js.index("[data-doc-source]"):js.index('window.addEventListener("pagehide", saveLocal)')]
+    block = js[js.index("[data-doc-source]"):js.index('window.addEventListener("beforeunload"')]
     assert "clearForm();" in block
     assert "FORWARDUS_DOC_FILL" in block
     # 가져오지 못하면 고른 것을 되돌려 둡니다. 채워진 줄 알면 안 됩니다.

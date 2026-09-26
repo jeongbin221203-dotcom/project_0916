@@ -371,7 +371,36 @@
       + `<span>${escapeHtml(advice.reason || "")}</span>${notes}`;
   }, 400);
 
+  /* 단가를 적으면 **금액을 대신 셉니다.** (금액 = 단가 × 포장 개수)
+     칸에 개수와 단가를 다 적어 놓고도 금액은 손으로 곱해 적어야 했습니다.
+     곱셈 한 번에 송장 금액이 걸리는 자리라, 직접 적은 값이 있으면 건드리지
+     않습니다. 우리가 넣은 값에는 노란 표시를 답니다. (2026-09-26 사용자 요청) */
+  function fillAmount(row) {
+    const priceEl = row.querySelector('[name="item_unit_price"]');
+    const countEl = row.querySelector('[name="item_quantity"]');
+    const amountEl = row.querySelector('[name="item_amount"]');
+    if (!priceEl || !countEl || !amountEl) return;
+    const number = (el) => {
+      const value = Number(String(el.value || "").replace(/,/g, "").trim());
+      return Number.isFinite(value) && value > 0 ? value : 0;
+    };
+    const price = number(priceEl);
+    const count = number(countEl);
+    if (!price || !count) return;
+    // 사람이 직접 적은 금액은 덮지 않습니다. 우리가 넣어 둔 값만 다시 셉니다.
+    const mine = amountEl.dataset.autoAmount;
+    if (amountEl.value.trim() && amountEl.value.trim() !== mine) return;
+    const total = (price * count).toFixed(2);
+    amountEl.value = total;
+    amountEl.dataset.autoAmount = total;
+    markPrefilled(amountEl);
+  }
+
   itemsBox.addEventListener("input", (event) => {
+    if (["item_unit_price", "item_quantity"].includes(event.target.name)) {
+      fillAmount(event.target.closest(".doc_item"));
+      applyCurrency();
+    }
     if (event.target.name === "item_amount") applyCurrency();
     if (CBM_FIELDS.includes(event.target.name)) askCargo();
   });
@@ -1225,7 +1254,9 @@
      서버가 "무엇이 비었는지"(field)를 함께 돌려줍니다. 그 칸을 빨갛게 칠하고 그 자리로 올라갑니다.
      칸을 채우기 시작하면 표시는 곧바로 지웁니다. */
   function clearInvalid() {
-    panel.querySelectorAll(".is_invalid").forEach((el) => el.classList.remove("is_invalid"));
+    panel.querySelectorAll(".is_invalid").forEach((el) => {
+      el.classList.remove("is_invalid", "is_check");
+    });
   }
 
   // 서버가 쓰는 이름과 화면의 칸을 잇습니다. 화면에 같은 이름의 칸이 없는 것만 적습니다.
@@ -1267,6 +1298,13 @@
     const target = fieldBox(field) || markEmptyRequired();
     if (target) {
       target.classList.add("is_invalid");
+      // **비어서** 걸린 것과 **값이 맞는지 봐야 해서** 걸린 것은 다릅니다.
+      // 항공에 FAS를 고르면 "한 번 더 눌러 주세요"인데, 칸은 채워져 있는데도
+      // "채워 주세요"가 붙어 무엇을 하라는 것인지 알 수 없었습니다.
+      // (2026-09-26)
+      const filled = Array.from(target.querySelectorAll("[data-doc-input]"))
+        .some((input) => String(input.value || "").trim());
+      target.classList.toggle("is_check", filled);
       markEmptyRequired();
       const top = target.getBoundingClientRect().top + window.scrollY - 140;
       window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
@@ -1281,12 +1319,12 @@
   // 다시 적기 시작하면 빨간 표시를 지웁니다. 고친 칸이 계속 빨갛게 남으면 헷갈립니다.
   form.addEventListener("input", (event) => {
     const box = event.target.closest(".is_invalid");
-    if (box) box.classList.remove("is_invalid");
+    if (box) box.classList.remove("is_invalid", "is_check");
     if (!form.querySelector(".is_invalid")) { errorEl.hidden = true; }
   });
   form.addEventListener("change", (event) => {
     const box = event.target.closest(".is_invalid");
-    if (box) box.classList.remove("is_invalid");
+    if (box) box.classList.remove("is_invalid", "is_check");
   });
 
   form.addEventListener("submit", async (event) => {

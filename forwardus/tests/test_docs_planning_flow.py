@@ -169,7 +169,12 @@ def test_서류_작성_화면은_적던_내용을_다시_불러온다(app):
     assert "forwardus:doc-form-draft" in js          # 이 탭에 두는 자리
     assert "function restoreDraft" in js and "restoreDraft();" in js
     assert "ForwardusWorkDraft.load()" in js         # 서버 저장분
-    assert 'window.addEventListener("pagehide", saveLocal)' in js   # 나가기 직전 저장
+    # 저장은 **누를 때만** 합니다. 적는 동안 저절로 저장하면 언제 저장됐는지
+    # 알 수 없고, 저장이 막혔을 때 조용히 넘어갑니다. (2026-09-26 사용자 결정)
+    assert 'data-doc-save-now' in js                 # 임시저장 단추
+    assert 'form.addEventListener("input", markDirty)' in js
+    assert 'saveSoon' not in js                      # 저절로 저장하던 자리
+    assert '"beforeunload"' in js                    # 저장 안 한 채로 떠나면 붙잡습니다
     assert "data-doc-clear" in js                    # 비우고 새로 시작
     shared = (STATIC / "js/work_draft.js").read_text(encoding="utf-8")
     assert "async function load()" in shared and "async function clear()" in shared
