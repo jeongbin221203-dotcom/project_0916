@@ -228,3 +228,22 @@
    기둥이 아니라 품목 바로 아래 한 칸으로 둡니다. */
 .doc_calc { margin: 14px 0 0; max-width: 520px; }
 .doc_calc .eyebrow { margin-bottom: 8px; }
+
+/* 임시저장 줄. 점수 옆에 둡니다 — 다 채웠는지 보는 자리와 저장하는 자리가
+   같으면 눈이 한 번만 갑니다.
+   저장 안 한 변경이 있으면 단추가 눈에 띄게, 저장이 **막혔으면 빨갛게**
+   말합니다. 조용히 넘어가면 저장된 줄 알고 있다가 잃습니다. (2026-09-26) */
+.doc_head_right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.doc_save { display: grid; gap: 3px; justify-items: end; }
+.doc_save .button.small { min-height: 34px; padding: 0 14px; font-size: 13px; }
+.doc_save_note { max-width: 320px; color: var(--muted); font-size: 12px; line-height: 1.55;
+  text-align: right; }
+.doc_save.is_dirty .button { border-color: var(--blue); color: var(--blue_dark);
+  background: var(--blue_soft); }
+.doc_save.is_dirty .doc_save_note { color: var(--blue_dark); font-weight: 700; }
+.doc_save.is_failed .button { border-color: #dc2626; color: #b91c1c; background: #fef2f2; }
+.doc_save.is_failed .doc_save_note { color: #b91c1c; font-weight: 700; }
+@media (max-width: 720px) {
+  .doc_head_right { width: 100%; justify-content: space-between; }
+  .doc_save_note { text-align: left; }
+}

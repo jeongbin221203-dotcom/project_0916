@@ -494,11 +494,20 @@
   // 시작 화면에서 넘어온 초안. 같은 회원 것만 집습니다. (home.js에서 넣습니다)
   const DOC_DRAFT_KEY = window.ForwardusStore.key("forwardus:doc-draft");
 
+  /* 적던 값을 이 탭에 남깁니다.
+     **못 남겼으면 그렇다고 돌려줍니다.** 예전에는 조용히 넘어갔습니다. 저장
+     공간이 막히거나 꽉 차면(시크릿 창·용량 초과) 사람은 저장된 줄 알고 있다가
+     그대로 잃었습니다. (2026-09-26 사용자 결정) */
   function saveLocal() {
     const draft = { ...sharedValues(), savedAt: Date.now(), lc: { ...carried }, tab: currentTab };
     try {
       window.sessionStorage.setItem(LOCAL_KEY, JSON.stringify(draft));
-    } catch (error) { /* 저장 공간을 못 쓰면 서버 쪽만 남습니다. */ }
+      return { ok: true, savedAt: draft.savedAt };
+    } catch (error) {
+      return { ok: false, savedAt: draft.savedAt,
+               reason: (error && error.name === "QuotaExceededError")
+                 ? "브라우저 저장 공간이 꽉 찼습니다." : "브라우저가 저장을 막고 있습니다." };
+    }
   }
 
   function readLocal() {
@@ -524,9 +533,52 @@
     });
   }
 
-  const saveSoon = debounce(() => { syncWorkDraft(); saveLocal(); }, 400);
-  form.addEventListener("input", saveSoon);
-  form.addEventListener("change", saveSoon);
+  /* ----- 임시저장은 **누를 때만** 합니다 -----
+     예전에는 적는 동안 0.4초마다 저절로 저장했습니다. 그러면 언제 저장됐는지
+     알 수 없고, 잘못 적은 값도 같이 남습니다. 무엇보다 저장이 막혔을 때
+     조용히 넘어가 사람은 저장된 줄 알고 있다가 잃었습니다.
+     이제 단추를 누른 그때만 저장하고, 됐는지 못 됐는지 그 자리에서 밝힙니다.
+     (2026-09-26 사용자 결정) */
+  let dirty = false;
+  const saveBar = panel.querySelector("[data-doc-save]");
+  const saveButton = saveBar && saveBar.querySelector("[data-doc-save-now]");
+  const saveNote = saveBar && saveBar.querySelector("[data-doc-save-note]");
+
+  function markDirty() {
+    if (dirty || !saveBar) return;
+    dirty = true;
+    saveBar.classList.add("is_dirty");
+    if (saveNote) saveNote.textContent = "저장하지 않은 변경이 있습니다.";
+  }
+
+  function saveNow() {
+    const local = saveLocal();
+    let server = true;
+    try {
+      syncWorkDraft();
+    } catch (error) {
+      server = false;
+    }
+    dirty = false;
+    if (saveBar) saveBar.classList.remove("is_dirty");
+    if (!saveNote) return;
+    const when = new Date(local.savedAt).toLocaleTimeString("ko-KR",
+      { hour: "2-digit", minute: "2-digit" });
+    if (local.ok) {
+      saveNote.textContent = `${when}에 임시저장했습니다.`;
+      saveBar.classList.remove("is_failed");
+      return;
+    }
+    // 이 탭에 못 남겼습니다. 서버에 남았으면 그렇다고, 아니면 잃는다고 밝힙니다.
+    saveBar.classList.add("is_failed");
+    saveNote.textContent = `임시저장하지 못했습니다 — ${local.reason} `
+      + (server ? "서버에는 남았으니 다른 기기에서는 이어 쓸 수 있습니다."
+        : "지금 창을 닫으면 적으신 내용이 사라집니다. 서류를 먼저 만들어 두세요.");
+  }
+
+  form.addEventListener("input", markDirty);
+  form.addEventListener("change", markDirty);
+  if (saveButton) saveButton.addEventListener("click", saveNow);
 
   // 값을 조용히 되돌립니다. (노란 표시를 붙이지 않습니다. 사람이 직접 적은 값이니까요)
   function applyDraft(draft) {
@@ -659,7 +711,8 @@
       // 대화창에서 이름 붙여 저장해 둔 초안이면, 여기서 만든 Shipment에 이어 붙입니다.
       carriedDraftId = stashed.draftId || null;
       window.FORWARDUS_DOC_FILL(stashed);
-      saveLocal();
+      // 대화에서 넘어온 값을 채웠습니다. **저장은 사람이 누를 때** 합니다.
+      markDirty();
       return;
     }
 
@@ -1347,7 +1400,9 @@
     askCargo();               // 총액과 같은 자리에서 부피·운임톤도 다시 셉니다
     suggestName();            // 읽어 온 도착지·품목으로 견적명을 다시 제안합니다.
     syncWorkDraft("upload");  // 올린 서류·대화에서 읽은 값도 운송 계획으로 이어집니다.
-    saveLocal();
+    // 칸은 채웠지만 **임시저장은 누를 때** 합니다. 채워 놓은 값이 맞는지 보고
+    // 나서 저장하는 편이, 잘못 읽은 값까지 남는 것보다 낫습니다.
+    markDirty();
   };
 
   addItem();
@@ -1436,9 +1491,12 @@
 
   // 화면을 떠나는 순간에는 기다리지 않고 바로 저장합니다.
   // (적자마자 홈으로 누르면 0.4초를 기다리던 마지막 입력이 사라집니다)
-  window.addEventListener("pagehide", saveLocal);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") saveLocal();
+  // 저장 안 한 채로 떠나려 하면 붙잡습니다. **저절로 저장하지는 않습니다.**
+  // (저절로 저장하면 잘못 적은 값도 같이 남고, 언제 저장됐는지 알 수 없습니다)
+  window.addEventListener("beforeunload", (event) => {
+    if (!dirty) return;
+    event.preventDefault();
+    event.returnValue = "";
   });
 
   // 적던 내용 되살리기. 칸·품목·달력이 모두 준비된 뒤에 부릅니다.
