@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from app.collectors import exchange_client, location_client
 from app.processors import document_defaults
+from app.processors.cargo_calculator import sum_money
 from app.processors.cost_calculator import INCOTERMS_INFO
 from app.services import ServiceError, document_service, planning_service
 from app.validators import ValidationError
@@ -208,7 +209,8 @@ def _invoice_value(items: list[dict]) -> float:
             "amount")
     if not amounts:
         raise ValidationError("품목 금액을 적어 주세요. 송장 금액이 됩니다.", "amount")
-    return round(sum(amounts), 2)
+    # float 로 더하면 줄이 쌓일수록 총액이 한 푼 어긋납니다. 은행이 다시 셈합니다.
+    return sum_money(amounts)
 
 
 def create(payload: dict, user_id: int | None = None) -> dict:

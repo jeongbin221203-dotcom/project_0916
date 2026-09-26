@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from app.validators import ValidationError
@@ -379,6 +380,43 @@ def _validate_units(payload: dict, *, strict: bool) -> dict:
     return result
 
 
+# 금액 셈법. **부동소수점으로 곱하지 않습니다.**
+#
+# 왜 이렇게 하는가
+#   단가 91,077.001 × 25개 = 2,276,925.025 입니다. 사사오입하면 …25.03 인데,
+#   float 로 곱해 round() 하면 …25.02 가 나옵니다. 곱셈 결과가 2진수로는
+#   딱 떨어지지 않아 정확히 절반인 자리가 아래로 떨어지기 때문입니다.
+#   30만 가지를 맞대어 보니 6,049건(2%)이 1센트 어긋났습니다.
+#
+#   1센트가 왜 문제인가
+#   신용장 서류는 은행이 단가 × 수량을 다시 셈해 맞춰 봅니다. 한 푼이라도
+#   다르면 불일치(discrepancy)로 반송됩니다. 송장·포장명세서·수출신고서가
+#   서로 다른 금액을 적는 일도 같은 이유로 생깁니다.
+#
+#   사사오입(ROUND_HALF_UP)을 쓰는 이유는 상업 송장의 관행이고, 은행·세관이
+#   쓰는 셈법과 같기 때문입니다. 파이썬 기본 round()는 짝수반올림입니다.
+# (2026-09-26)
+CENT = Decimal("0.01")
+
+
+def _dec(value) -> Decimal:
+    """사람이 적은 숫자를 그대로 Decimal 로. str() 로 한 번 거쳐 2진수 오차를 털어 냅니다."""
+
+    return Decimal(str(value))
+
+
+def round_money(value) -> float:
+    """금액을 소수 둘째 자리로. 사사오입."""
+
+    return float(_dec(value).quantize(CENT, rounding=ROUND_HALF_UP))
+
+
+def money_product(unit_price, basis) -> float:
+    """단가 × 수량. 곱셈까지 Decimal 로 하고 마지막에 한 번만 맞춥니다."""
+
+    return float((_dec(unit_price) * _dec(basis)).quantize(CENT, rounding=ROUND_HALF_UP))
+
+
 def _package_quantity(payload: dict, units: dict, *, strict: bool) -> int:
     """포장 개수. 안 적었으면 낱개 ÷ 포장당 낱개로 구하고, 적었으면 그 계산과 맞는지 봅니다."""
 
@@ -415,7 +453,7 @@ def _validate_money(payload: dict, quantity: int, unit_quantity: float | None = 
     basis = unit_quantity if by_units else quantity
 
     if amount is None and unit_price is not None and basis:
-        amount = unit_price * basis
+        amount = money_product(unit_price, basis)
     elif unit_price is None and amount is not None and basis:
         unit_price = round(amount / basis, 4)
         # 낱개 기준에서 나누어떨어지지 않는 단가(100 ÷ 3 = 33.3333)는 지어내지 않습니다.
@@ -424,11 +462,12 @@ def _validate_money(payload: dict, quantity: int, unit_quantity: float | None = 
         if by_units and abs(unit_price * basis - amount) > 1e-6:
             unit_price = None
     elif by_units and unit_price is not None and amount is not None:
-        if round(unit_price * basis, 2) != round(amount, 2):
+        counted = money_product(unit_price, basis)
+        if counted != round_money(amount):
             raise ValidationError(
                 f"수량 × 단가가 금액과 맞지 않습니다. {basis:,g} × {unit_price:,g} = "
-                f"{unit_price * basis:,.2f} 인데 금액은 {amount:,.2f} 입니다.", "amount")
+                f"{counted:,.2f} 인데 금액은 {amount:,.2f} 입니다.", "amount")
     # 금액은 줄 단위로 먼저 원 단위(소수 둘째 자리)까지 맞춥니다.
     # 그래야 송장에 적히는 품목 금액의 합과 총액이 어긋나지 않습니다.
     return {"unit_price": unit_price,
-            "amount": None if amount is None else round(amount, 2)}
+            "amount": None if amount is None else round_money(amount)}

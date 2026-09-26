@@ -20,7 +20,7 @@ from types import SimpleNamespace
 
 from app.collectors import location_client
 from app.processors import document_defaults
-from app.processors.cargo_calculator import calculate_cargo_lines
+from app.processors.cargo_calculator import calculate_cargo_lines, sum_money
 from app.services import ServiceError, document_service
 from app.validators import ValidationError
 from app.validators.cargo_validator import has_box, validate_commercial_line
@@ -147,8 +147,8 @@ def _as_shipment(draft: dict) -> SimpleNamespace:
 
     # 품목 금액을 모두 적었으면 그 합이 송장 금액입니다.
     amounts = [line.get("amount") for line in lines]
-    invoice_value = (round(sum(amounts), 2) if amounts and all(a is not None for a in amounts)
-                     else None)
+    invoice_value = (sum_money(amounts)
+                     if amounts and all(a is not None for a in amounts) else None)
     if invoice_value is None:
         invoice_value = _number(draft.get("invoice_value"))
 
