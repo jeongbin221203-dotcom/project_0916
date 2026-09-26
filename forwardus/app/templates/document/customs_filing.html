@@ -12,7 +12,7 @@
         <h2>관세사 전달용 수출신고 자료</h2>
         <p class="muted">{{ sheet.note }}</p>
       </div>
-      <a class="button ghost" href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}">서류 센터로</a>
+      <a class="button primary" href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}">서류 센터로</a>
     </div>
 
     {% if sheet.missing %}
