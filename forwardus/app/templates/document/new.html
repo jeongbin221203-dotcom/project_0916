@@ -5,12 +5,17 @@
 {% endblock %}
 {% block content %}
   {# Shipment에서 넘어왔으면 돌아갈 길을 화면 맨 위에 둡니다. 칸을 다 채우고
-     아래까지 내려간 뒤에야 "어떻게 돌아가지?"를 떠올리기 때문입니다. #}
+     아래까지 내려간 뒤에야 "어떻게 돌아가지?"를 떠올리기 때문입니다.
+
+     **나가는 길과 같은 줄·같은 모양으로 둡니다.** 이 화면으로 오는 길은
+     Shipment 화면 탭 줄의 오른쪽 끝 "서류 작성 →"입니다. 그런데 돌아가는 길은
+     제목 위에 맨 글자로 떠 있어, 짝이 안 맞아 보였습니다. 같은 높이·같은
+     탭 줄에 두고 **왼쪽 끝**에 붙입니다. (2026-09-26) #}
   {% if back %}
-    <p class="doc_back">
-      <a href="{{ back.url }}">← {{ back.shipment_id }} 로 돌아가기</a>
-      <span class="muted small">{{ back.project_name }}</span>
-    </p>
+    <nav class="sub_tabs doc_back" aria-label="돌아가기">
+      <a class="doc_back_link" href="{{ back.url }}">← {{ back.shipment_id }} 로 돌아가기</a>
+      <span class="doc_back_name muted">{{ back.project_name }}</span>
+    </nav>
   {% endif %}
   <div class="page_head">
     <div>

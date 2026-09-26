@@ -37,7 +37,11 @@
           <span class="doc_role doc_role_{{ item.role }}">{{ item.role_label }}</span>
           <p class="muted small doc_role_note">{{ item.role_note }}</p>
           {% if item.document %}
-            <span class="muted small">{{ item.document.data.get('doc_no', '') }} · 수정 {{ item.document.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            {# 포장명세서는 주문 서식이라 doc_no 대신 order_no를 씁니다. 그대로 doc_no만
+               찍으면 번호 자리가 비고 가운뎃점만 남아, 번호가 없는 서류처럼 보였습니다. #}
+            {% set doc_no = item.document.data.get('doc_no') or item.document.data.get('order_no')
+                            or item.document.data.get('invoice_no') or '' %}
+            <span class="muted small">{% if doc_no %}{{ doc_no }} · {% endif %}수정 {{ item.document.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
             <div class="button_row">
               <a class="button small ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=item.doc_type) }}">보기</a>
               {# 확정한 서류도 고칠 수 있습니다. 저장하면 확정이 풀리고 검증 대기로 돌아갑니다. #}

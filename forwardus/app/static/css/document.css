@@ -208,3 +208,17 @@
 .check_filled > summary { cursor: pointer; font-size: 13px; font-weight: 800; color: var(--muted); }
 .check_filled > summary::marker { color: var(--muted); }
 .check_filled[open] > summary { margin-bottom: 10px; }
+
+/* HS부호를 이 화면에서 바로 적는 줄. (수출요건 확인)
+   클래스만 달아 두고 모양을 안 줘서, 라벨·칸·단추가 제각각 줄바꿈되어
+   다른 입력 줄과 달라 보였습니다. 컨테이너 조회 줄(.ctr_form)과 같은 모양으로
+   맞춥니다. (2026-09-26) */
+.hs_set { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px 10px; align-items: center; margin: 10px 0 0; }
+.hs_set_label { font-size: 12.5px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.hs_set .text_input { min-width: 0; }
+.hs_set_help { grid-column: 1 / -1; margin: 2px 0 0; line-height: 1.6; }
+@media (max-width: 720px) {
+  .hs_set { grid-template-columns: 1fr; }
+  .hs_set_label { margin-bottom: -4px; }
+}

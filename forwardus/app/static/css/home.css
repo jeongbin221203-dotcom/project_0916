@@ -924,8 +924,13 @@ body.home_talking .support_panel { display: none !important; }
 /* Shipment에서 서류 작성으로 넘어왔을 때 돌아가는 줄.
    화면 맨 위, 제목보다 앞에 둡니다. 칸을 다 채우고 나서야 "어떻게 돌아가지?"를
    떠올리는데, 그때 위로 올리는 것이 아래를 뒤지는 것보다 빠릅니다. */
-.doc_back { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
-.doc_back a { font-weight: 600; }
+/* 돌아가기 줄. Shipment 화면의 탭 줄(.sub_tabs)과 **같은 높이·같은 모양**입니다.
+   나가는 길("서류 작성 →")이 그 줄 오른쪽 끝에 있으니, 돌아오는 길은 같은 줄
+   왼쪽 끝에 둡니다. 화면을 오갈 때 눈이 같은 자리를 봅니다. (2026-09-26) */
+.doc_back { align-items: center; }
+.doc_back .doc_back_link { color: var(--blue); border-bottom-color: transparent; }
+.doc_back .doc_back_link:hover { border-bottom-color: var(--blue); }
+.doc_back_name { padding: 10px 0; font-size: 13px; font-weight: 700; }
 
 /* 지난 대화를 골라서 불러오기. [골라서]를 누르면 안내 아래로 펼쳐집니다.
    전부 불러오면 상관없는 말이 섞이고, 새로 시작하면 다 잃습니다. 그 사이를 둡니다. */

@@ -47,6 +47,12 @@
                   {{ 'disabled' if home_locked }}>
             <span aria-hidden="true">🔎</span> HS CODE 조회
           </button>
+          {# 계약서 조항 점검도 창으로 띄웁니다. 상담 중에 "이 조항 괜찮나요"를
+             물을 때, 화면을 옮기면 하던 이야기가 끊깁니다. #}
+          <button type="button" class="home_hs_open" data-contract-open aria-haspopup="dialog"
+                  {{ 'disabled' if home_locked }}>
+            <span aria-hidden="true">📜</span> 계약서 조항
+          </button>
         </div>
 
         <form class="home_box" data-home-form>

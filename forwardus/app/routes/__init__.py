@@ -38,6 +38,7 @@ def load_shipment(shipment_id: str):
 def register_blueprints(flask_app: Flask) -> None:
     from app.routes.assistant import assistant_bp
     from app.routes.auth import auth_bp
+    from app.routes.contract import contract_bp
     from app.routes.dashboard import dashboard_api_bp, dashboard_bp
     from app.routes.document import document_bp
     from app.routes.lookup import lookup_bp
@@ -49,5 +50,5 @@ def register_blueprints(flask_app: Flask) -> None:
 
     for blueprint in (home_bp, planning_bp, shipment_bp, document_bp, tracking_bp,
                       assistant_bp, dashboard_bp, dashboard_api_bp, lookup_bp, auth_bp,
-                      work_draft_bp):
+                      work_draft_bp, contract_bp):
         flask_app.register_blueprint(blueprint)

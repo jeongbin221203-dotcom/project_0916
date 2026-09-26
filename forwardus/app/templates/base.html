@@ -7,6 +7,7 @@
     {# 탭 아이콘도 로고 마크를 씁니다. 파일을 바꾸면 여기도 같이 바뀝니다. #}
     <link rel="icon" type="image/svg+xml" href="{{ brand_mark }}">
     <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
+    <link rel="stylesheet" href="{{ static_url('css/contract.css') }}">
     {% if not standalone %}
       {# 사이드바·환율 창은 모든 화면이 같이 씁니다. (shell.css) #}
       <link rel="stylesheet" href="{{ static_url('css/shell.css') }}">
@@ -192,7 +193,27 @@
       </div>
     </div>
 
+    {# 계약서 조항 점검 창. 어느 화면에서나 [data-contract-open]을 누르면 뜹니다. #}
+    <div class="hs_modal" data-contract-modal hidden>
+      <div class="hs_modal_backdrop" data-contract-close></div>
+      <div class="hs_modal_box" role="dialog" aria-modal="true" aria-labelledby="contract_modal_title">
+        <header class="hs_modal_head">
+          <div>
+            <h2 id="contract_modal_title">📜 계약서 조항 점검</h2>
+            <small>필수·이익·독소 조항을 짚고, 올린 계약서에서 빠진 것과 위험한 것을 찾습니다</small>
+          </div>
+          <button type="button" class="hs_modal_close" data-contract-close aria-label="닫기">×</button>
+        </header>
+        <div class="hs_modal_body" data-contract-panel></div>
+      </div>
+    </div>
+
     <script>
+      window.FORWARDUS_CONTRACT = {
+        clausesUrl: "{{ url_for('contract.clauses') }}",
+        reviewUrl: "{{ url_for('contract.review') }}",
+        exportUrl: "{{ url_for('contract.export') }}"
+      };
       window.FORWARDUS_SUPPORT = {
         url: "{{ url_for('home.api_support_chat') }}",
         intro: {{ support_chat_intro|tojson }}
@@ -230,6 +251,8 @@
     <script src="{{ static_url('js/base.js') }}"></script>
     {# 운송 계획 화면도 이 파일의 HS 검색을 씁니다. standalone이어도 붙입니다. #}
     <script src="{{ static_url('js/hs_search.js') }}"></script>
+    <script src="{{ static_url('js/contract_clauses.js') }}"></script>
+    <script src="{{ static_url('js/contract_modal.js') }}"></script>
     {% if not standalone %}
       {# 시작 화면의 탭과 고래 상담창이 나눠 쓰는 대화. 둘보다 먼저 읽습니다. #}
       <script src="{{ static_url('js/chat_store.js') }}"></script>

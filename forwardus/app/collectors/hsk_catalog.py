@@ -21,6 +21,15 @@ MIN_KOREAN_LENGTH = 2       # 관세청 검색과 같은 기준입니다.
 MIN_ENGLISH_LENGTH = 3
 # 상위 단위 부호 길이. 5·7·9자리는 소호·세분류 중간 단계입니다.
 LEVEL_LENGTHS = (2, 4, 5, 6, 7, 8, 9)
+# 찾을 때 볼 상위 이름. **류(2자리)는 뺍니다.**
+#
+# 류 제목은 그 류에 들어가는 물건을 죽 늘어놓은 목록입니다.
+#   제42류 "가죽제품, 마구, 여행용구ㆍ핸드백과 …"
+#   제85류 "전기기기와 그 부분품, 녹음기ㆍ… 텔레비전의 …"
+# 그래서 "핸드백"으로 찾으면 제42류 **전부**가 걸려, 4201의 "끈"이 맨 앞에
+# 나왔습니다. 호(4자리) 아래만 봅니다. 보여 주는 경로(path)는 그대로입니다.
+# (2026-09-26)
+MATCH_LEVELS = (4, 5, 6, 7, 8, 9)
 
 
 def _catalog() -> dict | None:
@@ -162,7 +171,7 @@ def _match(catalog, words, korean, limit) -> list[dict]:
     scored = []
     for code, (name, english) in catalog["codes"].items():
         leaf, leaf_spaced = _plain(name), _spaced(name)
-        above_text = " ".join(levels[code[:n]][0] for n in LEVEL_LENGTHS if code[:n] in levels)
+        above_text = " ".join(levels[code[:n]][0] for n in MATCH_LEVELS if code[:n] in levels)
         above, above_spaced = _plain(above_text), _spaced(above_text)
         english = english.lower()
         if all(_hit(word, leaf_spaced, leaf) for word in words):
@@ -176,14 +185,64 @@ def _match(catalog, words, korean, limit) -> list[dict]:
             continue
         # 같은 등급 안의 순서.
         #  - 이름이 "기타"뿐인 줄은 뒤로 미룹니다. 먼저 보여 줘도 알 수가 없습니다.
+        #  - "냉장고용"처럼 **그 물건에 쓰는 부속·재료** 줄은 본품보다 뒤로 보냅니다.
+        #    "냉장고"를 찾는 사람은 냉장고용 온도조절기를 찾는 것이 아닙니다.
+        #  - 찾는 말이 **한 낱말로** 들어 있는 줄이 먼저입니다.
+        #    "인스턴트 커피"가 "커피크리머"보다 앞입니다.
         #  - 이름에서 직접 찾은 줄(rank 0)은 **이름이 짧은 것**이 먼저입니다.
         #    "맥주"로 찾으면 "맥주보리"보다 "맥주"가 먼저 나와야 합니다.
         #  - 상위 이름으로 걸린 줄(rank 1)은 이름 길이가 뜻이 없습니다
         #    (죄다 "기타"·"끈"입니다). 품목표 차례대로 둡니다.
-        scored.append((rank, 1 if _plain(name) in GENERIC else 0,
+        scored.append((rank,
+                       1 if _plain(name) in GENERIC else 0,
+                       _for_use(words, leaf),
+                       _glued(words, leaf_spaced),
                        len(name) if rank == 0 else 0, code))
     scored.sort()
-    return [_row(catalog, code) for *_, code in scored[:limit]]
+    return _spread(catalog, [row[-1] for row in scored], limit)
+
+
+def _for_use(words, leaf: str) -> int:
+    """이름이 '<찾는 말>용'뿐인가. 그 물건에 **쓰는** 부속·재료 줄입니다."""
+
+    return 1 if any(leaf == word + "용" for word in words) else 0
+
+
+def _glued(words, spaced: str) -> int:
+    """찾는 말이 다른 글자에 붙어 있는가. 한 낱말로 서 있으면 0."""
+
+    for word in words:
+        at = spaced.find(word)
+        while at >= 0:
+            before = spaced[at - 1] if at else " "
+            after = spaced[at + len(word):at + len(word) + 1] or " "
+            if not (before.isalnum() or "가" <= before <= "힣") and                not (after.isalnum() or "가" <= after <= "힣"):
+                return 0
+            at = spaced.find(word, at + 1)
+    return 1
+
+
+def _spread(catalog, codes: list[str], limit: int) -> list[dict]:
+    """한 호(號)가 결과를 다 차지하지 않게 폅니다.
+
+    "텔레비전"을 찾으면 8524(평판디스플레이 모듈) 줄만 여섯이 나오고, 정작
+    텔레비전 수신기기(8528)는 밀려나 안 보였습니다. 호마다 두 줄까지만
+    먼저 보여 주고, 자리가 남으면 나머지로 채웁니다. (2026-09-26)
+    """
+
+    PER_HEADING = 2
+    picked, spare, seen = [], [], {}
+    for code in codes:
+        head = code[:4]
+        if seen.get(head, 0) < PER_HEADING:
+            seen[head] = seen.get(head, 0) + 1
+            picked.append(code)
+        else:
+            spare.append(code)
+        if len(picked) >= limit:
+            break
+    picked += spare[:max(0, limit - len(picked))]
+    return [_row(catalog, code) for code in picked[:limit]]
 
 
 # 이름만 봐서는 무엇인지 알 수 없는 줄. 찾은 것 맨 앞에 두면 도움이 안 됩니다.

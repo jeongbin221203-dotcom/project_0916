@@ -1,4 +1,10 @@
-"""고객 상담 창구."""
+"""고객 상담 창구.
+
+질문을 고를 때
+  **적어 둔 답이 없는 질문**을 씁니다. 여기서 보려는 것은 AI에게 무엇을
+  넘기는가이므로, 우리가 답을 적어 둔 주제(계약서 조항 같은)를 쓰면
+  그 글이 답해 버려 AI를 부르지 않습니다. (2026-09-26)
+"""
 
 from __future__ import annotations
 
@@ -58,7 +64,7 @@ def test_incoterms_are_quoted_from_our_own_data_not_the_model(app, monkeypatch):
 
     monkeypatch.setattr(support_chat_service.ai_client, "chat", fake_chat)
     with app.app_context():
-        support_chat_service.ask("바이어와 첫 거래인데 계약서에 뭘 더 넣을까요")
+        support_chat_service.ask("바이어가 갑자기 연락이 끊기면 어떻게 하나요")
 
     reference = "\n".join(m["content"] for m in sent["messages"] if m["role"] == "system")
     assert "Free On Board" in reference and "본선 인도" in reference
@@ -77,8 +83,8 @@ def test_widget_gets_brief_prompt_and_home_gets_template(client, monkeypatch):
         return {"success": True, "source": "api", "data": "답변"}
 
     monkeypatch.setattr(support_chat_service.ai_client, "chat", fake_chat)
-    client.post("/api/support-chat", json={"question": "바이어와 첫 거래인데 계약서에 뭘 더 넣을까요", "style": "brief"})
-    client.post("/api/support-chat", json={"question": "바이어와 첫 거래인데 계약서에 뭘 더 넣을까요"})
+    client.post("/api/support-chat", json={"question": "바이어가 갑자기 연락이 끊기면 어떻게 하나요", "style": "brief"})
+    client.post("/api/support-chat", json={"question": "바이어가 갑자기 연락이 끊기면 어떻게 하나요"})
 
     (widget_prompt, widget_tokens), (home_prompt, home_tokens) = sent
     assert widget_prompt == support_chat_service.BRIEF_SYSTEM_PROMPT
@@ -118,7 +124,7 @@ def test_offline_when_no_key(app, monkeypatch):
         assert intro["available"] is False
         assert "AI_API_KEY" in intro["offline_note"]
 
-        result = support_chat_service.ask("바이어와 첫 거래인데 계약서에 뭘 더 넣을까요")
+        result = support_chat_service.ask("바이어가 갑자기 연락이 끊기면 어떻게 하나요")
         assert result["success"] is False
         assert "AI_API_KEY" in result["message"]
 
@@ -127,7 +133,7 @@ def test_endpoint_returns_the_answer(client, monkeypatch):
     monkeypatch.setattr(support_chat_service.ai_client, "chat",
                         lambda messages, **kw: {"success": True, "source": "api",
                                                 "data": "FOB는 본선 인도입니다."})
-    response = client.post("/api/support-chat", json={"question": "바이어와 첫 거래인데 계약서에 뭘 더 넣을까요"})
+    response = client.post("/api/support-chat", json={"question": "바이어가 갑자기 연락이 끊기면 어떻게 하나요"})
     assert response.status_code == 200
     body = response.get_json()
     assert body["success"] is True

@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% from "_macros.html" import doc_status, source_badge %}
 {% block title %}{{ document.title }} · {{ shipment.shipment_id }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/contract.css') }}">{% endblock %}
 
 {#- 서식 한 칸. 보기 모드는 값만, 수정 모드는 입력칸을 그립니다. -#}
 {% macro box(f, edit) %}
@@ -107,5 +108,29 @@
       <button type="button" class="button ghost" data-print>인쇄 / PDF 저장</button>
     </div>
   {% endif %}
+
+  {# 계약서 조항 점검.
+     서류가 다 맞아도 돈을 떼이거나 물리는 자리는 계약서입니다. 그런데 그 문장은
+     서류 어디에도 안 나와, 이 화면만 보고는 알 수가 없었습니다. 이 건의
+     인코텀즈로 걸리는 조항을 짚고, 올린 계약서를 읽어 판정합니다. #}
+  <section class="card no_print" data-contract-card>
+    <h2><span aria-hidden="true">📜</span> 계약서 조항 점검
+      <small class="muted">{{ shipment.incoterms or '조건 미정' }} 기준</small></h2>
+    <div data-contract-panel></div>
+  </section>
 {% endblock %}
-{% block scripts %}<script src="{{ static_url('js/document.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ static_url('js/document.js') }}"></script>
+<script src="{{ static_url('js/contract_clauses.js') }}"></script>
+<script>
+  (function () {
+    var host = document.querySelector("[data-contract-panel]");
+    if (host && window.ForwardusContractClauses) {
+      window.ForwardusContractClauses.mount(host, {
+        incoterms: {{ (shipment.incoterms or '')|tojson }},
+        clausesUrl: {{ url_for('contract.clauses')|tojson }},
+        reviewUrl: {{ url_for('contract.review')|tojson }},
+        exportUrl: {{ url_for('contract.export')|tojson }}
+      });
+    }
+  })();
+</script>{% endblock %}
