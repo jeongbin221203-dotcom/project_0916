@@ -8,7 +8,8 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
 from app.extensions import db
-from app.routes import collector_response, error_response, load_shipment, json_body
+from app.routes import (collector_response, error_response, json_body,
+                        load_shipment, once_only, remember_once)
 from app.routes.auth import current_user, login_required
 from app.services import (ServiceError, customs_filing_service, document_draft_service,
                           document_extract_service, document_service, document_source_service,
@@ -222,10 +223,17 @@ def start():
         # 화면이 이름을 따로 안 보냈으면 초안에 적어 둔 이름을 씁니다.
         payload = {**payload,
                    "project_name": document_draft_service.title_of(viewer, draft_id)}
+    # 두 번 눌러도 한 번만 만듭니다. (app/routes/__init__.py 의 주석을 보세요)
+    already = once_only("doc-start", payload)
+    if already:
+        return jsonify({"success": True, "data": {
+            "shipment_id": already, "reused": True,
+            "url": url_for("document.center", shipment_id=already)}})
     try:
         result = document_start_service.create(payload, user_id=viewer.id)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
+    remember_once("doc-start", payload, result["shipment_id"])
     if draft_id:
         document_draft_service.promote(viewer, draft_id,
                                        shipment_service.get_or_404(result["shipment_id"],

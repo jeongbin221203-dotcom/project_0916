@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template, request, url_for
 
-from app.routes import collector_response, error_response, json_body
+from app.routes import (collector_response, error_response, json_body,
+                        once_only, remember_once)
 from app.routes.auth import current_user, login_required
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
@@ -189,11 +190,17 @@ def api_departure_check():
 @planning_bp.post("/api/shipments")
 @login_required
 def api_create_shipment():
+    payload = json_body()
+    # 두 번 눌러도 한 번만 만듭니다. (app/routes/__init__.py 의 주석을 보세요)
+    already = once_only("shipment", payload)
+    if already:
+        return jsonify({"success": True, "data": {"shipment_id": already,
+                                                  "reused": True}})
     try:
-        shipment = planning_service.create_shipment(json_body(),
-                                                    user_id=current_user().id)
+        shipment = planning_service.create_shipment(payload, user_id=current_user().id)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
+    remember_once("shipment", payload, shipment.shipment_id)
     return jsonify({
         "success": True,
         "data": {
