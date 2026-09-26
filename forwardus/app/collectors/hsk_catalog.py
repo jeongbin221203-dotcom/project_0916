@@ -12,6 +12,7 @@ data/build_hsk.py가 만든 data/mock/hsk_codes.json을 읽습니다. 쓰는 곳
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from app.collectors.base_client import load_mock
@@ -163,15 +164,78 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[dict] | None:
     hint = EVERYDAY.get(_plain(text), ())
     rows: list[dict] = []
     for word in hint:
-        rows += [row for row in _match(catalog, [_plain(word)], True, limit)
+        rows += [row for row in _match(catalog, _words_of(word), True, limit)
                  if row not in rows]
 
     if len(text) < (MIN_KOREAN_LENGTH if korean else MIN_ENGLISH_LENGTH):
         return rows[:limit]
 
-    words = [_plain(word) for word in text.split() if word.strip()]
-    rows += [row for row in _match(catalog, words, korean, limit) if row not in rows]
+    # 물어보듯 적는 말을 걷어냅니다.
+    #
+    # _match 는 **모든 낱말**이 맞아야 합니다. 그래서 "칫솔 hs코드"라고 적으면
+    # '칫솔'은 맞는데 'hs코드'가 품목표에 없어 통째로 아무것도 안 나왔습니다.
+    # 무역을 모르는 분일수록 이렇게 적습니다. 226개 낱말에 말버릇을 얹어 보니
+    # 132가지가 그랬습니다. 걷어낸 뒤 남는 말이 없으면 원래대로 봅니다.
+    # (2026-09-26)
+    raw = [_plain(word) for word in text.split() if word.strip()]
+    words = [word for word in raw if not _is_noise(word)] or raw
+    rows += _look(catalog, words, korean, limit, rows, text)
+    if rows:
+        return rows[:limit]
+
+    # 조사를 떼고 한 번 더 봅니다.
+    #
+    # "양파는 몇 번이에요"는 '양파는'으로 갈립니다. 품목표에는 '양파'뿐이라
+    # 아무것도 안 나왔습니다. 무역을 모르는 분일수록 이렇게 적습니다.
+    # **한 건도 못 찾았을 때만** 떼어 봅니다. 먼저 떼면 '고구마'의 '마'처럼
+    # 진짜 이름의 끝글자를 잘라 엉뚱한 것이 걸립니다. (2026-09-26)
+    bare = [_strip_particle(word) for word in words]
+    if bare != words:
+        rows += _look(catalog, bare, korean, limit, rows, text)
     return rows[:limit]
+
+
+# 낱말 끝에 붙는 조사. 긴 것부터 봅니다.
+PARTICLES = ("으로는", "에서는", "으로", "에서", "라는", "이라", "은", "는", "이", "가",
+             "을", "를", "의", "도", "만", "와", "과", "로", "에")
+MIN_BARE = 2          # 떼고 나서 이만큼은 남아야 합니다
+
+
+def _strip_particle(word: str) -> str:
+    for particle in PARTICLES:
+        if not word.endswith(particle):
+            continue
+        bare = word[: -len(particle)]
+        # 한 글자만 남는 것은 사전에 적어 둔 말일 때만 인정합니다.
+        # ("게는" → "게" 는 되고, "가위" 의 "가" 를 떼는 일은 없습니다)
+        if len(bare) >= MIN_BARE or bare in EVERYDAY:
+            return bare
+    return word
+
+
+def _words_of(term: str) -> list[str]:
+    """사전이 가리키는 말을 낱말로 나눕니다.
+
+    **붙여서 찾으면 안 됩니다.** "새의 알"을 "새의알"로 붙이면 품목표의
+    "새의 알"과 안 맞습니다. 사전에 두 낱말짜리를 적어 두고도 한 건도 안
+    나오던 까닭입니다. (2026-09-26)
+    """
+
+    return [_plain(part) for part in str(term).split() if part.strip()]
+
+
+def _look(catalog, words, korean, limit, seen, text) -> list[dict]:
+    """일상어 사전을 먼저 보고, 그다음 품목표에서 찾습니다."""
+
+    found: list[dict] = []
+    # 낱말 하나로 줄었으면 일상어 사전을 한 번 더 봅니다. ("칫솔 hs코드" → "칫솔")
+    if len(words) == 1 and words[0] != _plain(text):
+        for word in EVERYDAY.get(words[0], ()):
+            found += [row for row in _match(catalog, _words_of(word), True, limit)
+                      if row not in seen and row not in found]
+    found += [row for row in _match(catalog, words, korean, limit)
+              if row not in seen and row not in found]
+    return found
 
 
 def _match(catalog, words, korean, limit) -> list[dict]:
@@ -287,6 +351,26 @@ def _hit(word: str, spaced: str, plain: str) -> bool:
 # **분류를 정해 주는 표가 아닙니다.** 찾는 말만 바꿉니다. 어느 호에 들어가는지는
 # 그대로 품목표가 정합니다. 여기 있는 말은 모두 품목표에서 실제로 찾아지는지
 # 확인한 것입니다. (2026-09-26)
+# 품목이 아니라 **묻는 말**입니다. 찾을 때 이 낱말은 빼고 봅니다.
+# (_plain 을 거친 모양 — 띄어쓰기·기호가 지워진 상태로 비교합니다)
+QUERY_NOISE = {
+    "hs", "hs코드", "hscode", "hs코드는", "hs번호", "code", "코드", "코드는", "코드가",
+    "세번", "세번은", "번호", "번호는", "번호가", "몇번", "몇번이에요", "몇번인가요",
+    "몇", "번", "수출", "수출하려는데", "수출할때", "수출하는데", "수입", "수입하려는데",
+    "알려줘", "알려주세요", "찾아줘", "찾아주세요", "검색", "조회", "뭐야", "뭔가요",
+    "무엇인가요", "어떻게", "어떤가요", "입니다", "인가요", "이에요", "예요",
+    "품목", "품목번호", "관세", "관세율", "hsk",
+}
+
+# 묻는 말끝. "양파는 몇 번이에요" 의 '번이에요' 처럼 어미가 붙어 오면
+# 위 목록으로는 못 거릅니다. 모양으로 봅니다. (2026-09-26)
+QUERY_TAIL = re.compile(
+    r"^(몇)?(번|번호|코드|세번)?(이|인|입|예)?(에요|예요|가요|인가요|입니까|니까|야|니|요)$")
+
+
+def _is_noise(word: str) -> bool:
+    return word in QUERY_NOISE or bool(QUERY_TAIL.match(word))
+
 EVERYDAY = {
     "양주": ("위스키", "브랜디", "보드카"),
     "막걸리": ("탁주",),
@@ -339,6 +423,79 @@ EVERYDAY = {
     "화장품": ("기초화장용", "메이크업용 제품류"),
     "스킨": ("기초화장용",),
     "로션": ("기초화장용",),
+
+    # 2차 확대 — 일상어 226개로 확인해 48개가 아무것도 못 찾았습니다.
+    # 무역을 모르는 분이 아는 말로 찾을 수 있어야 합니다. 여기 있는 말은
+    # 모두 품목표에서 실제로 찾아지는지 하나씩 확인했습니다. (2026-09-26)
+    # 먹을 것
+    "밀": ("밀과 메슬린",),
+    "콩": ("대두",),
+    "무": ("순무",),
+    "배": ("마르멜로",),
+    "감": ("단감",),
+    "귤": ("감귤류", "만다린"),
+    "소고기": ("쇠고기",),
+    "쇠고기": ("쇠고기",),
+    "닭고기": ("가금", "육과 설육"),
+    "오리고기": ("오리",),
+    "계란": ("새의 알",),
+    "달걀": ("새의 알",),
+    "게": ("갑각류",),
+    "참치": ("다랑어",),
+    "빵": ("빵·파이",),
+    "생수": ("광천수", "탄산수"),
+    "마요네즈": ("소스",),
+    "케첩": ("소스",),
+    # 씻고 바르는 것
+    "바디워시": ("비누", "유기계면활성제품"),
+    "물티슈": ("부직포", "화장지"),
+    "생리대": ("위생타월",),
+    "섬유유연제": ("조제세제", "유연제"),
+    "표백제": ("표백", "과산화"),
+    "방향제": ("조제향료", "탈취"),
+    # 입는 것
+    "옷": ("의류", "슈트"),
+    "원피스": ("드레스",),
+    "스웨터": ("풀오버", "카디건"),
+    "목도리": ("스카프", "머플러"),
+    "슬리퍼": ("실내화", "신발류"),
+    "카펫": ("양탄자", "바닥깔개"),
+    # 집에 두는 것
+    "선풍기": ("송풍기",),
+    "전자레인지": ("마이크로웨이브", "오븐"),
+    "믹서기": ("분쇄기", "믹서"),
+    "가습기": ("가습", "공기조절"),
+    "제습기": ("제습", "공기조절"),
+    "스피커": ("확성기",),
+    "옷장": ("침실용 가구",),
+    "책장": ("사무실용 가구",),
+    "공책": ("연습장",),
+    "노트": ("연습장",),
+    "풀": ("접착제", "글루"),
+    "비닐봉지": ("봉지", "포장용"),
+    # 몸에 쓰는 것
+    "영양제": ("비타민",),
+    "체온계": ("온도계",),
+    # 만드는 데 쓰는 것
+    "철": ("철강", "선철"),
+    "못": ("스테이플",),
+    "철사": ("와이어",),
+    "약": ("의약품",),
+    "헬멧": ("헬멧", "안전모"),
+    # 영어로 적는 분도 있습니다. 품목표 영문란에 없는 흔한 말만 담습니다.
+    "socks": ("양말",),
+    "sock": ("양말",),
+    "toothbrush": ("칫솔",),
+    "toothpaste": ("치약",),
+    "instantnoodle": ("면류",),
+    "ramen": ("면류",),
+    "ramyun": ("면류",),
+    "오토바이": ("모터사이클",),
+    "바이크": ("모터사이클",),
+    "휠체어": ("장애인용 차량", "신체장애자용"),
+    "공": ("볼", "운동용구"),
+    "축구공": ("볼", "운동용구"),
+    "농구공": ("볼", "운동용구"),
 }
 
 
