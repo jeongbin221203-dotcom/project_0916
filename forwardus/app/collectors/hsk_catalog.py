@@ -318,3 +318,34 @@ def _spaced(text: str) -> str:
     for mark in ("ㆍ", "·", ",", "，", ";", "/"):
         text = text.replace(mark, BREAK)
     return text
+
+
+def by_prefix(digits: str, limit: int = MAX_RESULTS) -> list[dict]:
+    """앞자리로 시작하는 줄들. 6자리 HS를 넣었을 때 한국 세번 후보를 보여 줍니다.
+
+    사람은 나라 공통인 6자리만 알고 오는 일이 많습니다. 우리 신고는 10자리라
+    "그 6자리 아래에 이런 것들이 있습니다"를 보여 줘야 고를 수 있습니다.
+    """
+
+    catalog = _catalog()
+    head = "".join(ch for ch in str(digits or "") if ch.isdigit())
+    if catalog is None or not head:
+        return []
+    found = [code for code in catalog["codes"] if code.startswith(head)]
+    found.sort()
+    return [_row(catalog, code) for code in found[:limit]]
+
+
+def heading_name(digits: str) -> str:
+    """그 자리의 상위 이름. 없으면 빈 글자입니다. ("4004" -> 고무 웨이스트…)"""
+
+    catalog = _catalog()
+    head = "".join(ch for ch in str(digits or "") if ch.isdigit())
+    if catalog is None or not head:
+        return ""
+    levels = catalog.get("levels") or {}
+    for size in (10, 9, 8, 7, 6, 5, 4, 2):
+        key = head[:size]
+        if len(key) == size and key in levels:
+            return levels[key][0]
+    return ""

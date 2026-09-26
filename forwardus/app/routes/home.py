@@ -197,19 +197,39 @@ def api_support_chat():
     # 지금 작성 중인 건을 AI에게 함께 넘깁니다. 화면 머리글("Busan -> Istanbul
     # 기준으로 답했습니다")과 같은 값입니다. 안 넘기면 AI는 지난 대화 요약만 보고,
     # 머리글은 이스탄불인데 본문은 로스앤젤레스라고 답하는 일이 생깁니다.
-    current = {}
+    #
+    # **이번 대화에서 말한 것이 먼저입니다.**
+    #   "부산에서 로스앤젤레스로 보냅니다" 라고 적은 뒤 "치약 500박스…"를
+    #   물었더니, 머리글에 엉뚱하게 "Busan → Kaohsiung · 담배"가 붙었습니다.
+    #   저장해 둔 지난 건(대만 담배)을 보고 있었기 때문입니다. 이번 말에서 읽은
+    #   값을 저장분 위에 덮어씁니다. 저장분은 **빈 자리를 메우는 데만** 씁니다.
+    #   (대화에서 읽은 값을 저장하는 일(capture)은 답을 만든 **뒤**에 일어나서,
+    #    바로 그 말을 한 차례에는 저장분이 아직 옛것입니다) (2026-09-26)
+    at, goods = {}, {}
     if viewer is not None:
         draft = work_draft_service.load(viewer) or {}
-        at = draft.get("fields") or {}
-        goods = (draft.get("items") or [{}])[0] if draft.get("items") else {}
-        if at.get("origin_name") and at.get("destination_name"):
-            current["구간"] = f"{at['origin_name']} -> {at['destination_name']}"
-        if at.get("destination_country"):
-            current["도착국"] = at["destination_country"]
-        if goods.get("product_description"):
-            current["품목"] = goods["product_description"]
-        if at.get("transport_mode"):
-            current["운송"] = "항공" if at["transport_mode"] == "AIR" else "해상"
+        at = dict(draft.get("fields") or {})
+        goods = dict((draft.get("items") or [{}])[0] if draft.get("items") else {})
+    said = chat_capture_service.read(question) or {}
+    said_fields = {key: value for key, value in (said.get("fields") or {}).items() if value}
+    said_item = (said.get("items") or [{}])[0] if said.get("items") else {}
+    # **말한 쪽만** 바꿉니다. 한 짝으로 통째로 지우면, "부산에서 로스앤젤레스로"
+    # 에서 도착지만 읽힌 경우 출발지가 통째로 날아갑니다. 새로 말한 곳은 덮고
+    # 말하지 않은 곳은 그대로 둡니다 — 출발항은 대개 그대로이고, 위험한 것은
+    # **묵은 도착지**입니다.
+    at.update(said_fields)
+    if said_item.get("product_description"):
+        goods = dict(said_item)
+
+    current = {}
+    if at.get("origin_name") and at.get("destination_name"):
+        current["구간"] = f"{at['origin_name']} -> {at['destination_name']}"
+    if at.get("destination_country"):
+        current["도착국"] = at["destination_country"]
+    if goods.get("product_description"):
+        current["품목"] = goods["product_description"]
+    if at.get("transport_mode"):
+        current["운송"] = "항공" if at["transport_mode"] == "AIR" else "해상"
     try:
         result = support_chat_service.ask(question, history,
                                           brief=payload.get("style") == "brief",
@@ -252,9 +272,9 @@ def api_support_chat():
         # 둘뿐입니다. 나머지(knowledge·faq·cache·clarification)는 보지도 않습니다.
         uses_context = result.get("source") in ("api", "calculated")
         if viewer is not None and uses_context:
-            kept = work_draft_service.load(viewer) or {}
-            fields = kept.get("fields") or {}
-            item = (kept.get("items") or [{}])[0] if kept.get("items") else {}
+            # 위에서 만든 값(이번 말 > 저장분)을 그대로 씁니다. 여기서 저장분을
+            # 다시 읽으면, AI에게 넘긴 기준과 머리글이 서로 달라집니다.
+            fields, item = at, goods
             assumed = {}
             if not (told.get("origin_code") and told.get("destination_code")):
                 if fields.get("origin_name") and fields.get("destination_name"):

@@ -505,26 +505,45 @@
     score();
   }
 
-  function showRestoredNote(savedAt) {
+  function savedWhen(savedAt) {
+    if (!savedAt) return "";
+    return new Date(savedAt).toLocaleString("ko-KR", { month: "long", day: "numeric",
+                                                      hour: "2-digit", minute: "2-digit" });
+  }
+
+  async function forgetEverything() {
+    forgetLocal();
+    // 대화가 들고 있는 서류 초안도 비웁니다. 이걸 두면 홈에 갔다 오는 순간
+    // 칸이 다시 채워져, 방금 비운 것이 헛일이 됩니다.
+    if (window.ForwardusChat && window.ForwardusChat.clearDocDraft) {
+      window.ForwardusChat.clearDocDraft();
+    }
+    if (window.ForwardusWorkDraft) await window.ForwardusWorkDraft.clear();
+  }
+
+  /* 적어 둔 것이 있다고 **알리기만** 합니다. 채우는 것은 누를 때입니다.
+     화면은 늘 빈 칸으로 시작합니다. 지난 값이 미리 차 있으면
+     "이게 언제 적은 것이지?"를 확인하지 않고 그 위에 덧쓰게 됩니다. */
+  function offerDraft(draft) {
     const note = document.createElement("div");
-    note.className = "flash flash_success doc_restored";
+    note.className = "flash doc_restored doc_offer";
     note.setAttribute("role", "status");
-    const when = savedAt
-      ? new Date(savedAt).toLocaleString("ko-KR", { month: "long", day: "numeric",
-                                                   hour: "2-digit", minute: "2-digit" })
-      : "";
-    note.innerHTML = `📝 적던 내용을 불러왔습니다.${when ? ` <b>${escapeHtml(when)}</b> 저장분입니다.` : ""}`
-      + ` <button type="button" class="link_button" data-doc-clear>비우고 새로 시작</button>`;
+    const when = savedWhen(draft.savedAt);
+    note.innerHTML = `📝 적어 두신 내용이 있습니다.${when ? ` <b>${escapeHtml(when)}</b> 저장분입니다.` : ""}`
+      + ` <button type="button" class="button small primary" data-doc-load>불러오기</button>`
+      + ` <button type="button" class="link_button" data-doc-clear>지우기</button>`;
     panel.prepend(note);
+    note.querySelector("[data-doc-load]").addEventListener("click", () => {
+      applyDraft(draft);
+      // 보던 갈래로 돌아갑니다. (탭이 아니라 그 구역으로 스크롤합니다)
+      if (draft.tab) goToSection(draft.tab);
+      note.className = "flash flash_success doc_restored";
+      note.textContent = when ? `📝 ${when} 저장분을 불러왔습니다.` : "📝 적어 두신 내용을 불러왔습니다.";
+    });
     note.querySelector("[data-doc-clear]").addEventListener("click", async () => {
-      forgetLocal();
-      // 대화가 들고 있는 서류 초안도 비웁니다. 이걸 두면 홈에 갔다 오는 순간
-      // 칸이 다시 채워져, 방금 비운 것이 헛일이 됩니다.
-      if (window.ForwardusChat && window.ForwardusChat.clearDocDraft) {
-        window.ForwardusChat.clearDocDraft();
-      }
-      if (window.ForwardusWorkDraft) await window.ForwardusWorkDraft.clear();
-      window.location.reload();
+      await forgetEverything();
+      note.className = "flash doc_restored";
+      note.textContent = "📝 적어 둔 내용을 지웠습니다.";
     });
   }
 
@@ -588,10 +607,10 @@
             fields: { ...local.fields, ...server.fields },
             items: (server.items && server.items.length) ? server.items : local.items });
     if (!newest || (!Object.keys(newest.fields || {}).length && !(newest.items || []).length)) return;
-    applyDraft(newest);
-    // 보던 갈래로 돌아갑니다. (탭이 아니라 그 구역으로 스크롤합니다)
-    if (newest.tab) goToSection(newest.tab);
-    showRestoredNote(newest.savedAt);
+    // **바로 채우지 않습니다.** 들어오자마자 지난 값이 차 있으면, 새 건을 쓰려던
+    // 사람은 그게 언제 적은 것인지도 모른 채 그 위에 덧씁니다. 무엇이 있는지만
+    // 알리고, 누를 때 채웁니다. (2026-09-26 사용자 결정)
+    offerDraft(newest);
   }
 
   /* ----- Consignee ↔ Buyer 자동 보완 -----

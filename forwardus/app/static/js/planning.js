@@ -569,10 +569,41 @@
   });
   refreshCountryOptions();
 
+  /* 적어 둔 것이 있다고 **알리기만** 합니다. 채우는 것은 누를 때입니다.
+     화면은 늘 빈 칸으로 시작합니다. 들어오자마자 지난 값이 차 있으면, 새 건을
+     내려던 사람이 그게 언제 적은 것인지도 모른 채 그 위에 덧씁니다.
+     (2026-09-26 사용자 결정) */
   async function restoreDraft() {
     const draft = loadDraft();
     if (!draft) return;
+    const note = document.createElement("div");
+    note.className = "flash prefill_note";
+    note.setAttribute("role", "status");
+    const when = draft.savedAt
+      ? new Date(draft.savedAt).toLocaleString("ko-KR", { month: "long", day: "numeric",
+                                                         hour: "2-digit", minute: "2-digit" })
+      : "";
+    // 서류 작성에서 넘어온 값이면 어디서 온 것인지 밝힙니다.
+    const from = draft.source ? `${SOURCE_LABELS[draft.source] || "서류 작성"}에서 적은 내용이 있습니다.`
+      : "적어 두신 견적이 있습니다.";
+    note.innerHTML = `📦 ${from}${when ? ` <b>${when}</b> 저장분입니다.` : ""}`
+      + ` <button type="button" class="button small primary" data-plan-load>불러오기</button>`
+      + ` <button type="button" class="link_button" data-plan-clear>지우기</button>`;
+    form.prepend(note);
+    note.querySelector("[data-plan-load]").addEventListener("click", async () => {
+      await applyDraftValues(draft);
+      note.className = "flash flash_success prefill_note";
+      note.textContent = when ? `📦 ${when} 저장분을 불러왔습니다.` : "📦 적어 두신 견적을 불러왔습니다.";
+    });
+    note.querySelector("[data-plan-clear]").addEventListener("click", async () => {
+      try { draftStore.removeItem(DRAFT_KEY); } catch (error) { /* 무시 */ }
+      if (window.ForwardusWorkDraft) await window.ForwardusWorkDraft.clear();
+      note.className = "flash prefill_note";
+      note.textContent = "📦 적어 둔 견적을 지웠습니다.";
+    });
+  }
 
+  async function applyDraftValues(draft) {
     DRAFT_FIELDS.forEach((name) => {
       const input = form.elements[name];
       if (input && draft.fields && draft.fields[name] !== undefined) input.value = draft.fields[name];
@@ -1963,14 +1994,8 @@
      이 화면에서 그 뒤에 고친 것이 있으면 그것이 더 새것이라 덮지 않습니다. */
   const SOURCE_LABELS = { document: "서류 작성 화면", upload: "올린 서류", chat: "대화" };
 
-  function showPrefillNote(source) {
-    const note = document.createElement("div");
-    note.className = "flash flash_success prefill_note";
-    note.setAttribute("role", "status");
-    note.textContent = `📄 ${SOURCE_LABELS[source] || "서류 작성"}에서 적은 내용으로 출발·도착지, `
-      + "Incoterms, 화물 칸을 미리 채웠습니다. 맞는지 확인해 주세요.";
-    form.prepend(note);
-  }
+  // (SOURCE_LABELS는 restoreDraft의 안내 한 줄이 씁니다. 예전에는 여기서 따로
+  //  "미리 채웠습니다" 줄을 띄웠는데, 이제 채우는 것은 사람이 누를 때입니다.)
 
   async function adoptWorkDraft() {
     if (!window.ForwardusWorkDraft) return;
@@ -1999,7 +2024,8 @@
     } catch (error) {
       return;
     }
-    showPrefillNote(shared.source);
+    // 여기서는 **저장만** 합니다. 알리고 채우는 것은 restoreDraft의 한 줄이
+    // 맡습니다. 두 줄이 겹쳐 뜨면 어느 쪽을 눌러야 하는지 알 수 없습니다.
   }
 
   // 복원은 recalc·openStep까지 모두 선언된 뒤에 실행해야 합니다.

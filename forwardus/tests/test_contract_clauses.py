@@ -172,3 +172,45 @@ def test_계약서가_아닌_글자파일은_이유를_밝힌다(app):
             attachment_service.handle("memo.txt", "오늘 할 일".encode("utf-8"),
                                       message="", mode="consult")
     assert "계약서" in str(caught.value)
+
+
+# ── 부호만 적어 보냈을 때 ──────────────────────────────────────────────────
+
+def test_HS부호만_적어_보내면_그_부호로_답한다(app):
+    from app.services import support_chat_service
+
+    with app.app_context():
+        answer = support_chat_service.ask("4004001010")
+    assert answer["success"] and answer["source"] == "hs_code"
+    body = answer["data"]["answer"]
+    assert "4004.00-1010" in body
+    assert "확정 분류가 아닙니다" in body
+
+
+def test_없는_10자리는_앞_6자리_아래를_보여_준다(app):
+    """뒤 네 자리만 틀린 일이 흔합니다. 없다고만 하면 다음에 할 일이 없습니다."""
+
+    from app.services import support_chat_service
+
+    with app.app_context():
+        body = support_chat_service.ask("2402200000")["data"]["answer"]
+    assert "2402.20-1000" in body and "2402.20-9000" in body
+    assert "담배" in body
+
+
+def test_아예_없는_부호에는_요건이_없다고_말하지_않는다(app):
+    """없는 부호를 '걸리는 요건 없음'이라고 하면 안전하다고 말하는 꼴입니다."""
+
+    from app.services import support_chat_service
+
+    with app.app_context():
+        body = support_chat_service.ask("9999999999")["data"]["answer"]
+    assert "이 부호가 없습니다" in body
+    assert "걸리는 요건이 없습니다" not in body
+
+
+def test_부호가_아닌_숫자는_되묻는다(app):
+    from app.services import support_chat_service
+
+    with app.app_context():
+        assert support_chat_service.ask("12345")["source"] == "clarification"

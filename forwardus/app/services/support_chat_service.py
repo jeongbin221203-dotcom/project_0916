@@ -366,6 +366,15 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
                        "url": "/documents"}],
         }}
 
+    # HS부호만 적어 보내는 일이 아주 흔합니다. 그것만으로도 답할 것이 있습니다.
+    #
+    # 예전에는 숫자만 오면 "뜻이 없는 말"로 보고 되물었습니다. 물어본 사람은
+    # 부호를 제대로 적었는데 "무엇이 궁금하신지 적어 주세요"를 받았습니다.
+    # 품목표와 우리 요건표는 AI 없이도 읽을 수 있습니다. (2026-09-26)
+    hs_answer = _hs_code_answer(text)
+    if hs_answer is not None:
+        return hs_answer
+
     # 뜻이 없는 말은 AI를 부르지 않고 되묻습니다.
     #
     # "?"·"..."·"ㅁㄴㅇㄹ"·"a" 같은 것이 그대로 AI로 넘어가고 있었습니다.
@@ -583,6 +592,106 @@ _WORD = re.compile(r"[가-힣]{2,}|[A-Za-z]{3,}")
 
 def _has_meaning(text: str) -> bool:
     return bool(_WORD.search(str(text or "")))
+
+
+# 부호만 적어 보낸 것인지 가립니다. 점·붙임표·빈칸은 빼고 봅니다.
+_ONLY_DIGITS = re.compile(r"^[\d.\-\s]+$")
+HS_LENGTHS = (4, 6, 10)
+
+
+def _hs_code_answer(text: str) -> dict | None:
+    """HS부호만 적어 보냈으면 그 부호로 답합니다. 아니면 None.
+
+    AI를 부르지 않습니다. 품목표(관세청 공표 자료)와 우리 요건표만 읽습니다.
+    **확정 분류가 아닙니다.** 그 말을 답에 함께 답니다.
+    """
+
+    from app.collectors import hsk_catalog
+    from app.processors import export_requirements
+
+    raw = str(text or "").strip()
+    if not raw or not _ONLY_DIGITS.match(raw):
+        return None
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if len(digits) not in HS_LENGTHS:
+        return None
+
+    rows = hsk_catalog.search(digits, limit=1) if len(digits) == 10 else []
+    exact = bool(rows)
+    if not rows:
+        rows = hsk_catalog.by_prefix(digits, limit=8)
+    # 10자리를 못 찾으면 **6자리 아래**를 보여 줍니다. 뒤 네 자리만 틀린 일이
+    # 흔합니다. 예: 2402.20-0000은 없고 -1000(필터담배)·-9000(기타)이 실제 세번입니다.
+    sibling = False
+    if not rows and len(digits) == 10:
+        rows = hsk_catalog.by_prefix(digits[:6], limit=8)
+        sibling = bool(rows)
+    heading = hsk_catalog.heading_name(digits[:6] if sibling else digits)
+    lines = [f"## HS {_dotted(digits)}", ""]
+    if not rows:
+        lines += ["우리가 들고 있는 품목표에는 **이 부호가 없습니다.**",
+                  "자리 수가 맞는지(신고는 10자리), 또는 관세청에서 바뀐 부호인지 "
+                  "확인해 주세요.", ""]
+    elif sibling:
+        lines += [f"이 **10자리는 품목표에 없습니다.** 앞 6자리 "
+                  f"`{_dotted(digits[:6])}` 아래에는 이런 세번이 있습니다. "
+                  "뒤 네 자리를 다시 봐 주세요.", ""]
+        if heading:
+            lines += [f"**{heading}**", ""]
+        lines += [f"- `{row['code']}` {row['name']}" for row in rows]
+        lines.append("")
+    else:
+        if heading:
+            lines += [f"**{heading}**", ""]
+        if len(digits) == 10 and len(rows) == 1:
+            lines += [f"- {rows[0]['name']}", ""]
+            path = [step for step in (rows[0].get("path") or []) if step]
+            if path:
+                lines += ["어디에 속하는지 — " + " › ".join(path), ""]
+        else:
+            lines += [f"이 자리 아래 한국 세번(HSK 10자리) {len(rows)}개입니다. "
+                      "신고는 10자리로 합니다.", ""]
+            lines += [f"- `{row['code']}` {row['name']}" for row in rows]
+            lines.append("")
+
+    # 부호를 못 찾았으면 요건도 말하지 않습니다. 없는 부호에 대고
+    # "걸리는 요건이 없습니다"라고 하면, 없는 것을 안전하다고 말하는 꼴입니다.
+    if rows:
+        found = export_requirements.check(digits, is_dangerous=False)
+        if found:
+            lines += ["### 이 품목에 걸리는 수출요건", ""]
+            for item in found:
+                lines.append(f"- **{item['title']}** — {item.get('agency', '')}")
+                for paper in (item.get("documents") or [])[:4]:
+                    lines.append(f"  - {paper}")
+            lines.append("")
+        else:
+            lines += ["우리 규칙표(HS 류 기준)에서는 걸리는 요건이 없습니다. "
+                      "다만 **세관장확인대상**인지는 관세청에 10자리로 물어야 압니다.", ""]
+
+    lines += ["※ 여기 내용은 품목표를 읽은 것이고 **확정 분류가 아닙니다.** "
+              "최종 분류는 세관이 합니다. 확실하지 않으면 관세청 품목분류 "
+              "사전심사를 받으세요."]
+    return {"success": True, "source": "hs_code", "data": {
+        "answer": "\n".join(lines),
+        "route": "hs_code",
+        "hs_code": digits,
+        "links": [
+            {"label": "🔎 HS CODE 간편 검색 (적합도·도착국 관세 비교)", "url": "/lookup/"},
+            {"label": "관세청 품목분류 (UNI-PASS)",
+             "url": "https://unipass.customs.go.kr/clip/index.do"},
+        ],
+    }}
+
+
+def _dotted(digits: str) -> str:
+    """4004001010 -> 4004.00-1010. 사람이 보는 모양으로 끊어 줍니다."""
+
+    if len(digits) == 10:
+        return f"{digits[:4]}.{digits[4:6]}-{digits[6:]}"
+    if len(digits) == 6:
+        return f"{digits[:4]}.{digits[4:]}"
+    return digits
 
 
 def _incoterms_of(current) -> str:
