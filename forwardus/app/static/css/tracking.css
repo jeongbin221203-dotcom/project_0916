@@ -73,3 +73,11 @@
   border-radius: 13px; background: #fff; }
 .ctr_box b { font-size: 14px; letter-spacing: .3px; }
 .ctr_seal { font-size: 11.5px; font-weight: 700; color: var(--blue_dark); }
+
+/* 직접 기록하기 — 오른쪽 한 장.
+   예전에는 카드 두 장이 위아래로 놓여, 왼쪽 Timeline 한 장과 테두리가 어긋나
+   보였습니다. 둘 다 사람이 손으로 적는 자리라 나눌 이유도 없었습니다. */
+.track_manual > h2 { margin-bottom: 4px; }
+.track_manual > h3 { margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid var(--line);
+  font-size: 14px; color: var(--muted); }
+.track_manual > h3:first-of-type { margin-top: 14px; }

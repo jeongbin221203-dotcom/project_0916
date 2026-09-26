@@ -55,26 +55,29 @@
       </ol>
     </section>
 
-    <aside class="stack">
-      <section class="card">
-        <h3>ETA 변경 입력 (Manual)</h3>
-        <form method="post" action="{{ url_for('tracking.update_eta', shipment_id=shipment.shipment_id) }}" class="stack">
-          <label class="field"><span class="field_label">새 ETA</span><input type="date" name="new_eta" required></label>
-          <button class="button ghost block">ETA 변경 기록</button>
-        </form>
-      </section>
-      <section class="card">
-        <h3>이벤트 수동 기록</h3>
-        <form method="post" action="{{ url_for('tracking.add_event', shipment_id=shipment.shipment_id) }}" class="stack">
-          <label class="field"><span class="field_label">이벤트</span>
-            <select name="event_code">{% for code, label in event_options %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
-          </label>
-          <label class="field"><span class="field_label">일자</span><input type="date" name="event_date" required></label>
-          <label class="field"><span class="field_label">위치</span><input type="text" name="location" maxlength="200"></label>
-          <label class="field"><span class="field_label">메모</span><input type="text" name="description" maxlength="500"></label>
-          <button class="button ghost block">기록</button>
-        </form>
-      </section>
+    {# 오른쪽은 **한 장**입니다. 둘 다 "사람이 직접 적는" 자리라 갈라 둘 이유가
+       없고, 카드 두 장이면 왼쪽 한 장과 높이·테두리가 어긋나 보입니다. #}
+    <aside class="card track_manual">
+      <h2>직접 기록하기</h2>
+      <p class="muted small">Tracking 조회로 안 들어오는 것을 손으로 적습니다.
+        적은 것은 위 Timeline에 그대로 올라갑니다.</p>
+
+      <h3>ETA 변경</h3>
+      <form method="post" action="{{ url_for('tracking.update_eta', shipment_id=shipment.shipment_id) }}" class="stack">
+        <label class="field"><span class="field_label">새 ETA</span><input type="date" name="new_eta" required></label>
+        <button class="button ghost block">ETA 변경 기록</button>
+      </form>
+
+      <h3>이벤트</h3>
+      <form method="post" action="{{ url_for('tracking.add_event', shipment_id=shipment.shipment_id) }}" class="stack">
+        <label class="field"><span class="field_label">이벤트</span>
+          <select name="event_code">{% for code, label in event_options %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+        </label>
+        <label class="field"><span class="field_label">일자</span><input type="date" name="event_date" required></label>
+        <label class="field"><span class="field_label">위치</span><input type="text" name="location" maxlength="200"></label>
+        <label class="field"><span class="field_label">메모</span><input type="text" name="description" maxlength="500"></label>
+        <button class="button ghost block">기록</button>
+      </form>
     </aside>
   </div>
 

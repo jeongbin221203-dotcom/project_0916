@@ -370,6 +370,7 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     if not quiet and not wants_data(text):
         found = knowledge_service.lookup(text)
         if found and early.get("candidates") and not (found.get("render")
+                                                      or found.get("direct")
                                                       or found["key"].startswith("country-")):
             found = None
         if found:

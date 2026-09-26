@@ -127,7 +127,10 @@ def _parse(path: Path) -> dict | None:
             continue
         name, _, value = line.partition(":")
         name, value = name.strip().lower(), value.strip()
-        if name in ("title", "ask", "render"):
+        # direct: 이 답은 FAQ가 찾아 둔 자료보다 낫다는 표시입니다.
+        # 비교 질문("FOB랑 CIF 차이")처럼, 자료를 요약하는 것보다 우리가 써 둔
+        # 답을 그대로 내보내는 편이 정확한 주제에만 답니다. (2026-09-26)
+        if name in ("title", "ask", "render", "direct"):
             entry[name] = value
         elif name in ("keywords", "must", "see"):
             entry[name] = _split(value)

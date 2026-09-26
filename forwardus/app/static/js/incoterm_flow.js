@@ -68,8 +68,12 @@
       // 바로 아래 "위험 이전"은 같은 자리에 찍히니, 짝이 안 맞아 빠진 것처럼 보였습니다.
       + mark(costEnd, "비용 이전", steps);
     bars.querySelector('[data-flow-bar="risk"]').innerHTML = runs(risks, "r", RISK_TEXT)
-      + (riskFrom === riskTo ? mark(riskFrom, "위험 이전", steps)
-        : mark(riskFrom, "위험 이전 범위", steps) + mark(riskTo, "", steps));
+      // 선은 **판매자 위험이 끝나는 지점 하나만** 긋습니다. 거기까지는 확정입니다.
+      // 예전에는 빗금 띠(인도지에 따라)의 오른쪽 끝에도 이름표 없는 검은 선을
+      // 하나 더 그었습니다. 그 끝은 약정 장소에 따라 달라져 정해진 지점이 아닌데,
+      // 검은 세로선은 "여기서 넘어간다"는 뜻이라 없는 지점을 있다고 말했습니다.
+      // 범위는 빗금 띠가 이미 보여 줍니다. (2026-09-26)
+      + mark(riskFrom, riskFrom === riskTo ? "위험 이전" : "위험 이전 범위", steps);
     bars.hidden = false;
     if (legend) {
       legend.hidden = false;

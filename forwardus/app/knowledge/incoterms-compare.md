@@ -5,6 +5,7 @@ must: FOB CIF, CIF FOB, FOB랑 CIF, CIF랑 FOB, FOB와 CIF, CFR CIF, CFR이랑 C
 ask: FOB랑 CIF는 어떻게 다른가요?
 links: 📦 운송 예상 견적에서 조건별 비용 비교|/planning/new ;; 🧭 인코텀즈 11개 한눈에 보기|/lookup/incoterms ;; 관세청 FTA 포털|https://www.customs.go.kr/ftaportalkor/main.do
 see: incoterms-2020, trade-insurance, letter-of-credit
+direct: yes
 ---
 조건끼리 비교할 때는 **"비용이 어디까지인가"와 "위험이 어디서 넘어가는가"를 따로** 보셔야 합니다. 둘이 같은 조건도 있고 다른 조건도 있습니다.
 
