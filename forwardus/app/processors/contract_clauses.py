@@ -419,7 +419,13 @@ def find_in(text: str) -> set[str]:
     쓰여 있다는 뜻은 아닙니다.
     """
 
-    body = str(text or "")
+    # **줄바꿈을 지웁니다.**
+    #
+    # 찾는 말은 "price lower than that offered"처럼 여러 낱말입니다. 그런데
+    # PDF에서 읽은 계약서는 줄이 꺾여 있어 "than"과 "that" 사이에 줄바꿈이
+    # 들어갑니다. 그러면 한 칸(space)을 찾는 규칙이 안 맞아, **실제 계약서에서만
+    # 못 잡습니다.** 시험에서는 한 줄로 넣어 잘 잡혔습니다. (2026-09-26)
+    body = re.sub(r"\s+", " ", str(text or ""))
     if not body.strip():
         return set()
     found = set()

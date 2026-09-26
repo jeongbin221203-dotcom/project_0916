@@ -61,6 +61,10 @@ SPECIFIC_WORDS = ("얼마", "견적", "우리 회사", "저희", "제가", "며�
                   "추천해", "알아봐", "찾아줘", "비교해줘", "비교해 줘",
                   "실적", "통계", "시장 규모",
                   "수출액", "얼마나 팔")
+# 값이 아니라 **얼마나 담기는지**를 묻는 말. 이런 말이 함께 있으면 위 목록을
+# 넘겨 보냅니다. ("20피트 컨테이너에 얼마나 실리나요")
+CAPACITY_WORDS = ("실리", "실을", "실려", "적재", "들어가", "담기", "담을",
+                  "몇 개", "몇 박스", "몇 대", "몇 파렛트", "용량")
 # 참고자료로 넘길 때 잘라내는 길이. 프롬프트가 너무 길면 답이 흐려집니다.
 REFERENCE_CHARS = 2_600
 
@@ -222,8 +226,13 @@ def find(question: str) -> dict | None:
     # 긴 질문은 이 사람 사정이 섞여 있습니다. 글 한 장으로 답하면 동문서답이 됩니다.
     if len(text) > LONG_QUESTION:
         return None
-    # "우리 건은 얼마인가요" 같은 질문도 마찬가지입니다. 글이 아니라 계산이 필요합니다.
-    if any(word in text for word in SPECIFIC_WORDS):
+    # "우리 건은 얼마인가요" 같은 질문은 글이 아니라 계산이 필요합니다.
+    #
+    # 다만 **"얼마나 실리나요"는 값이 아니라 용량을 묻는 말**입니다. '얼마'만
+    # 보고 막았더니 "20피트 컨테이너에 얼마나 실리나요"가 걸려, 컨테이너 규격
+    # 글을 두고도 답을 못 했습니다. 얼마나 **담기는지** 묻는 말은 비켜 주지
+    # 않습니다. (2026-09-26)
+    if any(word in text for word in SPECIFIC_WORDS)             and not any(word in text for word in CAPACITY_WORDS):
         return None
     entry, value = _best(text)
     return entry if entry and value >= ANSWER_SCORE else None

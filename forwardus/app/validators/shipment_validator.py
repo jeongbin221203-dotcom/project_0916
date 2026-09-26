@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Any
 
@@ -152,3 +153,37 @@ def validate_net_weight(value: Any, gross_weight_kg: float) -> float | None:
     if net is not None and net > gross_weight_kg:
         raise ValidationError("순중량은 총중량보다 클 수 없습니다.", "net_weight_kg")
     return net
+
+
+# HS부호로 받아들일 자릿수.
+#   4  호(heading)         품목을 크게 나눈 자리
+#   6  국제 공통            나라가 달라도 같습니다
+#  10  HSK                 우리 수출신고에 쓰는 자리
+# 그 밖의 자릿수는 적다 만 것이거나 잘못 옮겨 적은 것입니다.
+HS_LENGTHS = (4, 6, 10)
+
+
+def parse_hs_code(value: Any, *, field: str = "hs_code") -> str:
+    """HS부호의 모양을 봅니다. 비어 있으면 그대로 둡니다(나중에 적을 수 있습니다).
+
+    왜 필요한가
+      예전에는 길이만 보고 그대로 받았습니다. "401"이나 "ABCDEFGHIJ"를 적어도
+      통과했고, 그 값으로 관세율·수출요건을 찾으러 가고 수출신고서에도
+      실렸습니다. **세관에 가는 값**이라 모양이 틀리면 신고가 반려됩니다.
+      (2026-09-26)
+    """
+
+    text = optional_text(value, max_length=20)
+    if not text:
+        return ""
+    digits = re.sub(r"[.\-\s]", "", text)
+    if not digits.isdigit():
+        raise ValidationError(
+            f"HS부호는 숫자만 적습니다. ('{text[:20]}') "
+            "모르시면 비워 두시고 [HS CODE 조회]에서 찾아보세요.", field)
+    if len(digits) not in HS_LENGTHS:
+        raise ValidationError(
+            f"HS부호는 {', '.join(str(n) for n in HS_LENGTHS)}자리입니다. "
+            f"('{text[:20]}' — {len(digits)}자리) "
+            "우리 수출신고는 10자리(HSK)를 씁니다.", field)
+    return text

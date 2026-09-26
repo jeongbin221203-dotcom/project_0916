@@ -33,6 +33,7 @@ from app.validators.shipment_validator import (
     validate_parties,
     validate_route,
     validate_trade_terms,
+    parse_hs_code,
 )
 
 SORT_OPTIONS = {"recommended": "추천순", "price": "최저 운임순", "duration": "최단 운송기간순"}
@@ -1220,7 +1221,8 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
     product_description = optional_text(cargo_payload.get("product_description"), max_length=300)
     if not product_description:
         raise ValidationError("품명(Product Description)을 입력해주세요.", "product_description")
-    hs_code = optional_text(cargo_payload.get("hs_code"), max_length=20)
+    # 세관에 가는 값입니다. 모양이 틀리면 신고가 반려됩니다. (parse_hs_code 참고)
+    hs_code = parse_hs_code(cargo_payload.get("hs_code"))
     # 순중량은 품목별로 calculate_cargo_lines에서 이미 확인했습니다.
 
     schedule_id = str(payload.get("schedule_id") or "")
@@ -1295,7 +1297,7 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
             line_no=index,
             product_description=optional_text(item.get("product_description"), max_length=300)
             or product_description,
-            hs_code=optional_text(item.get("hs_code"), max_length=20) or hs_code,
+            hs_code=parse_hs_code(item.get("hs_code")) or hs_code,
             package_type=line["package_type"],
             is_dangerous=line["is_dangerous"],
             temperature_requirement=line["temperature_requirement"],
