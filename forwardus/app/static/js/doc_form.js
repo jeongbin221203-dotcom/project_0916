@@ -411,7 +411,15 @@
     itemsBox.appendChild(row);
     renumber();
     addHsButton(row);
-    row.addEventListener("input", () => { invalidateSchedule(); score(); });
+    // **품목을 적는다고 스케줄을 지우지 않습니다.**
+    //
+    // 예전에는 품목 칸에 글자 하나만 쳐도 고른 스케줄이 지워지고 목록을 다시
+    // 그렸습니다. 화면 안내는 "품목은 나중에 적어도 됩니다"인데, 안내대로
+    // 스케줄을 먼저 고르고 품명을 적으면 그 자리에서 선택이 날아갔습니다.
+    // 골라도 골라도 "스케줄을 고르세요"가 다시 떴습니다.
+    // 배가 언제 뜨는지는 항로·날짜·운송수단으로 정해집니다. 품명·수량·단가는
+    // 아무 상관이 없습니다. (2026-09-26 사용자 신고)
+    row.addEventListener("input", score);
     row.addEventListener("change", score);
     applyCurrency();
     askCargo();               // 총액과 같은 자리에서 부피·운임톤도 다시 셉니다
@@ -473,7 +481,7 @@
     if (!event.target.closest("[data-doc-remove-item]")) return;
     event.target.closest(".doc_item").remove();
     renumber();
-    invalidateSchedule();
+    // 품목 한 줄을 지운다고 배가 다른 날 뜨지는 않습니다. 고른 스케줄은 둡니다.
     score();
   });
   panel.querySelector("[data-doc-add-item]").addEventListener("click", () => addItem());
@@ -1002,9 +1010,29 @@
         </span>
         <input type="radio" name="schedule_pick" value="${escapeHtml(item.schedule_id)}">
       </label>`).join("");
+    // **다시 그려도 고른 것은 그대로 둡니다.**
+    //
+    // innerHTML 로 목록을 새로 그리면 체크가 사라집니다. 같은 스케줄이 그대로
+    // 목록에 있는데도 화면에는 아무것도 안 골라진 것처럼 보였고, 그래서
+    // "스케줄을 고르세요"가 다시 떴습니다. (항로가 바뀌어 지워야 할 때는
+    // invalidateSchedule() 이 먼저 chosenSchedule 을 비우므로 여기서 되살릴
+    // 것이 없습니다) (2026-09-26 사용자 신고)
+    let stillThere = false;
     scheduleBox.querySelectorAll("input[name=schedule_pick]").forEach((radio) => {
+      if (chosenSchedule && radio.value === chosenSchedule) {
+        radio.checked = true;
+        stillThere = true;
+      }
       radio.addEventListener("change", () => { chosenSchedule = radio.value; score(); });
     });
+    // 골라 둔 스케줄이 새 목록에 없으면 그 배는 이제 못 탑니다. 조용히 두면
+    // 고른 줄 알고 넘어가다 저장 단계에서 막힙니다.
+    if (chosenSchedule && !stillThere) {
+      chosenSchedule = "";
+      scheduleBox.insertAdjacentHTML("afterbegin",
+        `<p class="doc_error_line">앞서 고르신 스케줄이 목록에 없습니다. 아래에서 다시 골라주세요.</p>`);
+    }
+    score();
   }
 
   panel.querySelector("[data-doc-find-schedule]").addEventListener("click", findSchedules);

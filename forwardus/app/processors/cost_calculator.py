@@ -28,6 +28,21 @@ INSURANCE_RATE = 0.0035
 INSURANCE_MIN_KRW = 10_000
 
 # Which party pays which cost group under each Incoterm (exporter-side view).
+# 적하보험료를 **실제로 누가 내는가.**
+#
+# EXPORTER_PAYS 는 ICC 가 정한 **의무** 표입니다. 보험을 사 줄 의무는 CIF·CIP 에만
+# 있습니다. 그런데 견적서는 "이 돈을 누가 내는가"를 적는 자리라 뜻이 다릅니다.
+#
+#   D조건(DAP·DPU·DDP)은 수출자가 **도착지까지 위험을 집니다.** 그 위험을
+#   덮는 보험은 수출자가 자기 돈으로 듭니다. 바이어는 덮을 위험이 없습니다.
+#   그런데 의무 표만 보고 "적하보험료 — 바이어 부담"이라고 적고 있었습니다.
+#   DDP 견적에서 바이어 부담이 0원이어야 하는데 보험료만큼 남았습니다.
+#
+#   E·F·C조건(CIF·CIP 제외)은 주운송 중 위험이 바이어에게 있으므로 바이어가
+#   자기 보험을 듭니다.
+# (2026-09-26)
+INSURANCE_PAID_BY_EXPORTER = {"CIF", "CIP", "DAP", "DPU", "DDP"}
+
 EXPORTER_PAYS = {
     "EXW": set(),
     "FCA": {"origin"},
@@ -378,6 +393,11 @@ def calculate_logistics_cost(
 
     exporter_groups = EXPORTER_PAYS.get(incoterms, set())
     for line in lines:
+        if line["group"] == "insurance":
+            # 의무가 아니라 **누가 내는가**로 봅니다. 위의 주석을 보세요.
+            line["payer"] = ("exporter" if incoterms in INSURANCE_PAID_BY_EXPORTER
+                             else "buyer")
+            continue
         line["payer"] = "exporter" if line["group"] in exporter_groups else "buyer"
 
     category_totals: dict[str, int] = defaultdict(int)

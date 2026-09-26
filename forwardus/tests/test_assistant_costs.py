@@ -45,11 +45,64 @@ def test_비용_배분이_ICC_2020과_같다(term):
     assert EXPORTER_PAYS[term] == ICC_2020[term]
 
 
+# 적하보험료만 규칙이 다릅니다.
+#
+# EXPORTER_PAYS 는 ICC 가 정한 **의무** 표입니다. 보험을 사 줄 의무는 CIF·CIP 에만
+# 있습니다. 그런데 견적서는 "이 돈을 누가 내는가"를 적는 자리라 뜻이 다릅니다.
+# D조건(DAP·DPU·DDP)은 수출자가 도착지까지 위험을 지므로 그 보험도 수출자가
+# 자기 돈으로 듭니다. 바이어는 덮을 위험이 없습니다. 예전에는 의무 표만 보고
+# "적하보험료 — 바이어 부담"이라고 적어, DDP 견적에서 바이어 부담이 0원이어야
+# 하는데 보험료만큼 남았습니다. (2026-09-26)
+INSURANCE_PAID_BY_EXPORTER = {"CIF", "CIP", "DAP", "DPU", "DDP"}
+
+
 @pytest.mark.parametrize("term", sorted(ICC_2020))
 @pytest.mark.parametrize("category", sorted(CATEGORIES))
 def test_조건별로_이_비용을_누가_내는가(term, category):
-    assert assistant_service._exporter_pays(term, category) is (
-        CATEGORIES[category] in ICC_2020[term])
+    group = CATEGORIES[category]
+    want = (term in INSURANCE_PAID_BY_EXPORTER if group == "insurance"
+            else group in ICC_2020[term])
+    assert assistant_service._exporter_pays(term, category) is want
+
+
+def test_적하보험료는_D조건에서_수출자가_낸다():
+    """D조건은 수출자가 도착지까지 위험을 집니다. 바이어는 덮을 위험이 없습니다."""
+
+    for term in ("DAP", "DPU", "DDP", "CIF", "CIP"):
+        assert assistant_service._exporter_pays(term, "Insurance"), term
+    for term in ("EXW", "FCA", "FAS", "FOB", "CFR", "CPT"):
+        assert not assistant_service._exporter_pays(term, "Insurance"), term
+
+
+def test_DDP는_바이어_부담이_0이다():
+    """수출자가 문 앞까지 모두 부담하는 조건입니다. 한 항목이라도 남으면 틀린 견적입니다."""
+
+    from app.processors import cost_calculator
+    from app.processors.cargo_calculator import calculate_cargo_lines
+
+    metrics = calculate_cargo_lines([{
+        "product_description": "화물", "package_type": "carton", "quantity": 100,
+        "length_cm": 40, "width_cm": 30, "height_cm": 25, "weight_per_package_kg": 8}])
+    got = cost_calculator.calculate_logistics_cost(
+        transport_mode="SEA", sea_mode="LCL", incoterms="DDP",
+        freight_usd=1200, freight_source="tariff", invoice_value_usd=25000,
+        metrics=metrics, exchange_rate=1380.5)
+    assert got["buyer_total_krw"] == 0
+    assert got["exporter_total_krw"] == got["total_krw"]
+
+
+def test_EXW는_수출자_부담이_0이다():
+    from app.processors import cost_calculator
+    from app.processors.cargo_calculator import calculate_cargo_lines
+
+    metrics = calculate_cargo_lines([{
+        "product_description": "화물", "package_type": "carton", "quantity": 100,
+        "length_cm": 40, "width_cm": 30, "height_cm": 25, "weight_per_package_kg": 8}])
+    got = cost_calculator.calculate_logistics_cost(
+        transport_mode="SEA", sea_mode="LCL", incoterms="EXW",
+        freight_usd=1200, freight_source="tariff", invoice_value_usd=25000,
+        metrics=metrics, exchange_rate=1380.5)
+    assert got["exporter_total_krw"] == 0
 
 
 @pytest.mark.parametrize("term", sorted(ICC_2020))

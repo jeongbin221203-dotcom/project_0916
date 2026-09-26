@@ -11,7 +11,7 @@ from datetime import date
 
 from app.collectors import customs_client
 from app.processors.cashflow_calculator import calculate_cash_flow
-from app.processors.cost_calculator import EXPORTER_PAYS
+from app.processors.cost_calculator import EXPORTER_PAYS, INSURANCE_PAID_BY_EXPORTER
 from app.processors.schedule_calculator import check_buyer_deadline
 from app.repositories import shipment_repository
 from app.services import ServiceError
@@ -110,6 +110,11 @@ def _exporter_pays(incoterms: str, category: str) -> bool:
         "Insurance": "insurance",
         "Destination Charge": "destination",
     }.get(category)
+    # 적하보험료는 의무 표가 아니라 **누가 내는가**로 봅니다.
+    # D조건은 수출자가 도착지까지 위험을 지므로 보험도 수출자가 듭니다.
+    # (cost_calculator.INSURANCE_PAID_BY_EXPORTER 의 주석을 보세요)
+    if group == "insurance":
+        return incoterms in INSURANCE_PAID_BY_EXPORTER
     return group in EXPORTER_PAYS.get(incoterms, set())
 
 
