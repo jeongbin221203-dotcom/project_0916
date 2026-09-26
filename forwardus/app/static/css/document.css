@@ -222,3 +222,9 @@
   .hs_set { grid-template-columns: 1fr; }
   .hs_set_label { margin-bottom: -4px; }
 }
+
+/* 자동 계산 칸(부피·무게·운임톤과 LCL/FCL).
+   운송 예상 견적 화면의 것을 그대로 씁니다(planning.css). 여기서는 오른쪽
+   기둥이 아니라 품목 바로 아래 한 칸으로 둡니다. */
+.doc_calc { margin: 14px 0 0; max-width: 520px; }
+.doc_calc .eyebrow { margin-bottom: 8px; }

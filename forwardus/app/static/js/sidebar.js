@@ -81,6 +81,9 @@
     const height = flyout.offsetHeight || 0;
     let left = wide ? rect.right + 10 : rect.right - width;
     let top = wide ? rect.top : rect.bottom + EDGE;
+    // 아래로 다 못 들어가면 **위로 더 올려** 자리를 넓게 씁니다. 단추 높이에
+    // 맞춰 두면 목록이 길 때 화면 아래에서 잘린 채로만 보입니다.
+    if (wide && height > window.innerHeight - top - EDGE) top = EDGE;
     // 화면 밖으로 나가지 않게 안으로 당깁니다.
     left = Math.max(EDGE, Math.min(left, window.innerWidth - width - EDGE));
     top = Math.max(EDGE, Math.min(top, window.innerHeight - height - EDGE));

@@ -100,6 +100,60 @@ def _ports(text: str, mode: str) -> dict:
     return {}
 
 
+# 이름 뒤에 붙는 코드와 "항·공항" 같은 꼬리. 다시 찾을 때 떼어 냅니다.
+_CODE_TAIL = re.compile(r"\s*\([A-Z]{3,5}\)\s*$")
+_KIND_TAIL = re.compile(r"(국제공항|공항|항)$")
+
+
+def ports_match_mode(fields: dict, mode: str) -> bool:
+    """담아 둔 항구가 그 모드의 것인가.
+
+    바다는 UN/LOCODE 다섯 자리(KRPUS), 하늘은 IATA 세 자리(ICN)입니다.
+    자릿수만 봐도 어느 쪽 것인지 압니다.
+    """
+
+    codes = [str(fields.get(f"{role}_code") or "") for role in ("origin", "destination")]
+    codes = [code for code in codes if code]
+    if not codes:
+        return True
+    want = 3 if str(mode or "").upper() == "AIR" else 5
+    return all(len(code) == want for code in codes)
+
+
+def retune_ports(fields: dict, mode: str) -> dict:
+    """운송 모드가 바뀌면 **항구도 따라 바꿉니다.**
+
+    왜 필요한가
+      "부산에서 로스앤젤레스로 보냅니다"라고 적으면 해상 항구(KRPUS·USLAX)로
+      담아 둡니다. 그 뒤에 "항공으로 보내면 얼마나 걸리나요?"라고 물으면
+      모드만 AIR로 바뀌고 항구는 해상 그대로였습니다. 머리글에는
+      "부산항 → 로스앤젤레스항"이 붙고 본문은 항공 이야기를 했습니다.
+
+    한쪽이라도 그 모드의 항구·공항을 못 찾으면 **구간을 통째로 비웁니다.**
+    (부산은 우리 표에 공항이 없습니다) 반쪽짜리 구간은 없는 구간입니다.
+    비운 자리는 사람에게 다시 물어보게 됩니다.
+    """
+
+    from app.services.document_extract_service import _port
+
+    found, missed = {}, False
+    for role in ("origin", "destination"):
+        shown = str(fields.get(f"{role}_name") or "")
+        if not shown:
+            continue
+        bare = _KIND_TAIL.sub("", _CODE_TAIL.sub("", shown)).strip()
+        place = _port(bare, mode, role, []) if bare else None
+        if not place:
+            missed = True
+            continue
+        found[f"{role}_code"] = place["code"]
+        found[f"{role}_name"] = f"{place['name']} ({place['code']})"
+    if missed:
+        return {key: "" for key in ("origin_code", "origin_name",
+                                    "destination_code", "destination_name")}
+    return found
+
+
 def read(message: str) -> dict:
     """적힌 값만 뽑습니다. {"fields": {...}, "items": [{...}]} (없으면 빈 dict)"""
 
@@ -183,6 +237,12 @@ def capture(viewer, message: str) -> list[str]:
     # 사람이 방금 적은 말보다 더 새로운 값은 없습니다. (2026-09-26)
     fields = {key: value for key, value in read_values["fields"].items()
               if key in work_draft_service.SHARED_FIELDS and value}
+    # 담아 둔 항구가 모드와 안 맞으면 그 모드로 다시 풉니다. (retune_ports 참고)
+    # **이번 말에서 읽은 것이 먼저입니다.** 다시 푼 값을 밑에 깔고 그 위에 얹습니다.
+    # (순서를 바꿨더니 방금 읽은 공항이 지워졌습니다)
+    mode = fields.get("transport_mode") or known_fields.get("transport_mode")
+    if mode and not ports_match_mode(known_fields, mode):
+        fields = {**retune_ports(known_fields, mode), **fields}
     items = []
     if read_values["items"]:
         item = {key: value for key, value in read_values["items"][0].items()

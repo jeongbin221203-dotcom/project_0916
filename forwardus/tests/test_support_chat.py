@@ -210,17 +210,38 @@ def test_대화에서_말한_구간이_저장된_지난_건을_이긴다(app, cl
             "items": [{"product_description": "담배"}]})
 
     client.post("/api/support-chat",
-                json={"question": "부산에서 로스앤젤레스로 11월 초에 항공으로 보냅니다"})
+                json={"question": "부산에서 로스앤젤레스로 11월 초에 보냅니다"})
     answer = client.post("/api/support-chat",
                          json={"question": "치약 500박스, 한 박스 40x30x25cm에 12kg입니다"})
     assumed = answer.get_json()["data"]["assumed"]
     assert "로스앤젤레스" in assumed["route"]
     assert "Kaohsiung" not in assumed["route"]
-    assert assumed["mode"] == "항공"
 
     with app.app_context():
         kept = work_draft_service.load(User.query.filter_by(
             email=app.config["MASTER_EMAIL"]).one()) or {}
     # 품목이 바뀌었으면 지난 품목의 치수·무게는 따라오지 않습니다.
     assert kept["items"][0]["product_description"] == "치약"
-    assert kept["fields"]["destination_code"] == "LAX"
+    assert kept["fields"]["destination_code"] == "USLAX"
+
+
+def test_모드와_안_맞는_항구는_기준으로_내세우지_않는다(app, client, monkeypatch):
+    """해상 항구를 들고 "항공 기준으로 답했습니다"라고 하면 안 됩니다.
+
+    "부산에서 로스앤젤레스로 보냅니다"는 해상 항구(KRPUS·USLAX)로 담깁니다.
+    그 뒤 "항공으로 보내면"이라고 물으면 모드만 바뀌고 항구는 해상 그대로였고,
+    머리글에 "부산항 → 로스앤젤레스항 · 항공"이 붙었습니다.
+    (부산은 우리 표에 공항이 없어 항공 구간을 만들 수 없습니다. 그러면 구간을
+     내세우지 않는 것이 맞습니다 — 반쪽짜리 구간은 없는 구간입니다)
+    """
+
+    from app.services import support_chat_service
+
+    monkeypatch.setattr(support_chat_service.ai_client, "chat",
+                        lambda messages, **kw: {"success": True, "source": "api", "data": "답"})
+    client.post("/api/support-chat",
+                json={"question": "부산에서 로스앤젤레스로 11월 초에 보냅니다"})
+    answer = client.post("/api/support-chat",
+                         json={"question": "항공으로 보내면 얼마나 걸리나요?"})
+    assumed = (answer.get_json()["data"] or {}).get("assumed") or {}
+    assert "route" not in assumed

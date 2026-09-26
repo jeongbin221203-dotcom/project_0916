@@ -2,6 +2,9 @@
 {% block title %}서류 작성{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ static_url('css/home.css') }}">
+  {# 자동 계산 칸(.calc_panel·.sea_advice)은 운송 예상 견적과 **같은 모양**이어야
+     합니다. 같은 숫자를 화면마다 다르게 그리면 같은 것인지 알 수 없습니다. #}
+  <link rel="stylesheet" href="{{ static_url('css/planning.css') }}">
 {% endblock %}
 {% block content %}
   {# Shipment에서 넘어왔으면 돌아갈 길을 화면 맨 위에 둡니다. 칸을 다 채우고
@@ -79,6 +82,9 @@
       sourceUrl: "{{ url_for('document.source_values', kind='__KIND__', source_id='__ID__') }}",
       originUrl: "{{ url_for('document.origin_guide', shipment_id='__ID__') }}",
       {# 기타 필수 서류: HS·도착국으로 찾은 목록 (원산지증명서·인증서·검역증 …) #}
+      {# 부피·운임톤·LCL/FCL은 **운송 예상 견적과 같은 창구**에서 받습니다.
+         화면마다 따로 세면 같은 짐에 다른 답이 나옵니다. #}
+      cargoUrl: "{{ url_for('planning.api_cargo') }}",
       requiredDocsUrl: "{{ url_for('document.required_docs', shipment_id='__ID__') }}",
       {# HS부호만으로 미리 보는 목록. 건을 만들기 전에도 무엇이 필요한지 알려 줍니다. #}
       requiredDocsPreviewUrl: "{{ url_for('document.api_required_docs') }}"

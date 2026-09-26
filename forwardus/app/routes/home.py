@@ -219,7 +219,14 @@ def api_support_chat():
     # 에서 도착지만 읽힌 경우 출발지가 통째로 날아갑니다. 새로 말한 곳은 덮고
     # 말하지 않은 곳은 그대로 둡니다 — 출발항은 대개 그대로이고, 위험한 것은
     # **묵은 도착지**입니다.
+    # 담아 둔 항구가 모드와 안 맞으면 그 모드로 다시 풉니다. 해상 항구를 들고
+    # "항공 기준으로 답했습니다"라고 하면 머리글과 본문이 어긋납니다.
+    # 이번 말에서 읽은 것이 먼저라, 다시 푼 값을 밑에 깔고 그 위에 얹습니다.
+    mode_now = said_fields.get("transport_mode") or at.get("transport_mode")
+    if mode_now and not chat_capture_service.ports_match_mode(at, mode_now):
+        at = {**at, **chat_capture_service.retune_ports(at, mode_now)}
     at.update(said_fields)
+    at = {key: value for key, value in at.items() if value}
     if said_item.get("product_description"):
         goods = dict(said_item)
 

@@ -134,6 +134,21 @@
         {# 품목 금액의 합. 고른 통화가 함께 붙습니다. #}
         <p class="doc_total" data-doc-total hidden>총액<span data-money-unit> (USD)</span>
           <b data-doc-total-value>0.00</b></p>
+        {# 부피(CBM)·무게·운임톤과 LCL/FCL 판단.
+           **운송 예상 견적 화면과 같은 계산**을 같은 창구(/planning/api/cargo)에서
+           받아 씁니다. 화면마다 따로 세면 같은 짐에 다른 답이 나옵니다.
+           칸에 치수를 다 적어 놓고도 이 숫자를 보려고 화면을 떠나던 자리입니다.
+           (2026-09-26 사용자 요청) #}
+        <aside class="calc_panel doc_calc" data-doc-calc hidden>
+          <p class="eyebrow">자동 계산 <span class="badge source_calculated">Calculated</span></p>
+          <dl>
+            <div><dt>Total CBM</dt><dd data-doc-metric="total_cbm">-</dd></div>
+            <div><dt>Total Weight</dt><dd data-doc-metric="total_weight_kg">-</dd></div>
+            <div><dt>Revenue Ton</dt><dd data-doc-metric="revenue_ton">-</dd></div>
+          </dl>
+          <p class="sea_advice" data-doc-advice hidden></p>
+          <p class="muted small" data-doc-calc-note>서버에서 계산된 값입니다.</p>
+        </aside>
         <button type="button" class="link_button" data-doc-add-item>+ 품목 추가</button>
       </section>
 

@@ -309,8 +309,71 @@
       total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   if (form.elements.currency) form.elements.currency.addEventListener("change", applyCurrency);
+
+  /* ----- 총 부피(CBM)·운임톤·LCL/FCL -----
+     **운송 예상 견적 화면과 같은 계산**을 같은 창구에서 받습니다. 화면마다 따로
+     세면 같은 짐에 다른 답이 나옵니다. 치수가 한 칸이라도 비면 부르지 않습니다.
+     (반쪽 숫자가 더 위험합니다) (2026-09-26) */
+  const calcBox = panel.querySelector("[data-doc-calc]");
+  const CBM_FIELDS = ["item_length_cm", "item_width_cm", "item_height_cm",
+                      "item_package_count", "item_weight_per_package_kg"];
+
+  function cargoItems() {
+    const rows = [];
+    itemsBox.querySelectorAll(".doc_item").forEach((row) => {
+      const value = (name) => {
+        const input = row.querySelector(`[name="${name}"]`);
+        return String((input && input.value) || "").replace(/,/g, "").trim();
+      };
+      const count = value("item_package_count");
+      const item = {
+        quantity: count, package_count: count,
+        package_type: value("item_package_type") || "carton",
+        length_cm: value("item_length_cm"), width_cm: value("item_width_cm"),
+        height_cm: value("item_height_cm"),
+        weight_per_package_kg: value("item_weight_per_package_kg"),
+      };
+      if (CBM_FIELDS.every((name) => value(name))) rows.push(item);
+    });
+    return rows;
+  }
+
+  const askCargo = debounce(async () => {
+    if (!calcBox || !config.cargoUrl) return;
+    const items = cargoItems();
+    if (!items.length) { calcBox.hidden = true; return; }
+    const answer = await window.Forwardus.postJson(config.cargoUrl, {
+      transport_mode: (form.elements.transport_mode && form.elements.transport_mode.value) || "SEA",
+      sea_mode: (form.elements.sea_mode && form.elements.sea_mode.value) || "LCL",
+      items,
+    });
+    if (!answer.success) { calcBox.hidden = true; return; }
+    const data = answer.data;
+    calcBox.hidden = false;
+    const show = (key, text) => {
+      const cell = calcBox.querySelector(`[data-doc-metric="${key}"]`);
+      if (cell) cell.textContent = text;
+    };
+    show("total_cbm", `${Number(data.total_cbm).toFixed(3)} CBM`);
+    show("total_weight_kg", `${Number(data.total_weight_kg).toLocaleString("en-US",
+      { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`);
+    show("revenue_ton", `${Number(data.revenue_ton).toFixed(3)} R/T`);
+
+    const advice = data.sea_mode_advice;
+    const box = calcBox.querySelector("[data-doc-advice]");
+    if (!advice || !box) return;
+    const notes = (advice.notes || []).map((line) =>
+      `<small>${escapeHtml(line)}</small>`).join("");
+    box.hidden = false;
+    box.className = `sea_advice ${advice.confidence === "close" ? "is_close" : ""}`;
+    box.innerHTML = `<b>${escapeHtml(advice.mode)} 쪽`
+      + `${advice.confidence === "close" ? " (경계 구간)" : ""}</b>`
+      + `<span>${escapeHtml(advice.reason || "")}</span>${notes}`;
+  }, 400);
+
   itemsBox.addEventListener("input", (event) => {
     if (event.target.name === "item_amount") applyCurrency();
+    if (CBM_FIELDS.includes(event.target.name)) askCargo();
   });
 
   /* ----- 품목 ----- */
@@ -322,6 +385,7 @@
     row.addEventListener("input", () => { invalidateSchedule(); score(); });
     row.addEventListener("change", score);
     applyCurrency();
+    askCargo();               // 총액과 같은 자리에서 부피·운임톤도 다시 셉니다
     return row;
   }
 
@@ -500,6 +564,7 @@
       });
     }
     applyCurrency();
+    askCargo();               // 총액과 같은 자리에서 부피·운임톤도 다시 셉니다
     invalidateSchedule();
     drawCalendar();
     score();
@@ -559,6 +624,7 @@
     if (window.ForwardusWorkDraft) window.ForwardusWorkDraft.clear();
     applyMode(form.elements.transport_mode ? form.elements.transport_mode.value : "SEA");
     applyCurrency();
+    askCargo();               // 총액과 같은 자리에서 부피·운임톤도 다시 셉니다
     invalidateSchedule();
     score();
   }
@@ -1278,6 +1344,7 @@
     pairParties();            // 올린 B/L에 한쪽만 있어도 나머지가 채워집니다.
     score();
     applyCurrency();          // 읽어 온 통화가 금액 라벨에 바로 붙습니다.
+    askCargo();               // 총액과 같은 자리에서 부피·운임톤도 다시 셉니다
     suggestName();            // 읽어 온 도착지·품목으로 견적명을 다시 제안합니다.
     syncWorkDraft("upload");  // 올린 서류·대화에서 읽은 값도 운송 계획으로 이어집니다.
     saveLocal();
