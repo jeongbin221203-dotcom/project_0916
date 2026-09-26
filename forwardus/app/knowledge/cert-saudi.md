@@ -1,6 +1,6 @@
 ---
 title: 사우디아라비아 수출 인증 (SABER · SALEEM)
-keywords: 사우디, 사우디아라비아, SABER, SALEEM, SASO, CoC, PCoC, SCoC, 적합성증명서, 선적증명서, SFDA, 할랄, 리야드, 제다
+keywords: 사우디, 사우디아라비아, SABER, SALEEM, SASO, CoC, PCoC, SCoC, 적합성증명서, 선적증명서, SFDA, 할랄, 리야드, 제다, 인증, 수출 인증, 인증 필요
 must: 사우디, saber, saso, saleem, sfda
 ask: 사우디아라비아 수출할 때 SABER 인증이 꼭 필요한가요?
 links: SABER 플랫폼|https://saber.sa/ ;; SASO 사우디 표준청|https://www.saso.gov.sa/en/Pages/default.aspx ;; SASO 기술규정 목록|https://www.saso.gov.sa/en/Laws-And-Regulations/Technical_regulations/Pages/default.aspx ;; SFDA 사우디 식약청|https://www.sfda.gov.sa/en ;; KTL 사우디 SABER 인증|https://customer.ktl.re.kr/web/contents/K101021000.do ;; 중소기업 수출규제대응지원센터|https://www.smes.go.kr/globalcerti/main.do

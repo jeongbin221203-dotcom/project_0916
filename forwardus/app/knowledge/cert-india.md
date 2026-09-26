@@ -1,6 +1,6 @@
 ---
 title: 인도 수출 인증 (BIS · CRS · WPC · FSSAI)
-keywords: 인도, BIS, ISI 마크, CRS, FMCS, AIR, WPC ETA, FSSAI, TEC, CDSCO, QCO, 한·인도 CEPA, APTA, 인도 통관
+keywords: 인도, BIS, ISI 마크, CRS, FMCS, AIR, WPC ETA, FSSAI, TEC, CDSCO, QCO, 한·인도 CEPA, APTA, 인도 통관, 인증, 수출 인증, 인증 필요
 must: 인도, bis, crs, fmcs, isi마크, wpc, fssai, 인도 인증
 ask: 인도 수출할 때 BIS 인증이 꼭 필요한가요?
 links: BIS 제품인증|https://www.bis.gov.in/product-certification/ ;; BIS FMCS 신청서식|https://www.bis.gov.in/fmcs/forms-and-formats/ ;; BIS CRS 포털|https://www.crsbis.in/BIS/about-crs.do ;; CDSCO 의약품·화장품·의료기기|https://cdsco.gov.in/opencms/opencms/en/Home/ ;; TEC 통신장비 인증|https://www.tec.gov.in/ ;; 관세청 FTA 원산지증명서 발급방식|https://www.customs.go.kr/ftaportalkor/cm/cntnts/cntntsView.do?mi=3401&cntntsId=1061

@@ -1,6 +1,6 @@
 ---
 title: 캐나다 수출 인증 (cUL/CSA · ISED · SFCR)
-keywords: 캐나다, CSA, cUL, cETL, SCC, ISED, ICES-003, SFCR, CFIA, 불어 라벨, Bill 96, 이중언어, 한·캐나다 FTA, 캐나다 통관, 필드평가
+keywords: 캐나다, CSA, cUL, cETL, SCC, ISED, ICES-003, SFCR, CFIA, 불어 라벨, Bill 96, 이중언어, 한·캐나다 FTA, 캐나다 통관, 필드평가, 인증, 수출 인증, 인증 필요
 must: 캐나다, csa인증, cul, ised, sfcr, 캐나다 인증, 퀘벡
 ask: 캐나다 수출할 때 UL 인증만 있으면 되나요?
 links: Electrical Safety Authority (인정 인증마크)|https://esasafe.com/electrical-products/recognized-certification-marks/ ;; ISED Canada 무선기기 인증절차(RSP-100)|https://ised-isde.canada.ca/site/spectrum-management-telecommunications/en/devices-and-equipment/radio-standards-procedures-rsp/rsp-100-certification-radio-apparatus-and-broadcasting-equipment ;; CFIA 식품 수입 라이선스|https://inspection.canada.ca/en/food-licences ;; 포장·라벨 규칙 (C.R.C. c.417)|https://laws-lois.justice.gc.ca/eng/regulations/C.R.C.,_c._417/page-1.html ;; 퀘벡 OQLF Bill 96 제품 상표 규정|https://www.oqlf.gouv.qc.ca/francisation/entreprises/marque-commerce-produits.html ;; CBSA 한·캐나다 FTA 원산지증명서 BSF760|https://www.cbsa-asfc.gc.ca/publications/forms-formulaires/bsf760-eng.html

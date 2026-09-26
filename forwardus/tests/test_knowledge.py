@@ -200,3 +200,29 @@ def test_지식에_적힌_주소가_열린다():
               if status not in (200, 301, 302, 403, 405)
               and not any(host in url for host in BOT_BLOCKED)]
     assert not broken, f"열리지 않는 주소: {broken}"
+
+
+def test_나라_인증_글은_모두_자기_예시_질문으로_나온다():
+    """문서에 적어 둔 ask 로도 자기 글이 안 나오면 그 글은 꺼져 있는 것입니다.
+
+    홍콩·태국 두 글이 그랬습니다. keywords 에 '인증'이 없어 점수가 모자랐습니다.
+    이용자는 인증을 물었는데 '수출 절차'가 나왔습니다. (2026-09-26)
+    """
+
+    for entry in knowledge.entries():
+        for question in [q.strip() for q in str(entry.get("ask") or "").split(";;") if q.strip()]:
+            got = knowledge.lookup(question)
+            assert got is not None, f"[{entry['key']}] '{question}' 에 답이 안 나옵니다"
+            assert got["key"] == entry["key"], \
+                f"[{entry['key']}] '{question}' → {got['key']} 가 나옵니다"
+
+
+@pytest.mark.parametrize("question", [
+    "수출 인증이 뭔가요?", "인증 받아야 하나요?", "무슨 인증이 필요한가요?",
+    "수출 절차 알려줘", "CBM이 뭐예요?", "HS코드는 어떻게 찾아요?",
+])
+def test_나라를_대지_않은_인증_질문은_특정_나라_글로_새지_않는다(question):
+    """cert-* 글에 '인증' 키워드를 더했습니다. 나라를 안 댔으면 나오면 안 됩니다."""
+
+    got = knowledge.lookup(question)
+    assert not (got or {}).get("key", "").startswith("cert-")

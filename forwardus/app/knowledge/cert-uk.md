@@ -1,6 +1,6 @@
 ---
 title: 영국 수출 (UKCA는 대부분 의무가 아닙니다)
-keywords: 영국, UKCA, CE 마킹, UK Responsible Person, UKRP, MHRA, UKMCAB, 북아일랜드, UKNI, GB EORI, 한·영 FTA, 영국 통관, IPAFFS
+keywords: 영국, UKCA, CE 마킹, UK Responsible Person, UKRP, MHRA, UKMCAB, 북아일랜드, UKNI, GB EORI, 한·영 FTA, 영국 통관, IPAFFS, 인증, 수출 인증, 인증 필요
 must: 영국, ukca, ukrp, 영국 인증, 영국 통관, 북아일랜드
 ask: 2026년에도 영국 수출하려면 UKCA 마크를 받아야 하나요?
 links: GOV.UK GB 시장 제품 출시 안내|https://www.gov.uk/guidance/placing-manufactured-goods-on-the-market-in-great-britain ;; GOV.UK 부문별 제품규정·마킹 현황|https://www.gov.uk/government/publications/product-regulations-by-sector-and-current-approaches-to-product-marking-ukca-and-ce-regimes/product-regulations-by-sector-and-current-approaches-to-product-marking-ukca-and-ce-regimes ;; MHRA 의료기기 규제|https://www.gov.uk/guidance/regulating-medical-devices-in-the-uk ;; GOV.UK 건설자재 규정|https://www.gov.uk/guidance/construction-products-regulation-in-great-britain ;; UKMCAB 영국 공인기관 검색|https://find-a-conformity-assessment-body.service.gov.uk/ ;; GOV.UK 한·영 무역협정 자료모음|https://www.gov.uk/government/collections/uk-south-korea-trade-agreement

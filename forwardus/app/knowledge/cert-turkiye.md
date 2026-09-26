@@ -1,6 +1,6 @@
 ---
 title: 튀르키예 수출 인증 (CE · TAREKS · 한국어 서류)
-keywords: 튀르키예, 터키, CE 마킹, TSE, TAREKS, 가란티, 보증서, 사용설명서, 튀르키예 통관, BTK, 한·튀르키예 FTA
+keywords: 튀르키예, 터키, CE 마킹, TSE, TAREKS, 가란티, 보증서, 사용설명서, 튀르키예 통관, BTK, 한·튀르키예 FTA, 인증, 수출 인증, 인증 필요
 must: 튀르키예, 터키, tareks, tse, 튀르키예 인증, 터키 인증
 ask: 튀르키예 수출할 때 어떤 인증이 필요한가요?
 links: 튀르키예 무역부 TAREKS 안내|https://ticaret.gov.tr/urun-guvenligi/tareks ;; TAREKS 업체 등록 창구|https://tarekskayit.ticaret.gov.tr/ ;; 무역부 제품안전·검사 고시(ÜGD)|https://ugdgm.ticaret.gov.tr/duyurular/urun-guvenligi-ve-denetimi-tebligleri-resmi-gazetede-yayimlanarak-yururluge-girdi ;; TSE (인증기관 번호 1783)|https://www.tse.org.tr/ce-isareti/ ;; 관세청 FTA 원산지증명서 발급방식|https://www.customs.go.kr/ftaportalkor/cm/cntnts/cntntsView.do?mi=3401&cntntsId=1061 ;; KOTRA 이스탄불 무역관|https://www.kotra.or.kr/istanbul/subList/40000000894

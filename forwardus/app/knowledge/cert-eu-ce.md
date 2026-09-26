@@ -1,6 +1,6 @@
 ---
 title: EU CE 마킹과 EU 책임자(GPSR)
-keywords: EU, CE 마킹, CE 마크, 유럽 수출, DoC, 적합성선언서, 기술문서, EU 대리인, Authorised Representative, GPSR, Notified Body, NANDO, UKCA, RoHS, RED
+keywords: EU, CE 마킹, CE 마크, 유럽 수출, DoC, 적합성선언서, 기술문서, EU 대리인, Authorised Representative, GPSR, Notified Body, NANDO, UKCA, RoHS, RED, 인증, 수출 인증, 인증 필요
 must: ce마킹, ce마크, ce 인증, eu인증, 유럽 인증, 유럽 수출, gpsr, notified body, eu 대리인, doc, ukca
 ask: 유럽 수출할 때 CE 마킹은 어떻게 받나요?
 links: EU 집행위 CE 마킹 안내|https://single-market-economy.ec.europa.eu/single-market/ce-marking_en ;; CE 마킹 제조자 의무|https://single-market-economy.ec.europa.eu/single-market/goods/ce-marking/manufacturers_en ;; NANDO 인증기관 데이터베이스|https://ec.europa.eu/growth/tools-databases/nando/ ;; Your Europe 기술문서·DoC|https://europa.eu/youreurope/business/product-requirements/compliance/technical-documentation-conformity/index_en.htm ;; 시장감시규정 (EU) 2019/1020|https://eur-lex.europa.eu/eli/reg/2019/1020/oj

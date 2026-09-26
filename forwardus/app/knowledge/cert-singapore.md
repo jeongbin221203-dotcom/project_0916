@@ -1,6 +1,6 @@
 ---
 title: 싱가포르 수출 인증 (CPSR · SAFETY Mark)
-keywords: 싱가포르, CPS, CPSR, SAFETY Mark, CCCS, CPSO, SFA, IMDA, HSA, TradeNet, GST, 한·싱가포르 FTA, 자유항
+keywords: 싱가포르, CPS, CPSR, SAFETY Mark, CCCS, CPSO, SFA, IMDA, HSA, TradeNet, GST, 한·싱가포르 FTA, 자유항, 인증, 수출 인증, 인증 필요
 must: 싱가포르, safety mark, cpsr, cccs, sfa, imda, 싱가폴
 ask: 싱가포르 수출할 때 SAFETY Mark 인증이 필요한가요?
 links: CPSO 소비자제품안전 CPSR 개요|https://www.consumerproductsafety.gov.sg/suppliers/cpsr/overview-of-cpsr/ ;; CPSO 통제품목 33개 목록|https://www.consumerproductsafety.gov.sg/suppliers/cpsr/list-of-controlled-goods/ ;; CPSO 자료실 (지정 CAB 목록·서식)|https://www.consumerproductsafety.gov.sg/suppliers/cpsr/resources/ ;; SFA 싱가포르식품청 수입요건|https://www.sfa.gov.sg/food-import-export/commercial-imports/import-requirements-for-food-food-products ;; IMDA 통신기기 등록제도|https://www.imda.gov.sg/regulations-and-licensing-listing/dealer-and-equipment-registration-framework/equipment-registration-framework ;; 싱가포르 관세청 TradeNet|https://www.customs.gov.sg/businesses/national-single-window/tradenet/

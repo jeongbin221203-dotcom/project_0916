@@ -1,6 +1,6 @@
 ---
 title: 말레이시아 수출 인증 (ST COA · SIRIM · MCMC)
-keywords: 말레이시아, SIRIM, ST COA, 에너지위원회, MCMC, 형식승인, e-Permit, SIRIM 라벨, 말레이시아 통관, 할랄, JAKIM
+keywords: 말레이시아, SIRIM, ST COA, 에너지위원회, MCMC, 형식승인, e-Permit, SIRIM 라벨, 말레이시아 통관, 할랄, JAKIM, 인증, 수출 인증, 인증 필요
 must: 말레이시아, sirim, st coa, mcmc, 말레이 인증
 ask: 말레이시아 수출할 때 SIRIM 인증이 필요한가요?
 links: 에너지위원회 ST 승인증명서(COA) 안내|https://www.st.gov.my/stakeholders/electricity/appliances/certificate-approval-coa ;; MCMC 통신기기 인증|https://www.mcmc.gov.my/en/communications-equipment/certification-of-communications-equipment ;; MCMC 인증 라벨 요건|https://www.mcmc.gov.my/en/communications-equipment/certification-label ;; SIRIM Berhad|https://www.sirim.my/ ;; KTC 말레이시아 인증 안내|https://www.ktc.re.kr/asia/malaysia.asp

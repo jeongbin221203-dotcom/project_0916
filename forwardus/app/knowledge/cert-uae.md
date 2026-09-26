@@ -1,6 +1,6 @@
 ---
 title: UAE 수출 인증 (ECAS · 할랄 · TDRA)
-keywords: UAE, 아랍에미리트, ECAS, EQM, 할랄, MOIAT, ESMA, TDRA, 두바이, 아부다비, 적합성증명서, 한·UAE CEPA
+keywords: UAE, 아랍에미리트, ECAS, EQM, 할랄, MOIAT, ESMA, TDRA, 두바이, 아부다비, 적합성증명서, 한·UAE CEPA, 인증, 수출 인증, 인증 필요
 must: uae, 아랍에미리트, 두바이, ecas, moiat, 아부다비
 ask: UAE 수출할 때 어떤 인증이 필요한가요?
 links: MOIAT 규제품목 적합성증명서 발급|https://moiat.gov.ae/en/services/issue-conformity-certificates-for-regulated-products ;; MOIAT 할랄 프로그램|https://moiat.gov.ae/en/programs/halal ;; MOIAT 할랄 인정기구 목록|https://moiat.gov.ae/en/programs/halal/approved-accreditation-bodies-for-halal ;; TDRA 통신기자재 등록·승인|https://tdra.gov.ae/en ;; KTR ECAS 안내|https://m.ktr.or.kr/certification/overseas/contentsid/2363/index.do ;; FTA 강국 KOREA|https://fta.motir.go.kr/main/situation/fta/world/

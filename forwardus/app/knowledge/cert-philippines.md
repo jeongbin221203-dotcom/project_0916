@@ -1,6 +1,6 @@
 ---
 title: 필리핀 수출 인증 (PS 마크 · ICC)
-keywords: 필리핀, PS 마크, ICC, Import Commodity Clearance, BPS, DTI, PNS, 필리핀 통관, 한·필리핀 FTA, FDA Philippines, NTC
+keywords: 필리핀, PS 마크, ICC, Import Commodity Clearance, BPS, DTI, PNS, 필리핀 통관, 한·필리핀 FTA, FDA Philippines, NTC, 인증, 수출 인증, 인증 필요
 must: 필리핀, ps마크, ps 마크, icc, bps, 필리핀 인증
 ask: 필리핀 수출할 때 인증이 필요한가요?
 links: 필리핀 무역산업부 DTI|https://www.dti.gov.ph/ ;; 필리핀 식약청 FDA|https://www.fda.gov.ph/ ;; KTC 필리핀 인증 안내|https://www.ktc.re.kr/asia/philippines.asp ;; 관세청 FTA 발효현황|https://www.customs.go.kr/ftaportalkor/cm/cntnts/cntntsView.do?mi=3310&cntntsId=986 ;; FTA 강국 KOREA|https://fta.motir.go.kr/

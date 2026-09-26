@@ -1,6 +1,6 @@
 ---
 title: 홍콩 수출 (자유항이지만 규제는 있습니다)
-keywords: 홍콩, 자유항, 무관세, Cap 424, Cap 456, EMSD, 전기제품, CFS 식품표시, OFCA, 수출입신고 14일, CEPA, 전자담배 금지
+keywords: 홍콩, 자유항, 무관세, Cap 424, Cap 456, EMSD, 전기제품, CFS 식품표시, OFCA, 수출입신고 14일, CEPA, 전자담배 금지, 인증, 수출 인증, 인증 필요
 must: 홍콩, hongkong, cepa, emsd, 홍콩 통관, 홍콩 인증
 ask: 홍콩은 인증이 필요 없나요?
 links: 홍콩세관 수출입신고(14일 의무)|https://www.customs.gov.hk/en/service-enforcement-information/cargo-clearance/import-export-declaration/index.html ;; 홍콩세관 완구·아동용품 안전(Cap 424)|https://www.customs.gov.hk/en/service-enforcement-information/consumer-protection/toys-safety/index.html ;; 홍콩세관 소비재 안전(Cap 456)|https://www.customs.gov.hk/en/service-enforcement-information/consumer-protection/goods-safety/index.html ;; EMSD 전기제품 안전규정|https://www.emsd.gov.hk/en/electricity_safety/publications/guidance_notes_guidelines/outline_of_electrical_products_safety_regulation/index.html ;; CFS 식품안전센터 수입식품|https://www.cfs.gov.hk/english/import/import_ifc.html ;; TID 공업무역서 CEPA|https://www.tid.gov.hk/en/our_work/cepa/trade_in_goods.html

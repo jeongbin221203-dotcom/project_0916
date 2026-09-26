@@ -1,6 +1,6 @@
 ---
 title: 태국 수출 인증 (TISI · TIS 마크)
-keywords: 태국, TISI, TIS 마크, 태국산업표준원, QR코드 라벨, Thai FDA, NBTC, 태국 통관
+keywords: 태국, TISI, TIS 마크, 태국산업표준원, QR코드 라벨, Thai FDA, NBTC, 태국 통관, 인증, 수출 인증, 인증 필요
 must: 태국, tisi, tis마크, tis 마크, thai fda, nbtc
 ask: 태국 수출할 때 인증이 필요한가요?
 links: 태국산업표준원 TISI|https://www.tisi.go.th/ ;; TISI 강제표준 목록(영문)|https://www.tisi.go.th/website/standardlist/compulsory_en ;; TISI 인허가 신청 포털|https://www.tisi.go.th/app-licence/en ;; 태국 식약청 Thai FDA|https://en.fda.moph.go.th/ ;; KTC 태국 인증 안내|https://www.ktc.re.kr/asia/thailand.asp

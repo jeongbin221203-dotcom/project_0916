@@ -1,6 +1,6 @@
 ---
 title: 인도네시아 수출 인증 (SNI · 할랄 · BPOM)
-keywords: 인도네시아, 인니, SNI, SPPT-SNI, 할랄, BPJPH, SIHALAL, BPOM, ML 번호, SDPPI, 인니 통관, IK-CEPA
+keywords: 인도네시아, 인니, SNI, SPPT-SNI, 할랄, BPJPH, SIHALAL, BPOM, ML 번호, SDPPI, 인니 통관, IK-CEPA, 인증, 수출 인증, 인증 필요
 must: 인도네시아, 인니, sni, 할랄, bpjph, bpom, sdppi
 ask: 인도네시아 수출할 때 SNI 인증이나 할랄 인증이 필요한가요?
 links: BPJPH 할랄인증청|https://bpjph.halal.go.id/ ;; SIHALAL 할랄인증 신청포털|https://ptsp.halal.go.id/ ;; BPOM 인도네시아 식약청|https://www.pom.go.id/ ;; 인도네시아 관세청 Bea Cukai|https://www.beacukai.go.id/ ;; 인도네시아 무역부 Kemendag|https://www.kemendag.go.id/ ;; SDPPI 통신기기 인증|https://pelayanansdppi.postel.go.id/

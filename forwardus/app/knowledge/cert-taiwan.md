@@ -1,6 +1,6 @@
 ---
 title: 대만 수출 인증 (BSMI · NCC · TFDA)
-keywords: 대만, BSMI, 상품검험표식, CNS, NCC, 심험합격표첨, TFDA, 번체중문 라벨, 대만 통관, 대만 FTA 없음
+keywords: 대만, BSMI, 상품검험표식, CNS, NCC, 심험합격표첨, TFDA, 번체중문 라벨, 대만 통관, 대만 FTA 없음, 인증, 수출 인증, 인증 필요
 must: 대만, bsmi, ncc, tfda, cns, 대만 인증
 ask: 대만 수출할 때 BSMI 인증이 필요한가요?
 links: 經濟部標準檢驗局 BSMI|https://www.bsmi.gov.tw/wSite/mp?mp=2 ;; BSMI 검사대상 상품 전용구역|https://www.bsmi.gov.tw/wSite/np?ctNode=8799&mp=1 ;; BSMI 온라인 신청시스템|https://civil.bsmi.gov.tw/ ;; 全國法規資料庫 NCC 근거법령|https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=K0060137 ;; 衛生福利部 TFDA|https://www.fda.gov.tw/ENG/index.aspx ;; 대만 관세청|https://web.customs.gov.tw/en/

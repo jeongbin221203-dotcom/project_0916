@@ -1,6 +1,6 @@
 ---
 title: 일본 PSE · JIS · 식품 수입신고
-keywords: 일본, PSE, PSE 마크, 전기용품안전법, 전안법, JIS, JIS 마크, 식품위생법, 식품등 수입신고, METI, JET, JQA, 일본 통관
+keywords: 일본, PSE, PSE 마크, 전기용품안전법, 전안법, JIS, JIS 마크, 식품위생법, 식품등 수입신고, METI, JET, JQA, 일본 통관, 인증, 수출 인증, 인증 필요
 must: pse, jis, 일본 인증, 일본 수출, 전기용품안전법, 전안법, 식품등 수입신고, 일본 통관
 ask: 일본 수출할 때 PSE 인증이 필요한가요?
 links: METI 전기용품안전법 공식|https://www.meti.go.jp/policy/consumer/seian/denan/index.htm ;; METI 특정전기용품 116품목 일람|https://www.meti.go.jp/policy/consumer/seian/denan/specified_electrical.html ;; METI 전안법 절차 흐름|https://www.meti.go.jp/policy/consumer/seian/denan/procedure.html ;; JISC JIS 마크 제도 안내|https://www.jisc.go.jp/eng/jis-mark/newjis-eng.html ;; 후생노동성 식품 등 수입절차|https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000144562.html ;; KTC 일본 PSE 안내(한국어)|https://www.ktc.re.kr/asia/japan.asp

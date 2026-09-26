@@ -1,6 +1,6 @@
 ---
 title: 호주 수출 인증 (RCM · EESS · ACMA)
-keywords: 호주, RCM, ACMA, EESS, 생물보안, BICON, Responsible Supplier, ABN, AS/NZS, 한·호주 FTA, 호주 통관, BMSB
+keywords: 호주, RCM, ACMA, EESS, 생물보안, BICON, Responsible Supplier, ABN, AS/NZS, 한·호주 FTA, 호주 통관, BMSB, 인증, 수출 인증, 인증 필요
 must: 호주, rcm, eess, acma, 호주 인증, 호주 통관
 ask: 호주 수출할 때 RCM 마크가 필요한가요?
 links: EESS RCM 제도|https://www.eess.gov.au/rcm/regulatory-compliance-mark-rcm-general/ ;; EESS Responsible Supplier 요건|https://www.eess.gov.au/responsible-supplier/manufacturers-and-importers-responsible-suppliers/ ;; EESS 등록 수수료|https://www.eess.gov.au/registration/registration-fees/ ;; EESS 공인인증기관(RECS) 목록|https://www.eess.gov.au/safety-requirements/certification-general/recognised-external-certification-scheme-recs-certifiers/ ;; FSANZ 식품기준코드|https://www.foodstandards.gov.au/food-standards-code ;; 관세청 FTA 포털|https://www.customs.go.kr/ftaportalkor/main.do
