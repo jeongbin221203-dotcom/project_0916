@@ -271,7 +271,14 @@ def lookup(question: str) -> dict | None:
     if entry:
         name = _compact(place)
         about_country = any(name in word for word in entry["_match"] + entry["_must"])
-        if about_country:
+        # **그 나라 전용 글이면** 이름이 글자 그대로 겹치지 않아도 그 글입니다.
+        #
+        # "유럽 수출할 때 CE 마킹은 어떻게 받나요?"가 일반 안내(country-eu)로
+        # 샜습니다. cert-eu-ce는 EU 전용 글인데, 나라 이름이 "유럽연합(EU)"이라
+        # 글자 겹침으로는 안 잡혔기 때문입니다. 물어본 것은 CE인데 답은
+        # "유럽 수출하기"가 나왔습니다. (2026-09-26)
+        detail = _country_detail(code)
+        if about_country or (detail and detail["key"] == entry["key"]):
             return entry
 
     # 그 나라 전용 글이 따로 있고, 인증·규제를 묻는 말이면 그 글을 냅니다.
@@ -292,8 +299,11 @@ def _country_detail(code: str) -> dict | None:
 
     from app.processors import country_export_guide
 
-    note = country_export_guide.NOTES.get((code or "").upper())
-    if not note and (code or "").upper() in country_export_guide._eu_members():
+    code = (code or "").upper()
+    note = country_export_guide.NOTES.get(code)
+    # "EU" 자체는 회원국 목록에 없습니다. 그래서 "유럽 수출할 때 CE 마킹은"이
+    # EU 전용 글을 못 찾고 일반 안내로 샜습니다. (2026-09-26)
+    if not note and (code == "EU" or code in country_export_guide._eu_members()):
         note = country_export_guide.EU_NOTE
     return get(note.get("knowledge", "")) if note else None
 

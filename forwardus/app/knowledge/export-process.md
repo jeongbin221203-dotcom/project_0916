@@ -1,7 +1,7 @@
 ---
 title: 수출 전체 절차 (계약부터 대금 회수까지)
-keywords: 수출 절차, 수출절차, 수출 과정, 수출 순서, 수출하려면, 처음 수출, 수출 준비, 무역 절차, 수출 단계
-must: 수출 절차, 수출절차, 수출 과정, 수출 순서, 수출하려면, 처음 수출, 수출 준비, 수출 단계
+keywords: 수출 절차, 수출절차, 수출 과정, 수출 순서, 수출하려면, 처음 수출, 수출 준비, 무역 절차, 수출 단계, 어떤 순서, 수출 흐름, 수출 진행, 진행되나요
+must: 수출 절차, 수출절차, 수출 과정, 수출 순서, 수출하려면, 처음 수출, 수출 준비, 수출 단계, 어떤 순서, 수출 흐름, 수출 진행
 ask: 수출은 어떤 순서로 진행되나요?
 links: 📄 서류 작성하러 가기|/documents/new ;; 📦 운송 계획|/planning/new ;; 무역협회 TradeNAVI (수출 정보 통합)|https://www.tradenavi.or.kr ;; KOTRA 해외시장뉴스|https://dream.kotra.or.kr
 see: export-declaration, forwarder-booking, letter-of-credit, export-requirement-check

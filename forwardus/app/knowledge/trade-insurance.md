@@ -1,7 +1,7 @@
 ---
 title: 무역보험·적하보험 (대금을 못 받을 때)
-keywords: 무역보험, 수출보험, K-SURE, 무역보험공사, 단기수출보험, 적하보험, 해상보험, 보험, 미수금, 신용조사, ICC(A), 부보
-must: 무역보험, 수출보험, ksure, k-sure, 무역보험공사, 적하보험, 해상보험, 부보, 신용조사
+keywords: 무역보험, 수출보험, K-SURE, 무역보험공사, 단기수출보험, 적하보험, 해상보험, 보험, 미수금, 신용조사, ICC(A), 부보, 대금을 못 받, 돈을 못 받, 떼이면, 보상받, 못 받으면
+must: 무역보험, 수출보험, ksure, k-sure, 무역보험공사, 적하보험, 해상보험, 부보, 신용조사, 대금을 못 받, 돈을 못 받, 떼이면, 못 받으면, 보상받
 ask: 수출 대금을 못 받으면 보상받을 수 있나요?
 links: 한국무역보험공사 K-SURE|https://www.ksure.or.kr ;; 무역협회 TradeNAVI|https://www.tradenavi.or.kr
 see: payment-tt, incoterms-2020, letter-of-credit
