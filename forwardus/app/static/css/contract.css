@@ -38,3 +38,20 @@
 @media (max-width: 620px) {
   .cc_head { align-items: flex-start; }
 }
+
+/* 계약서 창은 **창 안에서 굴립니다.**
+   HS 창은 후보 목록 하나만 굴리면 되어 .hs_modal_body가 overflow: hidden 입니다.
+   그 틀을 그대로 쓰니 판정 결과(빠진 조항·독소조항)가 창 밖으로 잘려 나가고,
+   굴릴 막대도 없어 아래를 볼 수가 없었습니다. (2026-09-26) */
+[data-contract-modal] .hs_modal_body {
+  overflow-y: auto; overscroll-behavior: contain; padding-right: 6px;
+  /* 막대를 늘 보여 줍니다. 숨기면 아래에 더 있다는 걸 알 수가 없습니다. */
+  scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
+}
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar { width: 8px; }
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar-thumb {
+  border-radius: 999px; background: #cbd5e1; }
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar-track { background: transparent; }
+/* 붙여 넣는 칸이 너무 길면 창을 통째로 밀어냅니다. 그 칸도 제 안에서 굴립니다. */
+.cc_paste textarea { max-height: 34vh; }
