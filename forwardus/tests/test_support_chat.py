@@ -245,3 +245,58 @@ def test_모드와_안_맞는_항구는_기준으로_내세우지_않는다(app,
                          json={"question": "항공으로 보내면 얼마나 걸리나요?"})
     assumed = (answer.get_json()["data"] or {}).get("assumed") or {}
     assert "route" not in assumed
+
+
+def test_한_번_말한_모드는_구간을_다시_적어도_살아_있다(app, client, monkeypatch):
+    """"항공으로"라고 물은 사람이 구간을 적었다고 해상 설명까지 받으면 안 됩니다.
+
+    그리고 그때 항구도 **공항으로** 따라가야 합니다. 이 말만 보면 모드가 없어
+    해상 항구로 풀리므로, 합친 뒤에 다시 봅니다.
+    """
+
+    from app.services import support_chat_service
+
+    sent = {}
+    monkeypatch.setattr(support_chat_service.ai_client, "chat",
+                        lambda messages, **kw: (sent.update(m=messages) or
+                                                {"success": True, "source": "api", "data": "답"}))
+    client.post("/api/support-chat",
+                json={"question": "항공으로 보내면 얼마나 걸리나요?", "context": False})
+    client.post("/api/support-chat",
+                json={"question": "부산에서 로스앤젤레스로 11월 초에 보냅니다", "context": True})
+
+    basis = next(m["content"] for m in sent["m"]
+                 if m["role"] == "system" and "지금 작성 중인 건" in m["content"])
+    assert "김해국제공항 (PUS)" in basis and "로스앤젤레스국제공항 (LAX)" in basis
+    assert "운송 항공" in basis
+    assert "해상과 항공을 둘 다" not in basis        # 모드를 말했으니 한쪽만 답합니다
+
+
+def test_모드를_한_번도_말하지_않으면_해상_항공을_둘_다_짚는다(app, client, monkeypatch):
+    from app.services import support_chat_service
+
+    sent = {}
+    monkeypatch.setattr(support_chat_service.ai_client, "chat",
+                        lambda messages, **kw: (sent.update(m=messages) or
+                                                {"success": True, "source": "api", "data": "답"}))
+    client.post("/api/support-chat",
+                json={"question": "부산에서 로스앤젤레스로 11월 초에 보냅니다", "context": False})
+    client.post("/api/support-chat", json={"question": "서류는 뭐가 필요한가요?", "context": True})
+
+    basis = next(m["content"] for m in sent["m"]
+                 if m["role"] == "system" and "지금 작성 중인 건" in m["content"])
+    assert "해상과 항공을 둘 다" in basis
+
+
+def test_치수만_적고_구간을_모르면_AI를_부르지_않는다(app):
+    """구간을 모르는 채로 AI가 답하면 기간·비용·서류를 다 지어냅니다."""
+
+    from app.services import support_chat_service
+
+    with app.app_context():
+        answer = support_chat_service.ask("치약 500박스, 한 박스 40x30x25cm에 12kg입니다")
+    assert answer["source"] == "calculated"
+    body = answer["data"]["answer"]
+    assert "15.000 CBM" in body and "FCL" in body
+    assert "어디에서 어디로 보내시나요?" in body
+    assert answer["data"]["cargo"]["total_cbm"] == 15.0

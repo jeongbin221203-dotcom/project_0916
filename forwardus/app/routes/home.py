@@ -224,23 +224,25 @@ def api_support_chat():
     # 에서 도착지만 읽힌 경우 출발지가 통째로 날아갑니다. 새로 말한 곳은 덮고
     # 말하지 않은 곳은 그대로 둡니다 — 출발항은 대개 그대로이고, 위험한 것은
     # **묵은 도착지**입니다.
-    # **구간을 다시 말했는데 모드를 안 말했으면, 모드는 다시 묻습니다.**
+    # 한 번 말한 모드는 **다시 말할 때까지 살아 있습니다.**
     #
-    # "부산에서 로스앤젤레스로 보냅니다"에는 배인지 비행기인지가 없습니다.
-    # 그런데 앞서 "항공으로"라고 물은 적이 있으면 그 항공이 따라붙어,
-    # 해상 항구(부산항·로스앤젤레스항)에 "항공으로 수출할 경우"라고 답했습니다.
-    # 구간이 새로 나온 자리에서 지난 모드는 더 이상 근거가 아닙니다. 비워 두면
-    # 아래에서 **해상·항공 둘 다** 짚어 드립니다. (2026-09-26 사용자 결정)
-    if (said_fields.get("origin_code") or said_fields.get("destination_code")) \
-            and not said_fields.get("transport_mode"):
-        at.pop("transport_mode", None)
+    # 구간을 다시 적었다고 모드를 지웠더니, 바로 앞에서 "항공으로 보내면"이라고
+    # 물은 사람이 다음 답에서 해상 설명까지 함께 받았습니다. 물어본 사람은
+    # 방금 항공이라고 말했는데도요. 모드를 모르는 것과 지운 것은 다릅니다.
+    # (한 번도 말하지 않았을 때만 해상·항공을 둘 다 짚어 드립니다) (2026-09-26)
+    #
     # 담아 둔 항구가 모드와 안 맞으면 그 모드로 다시 풉니다. 해상 항구를 들고
     # "항공 기준으로 답했습니다"라고 하면 머리글과 본문이 어긋납니다.
     # 이번 말에서 읽은 것이 먼저라, 다시 푼 값을 밑에 깔고 그 위에 얹습니다.
-    mode_now = said_fields.get("transport_mode") or at.get("transport_mode")
-    if mode_now and not chat_capture_service.ports_match_mode(at, mode_now):
-        at = {**at, **chat_capture_service.retune_ports(at, mode_now)}
+    #
+    # **합친 다음에** 봅니다. 이번 말의 항구는 그 말에 모드가 없으면 해상으로
+    # 풀립니다. "항공으로"라고 먼저 말해 둔 사람이 그 다음에 "부산에서
+    # 로스앤젤레스로"라고 적으면, 이 말만 보고는 해상 항구가 됩니다.
+    # 합치기 전에 검사하면 그 해상 항구를 놓칩니다.
     at.update(said_fields)
+    mode_now = at.get("transport_mode")
+    if mode_now and not chat_capture_service.ports_match_mode(at, mode_now):
+        at.update(chat_capture_service.retune_ports(at, mode_now))
     at = {key: value for key, value in at.items() if value}
     if said_item.get("product_description"):
         goods = dict(said_item)

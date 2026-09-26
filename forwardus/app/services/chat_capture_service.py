@@ -238,11 +238,14 @@ def capture(viewer, message: str) -> list[str]:
     fields = {key: value for key, value in read_values["fields"].items()
               if key in work_draft_service.SHARED_FIELDS and value}
     # 담아 둔 항구가 모드와 안 맞으면 그 모드로 다시 풉니다. (retune_ports 참고)
-    # **이번 말에서 읽은 것이 먼저입니다.** 다시 푼 값을 밑에 깔고 그 위에 얹습니다.
-    # (순서를 바꿨더니 방금 읽은 공항이 지워졌습니다)
-    mode = fields.get("transport_mode") or known_fields.get("transport_mode")
-    if mode and not ports_match_mode(known_fields, mode):
-        fields = {**retune_ports(known_fields, mode), **fields}
+    #
+    # **합친 다음에** 봅니다. 이번 말의 항구는 그 말에 모드가 없으면 해상으로
+    # 풀립니다. "항공으로"라고 먼저 말해 둔 사람이 그 다음에 "부산에서
+    # 로스앤젤레스로"라고 적으면, 이 말만 보고는 해상 항구가 됩니다.
+    merged = {**known_fields, **fields}
+    mode = merged.get("transport_mode")
+    if mode and not ports_match_mode(merged, mode):
+        fields = {**fields, **retune_ports(merged, mode)}
     items = []
     if read_values["items"]:
         item = {key: value for key, value in read_values["items"][0].items()
