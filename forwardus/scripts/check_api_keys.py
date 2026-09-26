@@ -50,6 +50,12 @@ def _mark(result: dict) -> str:
 
 
 def main() -> int:
+    # 윈도 기본 콘솔은 cp949라 한글 대시(—)에서 죽습니다. 다 돌려 놓고
+    # 마지막 출력에서 멈추면 아무것도 못 봅니다. (2026-09-26)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
     app = create_app(Config)
     with app.app_context():
         from app.collectors import (carrier_client, customs_client, customs_extra_client,

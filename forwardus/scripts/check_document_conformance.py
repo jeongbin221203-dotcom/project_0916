@@ -66,6 +66,12 @@ def pick_breaker(field: str) -> str:
 
 
 def main() -> int:
+    # 윈도 기본 콘솔은 cp949라 한글 대시(—)에서 죽습니다. 다 돌려 놓고
+    # 마지막 출력에서 멈추면 아무것도 못 봅니다. (2026-09-26)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
     rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 100
     random.seed(20260926)                       # 같은 결과가 다시 나오게
 
