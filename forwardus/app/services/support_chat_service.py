@@ -302,7 +302,13 @@ def _write_answer(bundle: dict, text: str, history: list | None, *,
                                         "쓰지 마세요. 특히 구간은 위에 적힌 것만 쓰고, "
                                         "다른 항구 이름을 답에 적지 마세요. "
                                         "사용자가 이번 말에서 다른 구간을 적었다면 그 말을 "
-                                        "따르고, 그때는 그렇게 바뀌었다고 밝히세요."})
+                                        "따르고, 그때는 그렇게 바뀌었다고 밝히세요."
+                                        + ("" if current.get("운송") else
+                                           " 운송 모드(해상/항공)는 아직 정해지지 "
+                                           "않았습니다. **해상과 항공을 둘 다** 나눠 "
+                                           "설명하고, 기간·비용·서류가 어떻게 다른지 "
+                                           "짚어 주세요. 한쪽만 고르지 마세요. "
+                                           "마지막에 어느 쪽으로 보내실지 물어보세요.")})
     messages.append({"role": "user", "content": text})
 
     if brief:
@@ -374,6 +380,16 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     hs_answer = _hs_code_answer(text)
     if hs_answer is not None:
         return hs_answer
+
+    # 치수·수량만 적어 보냈는데 **어디로 보내는지 모르면**, AI를 부르지 않고
+    # CBM만 알려 드립니다.
+    #
+    # 구간을 모르는 채로 AI가 답하면 기간·비용·서류를 다 지어내게 됩니다.
+    # 정작 그 자리에서 사람이 알고 싶은 것은 "이게 몇 CBM이고 LCL이냐 FCL이냐"
+    # 하나이고, 그건 계산이라 우리가 바로 답할 수 있습니다. (2026-09-26 사용자 결정)
+    cargo_answer = _cargo_only_answer(text, current)
+    if cargo_answer is not None:
+        return cargo_answer
 
     # 뜻이 없는 말은 AI를 부르지 않고 되묻습니다.
     #
@@ -692,6 +708,53 @@ def _dotted(digits: str) -> str:
     if len(digits) == 6:
         return f"{digits[:4]}.{digits[4:]}"
     return digits
+
+
+def _cargo_only_answer(text: str, current) -> dict | None:
+    """치수·수량만 적었고 구간을 모를 때. CBM만 알려 주고 어디로 보내는지 묻습니다.
+
+    구간을 알면 None을 돌려줍니다(그때는 AI가 기간·비용까지 답합니다).
+    치수가 한 칸이라도 비면 계산하지 않습니다 — 반쪽 숫자가 더 위험합니다.
+    """
+
+    from app.services import chat_capture_service
+
+    if (current or {}).get("구간"):
+        return None
+    read_values = chat_capture_service.read(text) or {}
+    item = (read_values.get("items") or [{}])[0] if read_values.get("items") else {}
+    summary = chat_capture_service.cargo_summary(item) if item else None
+    if not summary:
+        return None
+    # 구간 말고 다른 것을 함께 물었으면 그 말에 답해야 합니다. 치수만 적은 말일 때만 나섭니다.
+    if "?" in text and not read_values.get("fields"):
+        return None
+
+    from app.processors import korean
+
+    name = item.get("product_description") or "화물"
+    air = summary.get("air") or {}
+    # 품명은 사람이 적은 말이라 받침을 알 수 없습니다. 조사를 맞춰 붙입니다.
+    lines = [f"적어 주신 **{name}**{korean.particle(name, '으로')} 계산하면 이렇습니다.", "",
+             f"- **총 부피 {summary['total_cbm']:,.3f} CBM** "
+             f"(한 포장 {summary['per_package_cbm']:,.3f} CBM)",
+             f"- 총 중량 {summary['total_weight_kg']:,.1f} kg",
+             f"- 해상 운임톤 **{summary['revenue_ton']:,.3f} R/T** → "
+             f"**{summary['mode']}**"
+             + (f" · {summary['containers']}대 ({summary['container_type']})"
+                if summary.get("container_type") else ""),
+             f"  - {summary.get('reason', '')}"]
+    if air.get("chargeable_weight_kg"):
+        lines += [f"- 항공 청구중량 **{air['chargeable_weight_kg']:,.1f} kg** "
+                  f"({air.get('charged_by', '')} 기준)",
+                  f"  - 용적중량 {air.get('volume_weight_kg', 0):,.1f} kg "
+                  "= 가로×세로×높이 ÷ 6,000. 실중량과 견줘 **큰 쪽**으로 냅니다."]
+    lines += ["",
+              "**어디에서 어디로 보내시나요?** 구간을 알려 주시면 기간·운임·필요 서류까지 "
+              "이어서 봐 드립니다. (해상인지 항공인지도 함께 적어 주시면 더 정확합니다)"]
+    return {"success": True, "source": "calculated", "data": {
+        "answer": "\n".join(lines), "route": "cargo", "cargo": summary,
+    }}
 
 
 def _incoterms_of(current) -> str:

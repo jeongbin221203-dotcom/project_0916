@@ -444,7 +444,13 @@
     const slow = setTimeout(() => {
       waiting.textContent = "관세청·무역보험공사 데이터를 조회해 분석하고 있습니다…";
     }, 4000);
-    const response = await postJson(config.chatUrl, { question, history }, 120000);
+    // 담아 둔 지난 건(구간·품목)을 **이 대화에서 쓸지**. 새로고침하거나 로고를
+    // 눌러 들어오면 꺼진 채로 시작합니다. 화면은 비웠는데 답은 지난 건을 기준으로
+    // 하면, 물어본 사람은 그 구간을 어디서 가져왔는지 알 수가 없습니다.
+    // 지난 대화를 불러오거나 이 대화에서 구간·품목을 적으면 그때 켜집니다.
+    // (2026-09-26 사용자 결정)
+    const response = await postJson(config.chatUrl,
+      { question, history, context: basisOn }, 120000);
     clearTimeout(slow);
     sendButton.disabled = false;
     waiting.remove();
@@ -482,6 +488,8 @@
     appendLinks(row, response.data.links);
     if (response.data.assumed) appendRoute(row, response.data.assumed);
     // 대화에 적은 화물 정보를 담아 두었으면 한 줄 알립니다. 어디에 쓰이는지까지.
+    // 이 대화에서 구간·품목을 담았으면, 이제부터는 그것을 기준으로 씁니다.
+    if ((response.data.captured || []).length) basisOn = true;
     if ((response.data.captured || []).length) {
       const note = document.createElement("p");
       note.className = "answer_kept";
@@ -1261,6 +1269,9 @@
     if (message.extra && message.extra.nextStep) showNextStep();
   }
 
+  // 담아 둔 지난 건을 기준으로 쓸지. 새로 들어오면 꺼져 있습니다.
+  let basisOn = false;
+
   function restore() {
     const messages = chat.messages();
     if (!messages.length) return;
@@ -1322,6 +1333,7 @@
 
     card.querySelector("[data-kept-open]").addEventListener("click", () => {
       const messages = chat.restoreKept(SOURCE);
+      basisOn = true;          // 이어서 보면 그 대화의 기준도 함께 삽니다
       card.remove();
       if (!messages) return;
       logEl.innerHTML = "";
@@ -1348,6 +1360,7 @@
         const pick = [...listEl.querySelectorAll("input:checked")].map((box) => Number(box.value));
         if (!pick.length) return;                 // 하나도 안 고르면 아무 일도 안 합니다
         const messages = chat.restoreKept(SOURCE, pick);
+        basisOn = true;        // 골라서 불러와도 마찬가지입니다
         card.remove();
         if (!messages) return;
         logEl.innerHTML = "";
