@@ -435,6 +435,11 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
         "total": len(found),
         "ai_used": ai_used,
         "ai_available": ai_client.available(),
+        # 도착국이 요구하는 것을 어디에 물어야 하는지. "FDA 인증이 필요합니다"까지만
+        # 말하면 사람은 또 검색해야 하고, 검색하면 대행업체가 먼저 나옵니다.
+        # 표에 없는 나라는 빈 목록입니다 — 지어내지 않습니다.
+        "country_agencies": document_issuers.agencies_for(country_code),
+        "country_code": country_code,
         "note": "여기 나오는 것은 '확인해야 할 것'입니다. 최종 판단은 세관과 수입국이 합니다. "
                 "올려 두신 파일은 관세사에게 넘길 자료에 함께 들어갑니다.",
     }
