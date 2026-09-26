@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 
+from flask import current_app
+
 from app.collectors.base_client import fail, get_config, ok, request_text
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
@@ -58,7 +60,11 @@ def embed(texts: list[str], *, timeout: float = 20) -> dict:
 
     key = get_config("AI_API_KEY", "")
     if not key:
-        return fail("API_AUTH_FAILED", "api", "AI 키(AI_API_KEY)가 없습니다.")
+        # 이 실패는 부르는 쪽이 낱말 검색으로 돌아가는 신호라 화면에 잘 안 뜹니다.
+        # 그래도 뜰 수 있으니 이용자의 말로 적습니다. 설정 이야기는 기록에만.
+        current_app.logger.info("AI_API_KEY 가 비어 있어 낱말 검색으로 답합니다.")
+        return fail("API_AUTH_FAILED", "api",
+                    "지금은 뜻으로 찾기를 쓸 수 없어 낱말로 찾았습니다.")
     if not texts:
         return ok([], "api")
     result = request_text("POST", OPENAI_EMBED_URL, timeout=timeout,
@@ -142,8 +148,12 @@ def chat(messages: list[dict], *, max_tokens: int = 700, tools: list[dict] | Non
 
     key = get_config("AI_API_KEY", "")
     if not key:
+        # 이용자에게는 **할 수 있는 일**을 알려 줍니다. 키 이름·.env 는 운영하는
+        # 사람의 말이지 수출자의 말이 아닙니다. 그대로 보여 주면 이용자는 자기가
+        # 뭘 잘못한 줄 알고 멈춥니다. 설정 이야기는 로그에만 남깁니다. (2026-09-26)
+        current_app.logger.warning("AI_API_KEY 가 비어 있어 AI 상담을 건너뜁니다.")
         return fail("API_AUTH_FAILED", "api",
-                    "AI 상담 키(AI_API_KEY)가 없습니다. .env에 키를 넣으면 바로 동작합니다.")
+                    "지금은 AI 상담을 쓸 수 없습니다. HS CODE 조회 · 운송 예상 견적 · 서류 작성은 그대로 쓰실 수 있습니다.")
 
     messages = list(messages)
     used: list[dict] = []
@@ -198,9 +208,10 @@ def review_document(document_text: str, context: dict) -> dict:
 
     key = get_config("AI_API_KEY", "")
     if not key:
+        current_app.logger.warning("AI_API_KEY 가 비어 있어 서류 자동 대조를 건너뜁니다.")
         return fail("API_AUTH_FAILED", "api",
-                    "AI 분석 키(AI_API_KEY)가 없습니다. .env에 키를 넣으면 업로드한 "
-                    "서류를 자동으로 대조해 드립니다.")
+                    "지금은 올리신 서류를 자동으로 읽어 드릴 수 없습니다. "
+                    "서류 작성 화면에서 직접 적으시면 나머지는 그대로 만들어 드립니다.")
 
     text = (document_text or "").strip()
     if not text:

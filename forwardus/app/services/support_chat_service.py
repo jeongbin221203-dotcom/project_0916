@@ -492,8 +492,13 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     result = outcome["answer"] or {"success": False, "message": "답을 만들지 못했습니다.",
                                    "source": "internal"}
     if not result["success"]:
+        # **실패 사유를 함께 넘깁니다.** 여태 error_code 를 떨어뜨려서, 우리 쪽에
+        # 키가 없는 것(우리 사정)도 502(기관이 죽음)로 나갔습니다. 화면·감시
+        # 도구는 그걸 "바깥이 죽었다"로 읽습니다. 사유가 사라지면 상태코드를
+        # 고를 수가 없습니다. (app/routes/__init__.py 의 collector_response)
+        # (2026-09-26)
         return {"success": False, "message": result["message"], "source": result["source"],
-                "trace": trace}
+                "error_code": result.get("error_code") or "", "trace": trace}
     data = {"answer": result["data"]}
     # 어떤 공공데이터로 답했는지. 화면이 답 아래에 근거를 표시합니다.
     used = [label for call in result.get("tools_used") or [] if call.get("success")
@@ -849,8 +854,7 @@ def intro() -> dict:
         "greeting": GREETING,
         "suggestions": list(SUGGESTIONS),
         "available": available(),
-        "offline_note": ("AI 상담 키(AI_API_KEY)가 없어 지금은 답변할 수 없습니다. "
-                         ".env에 키를 넣으면 바로 동작합니다."),
+        "offline_note": ("지금은 AI 상담을 쓸 수 없습니다. HS CODE 조회 · 운송 예상 견적 · 서류 작성은 그대로 쓰실 수 있습니다."),
         "lookup_links": [
             {"label": link["label"], "url": link["url"]}
             for link in export_requirements.LOOKUP_LINKS.values()

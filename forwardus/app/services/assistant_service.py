@@ -374,8 +374,9 @@ def ai_answer(shipment, question: str) -> dict:
 
     if not ai_client.available():
         fallback = answer_question(shipment, text)
-        fallback["note"] = ("AI 상담 키(AI_API_KEY)가 없어 규칙 기반으로 답했습니다. "
-                            ".env에 키를 넣으면 자유롭게 물어볼 수 있습니다.")
+        # 이용자에게는 **무엇으로 답했는지**를 알려 줍니다. 키 이름은 적지 않습니다.
+        fallback["note"] = ("지금은 AI 상담을 쓸 수 없어, 이 건에 적힌 값으로 "
+                            "계산해 답했습니다. 수치는 그대로 믿으셔도 됩니다.")
         return fallback
 
     result = ai_client.chat([

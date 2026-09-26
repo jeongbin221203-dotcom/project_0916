@@ -78,8 +78,8 @@ def translate(text: str, code: str) -> dict:
     if language is None:
         raise ServiceError("고를 수 없는 언어입니다.", "VALIDATION_ERROR")
     if not available():
-        raise ServiceError("번역에 쓰는 AI 키(AI_API_KEY)가 없어 옮기지 못했습니다.",
-                           "AI_UNAVAILABLE", 503)
+        raise ServiceError("지금은 다른 나라 말로 옮겨 드릴 수 없습니다. "
+                           "원문은 그대로 쓰실 수 있습니다.", "AI_UNAVAILABLE", 503)
 
     # 계좌번호·SWIFT는 가린 채 보내고, 돌아온 뒤 제자리에 되돌립니다.
     masked, secrets = bank_redaction.redact(body)

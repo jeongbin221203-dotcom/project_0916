@@ -673,8 +673,10 @@ def extract(filename: str, data: bytes) -> dict:
     """파일 하나를 읽어 서류 작성 화면이 그대로 쓰는 초안을 돌려줍니다."""
 
     if not available():
-        raise ServiceError("AI 키(AI_API_KEY)가 없어 서류를 읽을 수 없습니다. "
-                           "칸을 직접 채워 주세요.", "API_AUTH_FAILED")
+        # 키 이름은 운영하는 사람의 말입니다. 이용자에게는 할 일만 알려 줍니다.
+        raise ServiceError("지금은 올리신 서류를 자동으로 읽어 드릴 수 없습니다. "
+                           "칸을 직접 채워 주시면 나머지는 그대로 만들어 드립니다.",
+                           "API_AUTH_FAILED")
     text, images = read_upload(filename, data)
     # 사진·스캔 PDF는 Tesseract로 글자를 먼저 읽어 그림과 함께 넘깁니다. (app/processors/ocr.py)
     found = ocr_text(text, images)

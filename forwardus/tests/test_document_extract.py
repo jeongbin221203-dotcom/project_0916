@@ -254,7 +254,13 @@ def test_키가_없으면_읽지_않고_알린다(app, client):
                                content_type="multipart/form-data")
 
     assert response.status_code == 400
-    assert "AI_API_KEY" in response.get_json()["message"]
+    # 이용자에게는 키 이름·.env 를 보여 주지 않습니다. 운영하는 사람의 말이라
+    # 그대로 보여 주면 이용자는 자기가 뭘 잘못한 줄 알고 멈춥니다.
+    # 지키려는 것은 그대로입니다 — **지어내지 말고 못 한다고 알려 줄 것.**
+    # (2026-09-26 tests/test_user_facing_messages.py 도 함께 보세요)
+    message = response.get_json()["message"]
+    assert "AI_API_KEY" not in message and ".env" not in message
+    assert "자동으로 읽어" in message and "직접" in message
 
 
 def test_파일_없이_부르면_거절한다(client):

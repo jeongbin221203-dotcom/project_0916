@@ -280,8 +280,9 @@ def read(text: str) -> dict:
     if len(written) > MAX_TEXT:
         raise ValidationError(f"글이 너무 깁니다. {MAX_TEXT:,}자 아래로 줄여 주세요.", "text")
     if not available():
-        raise ServiceError("AI 키(AI_API_KEY)가 없어 글을 읽을 수 없습니다. "
-                           "칸을 직접 채워 주세요.")
+        # 키 이름은 운영하는 사람의 말입니다. 이용자에게는 할 일만 알려 줍니다.
+        raise ServiceError("지금은 붙여 넣으신 글을 자동으로 읽어 드릴 수 없습니다. "
+                           "칸을 직접 채워 주시면 나머지는 그대로 만들어 드립니다.")
 
     prompt = EXTRACT_PROMPT.format(today=date.today().isoformat())
     # 계좌번호·SWIFT는 AI로 보내지 않습니다. (붙여 넣은 오퍼 글에 섞여 오는 일이 흔합니다)

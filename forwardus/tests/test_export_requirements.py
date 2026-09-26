@@ -138,7 +138,12 @@ def test_analysis_without_a_key_says_so_instead_of_guessing(app, create_shipment
         document = requirement_service.upload(shipment, _file(b"CERTIFICATE", "c.txt"), "cosmetic")
         reviewed = requirement_service.analyze(shipment, document.id)
         assert reviewed.review_status == "failed"
-        assert "AI_API_KEY" in reviewed.review_summary
+        # 이용자에게는 키 이름·.env 를 보여 주지 않습니다. 운영하는 사람의 말이라
+        # 그대로 보여 주면 이용자는 자기가 뭘 잘못한 줄 알고 멈춥니다.
+        # 지키려는 것은 그대로입니다 — **지어내지 말고 못 한다고 알려 줄 것.**
+        # (2026-09-26 tests/test_user_facing_messages.py 도 함께 보세요)
+        assert "AI_API_KEY" not in reviewed.review_summary
+        assert "자동으로 읽어" in reviewed.review_summary
         requirement_service.delete_upload(shipment, document.id)
 
 

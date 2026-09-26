@@ -122,11 +122,18 @@ def test_offline_when_no_key(app, monkeypatch):
         assert support_chat_service.available() is False
         intro = support_chat_service.intro()
         assert intro["available"] is False
-        assert "AI_API_KEY" in intro["offline_note"]
+        # 이용자에게는 키 이름·.env 를 보여 주지 않습니다. 운영하는 사람의 말이라
+        # 그대로 보여 주면 이용자는 자기가 뭘 잘못한 줄 알고 멈춥니다.
+        # 지키려는 것은 그대로입니다 — **지어내지 말고 못 한다고 알려 줄 것.**
+        # (2026-09-26 tests/test_user_facing_messages.py 도 함께 보세요)
+        assert "AI_API_KEY" not in intro["offline_note"]
+        assert "쓰실 수 있습니다" in intro["offline_note"]
 
         result = support_chat_service.ask("바이어가 갑자기 연락이 끊기면 어떻게 하나요")
         assert result["success"] is False
-        assert "AI_API_KEY" in result["message"]
+        assert "AI_API_KEY" not in result["message"]
+        assert "쓸 수 없습니다" in result["message"]
+        assert result["error_code"] == "API_AUTH_FAILED",             "사유가 사라지면 상태코드를 고를 수 없습니다"
 
 
 def test_endpoint_returns_the_answer(client, monkeypatch):
@@ -185,7 +192,8 @@ def test_assistant_falls_back_when_the_key_is_missing(app, create_shipment, monk
 
     assert result["source"] == "rule"
     assert result["lines"]
-    assert "AI_API_KEY" in result["note"]
+    assert "AI_API_KEY" not in result["note"]
+    assert "계산해 답했습니다" in result["note"]
 
 
 def test_대화에서_말한_구간이_저장된_지난_건을_이긴다(app, client, monkeypatch):
