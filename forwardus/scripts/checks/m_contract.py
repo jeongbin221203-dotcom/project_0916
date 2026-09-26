@@ -83,9 +83,16 @@ def shake(text: str) -> str:
         text = re.sub(r" ", "  ", text)
     if random.random() < 0.30:
         text = page_breaks(text)
+    # 하이픈 줄나눔과 대소문자 뒤섞기는 **같이 걸지 않습니다.**
+    #
+    # 줄 끝에서 갈린 낱말을 도로 붙일 때는 뒤가 소문자로 이어질 때만 붙입니다.
+    # 진짜 붙임표를 지우지 않으려는 규칙입니다. 그런데 시험이 대소문자를
+    # 무작위로 뒤섞으면 그 규칙에 안 걸립니다.
+    # **실제 PDF 는 대소문자를 뒤섞지 않습니다.** 둘을 같이 걸면 있지도 않은
+    # 실패가 나와, 밤새 돌린 기록이 그 한 가지로 채워집니다. (2026-09-26)
     if random.random() < 0.20:
         text = hyphenate(text)
-    if random.random() < 0.15:
+    elif random.random() < 0.19:
         text = "".join(ch.upper() if random.random() < 0.5 else ch.lower() for ch in text)
     if random.random() < 0.10:
         text = text.replace('"', "“", 1).replace('"', "”", 1)
