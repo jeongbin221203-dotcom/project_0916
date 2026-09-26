@@ -349,7 +349,23 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     # 못할 때 비로소 깊은 자료가 나섭니다. 둘 다 아니면 AI가 답하고, 그때는 둘을
     # 모두 근거로 붙입니다.
     from app.services import consult_chain, consult_tools, faq_cache, faq_index
-    from app.services import knowledge_service
+    from app.services import contract_clause_service, knowledge_service
+
+    # 계약서를 통째로 붙여 넣으면 **조항으로 답합니다.**
+    #
+    # 그냥 AI에게 넘기면 "요약해 드릴게요"가 돌아옵니다. 정작 알고 싶은 것은
+    # 빠진 필수조항과 들어 있는 독소조항입니다. 그건 AI 없이 우리가 찾습니다.
+    # 계약서로 보일 때만 나섭니다(제목 + 조항 두 가지 이상). (2026-09-26)
+    if contract_clause_service.looks_like_contract(text):
+        judged = contract_clause_service.review(text, _incoterms_of(current))
+        return {"success": True, "source": "contract", "data": {
+            "answer": contract_clause_service.as_text(judged),
+            "route": "contract",
+            "contract": {key: judged[key] for key in ("missing", "toxic", "gain", "present")},
+            "links": [{"label": "📜 조항 문안 받기 · 계약서 다시 올리기",
+                       "url": "/documents"}],
+        }}
+
     # 뜻이 없는 말은 AI를 부르지 않고 되묻습니다.
     #
     # "?"·"..."·"ㅁㄴㅇㄹ"·"a" 같은 것이 그대로 AI로 넘어가고 있었습니다.
@@ -567,6 +583,18 @@ _WORD = re.compile(r"[가-힣]{2,}|[A-Za-z]{3,}")
 
 def _has_meaning(text: str) -> bool:
     return bool(_WORD.search(str(text or "")))
+
+
+def _incoterms_of(current) -> str:
+    """지금 작성 중인 건의 인코텀즈. 없으면 빈 글자입니다.
+
+    보험조항은 CIF·CIP에서만 요구해야 해서, 이 값이 있으면 더 정확해집니다.
+    """
+
+    for name, value in (current or {}).items():
+        if "인코텀즈" in name or name.lower() == "incoterms":
+            return str(value or "").upper()
+    return ""
 
 
 def wants_data(text: str) -> bool:

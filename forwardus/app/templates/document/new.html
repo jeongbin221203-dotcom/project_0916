@@ -11,13 +11,7 @@
      Shipment 화면 탭 줄의 오른쪽 끝 "서류 작성 →"입니다. 그런데 돌아가는 길은
      제목 위에 맨 글자로 떠 있어, 짝이 안 맞아 보였습니다. 같은 높이·같은
      탭 줄에 두고 **왼쪽 끝**에 붙입니다. (2026-09-26) #}
-  {% if back %}
-    <nav class="sub_tabs doc_back" aria-label="돌아가기">
-      <a class="doc_back_link" href="{{ back.url }}">← {{ back.shipment_id }} 로 돌아가기</a>
-      <span class="doc_back_name muted">{{ back.project_name }}</span>
-    </nav>
-  {% endif %}
-  <div class="page_head">
+  <div class="page_head doc_head">
     <div>
       <p class="eyebrow">Trade Documents</p>
       <h1>서류 작성</h1>
@@ -31,6 +25,15 @@
          download data-blank-form="commercial_invoice">⬇ 상업송장 빈 서식(PDF)</a>
       <a class="button ghost" href="{{ url_for('document.blank_file', kind='packing_list_std') }}"
          download data-blank-form="packing_list_std">⬇ 패킹리스트 빈 서식(PDF)</a>
+      {# 돌아갈 길은 **빈 서식 단추 줄 오른쪽 끝**에 둡니다. 칸을 다 채우고
+         아래까지 내려간 뒤에야 "어떻게 돌아가지?"를 떠올리는데, 그때 눈이
+         가는 자리가 이 줄입니다. 제목 위에 맨 글자로 떠 있으면 단추 줄과
+         따로 놀아 보였습니다. (2026-09-26) #}
+      {% if back %}
+        <a class="doc_back_link" href="{{ back.url }}"
+           title="{{ back.project_name }}"><span aria-hidden="true">↩</span>
+          {{ back.shipment_id }} 로 돌아가기</a>
+      {% endif %}
     </div>
   </div>
 

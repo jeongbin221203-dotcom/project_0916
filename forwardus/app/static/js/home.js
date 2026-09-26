@@ -679,12 +679,19 @@
       return;
     }
     const data = response.data;
-    lastDoc = data.document;
-    // 서류 작성 화면으로 넘어가도 이어 쓸 수 있게 놓아 둡니다. (HS 간편 검색 품명도)
-    window.ForwardusDocUpload.stash(data.document);
+    // 계약서는 서류가 아닙니다. "칸 N개를 읽었습니다" 카드를 그리면 빈 표만
+    // 나오고, 정작 보여 줄 것(빠진 조항·독소조항)은 답 쪽에 있습니다.
+    const isContract = data.document && data.document.document_type === "contract";
+    if (!isContract) {
+      lastDoc = data.document;
+      // 서류 작성 화면으로 넘어가도 이어 쓸 수 있게 놓아 둡니다. (HS 간편 검색 품명도)
+      window.ForwardusDocUpload.stash(data.document);
+    }
     say("bot", data.recognized);
-    const card = say("bot", "");
-    card.innerHTML = window.ForwardusDocUpload.resultHtml(data.document);
+    if (!isContract) {
+      const card = say("bot", "");
+      card.innerHTML = window.ForwardusDocUpload.resultHtml(data.document);
+    }
 
     if (data.route === "documents") {
       goDocuments(text ? "서류 작성을 요청하셔서" : "");

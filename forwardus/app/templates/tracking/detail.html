@@ -62,19 +62,25 @@
       <p class="muted small">Tracking 조회로 안 들어오는 것을 손으로 적습니다.
         적은 것은 위 Timeline에 그대로 올라갑니다.</p>
 
+      {# 머리글과 첫 칸 이름이 같은 말이었습니다("ETA 변경" 아래 "새 ETA",
+         "이벤트" 아래 "이벤트"). 같은 말을 두 줄로 적으면 칸만 길어지고
+         왼쪽 Timeline보다 아래로 흘러내립니다. 머리글 하나로 줄입니다. #}
       <h3>ETA 변경</h3>
       <form method="post" action="{{ url_for('tracking.update_eta', shipment_id=shipment.shipment_id) }}" class="stack">
-        <label class="field"><span class="field_label">새 ETA</span><input type="date" name="new_eta" required></label>
+        <label class="field"><input type="date" name="new_eta" required aria-label="새 ETA"></label>
         <button class="button ghost block">ETA 변경 기록</button>
       </form>
 
       <h3>이벤트</h3>
-      <form method="post" action="{{ url_for('tracking.add_event', shipment_id=shipment.shipment_id) }}" class="stack">
-        <label class="field"><span class="field_label">이벤트</span>
-          <select name="event_code">{% for code, label in event_options %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+      <form method="post" action="{{ url_for('tracking.add_event', shipment_id=shipment.shipment_id) }}" class="stack track_event">
+        <label class="field">
+          <select name="event_code" aria-label="이벤트">{% for code, label in event_options %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
         </label>
-        <label class="field"><span class="field_label">일자</span><input type="date" name="event_date" required></label>
-        <label class="field"><span class="field_label">위치</span><input type="text" name="location" maxlength="200"></label>
+        {# 일자와 위치는 한 줄에 나란히 둡니다. 둘 다 짧은 값입니다. #}
+        <div class="track_pair">
+          <label class="field"><span class="field_label">일자</span><input type="date" name="event_date" required></label>
+          <label class="field"><span class="field_label">위치</span><input type="text" name="location" maxlength="200"></label>
+        </div>
         <label class="field"><span class="field_label">메모</span><input type="text" name="description" maxlength="500"></label>
         <button class="button ghost block">기록</button>
       </form>

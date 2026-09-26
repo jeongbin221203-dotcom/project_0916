@@ -16,7 +16,8 @@
 
 from __future__ import annotations
 
-from app.services import (ServiceError, document_extract_service,
+from app.services import (ServiceError, contract_clause_service,
+                          document_extract_service,
                           document_pipeline_service as pipe, support_chat_service)
 
 MODES = ("consult", "planning", "documents")
@@ -51,6 +52,17 @@ def handle(filename: str, data: bytes, *, message: str = "", mode: str = "consul
     if len(message) > pipe.MAX_MESSAGE:
         raise ServiceError(f"{pipe.MAX_MESSAGE:,}자 아래로 줄여 주세요.", "VALIDATION_ERROR")
 
+    # 계약서를 붙였으면 **조항으로 답합니다.**
+    #
+    # 계약서는 무역 서류가 아닙니다. 그대로 서류 읽기에 넣으면 AI가 송장인 줄
+    # 알고 엉뚱한 칸을 채우거나, "읽을 값이 없습니다"로 끝납니다. 정작 알고
+    # 싶은 것은 빠진 조항과 위험한 조항인데 그 말이 아예 안 나옵니다.
+    # 글자만 먼저 읽어 계약서인지 보고, 맞으면 AI를 부르지 않고 판정합니다.
+    # (그래서 키가 없어도 됩니다) (2026-09-26)
+    judged = _contract_answer(filename, data, message)
+    if judged is not None:
+        return judged
+
     document = document_extract_service.extract(filename, data)
     label = document["document_label"]
     wish = pipe.intent(message)
@@ -79,3 +91,49 @@ def handle(filename: str, data: bytes, *, message: str = "", mode: str = "consul
         # 서류는 읽었으니 실패로 돌려보내지 않습니다. 읽은 결과는 보여 주고 답만 다시 묻게 합니다.
         result["answer_error"] = answer.get("message") or "답을 받지 못했습니다."
     return result
+
+
+def _contract_answer(filename: str, data: bytes, message: str) -> dict | None:
+    """붙인 파일이 계약서면 조항 판정을, 아니면 None을 돌려줍니다.
+
+    읽다가 잘못되면 조용히 None을 냅니다. 계약서가 아닐 때 여기서 막히면
+    멀쩡한 서류까지 못 읽게 됩니다.
+    """
+
+    # 읽다가 잘못되면 **조용히 넘어갑니다.** 계약서가 아닐 때 여기서 막히면
+    # 멀쩡한 서류까지 못 읽게 됩니다. (깨진 PDF 하나에 서류 읽기가 통째로 멈췄습니다)
+    try:
+        text = contract_clause_service.read_file(filename, data)
+    except Exception:                                   # noqa: BLE001
+        text = ""
+    if not (text and contract_clause_service.looks_like_contract(text)):
+        _refuse_plain_text(filename)
+        return None
+    result = contract_clause_service.review(text)
+    return {
+        "document": {"document_type": "contract", "document_label": "계약서",
+                     "form": {"fields": {}, "items": []}, "summary": [], "missing": [],
+                     "notes": [], "hs_queries": [], "filled": 0, "source": "contract"},
+        "recognized": "이 문서는 **계약서**입니다. 서류 칸을 채우는 대신 "
+                      "**조항을 살펴봤습니다.**",
+        "intent": {"make": False, "kinds": []},
+        "route": "consult",
+        "answer": contract_clause_service.as_text(result),
+        "contract": {key: result[key] for key in ("missing", "toxic", "gain", "present")},
+        "question": message or filename,
+    }
+
+
+def _refuse_plain_text(filename: str) -> None:
+    """글자 파일인데 계약서가 아니면 여기서 밝힙니다.
+
+    txt·md는 계약서를 보시려고 받는 것입니다. 그대로 서류 읽기로 넘기면
+    "올릴 수 있는 형식은 pdf, png…"라는 엉뚱한 말이 나옵니다.
+    """
+
+    if not str(filename or "").lower().endswith((".txt", ".md")):
+        return
+    raise ServiceError(
+        "글자 파일(TXT·MD)은 **계약서 조항을 살펴볼 때만** 받습니다. "
+        "계약서라면 조항이 보이게 전문을 넣어 주시고, 무역 서류(B/L·송장·"
+        "오퍼시트)라면 PDF나 사진으로 올려 주세요.", "VALIDATION_ERROR")

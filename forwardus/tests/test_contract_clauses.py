@@ -124,3 +124,51 @@ def test_읽을_수_없는_파일은_밝힌다(client):
         "file": (__import__("io").BytesIO(b"x"), "계약서.hwp")})
     assert answer.status_code == 400
     assert "PDF" in answer.get_json()["message"]
+
+
+# ── 챗봇에서 바로 ──────────────────────────────────────────────────────────
+
+def test_상담창에_계약서를_붙여_넣으면_조항으로_답한다(app):
+    from app.services import support_chat_service
+
+    with app.app_context():
+        answer = support_chat_service.ask(DANGEROUS * 2)
+    assert answer["success"] and answer["source"] == "contract"
+    assert "지우거나 고쳐야 할 조항" in answer["data"]["answer"]
+    assert len(answer["data"]["contract"]["toxic"]) >= 4
+
+
+def test_계약서가_아닌_말은_평소대로_답한다(app):
+    """길다고 다 계약서로 보면, 긴 상담글이 전부 조항 점검으로 갑니다."""
+
+    from app.services import support_chat_service
+
+    long_question = "부산에서 이스탄불로 타이어를 보내려고 합니다. " * 20
+    with app.app_context():
+        assert not service.looks_like_contract(long_question)
+        assert not service.looks_like_contract("계약서에 뭐가 들어가야 하나요?")
+        answer = support_chat_service.ask("FOB랑 CIF는 어떻게 다른가요?")
+    assert answer["source"] != "contract"
+
+
+def test_상담창에_계약서_파일을_붙이면_조항으로_답한다(app):
+    from app.services import attachment_service
+
+    with app.app_context():
+        result = attachment_service.handle(
+            "contract.txt", (DANGEROUS * 2).encode("utf-8"),
+            message="이 계약서 괜찮나요?", mode="consult")
+    assert result["document"]["document_type"] == "contract"
+    assert result["route"] == "consult"
+    assert len(result["contract"]["toxic"]) >= 4
+    assert "법률 자문이 아닙니다" in result["answer"]
+
+
+def test_계약서가_아닌_글자파일은_이유를_밝힌다(app):
+    from app.services import attachment_service
+
+    with app.app_context():
+        with pytest.raises(ServiceError) as caught:
+            attachment_service.handle("memo.txt", "오늘 할 일".encode("utf-8"),
+                                      message="", mode="consult")
+    assert "계약서" in str(caught.value)

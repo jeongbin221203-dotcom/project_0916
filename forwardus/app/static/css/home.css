@@ -924,13 +924,18 @@ body.home_talking .support_panel { display: none !important; }
 /* Shipment에서 서류 작성으로 넘어왔을 때 돌아가는 줄.
    화면 맨 위, 제목보다 앞에 둡니다. 칸을 다 채우고 나서야 "어떻게 돌아가지?"를
    떠올리는데, 그때 위로 올리는 것이 아래를 뒤지는 것보다 빠릅니다. */
-/* 돌아가기 줄. Shipment 화면의 탭 줄(.sub_tabs)과 **같은 높이·같은 모양**입니다.
-   나가는 길("서류 작성 →")이 그 줄 오른쪽 끝에 있으니, 돌아오는 길은 같은 줄
-   왼쪽 끝에 둡니다. 화면을 오갈 때 눈이 같은 자리를 봅니다. (2026-09-26) */
-.doc_back { align-items: center; }
-.doc_back .doc_back_link { color: var(--blue); border-bottom-color: transparent; }
-.doc_back .doc_back_link:hover { border-bottom-color: var(--blue); }
-.doc_back_name { padding: 10px 0; font-size: 13px; font-weight: 700; }
+/* 머리글도 아래 내용과 **같은 폭·같은 왼쪽 선**에 둡니다.
+   제목과 빈 서식 단추만 화면 끝까지 나가 있어, 아래 칸들과 줄이 어긋나
+   보였습니다. (2026-09-26) */
+.doc_head { width: min(920px, 100%); margin-left: auto; margin-right: auto; }
+/* 돌아갈 길은 그 줄의 **오른쪽 끝 구석**입니다. 빈 서식 단추는 왼쪽에 모이고
+   돌아가는 길만 반대편에 떨어져 있어야, 눌러야 할 것과 떠나는 길이 섞이지
+   않습니다. margin-left: auto 로 밀어 둡니다. (2026-09-26) */
+.blank_forms { flex: 1 1 auto; }
+.doc_back_link { align-self: center; margin-left: auto; color: var(--blue);
+  font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+.doc_back_link > span { margin-right: 4px; font-size: 15px; }
+.doc_back_link:hover { text-decoration: underline; }
 
 /* 지난 대화를 골라서 불러오기. [골라서]를 누르면 안내 아래로 펼쳐집니다.
    전부 불러오면 상관없는 말이 섞이고, 새로 시작하면 다 잃습니다. 그 사이를 둡니다. */

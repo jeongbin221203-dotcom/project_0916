@@ -135,3 +135,35 @@ def as_text(result: dict) -> str:
                   "다만 **글자를 찾은 결과**일 뿐이라 내용까지 맞다는 뜻은 아닙니다.", ""]
     lines += [f"※ {result['note']}"]
     return "\n".join(lines)
+
+# 계약서인지 가리는 표지.
+#
+# 왜 필요한가
+#   상담 창에 계약서를 통째로 붙여 넣는 일이 많습니다. 그걸 그냥 AI에게
+#   넘기면 "요약해 드릴게요" 같은 답이 돌아옵니다. 정작 물어보고 싶은 것은
+#   **빠진 조항과 위험한 조항**입니다. 계약서로 보이면 그쪽으로 답합니다.
+#
+# 두 가지를 함께 봅니다. 하나만 보면 헛짚습니다.
+#   - 계약서라고 적혀 있는가 (제목·머리글)
+#   - 조항이 실제로 두 가지 이상 보이는가
+CONTRACT_TITLES = (
+    "sales contract", "purchase contract", "supply agreement", "distribution agreement",
+    "sales agreement", "purchase order terms", "terms and conditions of sale",
+    "매매계약", "수출계약", "공급계약", "판매계약", "대리점계약", "총판계약", "계약서",
+)
+# 이만큼은 돼야 계약서 한 장으로 봅니다. 짧은 인용은 질문이지 계약서가 아닙니다.
+CONTRACT_MIN_CHARS = 400
+CONTRACT_MIN_CLAUSES = 2
+
+
+def looks_like_contract(text: str) -> bool:
+    """이 글이 계약서인가. 확실하지 않으면 False입니다(평소대로 상담으로 답합니다)."""
+
+    body = str(text or "")
+    if len(body) < CONTRACT_MIN_CHARS:
+        return False
+    lowered = body.lower()
+    titled = any(word in lowered for word in CONTRACT_TITLES)
+    clauses = len(contract_clauses.find_in(body))
+    # 제목이 있으면 조항 둘, 제목이 없으면 조항 넷을 봅니다.
+    return clauses >= (CONTRACT_MIN_CLAUSES if titled else CONTRACT_MIN_CLAUSES * 2)

@@ -11,7 +11,7 @@
 
   const { escapeHtml, postForm } = window.Forwardus;
 
-  const ACCEPT = [".pdf", ".png", ".jpg", ".jpeg", ".webp"];
+  const ACCEPT = [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".txt", ".md"];   // 계약서를 텍스트로 들고 계신 분이 많습니다
   const MAX_BYTES = 10 * 1024 * 1024;
   // 그림을 읽는 AI 호출은 30초를 넘기기도 합니다. 서버는 90초에 끊습니다.
   const TIMEOUT_MS = 120000;
@@ -22,7 +22,7 @@
     if (!file) return "올릴 파일을 골라 주세요.";
     const name = (file.name || "").toLowerCase();
     if (!ACCEPT.some((suffix) => name.endsWith(suffix))) {
-      return "PDF 또는 이미지(PNG·JPG·WEBP) 파일만 올릴 수 있습니다.";
+      return "PDF · 이미지(PNG·JPG·WEBP) · 텍스트(TXT·MD) 파일만 올릴 수 있습니다.";
     }
     if (!file.size) return "빈 파일입니다. 내용이 있는 파일을 올려 주세요.";
     if (file.size > MAX_BYTES) return "파일은 10MB까지 올릴 수 있습니다.";
