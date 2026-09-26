@@ -61,3 +61,43 @@ test('고른 스케줄이 새 목록에 없으면 그렇다고 말해 준다', (
   assert.ok(body.includes('다시 골라주세요'),
     '조용히 비우면 고른 줄 알고 넘어가다 저장에서 막힙니다');
 });
+
+
+// 운송 예상 견적 화면도 같은 자리가 있었습니다. (서류 작성 화면과 같은 결함)
+const planning = fs.readFileSync(path.join(__dirname, '../app/static/js/planning.js'), 'utf8');
+
+test('견적 화면: 금액을 적어도 고른 스케줄을 지우지 않는다', () => {
+  const at = planning.indexOf('[data-calc]');
+  assert.ok(at > 0);
+  const body = planning.slice(at - 900, at + 400);
+  assert.ok(body.includes('CALC_NOT_SCHEDULE'),
+    '금액·단가는 스케줄과 무관하므로 걸러야 합니다');
+  assert.ok(/CALC_NOT_SCHEDULE\s*=\s*new Set\(\[[^\]]*"amount"/.test(planning),
+    '금액이 예외 목록에 있어야 합니다');
+});
+
+test('견적 화면: 포장 유형을 바꿔도 고른 스케줄을 지우지 않는다', () => {
+  const at = planning.indexOf('form.elements.package_type.addEventListener');
+  assert.ok(at > 0, 'package_type 처리기를 찾지 못했습니다');
+  const body = planning.slice(at, at + 420);
+  assert.ok(!body.includes('invalidateSchedules'),
+    '포장 유형은 부피 계산에만 쓰입니다. 배가 언제 뜨는지와 무관합니다');
+});
+
+test('견적 화면: 항로·날짜·운송수단이 바뀌면 지운다', () => {
+  for (const anchor of ['bindToggle(form.querySelector("[data-toggle=sea_mode]")',
+                        'updateSelectedDates();']) {
+    const at = planning.indexOf(anchor);
+    if (at < 0) continue;
+    assert.ok(planning.slice(at, at + 500).includes('invalidateSchedules'),
+      anchor + ' 근처에서는 지워야 맞습니다');
+  }
+});
+
+test('견적 화면: 다시 찾은 목록에 그 배가 있으면 고른 채로 둔다', () => {
+  assert.ok(planning.includes(
+    'if (!state.schedules.some((s) => s.schedule_id === state.schedule_id)) state.schedule_id = null;'),
+    '새 목록에 없을 때만 비워야 합니다');
+  assert.ok(/state\.schedule_id === s\.schedule_id \? "checked" : ""/.test(planning),
+    '다시 그릴 때 고른 것이 체크되어야 합니다');
+});

@@ -281,6 +281,12 @@
           </dl>
           {# 이 짐이면 혼재(LCL)와 단독(FCL) 중 어느 쪽이 맞는지. 눌러서 바로 바꿀 수 있습니다. #}
           <p class="sea_advice" data-sea-advice hidden></p>
+          {# 값은 다 찼는데 **앞뒤가 안 맞는** 화물. 서버가 짚어 주는 말을 그대로 답니다.
+             "1CBM당 19,200kg이니 금만큼 무겁습니다 — 포장당 중량 칸에 전체 중량을
+             적지 않았는지 확인해주세요" 같은 것입니다. 여태 서버는 이 말을 만들어
+             보냈는데 화면 어디에도 붙지 않아 **아무도 못 봤습니다.** 포장당 중량에
+             전체 중량을 적으면 운임 기준이 100배 틀립니다. (2026-09-26) #}
+          <ul class="calc_warnings" data-calc-warnings hidden></ul>
           <p class="muted small" data-calc-message>치수·수량·중량을 입력하면 계산됩니다.</p>
         </aside>
       </div>

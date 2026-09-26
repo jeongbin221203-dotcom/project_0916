@@ -161,6 +161,11 @@
             <div><dt>Revenue Ton</dt><dd data-doc-metric="revenue_ton">-</dd></div>
           </dl>
           <p class="sea_advice" data-doc-advice hidden></p>
+          {# 값은 다 찼는데 **앞뒤가 안 맞는** 화물. 서버가 짚어 주는 말을 그대로 답니다.
+             포장당 중량 칸에 전체 중량을 적으면 운임 기준이 100배 틀리는데,
+             계산은 멀쩡히 되고 숫자도 그럴듯해서 견적을 받고 나서야 압니다.
+             (2026-09-26) #}
+          <ul class="calc_warnings" data-doc-warnings hidden></ul>
           <p class="muted small" data-doc-calc-note>서버에서 계산된 값입니다.</p>
         </aside>
         <button type="button" class="link_button" data-doc-add-item>+ 품목 추가</button>

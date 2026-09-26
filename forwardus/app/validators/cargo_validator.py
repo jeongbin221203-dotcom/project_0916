@@ -461,12 +461,20 @@ def _validate_money(payload: dict, quantity: int, unit_quantity: float | None = 
         # 되곱하면 금액이 안 나옵니다. 정확히 되곱해질 때만 채우고, 아니면 비워 둡니다.
         if by_units and abs(unit_price * basis - amount) > 1e-6:
             unit_price = None
-    elif by_units and unit_price is not None and amount is not None:
+    elif unit_price is not None and amount is not None and basis:
+        # **둘 다 적었으면 언제나 맞대어 봅니다.**
+        #
+        # 예전에는 낱개 수량을 적었을 때(by_units)만 봤습니다. 그래서 포장 개수만
+        # 적고 단가 12.50 · 100개 · 금액 99,999 를 적으면 그대로 통과했습니다.
+        # 송장에는 "12.50 × 100 = 99,999" 가 찍힙니다. 은행은 신용장 서류에서
+        # 단가 × 수량을 다시 셈해 맞춰 보므로 그 자리에서 반송됩니다.
+        # 세관도 신고가격과 송장이 다르면 되묻습니다. (2026-09-26)
         counted = money_product(unit_price, basis)
         if counted != round_money(amount):
             raise ValidationError(
                 f"수량 × 단가가 금액과 맞지 않습니다. {basis:,g} × {unit_price:,g} = "
-                f"{counted:,.2f} 인데 금액은 {amount:,.2f} 입니다.", "amount")
+                f"{counted:,.2f} 인데 금액은 {amount:,.2f} 입니다. "
+                "한쪽을 비워 두시면 나머지로 채워 드립니다.", "amount")
     # 금액은 줄 단위로 먼저 원 단위(소수 둘째 자리)까지 맞춥니다.
     # 그래야 송장에 적히는 품목 금액의 합과 총액이 어긋나지 않습니다.
     return {"unit_price": unit_price,

@@ -1379,6 +1379,24 @@
     if (invoiceAutoTag) invoiceAutoTag.hidden = false;
   }
 
+  /* 값은 다 찼는데 **앞뒤가 안 맞는** 화물을 알려 줍니다.
+
+     서버는 이런 말을 만들어 보내고 있었습니다.
+       "1CBM당 19,200kg이니 금만큼 무겁습니다. 포장당 중량 칸에 전체 중량을
+        적지 않았는지 확인해주세요"
+     그런데 화면 어디에도 붙지 않아 **아무도 못 봤습니다.** 포장당 중량 칸에
+     전체 중량을 적으면 운임 기준이 100배 틀립니다. 계산은 멀쩡히 되고 숫자도
+     그럴듯해서, 견적을 받고 나서야 압니다. (2026-09-26) */
+  const cargoWarnBox = document.querySelector("[data-calc-warnings]");
+
+  function showCargoWarnings(warnings) {
+    if (!cargoWarnBox) return;
+    const rows = (warnings || []).filter((row) => row && row.message);
+    cargoWarnBox.hidden = !rows.length;
+    cargoWarnBox.innerHTML = rows.map((row) =>
+      `<li><b>품목 ${row.line_no}</b> ${escapeHtml(row.message)}</li>`).join("");
+  }
+
   const recalc = debounce(async () => {
     const payload = cargoPayload();
     const filled = LINE_FIELDS.every((k) => payload.items[0][k] !== "");
@@ -1395,15 +1413,28 @@
     // 위험물 칸이 덜 채워진 것은 계산 오류가 아닙니다. 계산값은 그대로 보여주고
     // 경고만 해당 품목의 위험물 상자에 붙입니다.
     applyDgWarnings(response.success ? response.data.dg_warnings : [], boxes);
+    showCargoWarnings(response.success ? response.data.warnings : []);
     calcMessage.textContent = response.success ? "서버에서 계산된 값입니다." : response.message;
   }, 250);
 
-  form.querySelectorAll("[data-calc]").forEach((input) => input.addEventListener("input", () => { recalc(); invalidateSchedules(); }));
+  /* 치수·수량·중량이 바뀌면 부피가 달라져 운임과 컨테이너 수가 달라집니다.
+     그래서 스케줄을 다시 찾습니다.
+
+     **금액은 아닙니다.** 송장 금액은 배가 언제 뜨는지와 아무 상관이 없는데,
+     금액 칸에 글자 하나만 쳐도 고른 스케줄이 지워졌습니다. 서류 작성 화면에서
+     같은 일로 "골라도 골라도 다시 고르라고 한다"는 신고를 받았습니다.
+     (2026-09-26) */
+  const CALC_NOT_SCHEDULE = new Set(["amount", "unit_price"]);
+  form.querySelectorAll("[data-calc]").forEach((input) => input.addEventListener("input", () => {
+    recalc();
+    if (!CALC_NOT_SCHEDULE.has(input.name || input.dataset.line || "")) invalidateSchedules();
+  }));
   form.elements.hs_code.addEventListener("change", () => refreshTariff());
   form.elements.package_type.addEventListener("change", () => {
     const note = document.querySelector("[data-package-note]");
     if (note) note.textContent = form.elements.package_type.selectedOptions[0]?.dataset.note || "";
-    invalidateSchedules();
+    // 포장 유형은 부피·중량 계산에만 쓰입니다. 배가 언제 뜨는지와는 무관하므로
+    // 고른 스케줄을 지우지 않습니다. (2026-09-26)
   });
 
   /* ----- Schedules ----- */

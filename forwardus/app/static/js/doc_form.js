@@ -359,6 +359,16 @@
       { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`);
     show("revenue_ton", `${Number(data.revenue_ton).toFixed(3)} R/T`);
 
+    // 값은 다 찼는데 앞뒤가 안 맞는 화물. 서버는 이 말을 만들어 보내고 있었는데
+    // 화면 어디에도 안 붙어 **아무도 못 봤습니다.** (2026-09-26)
+    const warnBox = calcBox.querySelector("[data-doc-warnings]");
+    if (warnBox) {
+      const rows = (data.warnings || []).filter((row) => row && row.message);
+      warnBox.hidden = !rows.length;
+      warnBox.innerHTML = rows.map((row) =>
+        `<li><b>품목 ${row.line_no}</b> ${escapeHtml(row.message)}</li>`).join("");
+    }
+
     const advice = data.sea_mode_advice;
     const box = calcBox.querySelector("[data-doc-advice]");
     if (!advice || !box) return;
