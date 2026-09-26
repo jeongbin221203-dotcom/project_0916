@@ -160,7 +160,7 @@ def _country_notes(country_code: str, name: str = "", chapters: set[str] | None 
             why = "도착국에서 이 품목에 요구하는 인증입니다. 없으면 통관이 막힙니다."
         papers = watch if not found else []
         found.append({"key": f"country_{code}_{len(found)}", "title": title,
-                      "documents": papers,
+                      "country": code, "documents": papers,
                       "agency": ("도착국 인증기관 — 필요 서류·발급처·기간은 "
                                  f"상담에서 \"{name or code} 인증\"이라고 물어보세요"
                                  if guide else "도착국 인증기관"),
@@ -336,6 +336,10 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
         # 방법·걸리는 시간·공식 주소를 우리 표에서 찾아 붙입니다.
         # 주소는 그 표에서만 꺼냅니다. AI가 지어내면 없는 창구로 보내게 됩니다.
         guide = document_issuers.find(row["title"]) or _issuer_for(row)
+        # 도착국 인증 줄은 **나라가 같은 발급처만** 붙입니다. 이름만 보고 붙이면
+        # 태국 "Thai FDA"에 미국 FDA가 붙습니다. document_issuers.fits_country 참고.
+        if guide and row.get("source") == "country"                 and not document_issuers.fits_country(guide, row.get("country", "")):
+            guide = None
         if guide:
             row.setdefault("how", guide["how"])
             row["lead_time"] = guide.get("lead_time", "")

@@ -33,6 +33,8 @@
 
 from __future__ import annotations
 
+import re
+
 # 각 줄: 무엇을 · 어디서 · 어떻게 · 얼마나 걸리나 · 주소
 #
 # "how"는 **처음 하는 사람이 그대로 따라 할 수 있게** 적습니다. "신청하세요"가 아니라
@@ -155,6 +157,7 @@ ISSUERS = [
     {
         "key": "ce",
         "title": "CE 마킹 (EU)",
+        "country": "EU",
         "keywords": ("CE 마킹", "CE 인증", "CE마크"),
         "agency": "EU 인증기관(Notified Body) · 품목에 따라 자가선언",
         "how": "해당 지침을 찾아 적합성 평가를 받고 적합성선언서(DoC)를 만듭니다. "
@@ -167,6 +170,7 @@ ISSUERS = [
     {
         "key": "fda",
         "title": "FDA 등록 · 신고 (미국)",
+        "country": "US",
         "keywords": ("FDA",),
         "agency": "미국 식품의약국 (FDA)",
         "how": "식품·화장품·의료기기는 시설 등록과 품목 신고가 필요합니다. "
@@ -179,6 +183,7 @@ ISSUERS = [
     {
         "key": "fcc",
         "title": "FCC 인증 (미국 · 무선/전자)",
+        "country": "US",
         "keywords": ("FCC",),
         "agency": "미국 연방통신위원회 (FCC) 인정 시험소",
         "how": "무선기기는 Certification, 일반 전자기기는 SDoC입니다. "
@@ -199,9 +204,23 @@ def find(name: str) -> dict | None:
         return None
     lowered = text.lower()
     for row in ISSUERS:
-        if any(word.lower() in lowered for word in row["keywords"]):
+        if any(_hits(word.lower(), lowered) for word in row["keywords"]):
             return row
     return None
+
+
+def _hits(word: str, text: str) -> bool:
+    """찾는 말이 글 안에 있는가.
+
+    영문 약어는 **낱말 경계로만** 봅니다. 그냥 부분일치로 보면 대만의
+    "식품 TFDA" 안에 있는 FDA를 보고 미국 FDA 발급처를 안내합니다.
+    나라가 다른 기관을 대 주는 것이라 그대로 믿고 신청하면 헛걸음합니다.
+    한글은 조사가 붙어 경계가 흐리니 예전처럼 부분일치로 둡니다. (2026-09-26)
+    """
+
+    if word.isascii():
+        return re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", text) is not None
+    return word in text
 
 
 def describe(row: dict) -> str:
@@ -354,3 +373,26 @@ def agencies_for(country_code: str) -> list[dict]:
         return COUNTRY_AGENCIES[code]
     from app.processors import country_export_guide
     return COUNTRY_AGENCIES["EU"] if code in country_export_guide._eu_members() else []
+
+
+def fits_country(row: dict, code: str) -> bool:
+    """이 발급처를 **도착국 인증** 안내에 붙여도 되는가.
+
+    이 표는 한국 발급처가 대부분이고, 바깥 것은 몇 개뿐입니다(미국 FDA·FCC,
+    EU CE). 도착국 인증 줄에 이름으로만 맞춰 붙이면 나라가 어긋납니다.
+    태국 "Thai FDA 등록"과 필리핀 "FDA PH 등록"에 **미국 FDA**를 붙여,
+    태국에 보내는 사람에게 미국 식품의약국으로 가라고 안내하고 있었습니다.
+    그대로 믿고 신청하면 헛걸음합니다. (2026-09-26)
+
+    나라가 같은 것만 붙입니다. 나라를 안 적은 줄(한국 발급처)은 도착국 인증
+    안내가 될 수 없으므로 붙이지 않습니다.
+    """
+
+    want = str(row.get("country") or "").upper()
+    code = str(code or "").upper()
+    if not want or not code:
+        return False
+    if want == "EU":
+        from app.processors import country_export_guide
+        return code == "EU" or code in country_export_guide._eu_members()
+    return want == code
