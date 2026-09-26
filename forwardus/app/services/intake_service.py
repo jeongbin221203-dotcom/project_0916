@@ -185,6 +185,15 @@ def _amount(value, label: str, notes: list) -> str:
     return f"{number:.4f}".rstrip("0").rstrip(".")
 
 
+# 도시 이름으로 부르는 국내 공항. 자료에는 공항 이름만 있어 도시로는 안 찾힙니다.
+# ("부산"으로 항공을 적으면 자료의 "김해국제공항"을 못 찾습니다)
+KR_CITY_AIRPORT = {
+    "부산": "PUS", "김해": "PUS",
+    "서울": "ICN", "인천": "ICN", "김포": "GMP",
+    "대구": "TAE", "청주": "CJJ", "제주": "CJU",
+}
+
+
 def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
     """적힌 이름을 우리 항구·공항 목록에서 다시 찾습니다.
 
@@ -223,6 +232,16 @@ def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
             if rows:
                 notes.append(f"{label} '{text}'을(를) '{shorter}'(으)로 찾았습니다. 맞는지 봐 주세요.")
                 break
+    # 공항은 **도시 이름으로 부르는데 자료에는 공항 이름만** 있습니다.
+    # 부산 공항은 자료에 "김해국제공항"이라 "부산"으로는 안 나옵니다. 그래서
+    # "부산에서 항공으로"라고 적으면 출발 공항이 통째로 비었습니다. (2026-09-26)
+    if not rows and kind == "airport":
+        code = KR_CITY_AIRPORT.get(text.replace(" ", ""))
+        found = location_client.find_location(code) if code else None
+        if found and found["kind"] == "airport":
+            notes.append(f"{label} '{text}'은(는) {found['name']}({found['code']})으로 봤습니다. "
+                         "다른 공항이면 알려 주세요.")
+            return found
     if not rows:
         notes.append(f"{label} '{text}'을(를) 목록에서 찾지 못했습니다. 직접 골라 주세요.")
         return None

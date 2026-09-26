@@ -456,6 +456,11 @@
     const answer = response.data.answer;
     const row = say("bot", answer);
     record("assistant", answer);
+    // 치수와 수량을 적어 주셨으면 CBM·운임톤과 LCL/FCL을 **답 바로 아래**에 둡니다.
+    // 이건 계산이라 AI를 기다리지 않습니다(숫자를 지어내면 안 되는 자리입니다).
+    // 근거 줄·링크 뒤에 붙여 두었더니, 정작 물어본 숫자가 한참 아래에 있었습니다.
+    // (2026-09-26 사용자 요청)
+    if (response.data.cargo) appendCargo(row, response.data.cargo);
     // 어떤 공공데이터로 답했는지 답 아래에 남깁니다. 숫자의 근거를 사람이 볼 수 있어야 합니다.
     if ((response.data.sources || []).length) {
       const note = document.createElement("p");
@@ -475,10 +480,7 @@
       window.ForwardusIncotermWidget.attach(row, guessIncoterm(question));
     }
     appendLinks(row, response.data.links);
-    // 치수와 수량을 적어 주셨으면 CBM·운임톤과 LCL/FCL을 바로 알려 드립니다.
-    // 이건 계산이라 AI를 기다리지 않습니다. (숫자를 지어내면 안 되는 자리입니다)
     if (response.data.assumed) appendRoute(row, response.data.assumed);
-    if (response.data.cargo) appendCargo(row, response.data.cargo);
     // 대화에 적은 화물 정보를 담아 두었으면 한 줄 알립니다. 어디에 쓰이는지까지.
     if ((response.data.captured || []).length) {
       const note = document.createElement("p");
