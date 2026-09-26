@@ -84,9 +84,20 @@ def test_상담_흐름도_미승인_자료는_AI를_거친다(kb, monkeypatch):
     assert direct["source"] == "faq" and calls["n"] == 0
     assert direct["data"]["faq_id"] == "T-001"
 
+    # 미승인 자료는 **그대로 나가지 않습니다.** 어떤 길로 답하든 이것이 기준입니다.
+    #
+    # 예전에는 "AI를 거친다"로만 확인했는데, 검토를 거쳐 적어 둔 글이 답할 수
+    # 있으면 그 글로 답하는 것이 맞습니다(키가 없어도 답이 나오고, 내용도
+    # 검토를 거친 것입니다). 지켜야 할 것은 **미승인 FAQ 글이 새지 않는 것**
+    # 이므로, 그쪽을 직접 봅니다. (2026-09-26)
     context = support_chat_service.ask("수출신고필증은 어떻게 보관하나요?")
-    assert context["source"] == "api" and calls["n"] == 1
-    assert context["data"]["route"] == "faq_context"
+    assert context["success"] and context["source"] != "faq"
+    assert "결론 ... 처리 ... 주의 ..." not in context["data"]["answer"]
+    assert "짧은 답" not in context["data"]["answer"]
+
+    # 적어 둔 글도 없고 승인 FAQ도 없으면 그때 AI가 답합니다.
+    unknown = support_chat_service.ask("바이어가 갑자기 연락이 끊기면 어떻게 하나요?")
+    assert unknown["source"] == "api" and calls["n"] == 1
 
 
 def test_최신_확인이_필요한_질문은_FAQ로_건너뛰지_않는다(kb):

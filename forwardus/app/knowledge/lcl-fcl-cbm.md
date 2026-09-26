@@ -1,7 +1,7 @@
 ---
 title: LCL · FCL 고르기 (CBM 기준)
-keywords: LCL, FCL, CBM, 씨비엠, 컨테이너 크기, 20피트, 40피트, 40HC, 콘솔, 혼적, R/T, 레비뉴톤, 용적중량, 부피 무게
-must: lcl, fcl, cbm, 씨비엠, 혼적, 콘솔, 레비뉴톤, r/t, 20피트, 40피트, 컨테이너 크기
+keywords: LCL, FCL, CBM, 씨비엠, 컨테이너 크기, 20피트, 40피트, 40HC, 콘솔, 혼적, R/T, 레비뉴톤, 용적중량, 부피 무게, 운임톤, 운임 톤, 프레이트톤, freight ton, revenue ton, cbm 계산, 부피 계산
+must: lcl, fcl, cbm, 씨비엠, 혼적, 콘솔, 레비뉴톤, r/t, 20피트, 40피트, 컨테이너 크기, 운임톤, 운임 톤, 프레이트톤, freight ton, revenue ton, cbm 계산
 ask: LCL과 FCL은 어떤 기준으로 나누나요?
 links: 📦 운송 계획 — CBM 넣으면 자동 판단|/planning/new
 see: forwarder-booking, container-specs

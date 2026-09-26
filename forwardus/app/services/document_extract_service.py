@@ -140,7 +140,10 @@ Packing List 중 하나)의 그림과, 읽을 수 있으면 본문 글자를 받
 - 칸 이름이 다르게 찍혀 있어도 뜻으로 찾으세요.
   Shipper = Exporter = Seller = Beneficiary
   Consignee = Buyer = Messrs = Applicant(L/C) = Importer
-  Port of Loading = POL = From,  Port of Discharge = POD = To = Destination
+  Port of Loading = POL = From = Shipping Port,  Port of Discharge = POD = To = Destination
+  오퍼시트·견적서에는 도착항 칸이 없는 경우가 많습니다. 그때는 가격조건에 붙은 지명이
+  도착항입니다. "CIF YOKOHAMA, JAPAN" -> incoterms=CIF, incoterms_place=YOKOHAMA,
+  port_of_discharge=YOKOHAMA. 반대로 "FOB BUSAN"의 BUSAN은 출발항입니다.
 - 필드 설명
   document_type    서류 종류
   shipper/consignee/notify_party  name은 회사명, address는 주소, country는 두 글자 국가 코드(US, CN…)
@@ -495,6 +498,7 @@ def to_form(raw: dict) -> dict:
         if place:
             fields[f"{role}_code"] = place["code"]
             fields[f"{role}_name"] = f"{place['name']} ({place['code']})"
+    _port_from_incoterms(fields, incoterms, raw.get("incoterms_place"), mode, notes)
 
     items = raw.get("items") if isinstance(raw.get("items"), list) else []
     if len(items) > MAX_ITEMS:
@@ -527,6 +531,43 @@ def _lc_date(value, label: str, notes: list):
     except ValidationError:
         notes.append(f"{label}을(를) 날짜로 읽지 못했습니다. L/C 원문에서 확인해 주세요.")
         return None
+
+
+# 인코텀즈 뒤에 붙는 지명이 **어느 쪽 항구인가.** (Incoterms 2020)
+#   FOB BUSAN      → 실어 주는 곳. 출발항입니다.
+#   CIF YOKOHAMA   → 가져다 주는 곳. 도착항입니다.
+# E·F 조건은 출발지, C·D 조건은 도착지입니다.
+PLACE_IS_ORIGIN = ("EXW", "FCA", "FAS", "FOB")
+PLACE_IS_DESTINATION = ("CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP")
+
+
+def _port_from_incoterms(fields: dict, incoterms: str, place, mode: str, notes: list) -> None:
+    """항구 칸이 비어 있으면 가격조건에 붙은 지명으로 채웁니다.
+
+    왜 필요한가
+      오퍼시트·견적서에는 도착항 칸이 따로 없는 경우가 많습니다. 실려 나가는
+      곳은 "Shipping Port: BUSAN"이라고 적어 두고, 가져다 줄 곳은 가격조건
+      줄에만 "CIF YOKOHAMA, JAPAN"으로 적습니다. 그러면 도착지 칸이 빈 채로
+      나와, 올려도 아무것도 안 채워진 것처럼 보였습니다. (2026-09-26)
+
+    이미 항구 칸이 채워져 있으면 건드리지 않습니다. 서류에 직접 적힌 것이 먼저입니다.
+    """
+
+    text = _clean(place, 80)
+    if not incoterms or not text:
+        return
+    role = ("origin" if incoterms in PLACE_IS_ORIGIN
+            else "destination" if incoterms in PLACE_IS_DESTINATION else "")
+    if not role or fields.get(f"{role}_code"):
+        return
+    found = _port(text, mode, role, [])       # 못 찾아도 여기서는 조용히 넘어갑니다
+    if not found:
+        return
+    fields[f"{role}_code"] = found["code"]
+    fields[f"{role}_name"] = f"{found['name']} ({found['code']})"
+    label = "출발지" if role == "origin" else "도착지"
+    notes.append(f"{label} 칸이 비어 있어 가격조건 '{incoterms} {text}'에서 "
+                 f"{found['name']}({found['code']})로 넣었습니다. 맞는지 확인해 주세요.")
 
 
 def transit_range(origin_code: str, destination_code: str, mode: str) -> tuple[int, int] | None:

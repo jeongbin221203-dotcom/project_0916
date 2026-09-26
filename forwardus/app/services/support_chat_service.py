@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import re
+
 from app.collectors import ai_client
 from app.processors import answer_links, bank_redaction, export_requirements
 from app.services import ServiceError
@@ -348,6 +350,23 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     # 모두 근거로 붙입니다.
     from app.services import consult_chain, consult_tools, faq_cache, faq_index
     from app.services import knowledge_service
+    # 뜻이 없는 말은 AI를 부르지 않고 되묻습니다.
+    #
+    # "?"·"..."·"ㅁㄴㅇㄹ"·"a" 같은 것이 그대로 AI로 넘어가고 있었습니다.
+    # 키가 없으면 "AI 키가 없습니다"라는 오류가 뜨는데, 물어본 사람은
+    # 자기가 무엇을 잘못했는지 알 수 없습니다. 물어볼 말이 없다는 것은
+    # AI 없이도 우리가 압니다. (2026-09-26)
+    if not _has_meaning(text):
+        return {"success": True, "source": "clarification", "data": {
+            "answer": "\n".join([
+                "무엇이 궁금하신지 한 문장으로 적어 주세요.",
+                "",
+                "이렇게 물어보시면 됩니다.",
+                "- 수출할 때 꼭 필요한 서류가 뭔가요?",
+                "- FOB랑 CIF는 어떻게 다른가요?",
+                "- 미국에 보낼 때 어떤 인증이 필요한가요?",
+            ]),
+            "route": "clarification", "missing": []}}
 
     normalized = faq_index.normalize(text)
     version = faq_cache.knowledge_version()
@@ -374,11 +393,22 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     #     때만 나섭니다. 눌러 보는 표(인코텀즈)나 나라별 안내가 그것입니다.
     early = consult_chain.decide(text, history)
     quiet = early["route"] in ("faq_direct", "clarification")
-    if not quiet and not wants_data(text):
+    if not quiet and not wants_stats(text):
         found = knowledge_service.lookup(text)
-        if found and early.get("candidates") and not (found.get("render")
-                                                      or found.get("direct")
-                                                      or found["key"].startswith("country-")):
+        # **지금 확인해야 하는 값일 때만** 물러섭니다.
+        #
+        # 예전에는 "FAQ가 자료를 찾아 두었으면(candidates) 물러선다"였습니다.
+        # 그런데 후보는 가까운 다섯 건을 늘 돌려주므로, 조건이 사실상 언제나
+        # 참이었습니다. 검토를 거쳐 적어 둔 글 40장이 거의 쓰이지 않았고,
+        # "LCL이랑 FCL 차이"·"관세환급"·"HS코드 정하는 법"처럼 답이 이미
+        # 있는 질문까지 AI로 넘어갔습니다. AI 키가 없으면 그대로 실패했습니다.
+        #
+        # 세율·요건처럼 **오늘 값이 중요한 질문**(external_lookup)은 그대로
+        # 공식 조회에 맡깁니다. 적어 둔 글로 답하면 묵은 값을 말하게 됩니다.
+        # (2026-09-26)
+        if found and early["route"] == "external_lookup" and not (found.get("render")
+                                                                  or found.get("direct")
+                                                                  or found["key"].startswith("country-")):
             found = None
         if found:
             data = knowledge_service.answer(found)
@@ -531,9 +561,37 @@ DATA_WORDS = ("수출액", "수출 실적", "수출실적", "실적", "추천", 
               "대금", "l/c", "t/t", "신용장", "송금", "떼이", "미회수", "통계")
 
 
+# 물어본 말에 뜻이 있는가. 글자 두 자 이상인 낱말이 하나라도 있으면 뜻이 있다고 봅니다.
+_WORD = re.compile(r"[가-힣]{2,}|[A-Za-z]{3,}")
+
+
+def _has_meaning(text: str) -> bool:
+    return bool(_WORD.search(str(text or "")))
+
+
 def wants_data(text: str) -> bool:
     lowered = (text or "").lower()
     return any(word in lowered for word in DATA_WORDS)
+
+
+# 적어 둔 글을 **비켜야 하는** 말. 위 DATA_WORDS보다 좁습니다.
+#
+# DATA_WORDS에는 "위험"·"결제"·"신용장"·"l/c"·"비교" 같은 말이 들어 있습니다.
+# 도구를 쓸지 정하는 데는 맞지만, 그 말만 보고 적어 둔 글까지 비키면
+# "EXW로 하면 뭐가 위험해요"·"T/T랑 L/C 차이" 같은 **개념 질문**이
+# 전부 AI로 넘어갑니다. 답이 이미 있는데도요. (2026-09-26)
+#
+# 여기 남기는 것은 **수치를 달라는 말**뿐입니다. 그런 질문은 글이 아니라
+# 도구가 답해야 합니다.
+STATS_WORDS = ("수출액", "수출 실적", "수출실적", "실적", "시장 규모", "시장규모",
+               "증감", "수출입", "품목별", "k-stat", "kstat", "무역수지", "수출 규모",
+               "유망", "어느 나라", "어느나라", "어디로", "국가별", "통계",
+               "연체", "미회수", "떼이")
+
+
+def wants_stats(text: str) -> bool:
+    lowered = (text or "").lower()
+    return any(word in lowered for word in STATS_WORDS)
 
 
 def _today_note() -> str:
