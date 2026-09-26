@@ -85,6 +85,23 @@ def track(query: str, *, bl_year: str = "", today: date | None = None) -> dict:
               "available": False, "export": None, "cargo": None, "containers": [],
               "notes": [], "message": ""}
 
+    # 컨테이너 번호 모양인데 **검증숫자가 안 맞으면** 한 자리를 잘못 적은 것입니다.
+    # 여태는 그런 번호가 조용히 B/L번호로 넘어가 "기록이 없습니다"만 나왔습니다.
+    # 번호가 틀린 것인지 기록이 없는 것인지 알 길이 없었습니다. 이 번호는
+    # B/L·포장명세서·적재목록에 그대로 실리므로 그 자리에서 짚어 줍니다.
+    # (2026-09-26)
+    if kind == "container" and not container_client.container_no_valid(text):
+        clean = container_client.normalize_container_no(text)
+        right = container_client.container_check_digit(clean[:10])
+        result["kind_label"] = QUERY_KINDS["container"]
+        result["message"] = (
+            f"'{text}'는 있을 수 없는 컨테이너 번호입니다. "
+            + (f"끝자리 검증숫자가 {clean[10]}인데 앞 10자리로 계산하면 {right}입니다(ISO 6346). "
+               if clean[3] in container_client.CATEGORY_LETTERS
+               else f"네 번째 글자는 U·J·Z 중 하나여야 합니다(적은 것: {clean[3]}). ")
+            + "한 자리를 잘못 적으신 것 같습니다. B/L에 그대로 실리는 번호라 다시 확인해 주세요.")
+        return result
+
     if kind == "container":
         # 관세청은 컨테이너 번호를 입력으로 받지 않습니다. 지어내지 않고 알려 줍니다.
         result["message"] = (

@@ -89,7 +89,51 @@ def normalize_container_no(value: str) -> str:
 
 
 def is_container_no(value: str) -> bool:
+    """모양이 컨테이너 번호인가. (검증숫자는 보지 않습니다)"""
+
     return bool(CONTAINER_NO.match(normalize_container_no(value)))
+
+
+# ISO 6346 검증숫자.
+#
+# 왜 보아야 하는가
+#   컨테이너 번호는 B/L·포장명세서·적재목록에 그대로 실립니다. 한 자리를
+#   잘못 적으면 그 화물을 추적할 수 없고, 선사·세관 기록과 어긋납니다.
+#   그런데 여태 "영문 4자리 + 숫자 7자리" 모양만 보았습니다. 끝자리는
+#   앞 10자리에서 계산해 내는 **검증숫자**인데 확인하지 않았습니다.
+#   틀린 번호는 조회에서 B/L번호로 넘어가 "기록이 없습니다"만 나왔습니다.
+#   무엇이 잘못됐는지 알 길이 없습니다. (2026-09-26)
+#
+# 규칙 (ISO 6346)
+#   글자를 숫자로 바꿉니다. A=10 부터 세되 **11의 배수(11·22·33)는 건너뜁니다.**
+#   앞 10자리에 2의 거듭제곱(1,2,4,…,512)을 곱해 더하고, 11로 나눈 나머지의
+#   끝자리가 검증숫자입니다.
+#     CSQU3054383 → 6185 % 11 = 3 → 끝자리 3
+#
+# 네 번째 글자는 장비 구분입니다. U(화물 컨테이너)·J(부속장비)·Z(트레일러)뿐입니다.
+CATEGORY_LETTERS = ("U", "J", "Z")
+
+
+def _letter_value(letter: str) -> int:
+    value = 10 + (ord(letter) - ord("A"))
+    return value + (value // 11)          # 11의 배수를 건너뜁니다
+
+
+def container_check_digit(first_ten: str) -> int:
+    total = 0
+    for index, ch in enumerate(first_ten):
+        value = int(ch) if ch.isdigit() else _letter_value(ch)
+        total += value * (2 ** index)
+    return total % 11 % 10
+
+
+def container_no_valid(value: str) -> bool:
+    """검증숫자까지 맞는 번호인가."""
+
+    text = normalize_container_no(value)
+    if not CONTAINER_NO.match(text) or text[3] not in CATEGORY_LETTERS:
+        return False
+    return container_check_digit(text[:10]) == int(text[10])
 
 
 # --- 1. 화물통관 진행정보 -------------------------------------------------------

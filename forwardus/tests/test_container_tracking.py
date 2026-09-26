@@ -261,3 +261,56 @@ def test_particles_read_numbers_and_letters_aloud():
     assert josa("부산항", "로") == "부산항으로"
     # 알 수 없는 글자로 끝나면 예전처럼 둘 다 적습니다.
     assert josa("ロサンゼルス", "이") == "ロサンゼルス가(이)"
+
+
+# --- ISO 6346 검증숫자 -------------------------------------------------------------
+#
+# 컨테이너 번호는 B/L·포장명세서·적재목록에 그대로 실립니다. 한 자리를 잘못 적으면
+# 그 화물을 추적할 수 없고 선사·세관 기록과 어긋납니다. 그런데 여태 "영문 4자리 +
+# 숫자 7자리" 모양만 보았습니다. 틀린 번호는 조용히 B/L번호로 넘어가
+# "기록이 없습니다"만 나왔습니다. 무엇이 잘못됐는지 알 길이 없었습니다. (2026-09-26)
+
+@pytest.mark.parametrize("value", ["CSQU3054383", "MSKU6874230", "TGHU7681602",
+                                   "csqu3054383", "CSQU 3054 383", "CSQU-3054-383"])
+def test_있을_수_있는_컨테이너_번호는_통과한다(value):
+    assert container_client.container_no_valid(value)
+
+
+@pytest.mark.parametrize("value,why", [
+    ("CSQU3054384", "끝자리 검증숫자가 틀림"),
+    ("MSCU1234565", "끝자리 검증숫자가 틀림"),
+    ("ABCD1234567", "네 번째 글자는 U·J·Z 여야 함"),
+    ("MSKD6874230", "네 번째 글자가 D"),
+    ("MSKU687423", "자릿수 모자람"),
+    ("", "빈 값"),
+])
+def test_있을_수_없는_컨테이너_번호는_막는다(value, why):
+    assert not container_client.container_no_valid(value), why
+
+
+def test_끝자리_검증숫자를_계산한다():
+    """CSQU3054383 → 6185 % 11 = 3"""
+
+    assert container_client.container_check_digit("CSQU305438") == 3
+
+
+def test_틀린_번호는_번호가_틀렸다고_말해_준다(app):
+    """'기록이 없습니다'로 흘려보내면, 번호가 틀린 건지 기록이 없는 건지 모릅니다."""
+
+    got = tracking.track("CSQU3054384")
+    assert got["kind"] == "container"
+    assert "있을 수 없는" in got["message"]
+    assert "3" in got["message"], "맞는 끝자리를 알려 주어야 합니다"
+
+
+def test_네_번째_글자가_틀리면_그렇게_말해_준다(app):
+    got = tracking.track("ABCD1234567")
+    assert "U·J·Z" in got["message"]
+
+
+def test_맞는_번호는_관세청_안내로_넘어간다(app):
+    """관세청은 컨테이너 번호로 조회해 주지 않습니다. 그건 번호 잘못이 아닙니다."""
+
+    got = tracking.track("CSQU3054383")
+    assert "있을 수 없는" not in got["message"]
+    assert "B/L번호" in got["message"]
