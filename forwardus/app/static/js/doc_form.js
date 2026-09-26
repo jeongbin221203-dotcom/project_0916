@@ -947,6 +947,12 @@
     const files = (row.uploads || []).map((file) =>
       `<span class="rq_file">📎 ${escapeHtml(file.filename)}`
       + `<small>${escapeHtml(file.status_label || "")}</small></span>`).join("");
+    // 공식 창구 주소. 서버가 보내 주는데도 지금까지 그리지 않아, 화면에는
+    // "어디로 가라"가 없었습니다. 주소는 우리 표에서만 나옵니다. (2026-09-26)
+    const links = (row.links || []).length
+      ? `<p class="rq_links">${row.links.map((one) =>
+          `<a href="${escapeHtml(one.url)}" target="_blank" rel="noopener">`
+          + `${escapeHtml(one.label)} ↗</a>`).join("")}</p>` : "";
     const papers = (row.documents || []).length
       ? `<ul class="rq_papers">${row.documents.map((name) =>
           `<li>${escapeHtml(name)}</li>`).join("")}</ul>` : "";
@@ -959,6 +965,7 @@
         </div>
         ${row.why ? `<p class="rq_why">${escapeHtml(row.why)}</p>` : ""}
         ${row.agency ? `<p class="rq_agency">발급·신청: ${escapeHtml(row.agency)}</p>` : ""}
+        ${links}
         ${papers}
         ${files ? `<div class="rq_files">${files}</div>` : ""}
         <form class="rq_upload" method="post" enctype="multipart/form-data" action="${escapeHtml(uploadUrl)}">
@@ -978,6 +985,17 @@
     const others = (data.others || []).length
       ? `<p class="muted small">그 밖에 올려 두신 파일: `
         + data.others.map((row) => escapeHtml(row.filename)).join(", ") + "</p>" : "";
+    // 도착국이 요구하는 것을 물어볼 곳. 서류 이름만 알려 주면 사람은 또 검색해야
+    // 하고, 검색하면 대행업체가 먼저 나옵니다. 표에 없는 나라면 이 칸이 안 나옵니다.
+    const agencies = (data.country_agencies || []).length
+      ? `<div class="rq_agencies">
+           <h4>${escapeHtml(data.destination || data.country_code || "도착국")} 규제기관에 직접 확인하기</h4>
+           ${data.country_agencies.map((one) => `
+             <p class="rq_agency_row">
+               <a href="${escapeHtml(one.url)}" target="_blank" rel="noopener">${escapeHtml(one.label)} ↗</a>
+               ${one.note ? `<small>${escapeHtml(one.note)}</small>` : ""}
+             </p>`).join("")}
+         </div>` : "";
     const ai = data.ai_available
       ? (data.ai_used ? "" : "<small class=\"muted\">AI가 더 찾은 것은 없습니다.</small>")
       : "<small class=\"muted\">AI 키가 없어 우리 자료로만 찾았습니다.</small>";
@@ -987,6 +1005,7 @@
           <span class="rq_count">${data.ready}/${data.total}</span></h3>
         <p class="doc_note">${escapeHtml(data.note || "")} ${ai}</p>
         <div class="rq_list">${list}</div>
+        ${agencies}
         ${others}
         <p class="muted small"><a href="${escapeHtml(data.filing_url)}">관세사에게 넘길 자료 보기 →</a></p>
       </section>`;

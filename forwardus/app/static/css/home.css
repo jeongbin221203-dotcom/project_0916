@@ -851,6 +851,16 @@ body.home_talking .support_panel { display: none !important; }
 .rq_why { margin: 6px 0 0; color: var(--ink); font-size: 13px; line-height: 1.65; }
 .rq_agency { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; }
 .rq_papers { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+/* 공식 창구 주소. 서류 이름만 알려 주면 사람은 또 검색해야 하고, 검색하면
+   대행업체가 먼저 나옵니다. 주소는 우리 표에서만 꺼냅니다. (2026-09-26) */
+.rq_links { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0 0; }
+.rq_links a { color: var(--blue_dark); font-size: 12.5px; font-weight: 700; }
+.rq_agencies { margin-top: 14px; padding: 13px 15px; border-radius: 13px; background: var(--surface); }
+.rq_agencies h4 { margin: 0 0 8px; font-size: 13px; font-weight: 900; }
+.rq_agency_row { display: grid; gap: 2px; margin: 0 0 8px; }
+.rq_agency_row:last-child { margin-bottom: 0; }
+.rq_agency_row a { color: var(--blue_dark); font-size: 13px; font-weight: 800; }
+.rq_agency_row small { color: var(--muted); font-size: 12px; line-height: 1.65; }
 .rq_files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .rq_file { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
   background: var(--surface); font-size: 12.5px; font-weight: 700; }

@@ -59,6 +59,18 @@ UNVERIFIABLE = {
     "acma.gov.au": "미확인 · 시간 초과 · 주소는 공식(검색 확인)",
     "agriculture.gov.au": "미확인 · 시간 초과 · 주소는 공식(검색 확인)",
     "tcvn.gov.vn": "미확인 · 인증서 체인 불완전 · STAMEQ 공식 주소",
+    # 2026-09-26에 8개국을 새로 넣으며 하나씩 두드려 본 결과입니다.
+    "bsmi.gov.tw": "확인됨 · 열립니다 (이 컴퓨터에서만 인증서 오류)",
+    "web.customs.gov.tw": "확인됨 · 열립니다 (이 컴퓨터에서만 인증서 오류)",
+    "sirim-qas.com.my": "확인됨 · 공식 (이 컴퓨터에서만 인증서 오류)",
+    "bps.dti.gov.ph": "확인됨 · 공식 BPS 포털 (이 컴퓨터에서만 시간 초과)",
+    "ncc.gov.tw": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
+    "ntc.gov.ph": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
+    "nbtc.go.th": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
+    "moh.gov.my": "미확인 · HTTP 403 봇 차단 · 주소는 공식",
+    "customs.gov.my": "미확인 · 인증서 체인 불완전 · 왕립관세청 공식 주소",
+    "rst.gov.ru": "미확인 · 시간 초과(지역 차단으로 보임) · 주소는 공식",
+    "customs.gov.ru": "미확인 · 시간 초과(지역 차단으로 보임) · 주소는 공식",
 }
 
 
@@ -76,6 +88,12 @@ def collect() -> list[tuple[str, str]]:
 
 
 def main() -> int:
+    # 윈도 기본 콘솔은 cp949라 한글 대시(—)에서 죽습니다. 링크를 다 두드려 놓고
+    # 마지막 출력에서 멈추면 아무것도 못 봅니다. (2026-09-26)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
     seen: set[str] = set()
     alive = blocked = dead = unknown = 0
     print(f"{'대상':<46}{'결과':<22}주소")
