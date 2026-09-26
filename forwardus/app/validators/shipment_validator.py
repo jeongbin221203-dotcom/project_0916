@@ -135,8 +135,16 @@ def validate_parties(payload: dict) -> dict:
 
     payload = payload if isinstance(payload, dict) else {}
     buyer = payload.get("buyer") or {}
-    if not isinstance(buyer, dict):
+    # 화면마다 모양이 다릅니다. 운송 계획은 {"buyer": {"name": …}}로, 서류 작성은
+    # ⑨Buyer를 글자 하나로 보냅니다. 글자로 오면 통째로 버려서 "Buyer(Consignee)명을
+    # 입력해주세요"만 떴습니다. 적어 놓고도 왜 안 되는지 알 수가 없습니다.
+    # 두 모양을 다 받습니다. (2026-09-26)
+    if isinstance(buyer, str):
+        buyer = {"name": buyer}
+    elif not isinstance(buyer, dict):
         buyer = {}
+    if not str(buyer.get("name") or "").strip() and payload.get("buyer_name"):
+        buyer = {**buyer, "name": payload["buyer_name"]}
     return {
         "exporter_name": require_text(payload.get("exporter_name"), "수출자(Exporter)명", field="exporter_name"),
         "exporter_address": optional_text(payload.get("exporter_address")),

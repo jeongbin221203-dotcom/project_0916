@@ -40,9 +40,14 @@ _SWIFT_WORDS = re.compile(r"(?i)swift|\bbic\b")
 BANK_WINDOW = 2
 # 숫자 사이에 - . 공백이 끼어도 한 번호로 봅니다. 앞뒤가 글자에 붙어 있으면
 # (OS-2026-0917 같은 서류 번호) 번호로 보지 않습니다.
-_DIGITS = re.compile(r"(?<![A-Za-z0-9\-./])(\d[\d\-. ]{4,}\d)(?![A-Za-z0-9\-])")
-_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b")
-_SWIFT_CODE = re.compile(r"\b[A-Z]{4} ?[A-Z]{2} ?[A-Z0-9]{2}(?: ?[A-Z0-9]{3})?\b")
+#
+# 빈칸 자리는 **줄바꿈까지** 봅니다. PDF에서 읽은 글은 줄이 꺾입니다.
+# 한 칸(space)만 보던 때는 "SWIFT: DEUT DE\nFF 500"이 **한 글자도 안 가려진
+# 채로** 남았습니다. 계좌·SWIFT는 어떤 경우에도 남기지 않기로 한 자리라,
+# 줄이 꺾였다고 새면 안 됩니다. (2026-09-26)
+_DIGITS = re.compile(r"(?<![A-Za-z0-9\-./])(\d[\d\-.\s]{4,}\d)(?![A-Za-z0-9\-])")
+_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?:\s*[A-Z0-9]{4}){2,7}(?:\s*[A-Z0-9]{1,4})?\b")
+_SWIFT_CODE = re.compile(r"\b[A-Z]{4}\s*[A-Z]{2}\s*[A-Z0-9]{2}(?:\s*[A-Z0-9]{3})?\b")
 # 날짜 모양(2026-10-31, 31.10.2026)은 계좌번호가 아닙니다. 은행 줄 바로 아래의
 # "Validity: 2026-10-31"까지 가려서 AI가 유효기간을 못 읽은 일이 있었습니다.
 _DATE_SHAPE = re.compile(r"(?:19|20)\d{2}[-./]\d{1,2}[-./]\d{1,2}|\d{1,2}[-./]\d{1,2}[-./](?:19|20)\d{2}")
@@ -57,6 +62,46 @@ def _is_account_number(candidate: str, minimum: int) -> bool:
     candidate = candidate.strip()
     return (sum(ch.isdigit() for ch in candidate) >= minimum
             and not _DATE_SHAPE.fullmatch(candidate) and not _HS_SHAPE.fullmatch(candidate))
+
+
+def _join_wrapped_numbers(lines: list[str]) -> list[str]:
+    """줄이 꺾인 계좌·SWIFT를 **한 줄로 붙여 둡니다.**
+
+    왜 필요한가
+      아래 되풀이는 줄을 하나씩 봅니다. 그래서 PDF에서 줄이 꺾인 번호는
+      어떤 규칙을 써도 잡히지 않습니다. "SWIFT: DEUT DE\\nFF 500"이
+      **한 글자도 안 가려진 채로** 남았습니다.
+
+    어디까지만 하나
+      **은행 이야기를 하는 줄과 바로 다음 줄**만 봅니다. 그리고 두 줄을 붙였을
+      때에만 새로 걸리는 경우에만 붙입니다. 글 전체를 훑었더니 "SAMPLE CO."
+      같은 회사명이 SWIFT로 잡혀, 새는 것보다 더 나빴습니다. (2026-09-26)
+    """
+
+    out: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        nxt = lines[index + 1] if index + 1 < len(lines) else ""
+        window = _BANK_WORDS.search(line) or _BANK_WORDS.search(nxt)
+        if nxt and window:
+            pair = f"{line} {nxt}"
+            for pattern in (_SWIFT_CODE, _IBAN):
+                spans = [m.group(0) for m in pattern.finditer(pair)]
+                alone = [m.group(0) for m in pattern.finditer(line)]
+                alone += [m.group(0) for m in pattern.finditer(nxt)]
+                # 붙였을 때에만 새로 걸리는 것이 있으면 두 줄을 한 줄로 둡니다.
+                if any(span not in alone for span in spans):
+                    out.append(pair)
+                    index += 2
+                    break
+            else:
+                out.append(line)
+                index += 1
+            continue
+        out.append(line)
+        index += 1
+    return out
 
 
 def redact(text: str, *, everywhere: bool = False) -> tuple[str, dict]:
@@ -79,7 +124,7 @@ def redact(text: str, *, everywhere: bool = False) -> tuple[str, dict]:
         secrets[key] = original
         return key
 
-    lines = str(text or "").split("\n")
+    lines = _join_wrapped_numbers(str(text or "").split("\n"))
     bank_left = account_left = swift_left = 0
     for index, line in enumerate(lines):
         if _BANK_WORDS.search(line):

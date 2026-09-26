@@ -214,6 +214,25 @@ def apply_origin(items: list[dict], origin_code: str | None) -> list[dict]:
     return items
 
 
+# 사람이 흔히 쓰는 표기 → 우리 자료에 적힌 이름.
+#
+# 자료는 "호찌민항"·"안트베르펜항"으로 적혀 있는데, 실무에서는 "호치민"·"앤트워프"라고
+# 씁니다. 그대로 치면 **한 건도 안 나와 도착지를 고를 수가 없습니다.**
+# 흔한 지명 61개로 재어 보니 다섯 곳이 그랬습니다. (2026-09-26)
+PLACE_ALIASES = {
+    "호치민": "호찌민", "호치민시": "호찌민", "사이공": "호찌민",
+    "앤트워프": "안트베르펜", "안트워프": "안트베르펜", "앤트워프항": "안트베르펜",
+    "하노이": "노이바이",
+    "델리": "인디라", "뉴델리": "인디라",
+    "뭄바이": "mumbai", "봄베이": "mumbai",
+    "제다": "jeddah", "젯다": "jeddah",
+    "쿠알라룸푸르": "kuala",
+    "베이징": "beijing", "북경": "beijing",
+    "상해": "상하이", "심천": "선전", "청도": "칭다오", "대련": "다롄", "천진": "톈진",
+    "광주(중국)": "광저우",
+}
+
+
 def search_locations(query: str, kind: str | None = None, country: str | None = None,
                      origin_code: str | None = None) -> dict:
     """Match on code, Korean/English name, city, or country."""
@@ -224,6 +243,7 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         return fail("MOCK_DATA_ERROR", "mock")
 
     keyword = (query or "").strip().lower()
+    keyword = PLACE_ALIASES.get(keyword, keyword)
     country = (country or "").strip().upper()
     # With no keyword and no country there is nothing to rank by, so only the
     # well-known locations are suggested. Typing searches the full list.

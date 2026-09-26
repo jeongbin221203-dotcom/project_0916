@@ -1336,6 +1336,10 @@
     button.disabled = true;
     button.textContent = "만드는 중입니다…";
 
+    // 만들기는 **사람이 누른 일**입니다. 이때 적은 값을 다음 화면(운송 예상
+    // 견적)으로 넘겨 둡니다. 자동 저장을 끈 뒤로, 임시저장을 한 번도 누르지
+    // 않으면 화면을 옮겼을 때 값이 하나도 없었습니다. (2026-09-26)
+    syncWorkDraft();
     const response = await postJson(config.startUrl, planPayload(), 60000);
     button.disabled = false;
     button.textContent = "서류 만들기";
