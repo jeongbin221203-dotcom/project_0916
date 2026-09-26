@@ -338,3 +338,28 @@ def test_서류_작성은_한_스크롤로_이어지고_사이드바가_따라�
     rail = html.split('class="doc_rail"')[1].split("</nav>")[0]
     assert re.findall(r'href="#doc_sec_(\w+)"', rail) == ["when", "plan", "doc", "origin"]
     assert re.findall(r'data-doc-nav="(\w+)"', rail) == ["when", "plan", "doc", "origin"]
+
+
+def test_대화_중에는_답을_읽을_자리를_넓게_둔다():
+    """대화가 시작되면 인사말이 접히고 적는 칸이 화면 아래에 붙습니다.
+
+    그때 시작 화면용 여백이 남아 있으면 답을 읽을 자리를 그대로 잡아먹습니다.
+    실제로 탭 줄 위 64px이 그대로 남아, 적는 칸 안에 빈 띠로 보였습니다.
+    (브라우저 측정: 적는 칸 덩어리 236px → 166px)
+    """
+
+    from pathlib import Path
+
+    css = (Path(__file__).parent.parent / "app/static/css/home.css").read_text(encoding="utf-8")
+
+    # 시작 화면은 로고와 띄우려고 위 여백을 크게 둡니다. 그 값은 그대로 둡니다.
+    start = css[css.index(".home_actions {"):].split("}", 1)[0]
+    assert "margin: 64px 0 12px" in start
+
+    # 대화 중에는 그 여백을 걷어냅니다.
+    talking = css[css.index(".home_center.talking .home_actions { margin-top"):].split("}", 1)[0]
+    assert "margin-top: 0" in talking
+
+    # 대화 위 여백(최대 88px)도 인사말이 접힌 뒤에는 줄입니다.
+    stage = css[css.index(".home_stage:has(.home_center.talking)"):].split("}", 1)[0]
+    assert "padding-top: 24px" in stage and "padding-bottom: 0" in stage

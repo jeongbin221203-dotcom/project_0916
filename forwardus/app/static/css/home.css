@@ -271,8 +271,10 @@
 .home_center.talking {
   padding-bottom: calc(var(--composer_h, 170px) + 20px);
 }
-/* 대화 중에는 가운데 아래 여백(72px)이 적는 칸 자리와 겹쳐 빈자리가 너무 커집니다. */
-.home_stage:has(.home_center.talking) { padding-bottom: 0; }
+/* 대화 중에는 가운데 아래 여백(72px)이 적는 칸 자리와 겹쳐 빈자리가 너무 커집니다.
+   위 여백(최대 88px)도 인사말을 띄우려고 둔 것이라, 인사말이 접힌 뒤에는 답을
+   읽을 자리만 좁힙니다. 그래서 대화 중에는 둘 다 줄입니다. */
+.home_stage:has(.home_center.talking) { padding-top: 24px; padding-bottom: 0; }
 /* scrollIntoView·앵커 이동도 덩어리 뒤로 들어가지 않게 같은 만큼 비워 둡니다. */
 html:has(.home_center.talking) { scroll-padding-bottom: calc(var(--composer_h, 170px) + 16px); }
 .home_center.talking .home_hello { display: none; }
@@ -280,7 +282,7 @@ html:has(.home_center.talking) { scroll-padding-bottom: calc(var(--composer_h, 1
 
 .home_center.talking .home_composer {
   position: fixed; left: var(--rail_w); right: 0; bottom: 0; z-index: 30;
-  padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 16px calc(8px + env(safe-area-inset-bottom, 0px));
   /* 덩어리 자체는 불투명하게 칠합니다. 탭 단추 사이로 답 글자가 비쳐 보이면 겹쳐 보입니다. */
   background: var(--surface);
   box-shadow: 0 -1px 0 rgba(15, 23, 42, .04);
@@ -294,7 +296,10 @@ html:has(.home_center.talking) { scroll-padding-bottom: calc(var(--composer_h, 1
 .home_center.talking .home_box,
 .home_center.talking .home_actions { width: min(720px, 100%); margin-inline: auto; }
 
-.home_center.talking .home_actions { margin-bottom: 8px; }
+/* 탭 줄 위 64px은 시작 화면에서 로고와 띄우려고 둔 값입니다. 대화 중에는 로고가
+   접히고 이 덩어리가 화면 아래에 붙으므로, 그 여백이 적는 칸 안의 빈 띠로 남아
+   답을 읽을 자리를 그만큼 잡아먹습니다. 대화 중에만 걷어냅니다. (약 1.7cm) */
+.home_center.talking .home_actions { margin-top: 0; margin-bottom: 6px; }
 .home_center.talking .home_actions button { padding: 6px 13px; font-size: 12.5px; }
 
 /* 대화 중 적는 칸: 2줄 높이 + 아래 단추 줄. (예전 184px → 약 138px) */
