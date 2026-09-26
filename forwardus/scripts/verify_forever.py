@@ -35,6 +35,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+# 윈도 콘솔(cp949)은 '—' 같은 글자를 못 찍습니다. 기록하다 멈추면
+# 밤새 돌린 것이 통째로 사라집니다.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parent.parent
 LOG = ROOT / "data" / "cache" / "verify_log.md"
 
@@ -48,6 +53,40 @@ JOBS = [
     ("적합성 100회", ["python", "scripts/check_document_conformance.py", "100"]),
     ("어려운 적합성 시험", ["python", "scripts/check_document_hard.py"]),
     ("전체 테스트", ["python", "-m", "pytest", "tests", "-q", "-m", "not live"]),
+
+    # 2026-09-26 에 만든 검사들. 무작위 씨앗을 회차마다 바꿔 돌립니다.
+    # (scripts/checks/README.md 에 무엇을 보는지 적어 두었습니다)
+    ("① 나갔다 들어오기", ["python", "scripts/checks/m1_roundtrip.py", "3000"]),
+    ("② 선택·다시 그리기", ["python", "scripts/checks/m_redraw.py"]),
+    ("② 환율 표", ["python", "scripts/checks/m_fx_big.py", "5000"]),
+    ("② 환율 4단계", ["python", "scripts/checks/m_fx.py"]),
+    ("③ 계산 독립 검산", ["python", "scripts/checks/m3_calc.py", "5000"]),
+    ("④ 지식 글 예시 질문", ["python", "scripts/checks/m4_ask.py"]),
+    ("④ 나라 인증 말투", ["python", "scripts/checks/m4_cert.py"]),
+    ("④ 나라 무관 질문", ["python", "scripts/checks/m4_cross.py"]),
+    ("④ PDF 생성", ["python", "scripts/checks/m_pdf_fuzz.py", "3000"]),
+    ("⑤ HS → 수출요건", ["python", "scripts/checks/m5_hs_req.py"]),
+    ("⑤ 계약서 조항", ["python", "scripts/checks/m_contract.py", "5000"]),
+    ("⑤ 계약서 한국어", ["python", "scripts/checks/m_contract_ko.py"]),
+    ("⑤ 계약서 오인", ["python", "scripts/checks/m_contract_cross.py"]),
+    ("⑥ 서로 모순되는 입력", ["python", "scripts/checks/m6_contradiction.py", "3000"]),
+    ("⑪ 일상어 HS", ["python", "scripts/checks/m11_hs.py"]),
+    ("⑫ 역순·섞어 적기", ["python", "scripts/checks/m12_reverse.py", "3000"]),
+    ("⑯ 사업자등록번호", ["python", "scripts/checks/m16_brn.py", "30000"]),
+    ("⑰~㉕ 화면 전수", ["python", "scripts/checks/m_render.py"]),
+    ("⑰~㉕ 붙는 값 흔들기", ["python", "scripts/checks/m_screens_fuzz.py", "3000"]),
+    ("⑱⑲⑳ 서류·신고자료", ["python", "scripts/checks/m_filing.py", "500"]),
+    ("㉑ 물류비 견적", ["python", "scripts/checks/m21_cost.py", "5000"]),
+    ("㉒㉔ 컨테이너 번호", ["python", "scripts/checks/m2224.py", "30000"]),
+    ("㉓ AI Assistant", ["python", "scripts/checks/m23_ai.py", "300"]),
+    ("㉖ 수출 상위 품목", ["python", "scripts/checks/m26_top200.py"]),
+    ("㉖ 품목표 전체", ["python", "scripts/checks/m26_all.py", "1500"]),
+    ("① L/C 날짜", ["python", "scripts/checks/m_lc.py", "5000"]),
+    ("모델·저장", ["python", "scripts/checks/m_model.py", "500"]),
+    ("동시·중복", ["python", "scripts/checks/m_concurrent.py"]),
+    ("정적 점검", ["python", "scripts/checks/m_static.py"]),
+    ("배선 점검", ["python", "scripts/checks/m_wiring.py"]),
+    ("CSS 규칙 없는 class", ["python", "scripts/check_css_classes.py"]),
 ]
 
 # 바깥으로 나가려 한 흔적. 퍼즈가 이것을 찍으면 기록합니다.
@@ -76,7 +115,7 @@ def headline(output: str) -> str:
     """
 
     marks = ("검사 ", " passed", "합계 ", "됩니다 ", "잡음 ", "놓침도 헛경보도",
-             "무작위 ", "실패 ")
+             "무작위 ", "실패 ", "■ ", "문제 ", "못 찾", "새로 생긴")
     rows = [line.strip() for line in output.splitlines() if line.strip()]
     for line in reversed(rows):
         if any(mark in line for mark in marks):
@@ -93,7 +132,10 @@ def run(label: str, command: list[str]) -> tuple[bool, str]:
         return False, "한 시간을 넘겨 끊었습니다."
     output = (done.stdout or "") + (done.stderr or "")
     # 돌아간 값이 0이어도 "실패 N"처럼 본문에 적히는 도구가 있습니다.
-    bad = done.returncode != 0 or re.search(r"실패\s*[1-9]|놓침\s*[1-9]|헛경보\s*[1-9]|FAILED", output)
+    bad = done.returncode != 0 or re.search(
+        r"실패\s*[1-9]|놓침\s*[1-9]|헛경보\s*[1-9]|FAILED"
+        r"|문제\s*[1-9]|미탐\s*[1-9]|오탐\s*[1-9]|500\s*[1-9]"
+        r"|못 찾는 낱말\s*[1-9]|못 찾음\s*[1-9]|유출\s*[1-9]", output)
     return (not bad), output
 
 
@@ -112,6 +154,12 @@ def main() -> int:
         hours = float(args[args.index("--hours") + 1])
     if "--rounds" in args:
         rounds = int(args[args.index("--rounds") + 1])
+    # 시계 시각으로 끊습니다. "내일 아침 7시까지" 처럼 정할 때 씁니다.
+    #     python scripts/verify_forever.py --until 2026-09-27T07:00
+    until = None
+    if "--until" in args:
+        until = datetime.fromisoformat(args[args.index("--until") + 1])
+        hours = max(0.0, (until - datetime.now()).total_seconds() / 3600)
 
     deadline = time.monotonic() + hours * 3600
     seen: set[str] = set()
