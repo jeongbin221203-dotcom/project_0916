@@ -8,7 +8,7 @@ from flask import (Blueprint, flash, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
 from app.extensions import db
-from app.routes import error_response, load_shipment
+from app.routes import error_response, load_shipment, json_body
 from app.routes.auth import current_user, login_required
 from app.services import (ServiceError, customs_filing_service, document_draft_service,
                           document_extract_service, document_service, document_source_service,
@@ -27,7 +27,7 @@ def draft_file(kind: str):
     아니라 서버에 남길 이유가 없습니다.
     """
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     # 은행 정보·바이어 주소는 브라우저가 따로(private) 보냅니다. 여기서만 합치고 버립니다.
     draft = draft_document_service.with_private(payload.get("draft") or {}, payload.get("private"))
     try:
@@ -101,7 +101,7 @@ def source_values(kind: str, source_id: str):
 def draft_preview():
     """검토 창에서 고친 값으로 미리보기를 다시 그립니다. 저장하지 않습니다."""
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         image = draft_document_service.preview_data(str(payload.get("kind") or ""),
                                                     payload.get("data"))
@@ -118,7 +118,7 @@ def draft_review_pdf():
     화면의 미리보기와 인쇄물이 같은 모양이 됩니다.
     """
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     documents = payload.get("documents")
     try:
         data = draft_document_service.pdf_documents(documents)
@@ -158,7 +158,7 @@ def suggest_name():
     규칙은 document_defaults.project_name 한 곳에만 둡니다.
     """
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     items = payload.get("items")
     name = document_start_service.suggest_project_name(
         payload, items if isinstance(items, list) else [])
@@ -176,7 +176,7 @@ def save_draft():
     """
 
     try:
-        data = document_draft_service.save(current_user(), request.get_json(silent=True) or {})
+        data = document_draft_service.save(current_user(), json_body())
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     return jsonify({"success": True, "data": data})
@@ -187,7 +187,7 @@ def save_draft():
 def rename_draft(draft_id: int):
     """견적명만 고칩니다. 검토 창에서 이름 칸을 벗어날 때 부릅니다."""
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         data = document_draft_service.rename(current_user(), draft_id,
                                              str(payload.get("quote_title") or ""))
@@ -216,7 +216,7 @@ def start():
     """
 
     viewer = current_user()
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     draft_id = payload.get("draft_id")
     if draft_id and not str(payload.get("project_name") or "").strip():
         # 화면이 이름을 따로 안 보냈으면 초안에 적어 둔 이름을 씁니다.
@@ -453,7 +453,7 @@ def api_translate_filing(shipment_id: str):
     """그대로 보내기 글을 바이어의 언어로 옮깁니다. 저장하지 않습니다."""
 
     load_shipment(shipment_id)
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         data = translate_service.translate(str(payload.get("text") or ""),
                                            str(payload.get("language") or ""))

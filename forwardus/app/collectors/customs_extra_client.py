@@ -212,11 +212,20 @@ def export_requirement_laws(hs_code: str, direction: str = EXPORT) -> dict:
 def clearance_code(*, business_no: str = "", code: str = "") -> dict:
     """수출신고서에 반드시 들어가는 통관고유부호를 찾아 줍니다."""
 
+    from app.validators import business_no as business_no_rule
+
     params = {}
     if business_no:
-        digits = "".join(ch for ch in business_no if ch.isdigit())
-        if len(digits) != 10:
+        digits = business_no_rule.digits_of(business_no)
+        if len(digits) != business_no_rule.LENGTH:
             return fail("VALIDATION_ERROR", "api", "사업자등록번호는 숫자 10자리입니다.")
+        # 검증번호가 안 맞으면 관세청을 부르지 않습니다. 어차피 없는 번호이고,
+        # "조회 결과 없음"보다 "한 자리를 잘못 적으셨다"가 훨씬 도움이 됩니다.
+        if not business_no_rule.is_valid(digits):
+            return fail("VALIDATION_ERROR", "api",
+                        f"사업자등록번호 '{business_no_rule.format_no(digits)}'는 "
+                        "있을 수 없는 번호입니다. 끝자리 검증번호가 맞지 않습니다 — "
+                        "한 자리를 잘못 적으신 것 같습니다.")
         params["brno"] = digits
     if code:
         params["ecm"] = code.strip().upper()

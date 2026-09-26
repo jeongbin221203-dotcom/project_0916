@@ -20,6 +20,26 @@ def error_response(exc: Exception):
     raise exc
 
 
+def json_body() -> dict:
+    """보내 온 JSON 본문을 **반드시 dict 로** 돌려줍니다.
+
+    왜 필요한가
+      여태 `request.get_json(silent=True) or {}` 라고 적었습니다. 본문이
+      `12345` 나 `"글자"` 나 `[]` 로 오면 `or {}` 가 듣지 않아(숫자·글자는
+      참입니다) 그대로 서비스로 넘어갔고, 거기서 `payload.get(...)` 이
+      `AttributeError` 로 터졌습니다. 이용자에게는 **500** 이 갑니다.
+      무엇이 잘못됐는지 한마디도 없이 화면이 멈춥니다.
+
+      흔들어 보니 /planning/api/schedules 와 /planning/api/departure-check 에서
+      실제로 났습니다. 같은 자리가 21곳이라 한 곳에서 막습니다. (2026-09-26)
+    """
+
+    from flask import request
+
+    body = request.get_json(silent=True)
+    return body if isinstance(body, dict) else {}
+
+
 def load_shipment(shipment_id: str):
     """주소의 Shipment를 읽습니다. 볼 권한이 없으면 없는 것처럼 404로 답합니다."""
 

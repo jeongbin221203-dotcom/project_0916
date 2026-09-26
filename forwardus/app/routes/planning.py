@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template, request, url_for
 
-from app.routes import error_response
+from app.routes import error_response, json_body
 from app.routes.auth import current_user, login_required
 from app.services import ServiceError, planning_service
 from app.validators import ValidationError
@@ -145,7 +145,7 @@ def api_dangerous_goods():
 @planning_bp.post("/api/cargo")
 def api_cargo():
     try:
-        return jsonify({"success": True, "data": planning_service.calculate_cargo(request.get_json(silent=True) or {})})
+        return jsonify({"success": True, "data": planning_service.calculate_cargo(json_body())})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
 
@@ -153,7 +153,7 @@ def api_cargo():
 @planning_bp.post("/api/schedules")
 def api_schedules():
     try:
-        return jsonify({"success": True, "data": planning_service.search_schedules(request.get_json(silent=True) or {})})
+        return jsonify({"success": True, "data": planning_service.search_schedules(json_body())})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
 
@@ -171,7 +171,7 @@ def api_schedule_outlook():
 
     try:
         return jsonify({"success": True,
-                        "data": planning_service.schedule_outlook(request.get_json(silent=True) or {})})
+                        "data": planning_service.schedule_outlook(json_body())})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
 
@@ -181,7 +181,7 @@ def api_departure_check():
     """출발 희망일 여유(Seller 예정일) 확인."""
 
     try:
-        return jsonify({"success": True, "data": planning_service.check_departure_date(request.get_json(silent=True) or {})})
+        return jsonify({"success": True, "data": planning_service.check_departure_date(json_body())})
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
 
@@ -190,7 +190,7 @@ def api_departure_check():
 @login_required
 def api_create_shipment():
     try:
-        shipment = planning_service.create_shipment(request.get_json(silent=True) or {},
+        shipment = planning_service.create_shipment(json_body(),
                                                     user_id=current_user().id)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)

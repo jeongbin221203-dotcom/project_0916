@@ -6,7 +6,7 @@ import json
 
 from flask import Blueprint, jsonify, render_template, request, url_for
 
-from app.routes import error_response
+from app.routes import error_response, json_body
 from app.routes.auth import current_user
 from app.services import (ServiceError, agent_service, attachment_service,
                           chat_capture_service, chat_memory_service,
@@ -83,7 +83,7 @@ def api_intake():
     Shipment를 만들지는 않습니다. 사람이 화면에서 확인하고 만듭니다.
     """
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         return jsonify({"success": True, "data": intake_service.read(payload.get("text", ""))})
     except (ValidationError, ServiceError) as exc:
@@ -98,7 +98,7 @@ def api_agent():
     들고 다니고 매번 같이 보냅니다.
     """
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         result = agent_service.turn(payload)
     except (ValidationError, ServiceError) as exc:
@@ -152,7 +152,7 @@ def api_doc_pipeline(step: str):
     if step not in handlers:
         return error_response(ServiceError("없는 단계입니다.", "NOT_FOUND", 404))
     try:
-        result = handlers[step](request.get_json(silent=True) or {})
+        result = handlers[step](json_body())
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     return jsonify({"success": True, "data": result})
@@ -189,7 +189,7 @@ def api_attach():
 def api_support_chat():
     """어느 화면에서나 열 수 있는 고객상담 창구."""
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     question = payload.get("question", "")
     # 로그인한 회원의 상담은 대화 전체를 DB에 남기고 이어 갑니다. (Entity)
     # 로그인 전에는 남기지 않고, 브라우저가 들고 온 최근 대화만 씁니다.

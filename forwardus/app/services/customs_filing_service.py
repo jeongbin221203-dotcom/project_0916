@@ -37,6 +37,18 @@ DEFAULT_PAYMENT_METHOD = "TT"
 TRANSPORT_LABELS = {"SEA": "10 · 해상", "AIR": "40 · 항공"}
 
 
+def _country_label(code: str) -> str:
+    """'US' → '미국 (US)'. 목록에 없으면 코드만 적습니다. **바깥을 부르지 않습니다.**"""
+
+    code = str(code or "").strip().upper()
+    if not code:
+        return ""
+    from app.collectors import location_client
+
+    name = location_client.country_name(code)
+    return f"{name} ({code})" if name and name != code else code
+
+
 def lookup_clearance_code(business_no: str) -> dict:
     """사업자등록번호로 통관고유부호를 관세청에서 찾아 줍니다.
 
@@ -139,8 +151,16 @@ def filing_sheet(shipment) -> dict:
                 {"label": "운송수단", "value": TRANSPORT_LABELS.get(shipment.transport_mode, "")},
                 {"label": "적재항 (POL)",
                  "value": f"{shipment.origin_name} ({shipment.origin_code})"},
-                {"label": "목적국",
-                 "value": f"{shipment.destination_name} ({shipment.destination_country})"},
+                # 목적국은 **나라**입니다. 예전에는 도착항 이름을 넣어
+                # "목적국: Los Angeles (US)" 라고 적혔습니다. 수출신고서 ⑫목적국
+                # 칸에 그대로 옮겨 적는 값이라 나라로 적습니다. 관세사가 선적서류와
+                # 맞춰 볼 도착항은 아래에 따로 답니다. (2026-09-26)
+                {"label": "목적국", "value": _country_label(shipment.destination_country)},
+                {"label": "도착항 (POD)",
+                 "value": " ".join(part for part in
+                                   [shipment.destination_name,
+                                    f"({shipment.destination_code})"
+                                    if shipment.destination_code else ""] if part)},
                 {"label": "선사 · 선박/편명",
                  "value": " · ".join(part for part in
                                      [shipment.carrier, shipment.vessel_or_flight] if part)},
@@ -272,12 +292,12 @@ def update_filing_fields(shipment, form: dict) -> None:
     from app.repositories import shipment_repository
     from app.validators import ValidationError
 
-    business_no = str(form.get("exporter_business_no") or "").strip()
-    if business_no:
-        digits = "".join(ch for ch in business_no if ch.isdigit())
-        if len(digits) != 10:
-            raise ValidationError("사업자등록번호는 숫자 10자리입니다.", "exporter_business_no")
-        business_no = f"{digits[:3]}-{digits[3:5]}-{digits[5:]}"
+    # 자릿수만 보면 0000000000 도 통과해 수출신고서에 그대로 실립니다.
+    # 국세청 검증번호까지 봅니다. (2026-09-26)
+    from app.validators import business_no as business_no_rule
+
+    business_no = business_no_rule.parse(form.get("exporter_business_no"),
+                                         field="exporter_business_no")
 
     trade_kind = str(form.get("customs_trade_kind") or DEFAULT_TRADE_KIND)
     if trade_kind not in TRADE_KINDS:

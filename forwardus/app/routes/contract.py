@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request, Response
 
-from app.routes import error_response
+from app.routes import error_response, json_body
 from app.services import ServiceError, contract_clause_service
 from app.validators import ValidationError
 
@@ -75,7 +75,7 @@ def review():
 def export():
     """고른 조항의 문안을 텍스트 파일로 내려받습니다."""
 
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     keys = payload.get("keys")
     try:
         body = contract_clause_service.clause_text(keys if isinstance(keys, list) else [])

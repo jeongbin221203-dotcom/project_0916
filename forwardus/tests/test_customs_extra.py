@@ -100,10 +100,10 @@ def test_clearance_code_is_read_from_the_business_number(keyed):
     xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
     <ecmQryRtnVo><ntceInfo/>
       <ecmQryRsltVo><useYn>Y</useYn><ecm>포워더스102011</ecm><conmNm>포워더스</conmNm>
-        <bsnsNo>1078800075</bsnsNo><rppnNm>이정빈</rppnNm></ecmQryRsltVo>
+        <bsnsNo>1078800070</bsnsNo><rppnNm>이정빈</rppnNm></ecmQryRsltVo>
       <tCnt>1</tCnt></ecmQryRtnVo>"""
     with patch("httpx.request", side_effect=_reply(xml)):
-        result = extra.clearance_code(business_no="107-88-00075")
+        result = extra.clearance_code(business_no="107-88-00070")
 
     assert result["data"][0]["clearance_code"] == "포워더스102011"
     assert result["data"][0]["in_use"] is True
@@ -135,7 +135,7 @@ def test_declaration_verification_returns_match_or_not(keyed):
           <vrfcRsltCn>{label}</vrfcRsltCn></expDclrCrfnVrfcQryRsltVo>"""
 
     args = dict(publication_no="1234567890123", declaration_no="122100900340033",
-                business_no="1078800075", origin_country="KR",
+                business_no="1078800070", origin_country="KR",
                 product_name="SHAMPOO", net_weight_kg="250")
 
     with patch("httpx.request", side_effect=_reply(answer(1, "일치함"))):
@@ -176,7 +176,7 @@ def test_missing_keys_say_so_instead_of_calling(app, monkeypatch):
                         lambda name, default=None: {} if name == "UNIPASS_API_KEYS" else default)
     with patch("httpx.request", side_effect=AssertionError("불러서는 안 됩니다")):
         for call in (lambda: extra.export_requirement_laws("3305100000"),
-                     lambda: extra.clearance_code(business_no="1078800075"),
+                     lambda: extra.clearance_code(business_no="1078800070"),
                      lambda: extra.refund_rate("3305100000")):
             result = call()
             assert result["success"] is False

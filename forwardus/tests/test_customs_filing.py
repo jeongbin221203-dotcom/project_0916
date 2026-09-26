@@ -41,11 +41,11 @@ def test_business_number_is_stored_in_the_standard_shape(app, create_shipment):
     with app.app_context():
         shipment = create_shipment()
         customs_filing_service.update_filing_fields(shipment, {
-            "exporter_business_no": "1234567890",
+            "exporter_business_no": "1234567891",
             "customs_trade_kind": "11",
             "customs_payment_method": "LS",
         })
-        assert shipment.exporter_business_no == "123-45-67890"
+        assert shipment.exporter_business_no == "123-45-67891"
         assert shipment.customs_payment_method == "LS"
 
         with pytest.raises(ValidationError):
@@ -72,3 +72,34 @@ def test_copyable_text_lists_every_item(app, create_shipment):
     assert "샴푸" in text and "린스" in text
     assert "HS 3305100000" in text
     assert "아직 비어 있는 칸" in text
+
+
+def test_목적국은_나라로_도착항은_따로_적는다(create_shipment):
+    """예전에는 '목적국: Los Angeles (US)' 라고 적혔습니다.
+
+    수출신고서 ⑫목적국 칸에 그대로 옮겨 적는 값입니다. 거기에 도시 이름이
+    들어가 있으면 관세사가 한 번 더 묻거나, 그대로 신고되어 정정해야 합니다.
+    관세사가 선적서류와 맞춰 볼 도착항은 따로 답니다. (2026-09-26)
+    """
+
+    shipment = create_shipment()
+    text = customs_filing_service.as_text(customs_filing_service.filing_sheet(shipment))
+    lines = {line.split(":")[0].strip(" -"): line.split(":", 1)[1].strip()
+             for line in text.split("\n") if ":" in line and line.strip().startswith("-")}
+    assert lines["목적국"] == "미국 (US)"
+    assert lines["도착항 (POD)"] == "Los Angeles (USLAX)"
+    assert lines["적재항 (POL)"] == "Busan (KRPUS)"
+
+
+def test_사업자등록번호는_검증번호까지_본다(create_shipment):
+    """자릿수만 보면 0000000000 이 수출신고서에 그대로 실립니다."""
+
+    from app.validators import ValidationError
+
+    shipment = create_shipment()
+    with pytest.raises(ValidationError):
+        customs_filing_service.update_filing_fields(
+            shipment, {"exporter_business_no": "0000000000"})
+    customs_filing_service.update_filing_fields(
+        shipment, {"exporter_business_no": "124-81-00998"})
+    assert shipment.exporter_business_no == "124-81-00998"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
-from app.routes import error_response, load_shipment
+from app.routes import error_response, load_shipment, json_body
 from app.services import ServiceError, assistant_service
 from app.validators import ValidationError
 
@@ -27,7 +27,7 @@ def index(shipment_id: str):
 @assistant_bp.post("/<shipment_id>/api/ask")
 def api_ask(shipment_id: str):
     shipment = load_shipment(shipment_id)
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         return jsonify({"success": True, "data": assistant_service.ai_answer(shipment, payload.get("question", ""))})
     except (ValidationError, ServiceError) as exc:

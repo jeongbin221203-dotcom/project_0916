@@ -16,7 +16,7 @@ from __future__ import annotations
 from flask import Blueprint, Response, abort, flash, jsonify, redirect, render_template, request, url_for
 
 from app.models.shipment import STATUS_LABELS
-from app.routes import error_response
+from app.routes import error_response, json_body
 from app.routes.auth import current_user, login_required_response
 from app.services import ServiceError, analytics_service, dashboard_service
 
@@ -141,7 +141,7 @@ def api_admin_shipments():
 
 @dashboard_api_bp.post("/admin/shipments/<shipment_id>/status")
 def api_admin_status(shipment_id: str):
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         shipment = dashboard_service.force_status(current_user(), shipment_id,
                                                   str(payload.get("status") or ""))

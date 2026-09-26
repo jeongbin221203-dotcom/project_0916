@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from app.routes import error_response
+from app.routes import error_response, json_body
 from app.routes.auth import current_user, login_required_response
 from app.services import ServiceError, work_draft_service
 
@@ -30,7 +30,7 @@ def show():
 
 @work_draft_bp.put("")
 def save():
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         data = work_draft_service.save(current_user(), payload, str(payload.get("source") or ""))
     except ServiceError as exc:
