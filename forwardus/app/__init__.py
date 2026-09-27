@@ -145,6 +145,8 @@ def ensure_master_account(database, email: str, password: str) -> None:
     이미 마스터이면 비밀번호를 건드리지 않습니다.
     """
 
+    from sqlalchemy.exc import IntegrityError
+
     from app.models import User
 
     if not email or not password:
@@ -159,7 +161,21 @@ def ensure_master_account(database, email: str, password: str) -> None:
         user.set_password(password)
     else:
         return
-    database.session.commit()
+    try:
+        database.session.commit()
+    except IntegrityError:
+        # **다른 일꾼이 같은 순간에 먼저 만들었습니다.**
+        #
+        # 위는 "찾아보고 → 없으면 넣는" 모양이라 그 사이가 비어 있습니다.
+        # gunicorn 일꾼 둘이 같이 뜨면 둘 다 "없다"를 보고 둘 다 넣습니다.
+        # 뒤늦은 쪽이 UNIQUE 에 걸리는데, 그때 이 일꾼이 죽으면 gunicorn 이
+        # "Worker failed to boot" 로 **앱 전체를 내립니다.** (2026-09-27 Render 502)
+        #
+        # 겹친 것 자체는 잘못이 아닙니다 — 만들려던 것이 이미 있으니 된 것입니다.
+        # 되돌리고 다시 찾아봅니다. 정말 있으면 조용히 넘어갑니다.
+        database.session.rollback()
+        if User.query.filter_by(email=email).first() is None:
+            raise                       # 없는데도 실패했다면 그건 진짜 문제입니다
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
