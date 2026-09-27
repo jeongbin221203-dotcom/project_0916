@@ -249,8 +249,17 @@ def test_external_api_failures_never_break_the_page(app):
                 else:
                     assert result["message"]
 
+                # 세율도 위 품목표와 같은 규칙을 따릅니다. 넘어갈 것이 있으면
+                # 넘어가고(source=internal/stored), 없으면 이유를 알립니다.
+                # 2026-09-27 부터 관세청이 공개한 관세율표를 굳혀 두었으므로
+                # 기관이 죽어도 답합니다. 세율을 못 내면 견적이 멈춥니다.
                 rates = customs_client.fetch_tariff_rates("3305100000")
-                assert rates["success"] is False and rates["message"]
+                assert isinstance(rates, dict) and "success" in rates
+                if rates["success"]:
+                    assert rates["source"] in ("internal", "stored"), "실데이터인 척하면 안 됩니다"
+                    assert rates["message"], "언제 자료인지 밝혀야 합니다"
+                else:
+                    assert rates["message"]
 
 
 def test_many_items_and_repeated_submits(app, create_shipment):

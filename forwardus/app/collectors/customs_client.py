@@ -222,7 +222,9 @@ def fetch_tariff_rates(hs_code: str) -> dict:
 
     key = (get_config("UNIPASS_API_KEYS", {}) or {}).get("TARIFF_RATE", "")
     if not key:
-        return fail("API_AUTH_FAILED", "api", "관세율 조회 API 키가 없습니다.")
+        # 키가 없어도 굳혀 둔 표로 답합니다. 세율을 못 내면 견적이 멈춥니다.
+        return tariff_rates_offline(digits) or fail(
+            "API_AUTH_FAILED", "api", "관세율 조회 API 키가 없습니다.")
 
     result = request_text("GET", UNIPASS_TARIFF_URL, params={"crkyCn": key, "hsSgn": digits})
     if not result["success"]:
@@ -232,7 +234,8 @@ def fetch_tariff_rates(hs_code: str) -> dict:
         # 세율은 법이 바뀔 때만 바뀌므로 law(90일) 수명을 씁니다.
         # (2026-09-27 이 파일에는 저장·꺼내기가 한 줄도 없었습니다. collectors
         #  가운데 유일했습니다 — scripts/checks/cache_offline.py 가 찾았습니다)
-        return snapshot.recall(f"tariff_{digits}", "law") or result
+        return (snapshot.recall(f"tariff_{digits}", "law")
+                or tariff_rates_offline(digits) or result)
     try:
         root = ET.fromstring(result["data"])
     except ET.ParseError:
@@ -250,7 +253,8 @@ def fetch_tariff_rates(hs_code: str) -> dict:
     if not rows and notice:
         # 기관이 "없다"고 답한 것도 실패가 아닙니다. 다만 예전에 세율이 있었다면
         # 그것을 주는 편이 낫습니다 — 미등재는 우리 쪽 조회 범위 문제일 수 있습니다.
-        return snapshot.recall(f"tariff_{digits}", "law") or fail("API_NO_DATA", "api", notice)
+        return (snapshot.recall(f"tariff_{digits}", "law")
+                or tariff_rates_offline(digits) or fail("API_NO_DATA", "api", notice))
     return snapshot.remember(f"tariff_{digits}", ok(rows, "api"))
 
 
@@ -258,6 +262,90 @@ def fetch_tariff_rates(hs_code: str) -> dict:
 UNIPASS_STATS_URL = "https://unipass.customs.go.kr:38010/ext/rest/statsSgnQry/retrieveStatsSgnBrkd"
 COUNTRY_CODE_GROUP = "A06"
 
+
+# 관세청 품목번호별 관세율표를 굳혀 둔 내부 표. (data/build_tariff.py 가 만듭니다)
+#
+# 왜 두나 — 세율은 **돈이 걸린 값**입니다
+#   UNI-PASS 관세율 조회는 키가 있어야 하고 기관이 멈추면 빈손입니다. 포털이
+#   파일로 내놓는 표에는 전 품목이 들어 있어, 굳혀 두면 키 없이도 답합니다.
+#   출처를 "internal" 로 적어 **방금 받은 값과 구분**하고 기준일을 함께 알립니다.
+#   (2026-09-27)
+_TARIFF: dict | None = None
+
+
+def _tariff_table() -> dict | None:
+    global _TARIFF
+    if _TARIFF is None:
+        try:
+            _TARIFF = load_mock("tariff_rates")
+        except (OSError, ValueError):
+            _TARIFF = {}
+    return _TARIFF or None
+
+
+def tariff_rates_offline(hs_code: str) -> dict | None:
+    """내부 세율표에서 찾습니다. 표가 없거나 그 부호가 없으면 None.
+
+    돌려주는 모양은 fetch_tariff_rates 와 같습니다 — 부르는 쪽이 갈라 볼 필요가
+    없습니다. 다만 source 는 "internal" 이고 message 에 기준일을 적습니다.
+    """
+
+    digits = (hs_code or "").replace(".", "").replace("-", "").replace(" ", "")
+    table = _tariff_table()
+    if not table or len(digits) != HS_CODE_LENGTH:
+        return None
+    kinds = (table.get("codes") or {}).get(digits)
+    if not kinds:
+        return None
+
+    names = table.get("rate_kinds") or {}
+    start, end = (table.get("period") or ["", ""])[:2]
+    extra = ((table.get("extra") or {}).get(digits)) or {}
+    rows = []
+    for kind, rate in kinds.items():
+        odd = extra.get(kind) or {}
+        rows.append({
+            "code": kind,
+            # 표에 없는 부호는 부호 그대로 보여 줍니다. 우리가 지어내지 않습니다.
+            "name": names.get(kind, kind),
+            "rate": rate,
+            "unit_amount": odd.get("unit_amount", ""),
+            "start_date": odd.get("start_date", start),
+            "end_date": odd.get("end_date", end),
+        })
+    base = table.get("base_date") or ""
+    return {**ok(rows, "internal"),
+            "message": f"관세청이 공개한 관세율표({base} 기준)로 답했습니다. "
+                       "기관에 직접 물은 값이 아니므로 신고 전에 확인하세요.",
+            "base_date": base}
+
+# 관세청 국가코드(통계부호 A06)를 굳혀 둔 내부 표.
+#
+# 왜 두나
+#   관세율구분명("한ㆍ터키 FTA협정세율")에서 나라를 읽어낼 때 이 표가 필요합니다.
+#   표가 없으면 fta_guide.countries_for() 가 빈손을 돌려주고, **원산지증명서
+#   안내가 목록에서 통째로 사라집니다.** 키가 없을 때 실제로 그랬습니다.
+#   나라 이름은 우리가 짓지 않았습니다 — 관세청 응답(cdValtValNm)을 그대로
+#   굳힌 것입니다. (2026-09-27)
+_COUNTRY_CODES: dict | None = None
+
+
+def country_codes_offline() -> dict | None:
+    """내부 국가코드표. {한글 국가명: 2자리 코드} — 없으면 None."""
+
+    global _COUNTRY_CODES
+    if _COUNTRY_CODES is None:
+        try:
+            _COUNTRY_CODES = load_mock("country_codes")
+        except (OSError, ValueError):
+            _COUNTRY_CODES = {}
+    table = _COUNTRY_CODES or None
+    names = (table or {}).get("codes") or {}
+    if not names:
+        return None
+    return {**ok(names, "internal"),
+            "message": f"관세청 국가코드표({table.get('received_on', '')} 받은 것)로 답했습니다.",
+            "base_date": table.get("received_on", "")}
 
 def fetch_country_codes() -> dict:
     """관세청이 쓰는 국가코드 목록. {한글 국가명: 2자리 코드}
@@ -267,14 +355,17 @@ def fetch_country_codes() -> dict:
 
     key = (get_config("UNIPASS_API_KEYS", {}) or {}).get("STATISTICS_CODE", "")
     if not key:
-        return fail("API_AUTH_FAILED", "api", "통계부호 조회 API 키가 없습니다.")
+        # 키가 없어도 굳혀 둔 표로 답합니다. 이 표가 없으면 협정을 못 찾습니다.
+        return country_codes_offline() or fail(
+            "API_AUTH_FAILED", "api", "통계부호 조회 API 키가 없습니다.")
 
     result = request_text("GET", UNIPASS_STATS_URL,
                           params={"crkyCn": key, "statsSgnTp": COUNTRY_CODE_GROUP})
     if not result["success"]:
         # 국가코드는 거의 안 바뀝니다. 나라 이름을 못 찾으면 협정세율 구분명에서
         # 대상국을 못 읽어, 화면이 "한ㆍ칠레FTA협정세율"을 그냥 글자로 보여 줍니다.
-        return snapshot.recall("country_codes", "registry") or result
+        return (snapshot.recall("country_codes", "registry")
+                or country_codes_offline() or result)
     try:
         root = ET.fromstring(result["data"])
     except ET.ParseError:
@@ -287,7 +378,8 @@ def fetch_country_codes() -> dict:
         if len(code) == 2 and name:
             names[name] = code
     if not names:
-        return snapshot.recall("country_codes", "registry") or fail(
-            "API_NO_DATA", "api",
-            (root.findtext("ntceInfo") or "").strip() or "국가코드를 받지 못했습니다.")
+        return (snapshot.recall("country_codes", "registry") or country_codes_offline()
+                or fail("API_NO_DATA", "api",
+                        (root.findtext("ntceInfo") or "").strip()
+                        or "국가코드를 받지 못했습니다."))
     return snapshot.remember("country_codes", ok(names, "api"))
