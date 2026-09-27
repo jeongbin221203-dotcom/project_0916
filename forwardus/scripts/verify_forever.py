@@ -72,6 +72,7 @@ JOBS = [
     ("⑥ 서로 모순되는 입력", ["python", "scripts/checks/m6_contradiction.py", "3000"]),
     ("⑪ 일상어 HS", ["python", "scripts/checks/m11_hs.py"]),
     ("⑫ 역순·섞어 적기", ["python", "scripts/checks/m12_reverse.py", "3000"]),
+    ("⑬ 인코텀즈 선택", ["python", "scripts/checks/m13_incoterms.py"]),
     ("⑯ 사업자등록번호", ["python", "scripts/checks/m16_brn.py", "30000"]),
     ("⑰~㉕ 화면 전수", ["python", "scripts/checks/m_render.py"]),
     ("⑰~㉕ 붙는 값 흔들기", ["python", "scripts/checks/m_screens_fuzz.py", "3000"]),
