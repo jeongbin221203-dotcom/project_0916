@@ -174,9 +174,18 @@ def busiest_ports(months: int = 6, limit: int = 10) -> dict:
     for row in rows:
         for field in ("full_teu", "empty_teu", "total_teu"):
             row[field] = round(row[field], 1)
+    # 출처는 container_throughput 이 준 것을 그대로 물려줍니다.
+    #
+    # 이 함수는 조회를 하지 않습니다 — 그 결과를 항구별로 더하기만 합니다.
+    # "api" 로 못 박으면 저장분으로 답했는데도 **방금 받은 값**으로 화면에
+    # 내보냅니다. trade_stats_client.top_destinations 와 같은 유형이었고,
+    # 그쪽을 고칠 때 이쪽은 아직 캐시가 없어 드러나지 않았습니다.
+    # container_throughput 에 캐시를 붙이자 비로소 보였습니다.
+    # (2026-09-27 scripts/checks/cache_offline.py 가 찾았습니다)
     return ok({**result["data"], "rows": rows,
                "note": f"{result['data']['from']}~{result['data']['to']} 합계입니다. "
-                       "TEU는 20피트 컨테이너 한 대를 1로 셉니다."}, "api")
+                       "TEU는 20피트 컨테이너 한 대를 1로 셉니다."},
+              result.get("source", "api"))
 
 
 def region_traffic(months: int = 6) -> dict:
