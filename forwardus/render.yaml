@@ -60,6 +60,76 @@ services:
       - key: TRACKING_API_KEY
         sync: false
 
+      # --- 관세청 UNI-PASS 서비스별 인증키 ------------------------------------
+      #
+      # config.py 가 서비스마다 UNIPASS_KEY_<이름> 을 따로 읽습니다.
+      # 32개를 모두 넣어야 그 조회가 삽니다. 비운 것은 그 조회만 꺼집니다.
+      # (관세율·표준품명은 굳혀 둔 파일로 답하므로 키가 없어도 됩니다)
+      - key: UNIPASS_KEY_AIRLINE_DETAIL
+        sync: false
+      - key: UNIPASS_KEY_AIRLINE_LIST
+        sync: false
+      - key: UNIPASS_KEY_ARRIVAL_REPORT_AIR
+        sync: false
+      - key: UNIPASS_KEY_ARRIVAL_REPORT_SEA
+        sync: false
+      - key: UNIPASS_KEY_CARGO_CLEARANCE_PROGRESS
+        sync: false
+      - key: UNIPASS_KEY_CONTAINER_DETAIL
+        sync: false
+      - key: UNIPASS_KEY_CUSTOMS_CLEARANCE_CODE
+        sync: false
+      - key: UNIPASS_KEY_CUSTOMS_EXCHANGE_RATE
+        sync: false
+      - key: UNIPASS_KEY_DECLARATION_ATTACHMENT_SUBMISSION
+        sync: false
+      - key: UNIPASS_KEY_DECLARATION_CORRECTION_STATUS
+        sync: false
+      - key: UNIPASS_KEY_DEPARTURE_PERMIT_AIR
+        sync: false
+      - key: UNIPASS_KEY_DEPARTURE_PERMIT_SEA
+        sync: false
+      - key: UNIPASS_KEY_ENTRY_DEPARTURE_REPORT
+        sync: false
+      - key: UNIPASS_KEY_EXPORT_DECLARATION_VERIFY
+        sync: false
+      - key: UNIPASS_KEY_EXPORT_PERFORMANCE_BY_DECLARATION
+        sync: false
+      - key: UNIPASS_KEY_EXPORT_PERFORMANCE_BY_VIN
+        sync: false
+      - key: UNIPASS_KEY_EXPORT_PERIOD_SHORTENING_ITEM
+        sync: false
+      - key: UNIPASS_KEY_FORWARDER_DETAIL
+        sync: false
+      - key: UNIPASS_KEY_FORWARDER_LIST
+        sync: false
+      - key: UNIPASS_KEY_HS_CODE_SEARCH
+        sync: false
+      - key: UNIPASS_KEY_HS_NAVIGATION
+        sync: false
+      - key: UNIPASS_KEY_INSPECTION_QUARANTINE
+        sync: false
+      - key: UNIPASS_KEY_REEXPORT_COMPLETION_REPORT
+        sync: false
+      - key: UNIPASS_KEY_REEXPORT_CONDITIONAL_IMPORT_DEADLINE
+        sync: false
+      - key: UNIPASS_KEY_REEXPORT_EXEMPTION_BALANCE
+        sync: false
+      - key: UNIPASS_KEY_REQUIREMENT_APPROVAL
+        sync: false
+      - key: UNIPASS_KEY_SHIPPING_COMPANY_DETAIL
+        sync: false
+      - key: UNIPASS_KEY_SHIPPING_COMPANY_LIST
+        sync: false
+      - key: UNIPASS_KEY_SIMPLE_REFUND_COMPANY
+        sync: false
+      - key: UNIPASS_KEY_SIMPLE_REFUND_RATE
+        sync: false
+      - key: UNIPASS_KEY_STATISTICS_CODE
+        sync: false
+      - key: UNIPASS_KEY_TARIFF_RATE
+        sync: false
+
       # --- 화면에서 내려 둔 기능 ----------------------------------------------
       # 계약서 조항 점검. 되살리려면 1 로 바꿉니다. (2026-09-27 사용자 결정)
       - key: CONTRACT_CLAUSES_ON
