@@ -185,8 +185,7 @@ def main() -> int:
     print(f"   받아서 저장 {len(saved)}건 · 기관에 자료 없음 {len(empty)}건 · "
           f"못 받음 {len(missed)}건 · 상한으로 미룸 {len(skipped)}건")
     if empty:
-        print("
-■ 기관이 답했으나 내용이 빈 것 — 저장할 것이 없습니다")
+        print("\n■ 기관이 답했으나 내용이 빈 것 — 저장할 것이 없습니다")
         print("   ('규제 없음'이 아닙니다. 이 조회에 걸리는 항목이 없다는 뜻입니다)")
         for label in empty:
             print(f"   . {label}")
