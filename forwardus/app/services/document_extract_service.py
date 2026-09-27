@@ -74,6 +74,21 @@ _STR = {"type": ["string", "null"]}
 _NUM = {"type": ["number", "null"]}
 
 
+# Incoterms 2020 에서 배로만 쓰는 조건. ICC 가 "Rules for Sea and Inland
+# Waterway Transport" 로 묶어 둔 넷입니다. 이 조건이 적힌 서류는 항공일 수 없습니다.
+SEA_ONLY_TERMS = frozenset({"FOB", "CFR", "CIF", "FAS"})
+
+# L/C 날짜를 **가질 수 없는** 서류. 여기 적힌 "Validity" 는 그 가격이 언제까지
+# 유효한가이지, L/C 유효기일(SWIFT 31D)이 아닙니다. L/C 는 은행이 따로 내는
+# 서류라 오퍼시트·견적서 안에는 없습니다.
+#
+# 표본 003 오퍼시트에서 "6) Validity  Valid through 2027-04-19" 를 L/C 유효기일로
+# 보고, 거기서 21일을 뺀 날로 **서류에 적힌 선적일을 덮어썼습니다.**
+#   서류 2027-04-28  ->  우리 2027-03-26   (한 달 앞당겨짐)
+# 그 날짜로 스케줄을 잡으면 배를 놓칩니다. (2026-09-27)
+NO_LC_DATES = frozenset({"offer_sheet", "quotation", "packing_list"})
+
+
 def _object(properties: dict) -> dict:
     """strict 모드는 모든 키를 required로, 나머지 키는 막아야 합니다."""
 
@@ -349,10 +364,24 @@ def _ask_ai(text: str, images: list[str]) -> dict:
         if text else "서류 그림입니다. 글자를 읽어 옮겨 주세요.")}]
     content += [{"type": "image_url", "image_url": {"url": url, "detail": "high"}}
                 for url in images]
-    result = ai_client.structured_chat(
-        [{"role": "system", "content": EXTRACT_PROMPT}, {"role": "user", "content": content}],
-        EXTRACT_SCHEMA, name="trade_document_extract", max_tokens=3000,
-        model=ai_client.model_name(get_config("AI_DOC_MODEL", "")), timeout=AI_TIMEOUT_SECONDS)
+    def ask() -> dict:
+        return ai_client.structured_chat(
+            [{"role": "system", "content": EXTRACT_PROMPT}, {"role": "user", "content": content}],
+            EXTRACT_SCHEMA, name="trade_document_extract", max_tokens=3000,
+            model=ai_client.model_name(get_config("AI_DOC_MODEL", "")), timeout=AI_TIMEOUT_SECONDS)
+
+    result = ask()
+    # **한 번만 다시 물어봅니다.**
+    #
+    # 표본 15장을 넣어 보니 두 장이 "읽지 못했습니다"로 떨어졌는데, 그대로
+    # 다시 부르니 둘 다 됐습니다. 서류 탓이 아니라 그때 한 번 어긋난 것입니다.
+    # 사람 눈에는 "올렸는데 안 읽혔다"로 보이고, 파일을 다시 올려야 합니다.
+    # (2026-09-27 · 15장 가운데 2장)
+    #
+    # 인증이 막힌 것은 다시 물어도 같고, 시간 초과는 다시 물으면 기다림이
+    # 두 배가 됩니다. 그 둘은 빼고 한 번만 더 봅니다.
+    if not result["success"] and result.get("error_code") not in ("API_TIMEOUT", "API_AUTH_FAILED"):
+        result = ask()
     if not result["success"]:
         # structured_chat의 문구는 HS 검색용이라 여기서 다시 씁니다.
         if result.get("error_code") == "API_TIMEOUT":
@@ -465,6 +494,15 @@ def to_form(raw: dict) -> dict:
 
     notes: list[str] = []
     mode = _pick(raw.get("transport_mode"), {"SEA", "AIR"}) or "SEA"
+    written_terms = _incoterms_word(raw.get("incoterms"))
+    # FOB·CFR·CIF·FAS 는 Incoterms 2020 에서 **배로만 쓰는 조건**입니다.
+    # 이 조건이 적힌 서류가 항공일 수는 없습니다. 조건이 더 믿을 만하므로
+    # 배로 바로잡습니다. 그대로 두면 부산항 대신 김해공항이 들어갑니다.
+    # (표본 003-02 에서 실제로 그랬습니다. 2026-09-27)
+    if mode == "AIR" and written_terms in SEA_ONLY_TERMS:
+        notes.append(f"가격조건이 {written_terms}라 바닷길로 봤습니다. "
+                     f"{written_terms}는 배로만 쓰는 조건입니다. 항공이면 화면에서 바꿔 주세요.")
+        mode = "SEA"
     fields: dict[str, str] = {"transport_mode": mode}
 
     shipper, consignee, notify = (_party(raw.get(key))
@@ -589,10 +627,41 @@ def transit_range(origin_code: str, destination_code: str, mode: str) -> tuple[i
     return int(leg["min"]), int(leg["max"])
 
 
+def has_letter_of_credit(raw: dict) -> bool:
+    """이 서류가 **L/C 거래라고 말하고 있는가.**
+
+    왜 물어보나
+      오퍼시트에는 "Validity — Valid through 2027-03-16" 이 흔히 있습니다.
+      이 가격이 언제까지 유효한가일 뿐, L/C 와 아무 상관이 없습니다.
+      그런데 AI 가 이것을 L/C 유효기일로 넘기는 일이 있었고, 우리는 그대로
+      받아 선적 마감을 계산한 뒤 **서류에 또렷이 적힌 선적일을 덮어썼습니다.**
+      결제가 T/T 라고 적힌 서류였습니다. (표본 003-01, 2026-09-27)
+
+      한 달 넘게 앞당겨진 선적일로 스케줄을 잡으면 배를 놓칩니다.
+      그래서 서류가 L/C 라고 말할 때만 L/C 일정을 씁니다.
+    """
+
+    if str(raw.get("lc_no") or "").strip():
+        return True
+    said = " ".join(str(raw.get(key) or "") for key in
+                    ("payment_terms", "document_type")).lower()
+    return bool(re.search(r"l/c|letter of credit|documentary credit|신용장", said))
+
+
 def lc_plan(raw: dict, fields: dict, mode: str, notes: list) -> dict | None:
     """읽은 L/C 조건으로 선적 마감·권하는 선적예정일·도착 예상을 냅니다. (계산은 우리 코드가 합니다)"""
 
     from app.processors import lc_schedule
+
+    if not has_letter_of_credit(raw):
+        return None
+    if raw.get("document_type") in NO_LC_DATES:
+        if raw.get("lc_expiry_date") or raw.get("lc_latest_shipment_date"):
+            notes.append(
+                "이 서류에 적힌 유효기일은 **이 제안이 언제까지 유효한가**로 봤습니다. "
+                "L/C 유효기일이 아닙니다(L/C는 은행이 따로 냅니다). "
+                "L/C를 받으셨으면 그 원본을 올려 주세요 — 선적 마감을 계산해 드립니다.")
+        return None
 
     result = lc_schedule.plan(
         transit_days=transit_range(fields.get("origin_code", ""),
