@@ -119,6 +119,7 @@
       box.querySelector("[data-place-search]").value = "";
       box.querySelector("[data-doc-input]").value = "";
       placeCountry[box.dataset.docPlace] = "";
+      placeCountryCode[box.dataset.docPlace] = "";
     });
   }
 
@@ -130,6 +131,7 @@
 
   // 고른 항구의 나라 이름. 견적명(도착국가_품목_날짜)에 씁니다.
   const placeCountry = { origin: "", destination: "" };
+  const placeCountryCode = { origin: "", destination: "" };
 
   panel.querySelectorAll("[data-doc-place]").forEach((box) => {
     const role = box.dataset.docPlace;
@@ -141,7 +143,13 @@
     function showRows(rows, emptyText) {
       list.innerHTML = rows.length
         ? rows.map((row) => `<li><button type="button" data-code="${escapeHtml(row.code)}"`
-            + ` data-name="${escapeHtml(row.name)}"${row.code === hidden.value ? ' class="picked"' : ""}>`
+            + ` data-name="${escapeHtml(row.name)}"`
+            // 나라를 실어 둡니다. 여태 안 실어서 화면이 도착지의 나라를 몰랐고,
+            // 부호 앞 두 글자로 짐작했습니다. 공항이면 LAX → "LA" 가 되어
+            // 나라가 아닌 글자를 나라로 썼습니다. (2026-09-27)
+            + ` data-country="${escapeHtml(row.country || "")}"`
+            + ` data-country-code="${escapeHtml(row.country_code || "")}"`
+            + `${row.code === hidden.value ? ' class="picked"' : ""}>`
             + `${escapeHtml(row.name)}`
             + ` <small>${escapeHtml(row.code)} · ${escapeHtml(row.country)}</small></button></li>`).join("")
         : `<li class="empty">${escapeHtml(emptyText)}</li>`;
@@ -181,7 +189,10 @@
 
     search.addEventListener("input", () => {
       hidden.value = "";
-      if (role === "destination") placeCountry.destination = "";
+      if (role === "destination") {
+        placeCountry.destination = "";
+        placeCountryCode.destination = "";
+      }
       invalidateSchedule();
       look();
     });
@@ -193,6 +204,8 @@
       search.value = `${button.dataset.name} (${button.dataset.code})`;
       // 도착 국가는 "미국_의류_20260923"처럼 지을 이름에 씁니다. 골라 둘 때 받아 둡니다.
       placeCountry[role] = button.dataset.country || "";
+      placeCountryCode[role] = (button.dataset.countryCode || "").toUpperCase();
+      checkBuyerCountry();
       hideList();
       invalidateSchedule();
       suggestName();
@@ -439,9 +452,44 @@
   /* ----- 품목의 HS부호를 간편 검색 창으로 찾기 -----
      이 줄의 품명으로 바로 찾고, 고르면 이 줄의 HS부호 칸에 넣습니다.
      도착지를 골라 두었으면 그 나라 관세로 비교합니다. */
+  /* 받는 곳과 도착지가 어긋나면 그 자리에서 알려 줍니다.
+
+     Buyer 국가는 TR(터키)인데 도착항이 USLAX(미국)인 건이 **아무 말 없이**
+     통과했습니다. 그대로 서류가 되면 수하인은 터키 회사, 양륙항은 로스앤젤레스로
+     찍힙니다. 삼각무역이면 맞는 일이라 막지는 않습니다. 다만 대부분은 둘 중
+     하나를 잘못 고른 것이고, 그걸 나중에 알면 서류를 다시 만들어야 합니다.
+     (2026-09-27 사용자 신고) */
+  function checkBuyerCountry() {
+    const field = form.querySelector('[data-doc-field="buyer_country"]');
+    if (!field) return;
+    let note = field.querySelector("[data-country-mismatch]");
+    const buyer = (form.elements.buyer_country?.value || "").trim().toUpperCase();
+    const place = placeCountryCode.destination;
+    const placeName = placeCountry.destination;
+    if (!buyer || !place || buyer === place) {
+      if (note) note.remove();
+      return;
+    }
+    if (!note) {
+      note = document.createElement("p");
+      note.className = "doc_note warn";
+      note.setAttribute("data-country-mismatch", "");
+      field.appendChild(note);
+    }
+    note.textContent =
+      `받는 분은 ${buyer} 인데 도착지는 ${placeName || place}(${place}) 입니다. `
+      + "삼각무역이면 맞습니다. 아니라면 둘 중 하나를 다시 골라 주세요 — "
+      + "서류에는 수하인 나라와 양륙항이 그대로 찍힙니다.";
+  }
+
   function destinationCountry() {
+    // 고른 곳이 알려 준 나라가 가장 정확합니다. 부호 앞 두 글자는 **항구일 때만**
+    // 나라입니다(UN/LOCODE). 공항이면 LAX → "LA" 라서 나라가 아닙니다. (2026-09-27)
+    if (placeCountryCode.destination) return placeCountryCode.destination;
     const port = (form.elements.destination_code?.value || "").trim();
-    return port.slice(0, 2) || (form.elements.buyer_country?.value || "").trim();
+    const looksLikePort = /^[A-Za-z]{2}[A-Za-z0-9]{3}$/.test(port);
+    return (looksLikePort ? port.slice(0, 2).toUpperCase() : "")
+      || (form.elements.buyer_country?.value || "").trim().toUpperCase();
   }
 
   function addHsButton(row) {
@@ -870,6 +918,7 @@
       requested_departure_date: departEl.value,
       // 나라 이름은 도착지를 고를 때 받아 둔 것을 씁니다. 코드만으로는 "미국"이 안 나옵니다.
       destination_country_name: placeCountry.destination,
+      destination_country_code: placeCountryCode.destination,
       items: [{ product_description: first.product_description || "" }],
     });
     return response.success ? (response.data.project_name || "") : "";
@@ -970,6 +1019,7 @@
     if (!nameStep) return;
     const name = event.target.name || "";
     if (name === "project_name") return;
+    if (name === "buyer_country") checkBuyerCountry();
     if (name === "item_product_description" || name === "buyer_country"
         || name === "requested_departure_date" || name === "destination_code") suggestName();
   });

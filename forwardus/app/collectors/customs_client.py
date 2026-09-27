@@ -172,9 +172,20 @@ def fetch_regulations(hs_code: str, country_code: str) -> dict:
     except (OSError, ValueError):
         return fail("MOCK_DATA_ERROR", "mock")
 
-    chapter = (hs_code or "").replace(".", "")[:2]
+    digits = "".join(ch for ch in str(hs_code or "") if ch.isdigit())
+    chapter, heading = digits[:2], digits[:4]
     items = [deepcopy(item) for item in data["common"]]
     chapter_rules = data["by_chapter"].get(chapter, {})
+
+    # 호(4자리)로 갈리는 것을 먼저 붙입니다.
+    #
+    # 류만 보면 틀리는 자리가 있습니다. 제33류는 대개 화장품이지만, 미국은
+    # 자외선차단제·불소 치약·발한억제제·비듬 치료 샴푸를 **화장품이 아니라
+    # OTC 의약품**으로 봅니다. 화장품으로 알고 MoCRA 로 등록하면 통관에서
+    # 반송됩니다. 류 규칙보다 앞에 둡니다. (2026-09-27)
+    for item in deepcopy((data.get("by_heading") or {}).get(heading, {})
+                         .get(country_code, [])):
+        items.append(item)
     country_items = chapter_rules.get(country_code)
     if country_items:
         items.extend(deepcopy(country_items))

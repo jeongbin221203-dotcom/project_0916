@@ -45,6 +45,8 @@ with app.app_context():
     def wants(code):
         return by_name.get(H._plain(catalog["codes"][code][0]), {code})
 
+    rates = {}
+
     def score(pairs, label, limit=12):
         top1 = inlist = missing = skipped = 0
         misses = []
@@ -72,6 +74,7 @@ with app.app_context():
         print(f"  {label:<34} 맨 위 {top1 * 100 / max(total,1):5.1f}%"
               f" · 목록 안 {inlist * 100 / max(total,1):5.1f}%"
               f" · 아무것도 없음 {missing * 100 / max(total,1):4.1f}%   ({total:,}개)")
+        rates[label] = (top1 * 100 / max(total, 1), inlist * 100 / max(total, 1))
         return misses
 
     picks = random.sample(codes, min(SAMPLE, len(codes)))
@@ -94,3 +97,19 @@ with app.app_context():
     for label, misses in (("①", m1), ("②", m2), ("③", m3), ("④", m4)):
         for x in misses[:4]:
             print(f"   {label} ☆ {x[:110]}")
+
+    # 떨어지면 걸리게 해 둡니다. 지금 수치보다 조금 낮게 잡아, 뽑기 운으로는
+    # 안 걸리고 **진짜로 나빠졌을 때만** 걸리게 합니다. (2026-09-26 기준)
+    #   ① 제 이름 99.4/99.8  ② 앞 2낱말 86.7/95.5  ③ 앞 3낱말 92.7/98.8
+    #   ④ 호 이름 60.7/84.8
+    # ④가 낮은 것은 호 이름이 "그 밖의"·"직물" 처럼 여러 호에 겹치기 때문입니다.
+    FLOOR = {"① 제 이름 그대로": (97, 99), "② 앞 낱말 2개만": (80, 93),
+             "③ 앞 낱말 3개만": (88, 97), "④ 호 이름 앞 낱말 2개": (55, 80)}
+    low = [f"{label} 맨 위 {got[0]:.1f}% (바닥 {want[0]}%)"
+           for label, want in FLOOR.items()
+           for got in [rates.get(label, (0, 0))]
+           if got[0] < want[0] or got[1] < want[1]]
+    print()
+    print(f"■ ㉖ 품목표 전체 찾기 · 바닥 아래로 떨어진 것 {len(low)}건")
+    for x in low:
+        print("   ★", x)

@@ -218,6 +218,8 @@ def filing_sheet(shipment) -> dict:
         "shipment_id": shipment.shipment_id,
         "papers": papers,
         "sections": sections,
+        # 값은 다 찼는데 **앞뒤가 안 맞는** 것. 비어 있는 칸(missing)과는 다릅니다.
+        "mismatches": _mismatches(shipment),
         # Jinja에서 dict.items()와 헷갈리지 않게 lines로 둡니다.
         "lines": lines,
         "missing": missing,
@@ -273,6 +275,24 @@ def as_text(sheet: dict) -> str:
         lines += ["", "■ 아직 비어 있는 칸",
                   "  " + ", ".join(sheet["missing"])]
     return "\n".join(lines)
+
+
+def _mismatches(shipment) -> list[str]:
+    """값은 다 찼는데 앞뒤가 안 맞는 것.
+
+    비어 있는 칸은 사람이 바로 알아챕니다. 이건 다 채워져 있어서 안 보입니다.
+    그대로 신고되고, 나중에 정정해야 합니다. (2026-09-27)
+    """
+
+    found = []
+    buyer = (getattr(shipment.buyer, "country", "") or "").strip().upper()
+    place = (shipment.destination_country or "").strip().upper()
+    if buyer and place and buyer != place:
+        found.append(
+            f"받는 분 나라({buyer})와 도착지 나라({place})가 다릅니다. "
+            "삼각무역이면 맞습니다. 아니라면 둘 중 하나를 고쳐 주세요 — "
+            "수출신고서 목적국과 선적서류 수하인이 서로 다르게 나갑니다.")
+    return found
 
 
 def describe_missing(sheet: dict) -> str:

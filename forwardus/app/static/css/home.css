@@ -213,6 +213,10 @@
 .doc_fold[open] .doc_fold_mark { transform: rotate(180deg); }
 .doc_fold[open] > summary { margin-bottom: 8px; }
 .doc_note { margin: 0 0 16px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+/* 값은 다 찼는데 앞뒤가 안 맞는 칸. 회색 작은 글로 두면 지나칩니다.
+   (받는 분은 터키인데 도착지가 미국 같은 것) (2026-09-27) */
+.doc_note.warn { margin: 6px 0 0; padding: 8px 11px; border-radius: 10px;
+  border: 1px solid #fcd34d; background: var(--amber_soft); color: #8a4f00; }
 
 .doc_grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
 .doc_field { display: grid; align-content: start; gap: 5px; min-width: 0; }
