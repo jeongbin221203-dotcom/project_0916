@@ -6,10 +6,17 @@
   인쇄해서 손에 들고 싶을 때 쓸 파일이 필요합니다.
 
 어떻게 그리나
-  프로젝트가 상업송장·포장명세서를 그릴 때 쓰는 방식과 같습니다 — Pillow 로
-  A4 크기 그림을 그리고 PDF 로 저장합니다. 글꼴도 document_form 과 같은 것을
-  찾아 씁니다. **글꼴을 못 찾으면 만들지 않고 멈춥니다.** 글자가 전부 네모로
-  나온 PDF 를 만들어 두면, 인쇄해서 들고 간 뒤에야 알게 됩니다.
+  reportlab 으로 **글자를 진짜 글자로** 넣습니다. 그래서 PDF 안에서 검색과
+  복사가 됩니다.
+
+  처음에는 Pillow 로 그림을 그려 PDF 로 저장했습니다(상업송장을 그리는 방식).
+  모양은 같지만 **글자가 그림이라 검색이 안 됐습니다.** 발표장에서 질문을
+  받고 낱말로 찾아야 하는 자료인데, 검색이 안 되면 쓸모가 절반입니다.
+  (2026-09-27 사용자 지적)
+
+  한글 글꼴은 document_form 이 쓰는 것과 같은 것을 찾아 PDF 에 심습니다.
+  **글꼴을 못 찾으면 만들지 않고 멈춥니다.** 글자가 전부 네모로 나온 PDF 를
+  만들어 두면, 인쇄해서 들고 간 뒤에야 알게 됩니다.
 
     python scripts/make_qna_pdf.py
     python scripts/make_qna_pdf.py --out C:/내문서/질의응답.pdf
@@ -203,107 +210,113 @@ FACTS = [("1,668", "테스트 전부 통과"), ("105", "커밋 (12일)"),
          ("4,086회", "HS 정확도 100%"), ("21건", "찾아 고친 결함")]
 
 
-class Sheet:
-    """A4 여러 장을 이어 그립니다. 자리가 모자라면 다음 장으로 넘깁니다."""
 
-    def __init__(self) -> None:
-        self.pages: list[Image.Image] = []
-        self._new()
 
-    def _new(self) -> None:
-        page = Image.new("RGB", (WIDTH, HEIGHT), "white")
-        self.pages.append(page)
-        self.draw = ImageDraw.Draw(page)
-        self.y = MARGIN
+def korean_fonts() -> tuple[str, str]:
+    """PDF 에 심을 한글 글꼴을 찾습니다. 못 찾으면 멈춥니다."""
 
-    def room(self, need: int) -> None:
-        if self.y + need > HEIGHT - MARGIN - 30:
-            self._new()
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
 
-    def text(self, value: str, font, fill=INK, indent: int = 0, gap: int = 0) -> None:
-        """한 줄 적고 그 글씨 높이만큼 내려갑니다.
+    from app.processors.document_form import BOLD_CANDIDATES, FONT_CANDIDATES
 
-        줄 높이를 LINE 으로 못 박아 두었더니 **큰 글씨가 다음 줄과 겹쳤습니다.**
-        (제목 38pt 가 26px 만 내려가 부제를 덮었습니다) 글씨마다 실제 높이를
-        재서 내려갑니다. gap 을 주면 그 값을 그대로 씁니다. (2026-09-27)
-        """
-
-        self.draw.text((MARGIN + indent, self.y), value, font=font, fill=fill)
-        if gap:
-            self.y += gap
-            return
-        box = self.draw.textbbox((0, 0), value or "가", font=font)
-        self.y += (box[3] - box[1]) + 10
-
-    def rule(self, color=LINE_COLOR) -> None:
-        self.draw.line([(MARGIN, self.y), (WIDTH - MARGIN, self.y)], fill=color, width=1)
-        self.y += 12
+    regular = next((path for path in FONT_CANDIDATES if Path(path).exists()), None)
+    if not regular:
+        raise SystemExit("한글 글꼴을 찾지 못해 만들지 않았습니다. "
+                         "글자가 네모로 나온 PDF 를 인쇄해 들고 가면 그때야 압니다.")
+    bold = next((path for path in BOLD_CANDIDATES if Path(path).exists()), regular)
+    pdfmetrics.registerFont(TTFont("KR", regular))
+    pdfmetrics.registerFont(TTFont("KR-B", bold))
+    return "KR", "KR-B"
 
 
 def build(out: Path) -> Path:
-    small = load_font(17)
-    body = load_font(19)
-    strong = load_font(20, bold=True)
-    head = load_font(25, bold=True)
-    title = load_font(38, bold=True)
-    if not all((small, body, strong, head, title)):
-        raise SystemExit("한글 글꼴을 찾지 못해 만들지 않았습니다. "
-                         "글자가 네모로 나온 PDF 를 인쇄해서 들고 가면 그때야 압니다.")
+    """질문과 답을 A4 여러 장에 이어 적습니다."""
 
-    sheet = Sheet()
-    sheet.text("FORWARDUS 질의응답 대비", title)
-    sheet.y += 4
-    sheet.text("발표 중 손에 들고 보는 종이입니다 · 2026-09-27 기준", small, MUTED)
-    sheet.y += 10
-    sheet.rule()
+    from reportlab.lib.colors import Color
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
 
-    # 숫자 여섯 개를 두 줄로.
-    for row in (FACTS[:3], FACTS[3:]):
-        line = "     ".join(f"{n}  {label}" for n, label in row)
-        sheet.text(line, strong, BLUE)
-    sheet.y += 6
-    sheet.text("[먼저 말하기] 질문받기 전에 발표에서 먼저 말하는 쪽이 낫습니다."
-               "     [자신 있게] 숫자 근거가 확실합니다.", small, MUTED)
-    sheet.y += 8
-    sheet.rule()
-    sheet.y += 8
+    body_font, bold_font = korean_fonts()
+    width, height = A4
+    margin = 40
+    right = width - margin
 
-    for group, rows in DATA:
-        sheet.room(120)
-        sheet.text(group, head, BLUE)
-        sheet.y += 4
-        for question, tone, answer in rows:
-            sheet.room(LINE * (len(answer) + 3))
-            mark = {"hard": "  [먼저 말하기]", "sure": "  [자신 있게]"}.get(tone, "")
-            color = {"hard": AMBER, "sure": GREEN}.get(tone, INK)
-            sheet.text(f"Q. {question}{mark}", strong, color)
-            for index, line in enumerate(answer):
-                sheet.text(line, body if index == 0 else small,
-                           INK if index == 0 else BODY, indent=22, gap=LINE)
-            sheet.y += 10
-        sheet.y += 6
-
-    sheet.room(90)
-    sheet.rule()
-    sheet.text("확실하지 않은 것은 \"확인해 보겠습니다\" 가 정답입니다. "
-               "지어내면 그 자리에서 무너집니다.", body, AMBER)
-
-    # 쪽 번호
-    for number, page in enumerate(sheet.pages, 1):
-        pen = ImageDraw.Draw(page)
-        pen.text((WIDTH - MARGIN - 60, HEIGHT - MARGIN + 6),
-                 f"{number} / {len(sheet.pages)}", font=small, fill=MUTED)
+    def rgb(value):
+        return Color(value[0] / 255, value[1] / 255, value[2] / 255)
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    sheet.pages[0].save(out, "PDF", resolution=150.0,
-                        save_all=True, append_images=sheet.pages[1:])
+    pdf = canvas.Canvas(str(out), pagesize=A4)
+    pdf.setTitle("FORWARDUS 질의응답 대비")
+    pdf.setAuthor("TradeOne")
+
+    state = {"y": height - margin, "page": 1}
+
+    def room(need: float) -> None:
+        if state["y"] - need < margin + 18:
+            footer()
+            pdf.showPage()
+            state["page"] += 1
+            state["y"] = height - margin
+
+    def footer() -> None:
+        pdf.setFont(body_font, 8)
+        pdf.setFillColor(rgb(MUTED))
+        pdf.drawRightString(right, margin - 12, f"{state['page']}")
+
+    def line(text: str, size: float, color=INK, *, bold: bool = False,
+             indent: float = 0, gap: float = 0) -> None:
+        pdf.setFont(bold_font if bold else body_font, size)
+        pdf.setFillColor(rgb(color))
+        pdf.drawString(margin + indent, state["y"] - size, text)
+        state["y"] -= (gap or size + 5)
+
+    def rule() -> None:
+        pdf.setStrokeColor(rgb(LINE_COLOR))
+        pdf.setLineWidth(0.6)
+        pdf.line(margin, state["y"], right, state["y"])
+        state["y"] -= 10
+
+    # ── 머리
+    line("FORWARDUS 질의응답 대비", 21, INK, bold=True, gap=27)
+    line("발표 중 손에 들고 보는 종이입니다 · 2026-09-27 기준", 9, MUTED, gap=16)
+    rule()
+    for row in (FACTS[:3], FACTS[3:]):
+        line("     ".join(f"{number}  {label}" for number, label in row),
+             10.5, BLUE, bold=True, gap=15)
+    line("[먼저 말하기] 질문받기 전에 발표에서 먼저 말하는 쪽이 낫습니다."
+         "     [자신 있게] 숫자 근거가 확실합니다.", 8.5, MUTED, gap=14)
+    rule()
+    state["y"] -= 4
+
+    # ── 본문
+    for group, rows in DATA:
+        room(70)
+        line(group, 13, BLUE, bold=True, gap=19)
+        for question, tone, answer in rows:
+            room(18 + 13 * len(answer) + 8)
+            mark = {"hard": "   [먼저 말하기]", "sure": "   [자신 있게]"}.get(tone, "")
+            color = {"hard": AMBER, "sure": GREEN}.get(tone, INK)
+            line(f"Q. {question}{mark}", 10.5, color, bold=True, gap=15)
+            for index, text in enumerate(answer):
+                line(text, 9.5 if index else 10, INK if index == 0 else BODY,
+                     indent=14, gap=13)
+            state["y"] -= 7
+        state["y"] -= 5
+
+    room(40)
+    rule()
+    line("확실하지 않은 것은 \"확인해 보겠습니다\" 가 정답입니다. "
+         "지어내면 그 자리에서 무너집니다.", 10, AMBER, bold=True, gap=14)
+    footer()
+    pdf.save()
     return out
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="질의응답 대비 자료를 PDF 로 만듭니다.")
-    parser.add_argument("--out", default=str(Path.home() / "Downloads" /
-                                             "FORWARDUS_질의응답.pdf"))
+    parser.add_argument("--out", default=str(Path.home() / "Downloads"
+                                             / "FORWARDUS_질의응답.pdf"))
     args = parser.parse_args()
     path = build(Path(args.out))
     print(f"■ 만들었습니다 · {path} ({path.stat().st_size:,}바이트)")
