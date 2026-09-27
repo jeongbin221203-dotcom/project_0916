@@ -61,7 +61,15 @@ def build_jobs(app):
                                 exchange_client, ksure_client, port_stats_client,
                                 trade_stats_client)
 
-    TOP_HS = ("3304990000", "8507600000", "3306100000", "1902301010", "8708299000")
+    # keys_off.py · host_down.py · prime_customs_gaps.py 와 같은 목록이어야 합니다.
+    # 2026-09-27: 3304990000 · 8507600000 · 8708299000 은 존재하지 않는 부호였습니다.
+    # 다른 파일은 그때 고쳤는데 여기만 빠져, 망을 끊고 도는 검사가 "저장된 것이
+    # 없다(X)"를 15줄씩 뱉었습니다. 저장 구멍이 아니라 없는 부호를 물은 것입니다.
+    TOP_HS = ("3304991000",    # 기초화장용 제품류
+              "8507602000",    # 리튬이온 축전지
+              "3306100000",    # 구강청결용 제품류
+              "1902301010",    # 라면
+              "8708290000")    # 자동차 차체부품 (기타)
 
     jobs: list[tuple[str, str, object]] = [
         ("환율", "오늘 고시환율", exchange_client.fetch_krw_rates),
