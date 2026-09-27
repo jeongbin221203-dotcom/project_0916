@@ -241,9 +241,14 @@ def search_hs_codes(query: str, *, compare_navigation: bool = False,
         # 순간 사람이 쓰는 말로는 아무것도 못 찾게 됐습니다. 키가 있든 없든
         # 관세청이 못 찾으면 품목표를 봅니다. 어디서 찾았는지는 밝힙니다.
         # (2026-09-27 실키 검사에서 확인)
-        offline = customs_client.search_hs_codes_offline(text, "관세청 품명 검색에 없어")
-        if offline.get("data"):
-            return offline
+        # **관세청이 실제로 답했는데 0건일 때만** 품목표를 봅니다.
+        # source 가 이미 mock·internal 이면 customs_client 안에서 품목표를 벌써
+        # 보고 온 것입니다. 또 보면 같은 일을 두 번 하고, 국제 출처로 갈 차례를
+        # 가로챕니다.
+        if found.get("source") == "api":
+            offline = customs_client.search_hs_codes_offline(text, "관세청 품명 검색에 없어")
+            if offline.get("data"):
+                return offline
 
     # 관세청이 답하지 않거나 예시로 대체됐으면 국제 출처를 봅니다.
     fallback = _hs_from_open_sources(text)

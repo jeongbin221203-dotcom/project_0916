@@ -260,7 +260,13 @@ def refund_rate(hs_code: str, base_date: date | None = None) -> dict:
     result = _call("refund_rate", {"baseDt": (base_date or date.today()).strftime("%Y%m%d"),
                                    "hsSgn": digits}, "간이정액 환급율표")
     if not result["success"]:
-        return result
+    # 기관이 막히면 **받아 둔 값**으로 답합니다.
+    #
+    # 저장(remember)은 하는데 꺼내 보는(recall) 곳이 없었습니다. 그래서
+    # 파일에 남겨 두고도 기관이 죽으면 빈손으로 답했습니다. 같은 파일의
+    # 다른 조회(HS 내비·항공사·포워더)는 다 꺼내 보는데 이 둘만
+    # 빠져 있었습니다. (2026-09-27 저장분으로 답하는지 확인하다 찾음)
+        return snapshot.recall(f"refund_rate_{digits}", "law") or result
     root = result["data"]
 
     rows = []
@@ -363,7 +369,8 @@ def shortened_loading_period(hs_code: str) -> dict:
 
     result = _call("shortened_period", {"hsSgn": digits}, "수출이행기간 단축대상")
     if not result["success"]:
-        return result
+        # 위 refund_rate 와 같은 까닭입니다. 저장해 두고 안 꺼내 보고 있었습니다.
+        return snapshot.recall(f"short_period_{digits}", "law") or result
     root = result["data"]
 
     rows = [{
