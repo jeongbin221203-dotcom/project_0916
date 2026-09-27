@@ -140,7 +140,11 @@ def test_시세표는_앞의_곳이_안_되면_다음_곳을_쓰고_한_시간_�
         again = fx.board()
 
     assert first["data"]["source"] == "openexchangerates"
-    assert "EXCHANGE_API_KEY" in first["data"]["tried"][0]
+    # 앞의 곳이 왜 안 됐는지 남깁니다. 키 이름은 적지 않습니다 — 이 목록은
+    # 응답에 실려 브라우저까지 갑니다. 어느 환경변수가 비었는지는 운영자
+    # 진단 화면(lookup_service)에서 봅니다. (2026-09-27)
+    assert first["data"]["tried"] and "환율" in first["data"]["tried"][0]
+    assert "EXCHANGE_API_KEY" not in first["data"]["tried"][0]
     assert first["data"]["default_spread_pct"] == 1.0
     assert again is first and len(calls) == 3           # 두 번째는 부르지 않습니다
 

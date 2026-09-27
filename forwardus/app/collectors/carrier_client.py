@@ -121,7 +121,13 @@ def search_shipping_companies(name: str) -> dict:
                         "한글 상호나 네 글자 선사부호(예: MAEU)로 다시 찾아 주세요.")
     key = _unipass_key("SHIPPING_COMPANY_LIST")
     if not key:
-        return fail("API_AUTH_FAILED", "api", "선박회사목록 API 키가 없습니다.")
+        # 키가 없어도 받아 둔 등록부가 있으면 그것으로 답합니다.
+        # 선사 등록부는 거의 바뀌지 않습니다. 키가 정지되었다고 이미 받아 둔
+        # 값을 안 쓸 이유가 없습니다. 같은 파일 아래쪽은 이미 그렇게 하는데
+        # (조회 실패 시 recall) 키가 없을 때만 빠져 있었습니다.
+        # (2026-09-27 scripts/checks/keys_off.py 가 찾았습니다)
+        return (snapshot.recall(f"ships_{query}", "registry")
+                or fail("API_AUTH_FAILED", "api", "선박회사목록 API 키가 없습니다."))
 
     svc, op = SHIP_LIST
     result = request_text("GET", UNIPASS_BASE.format(svc=svc, op=op),
@@ -275,7 +281,7 @@ def fetch_icn_cargo_flights(airport_code: str = "", arrivals: bool = False) -> d
     key = get_config("DATA_GO_KR_SERVICE_KEY", "")
     if not key:
         return fail("API_AUTH_FAILED", "api",
-                    "공공데이터포털 키(DATA_GO_KR_SERVICE_KEY)가 없습니다."
+                    "지금은 인천공항 화물기 시간표를 받을 수 없습니다."
                     " data.go.kr에서 인천국제공항공사 화물기 운항 일정을 신청합니다.")
 
     url = ICN_SCHEDULE_URL.format(direction="Arrivals" if arrivals else "Departures")

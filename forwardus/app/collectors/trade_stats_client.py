@@ -69,7 +69,7 @@ def _call(url: str, params: dict, label: str) -> dict:
     key = get_config("DATA_GO_KR_SERVICE_KEY", "")
     if not key:
         return fail("API_AUTH_FAILED", "api",
-                    f"{label} 키(DATA_GO_KR_SERVICE_KEY)가 없습니다.")
+                    f"지금은 {label}을 받을 수 없습니다. 관세청 수출입무역통계에서 확인하실 수 있습니다.")
 
     result = request_text("GET", url, timeout=25,
                           params={"serviceKey": key, "type": "json", **params})

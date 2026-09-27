@@ -54,7 +54,7 @@ def _period(months: int = 6) -> tuple[str, str]:
 def _call(url: str, params: dict, label: str) -> dict:
     key = get_config("DATA_GO_KR_SERVICE_KEY", "")
     if not key:
-        return fail("API_AUTH_FAILED", "api", f"{label} 키(DATA_GO_KR_SERVICE_KEY)가 없습니다.")
+        return fail("API_AUTH_FAILED", "api", f"지금은 {label}을 받을 수 없습니다. 해양수산부 항만물류정보에서 확인하실 수 있습니다.")
 
     result = request_text("GET", url, timeout=25,
                           params={"serviceKey": key, "pageNo": 1, "numOfRows": 100, **params})

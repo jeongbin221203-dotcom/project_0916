@@ -116,7 +116,7 @@ def _latest_koreaexim(key: str, start: date, skip: date | None = None) -> tuple[
 def from_koreaexim(today: date | None = None) -> dict:
     key = get_config("EXCHANGE_API_KEY", "")
     if not key:
-        return fail("API_AUTH_FAILED", "koreaexim", "수출입은행 환율 키(EXCHANGE_API_KEY)가 없습니다.")
+        return fail("API_AUTH_FAILED", "koreaexim", "지금은 수출입은행 환율표를 받을 수 없습니다.")
     today = today or date.today()
     latest = _latest_koreaexim(key, today)
     if not latest:
@@ -174,7 +174,7 @@ def from_open_exchange_rates() -> dict:
     app_id = get_config("OPEN_EXCHANGE_RATES_APP_ID", "")
     if not app_id:
         return fail("API_AUTH_FAILED", "openexchangerates",
-                    "Open Exchange Rates 키(OPEN_EXCHANGE_RATES_APP_ID)가 없습니다.")
+                    "지금은 시장 환율표를 받을 수 없습니다.")
     latest = _oxr(OXR_LATEST, app_id, "fx_oxr_latest", LIVE_TTL / 86_400)
     rates = (latest or {}).get("rates") or {}
     if not rates.get("KRW"):

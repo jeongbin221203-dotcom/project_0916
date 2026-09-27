@@ -71,7 +71,7 @@ def fetch_unipass_rates(query_date: date | None = None) -> dict:
 
     key = _unipass_key()
     if not key:
-        return fail("API_AUTH_FAILED", "api", "관세환율 API 키(UNIPASS_KEY_CUSTOMS_EXCHANGE_RATE)가 없습니다.")
+        return fail("API_AUTH_FAILED", "api", "지금은 관세청 고시환율을 받을 수 없습니다. 가지고 있는 환율로 답합니다.")
 
     params = {
         "crkyCn": key,

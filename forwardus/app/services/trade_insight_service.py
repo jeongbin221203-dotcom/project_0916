@@ -197,7 +197,7 @@ def fetch_customs_export_stats(item_name: str = "", target_year=None, hs_codes=N
     """
 
     if not trade_stats_client.available():
-        return _fail("관세청 무역통계 키(DATA_GO_KR_SERVICE_KEY)가 없어 조회하지 못했습니다.",
+        return _fail("지금은 관세청 무역통계를 조회할 수 없습니다.",
                      "API_AUTH_FAILED")
     hs = resolve_hs(item_name, hs_codes)
     if hs["basis"] == "ambiguous":
@@ -367,7 +367,7 @@ def get_item_trade_statistics(item_name: str = "", hs_code: str = "", period: st
     """
 
     if not trade_stats_client.available():
-        return _fail("관세청 무역통계 키(DATA_GO_KR_SERVICE_KEY)가 없어 조회하지 못했습니다.",
+        return _fail("지금은 관세청 무역통계를 조회할 수 없습니다.",
                      "API_AUTH_FAILED")
     hs = resolve_hs(item_name, [hs_code] if hs_code else None)
     if hs["basis"] == "ambiguous":
@@ -542,7 +542,7 @@ def fetch_ksure_payment_risk(country_name: str = "") -> dict:
     """나라의 결제방식 비중, 평균 결제기간, 연체율, 참고 위험 등급과 주의점."""
 
     if not ksure_client.available():
-        return _fail("무역보험공사 수출결제정보 키(DATA_GO_KR_SERVICE_KEY)가 없어 조회하지 "
+        return _fail("지금은 무역보험공사 수출결제정보를 조회할 수 없습니다. "
                      "못했습니다.", "API_AUTH_FAILED")
     country = ksure_client.find_country(country_name)
     if not country:

@@ -148,20 +148,28 @@ def parse(item: dict) -> dict:
 def payment_info(country_code: str = "") -> dict:
     """나라 코드(무역보험공사 숫자)의 결제 통계. 코드를 비우면 전체 나라 합계."""
 
-    key = get_config("DATA_GO_KR_SERVICE_KEY", "")
-    if not key:
-        return fail("API_AUTH_FAILED", "api",
-                    "무역보험공사 수출결제정보 키(DATA_GO_KR_SERVICE_KEY)가 없습니다.")
+    # **받아 둔 것을 키보다 먼저 봅니다.**
+    #
+    # 예전에는 키가 없으면 여기서 바로 돌아섰습니다. 그런데 이 통계는 한 해에
+    # 한 번 바뀝니다 — 키가 정지되었다고 이미 받아 둔 값을 안 쓸 이유가 없습니다.
+    # 망을 끊었을 때는 답하는데 키를 뺐을 때는 못 답하는, 앞뒤가 안 맞는
+    # 상태였습니다. (2026-09-27 scripts/checks/keys_off.py 가 찾았습니다)
+    #
+    # 출처는 "cache" 입니다. "api" 는 이 프로젝트에서 **방금 기관에서 받았다**는
+    # 뜻이라, 받아 둔 파일을 그렇게 적으면 신선도를 거짓말하는 것이 됩니다.
     code = "".join(ch for ch in str(country_code or "") if ch.isdigit())
     cache_name = f"ksure_payment_{code or 'all'}"
     cached = file_cache.read(cache_name)
     if cached and cached[1] < CACHE_DAYS:
-        # 받아 둔 파일에서 꺼낸 것이라 "cache" 입니다.
-        # 예전에는 "api" 라고 적었습니다. 같은 파일 아래쪽(실패 시 폴백)은
-        # 이미 "cache" 라고 바르게 적고 있어, 한 함수 안에서 관례가 둘이었습니다.
-        # "api" 는 이 프로젝트에서 **방금 기관에서 받았다**는 뜻입니다.
-        # (2026-09-27)
         return ok(cached[0], "cache")
+
+    key = get_config("DATA_GO_KR_SERVICE_KEY", "")
+    if not key:
+        # 키가 없어도 받아 둔 것이 있으면 그것으로 답합니다. (나이가 지났어도
+        # 예시보다 정확합니다)
+        return ok(cached[0], "cache") if cached else fail(
+            "API_AUTH_FAILED", "api",
+            "지금은 무역보험공사 수출결제정보를 받을 수 없습니다.")
 
     params = {"serviceKey": key}
     if code:
@@ -169,8 +177,11 @@ def payment_info(country_code: str = "") -> dict:
     result = request_text("GET", URL, timeout=20, params=params)
     if not result["success"]:
         if result["error_code"] == "API_AUTH_FAILED":
-            return fail("API_NOT_SUBSCRIBED", "api",
-                        f"무역보험공사 수출결제정보 API에 활용신청이 되어 있지 않습니다. {SIGNUP['how']}")
+            # 인증이 막혀도 받아 둔 것이 있으면 그것으로 답합니다. 활용신청 안내는
+            # 받아 둔 것도 없을 때만 보여 줍니다. (2026-09-27)
+            return ok(cached[0], "cache") if cached else fail(
+                "API_NOT_SUBSCRIBED", "api",
+                f"무역보험공사 수출결제정보 API에 활용신청이 되어 있지 않습니다. {SIGNUP['how']}")
         # 받지 못하면 예전에 받아 둔 것이라도 씁니다. (한 해에 한 번 바뀌는 통계입니다)
         return ok(cached[0], "cache") if cached else result
     try:

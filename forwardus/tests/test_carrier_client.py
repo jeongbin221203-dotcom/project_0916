@@ -138,15 +138,33 @@ def test_hmm_rows_map_to_our_schedule_shape(app, monkeypatch):
 
 
 def test_missing_keys_say_where_to_get_them(app, monkeypatch):
-    """키가 없을 때 "API가 없다"가 아니라 어디서 받는지 알려줍니다."""
+    """키가 없을 때 "API가 없다"가 아니라 **어디서 확인하는지** 알려줍니다.
+
+    키 이름을 메시지에서 뺀 이유 (2026-09-27)
+      "'.env의 UNIPASS_KEY_CUSTOMS 에 넣습니다'" 같은 글이 이용자 화면으로
+      나가고 있었습니다. 수출자가 할 수 없는 일입니다.
+      (tests/test_user_facing_messages.py 가 수집기까지 보게 넓히며 9곳 찾음)
+      키 이름은 **운영자 진단 화면**에 그대로 있습니다 — 각 수집기의 sources()
+      가 "env" 로 내놓고 lookup_service 가 보여 줍니다.
+      이 테스트가 지키려던 것은 그대로 지킵니다: 부르지 않고, 무엇이 막혔는지와
+      어디서 확인할 수 있는지를 알려 주는가.
+    """
 
     # 개발자 환경에 키가 있든 없든 같은 결과가 나와야 합니다.
     monkeypatch.setattr(carrier_client, "get_config", lambda key, default="": default)
 
     sea = carrier_client.fetch_hmm_schedules("KRPUS", "DEHAM", date(2026, 10, 1))
-    assert sea["success"] is False and "HMM_API_KEY" in sea["message"]
+    assert sea["success"] is False and sea["message"]
     air = carrier_client.fetch_icn_cargo_flights("FRA")
-    assert air["success"] is False and "DATA_GO_KR_SERVICE_KEY" in air["message"]
+    assert air["success"] is False and air["message"]
+    # 무엇이 막혔는지와 어디서 볼 수 있는지가 들어 있어야 합니다.
+    assert "화물기" in air["message"] and "data.go.kr" in air["message"]
+    # 이용자에게 설정 이야기를 하지 않습니다.
+    for said in (sea["message"], air["message"]):
+        assert ".env" not in said and "SERVICE_KEY" not in said
+    # 키 이름은 운영자 진단 화면 쪽에 남아 있어야 합니다.
+    assert any("DATA_GO_KR_SERVICE_KEY" in str(row.get("env", ""))
+               for row in carrier_client.sources())
 
 
 def test_icn_timetable_reads_operating_days(app, monkeypatch):

@@ -170,7 +170,17 @@ def test_airlines_and_forwarders_share_the_same_shape(keyed):
 
 
 def test_missing_keys_say_so_instead_of_calling(app, monkeypatch):
-    """키가 없으면 부르지 않고 키가 없다고 알려 줍니다."""
+    """키가 없으면 **부르지 않고** 무엇이 막혔는지 알려 줍니다.
+
+    키 이름을 메시지에서 뺀 이유 (2026-09-27)
+      "'.env의 UNIPASS_KEY_CUSTOMS 에 넣습니다'" 같은 글이 이용자 화면으로
+      나가고 있었습니다. 수출자가 할 수 없는 일입니다.
+      (tests/test_user_facing_messages.py 가 수집기까지 보게 넓히며 9곳 찾음)
+      키 이름은 **운영자 진단 화면**에 그대로 있습니다 — 각 수집기의 sources()
+      가 "env" 로 내놓고 lookup_service 가 보여 줍니다.
+      이 테스트가 지키려던 것은 그대로 지킵니다: 부르지 않고, 무엇이 막혔는지와
+      어디서 확인할 수 있는지를 알려 주는가.
+    """
 
     monkeypatch.setattr(extra, "get_config",
                         lambda name, default=None: {} if name == "UNIPASS_API_KEYS" else default)
@@ -180,7 +190,9 @@ def test_missing_keys_say_so_instead_of_calling(app, monkeypatch):
                      lambda: extra.refund_rate("3305100000")):
             result = call()
             assert result["success"] is False
-            assert "키가 없습니다" in result["message"]
+            # 키 이름을 적지 않고도 무엇이 막혔는지 알려 줘야 합니다.
+            # (설정 이야기는 운영자 진단 화면에서만 합니다 — 위 주석 참고)
+            assert result["message"] and ".env" not in result["message"]
 
 
 def test_every_service_has_a_key_name_and_endpoint():

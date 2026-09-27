@@ -167,8 +167,9 @@ def export_requirement_laws(hs_code: str, direction: str = EXPORT) -> dict:
     key = get_config("CUSTOMS_CONFIRM_API_KEY", "")
     if not key:
         return fail("API_AUTH_FAILED", "api",
-                    "세관장확인대상물품 API 키가 없습니다. "
-                    f"{CUSTOMS_CONFIRM_SIGNUP['how']}")
+                    "지금은 세관장확인대상 조회를 쓸 수 없습니다. "
+                    "관세청 유니패스나 관세법령정보포털에서 직접 확인하시고, "
+                    "품목에 따라 요건승인기관 확인이 필요할 수 있습니다.")
 
     result = request_text("GET", CUSTOMS_CONFIRM_URL, timeout=25,
                           params={"serviceKey": key, "hsSgn": digits,

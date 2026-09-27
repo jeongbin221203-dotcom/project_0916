@@ -149,7 +149,12 @@ def test_키가_없거나_못_찾으면_지어내지_않고_이유를_돌려준�
     monkeypatch.setattr(trade_stats_client, "available", lambda: False)
     with app.app_context():
         result = insight.fetch_customs_export_stats("의류")
-    assert result["success"] is False and "DATA_GO_KR_SERVICE_KEY" in result["message"]
+    # 지어내지 않고 이유를 돌려주는 것이 핵심입니다. 키 이름은 이용자에게
+    # 할 말이 아니라 적지 않습니다 — 운영자 진단 화면에 남아 있습니다.
+    # (2026-09-27 tests/test_user_facing_messages.py 가 수집기까지 보게 넓힘)
+    assert result["success"] is False and result["message"]
+    assert "조회할 수 없습니다" in result["message"]
+    assert "DATA_GO_KR_SERVICE_KEY" not in result["message"]
 
 
 # --- 무역보험공사 ------------------------------------------------------------------

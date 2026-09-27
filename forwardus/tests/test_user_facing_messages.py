@@ -20,15 +20,20 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 # 이용자 화면으로 나가는 글을 만드는 곳. (조회처 설정 화면은 운영자용이라 뺍니다)
-USER_FACING = [
-    "app/collectors/ai_client.py",
-    "app/services/support_chat_service.py",
-    "app/services/assistant_service.py",
-    "app/services/document_extract_service.py",
-    "app/services/intake_service.py",
-    "app/services/translate_service.py",
-]
-SETTING_WORDS = (".env", "AI_API_KEY", "환경변수를 넣", "config.py")
+#
+# 처음에는 여섯 파일만 봤습니다. 그런데 키가 없을 때 나가는 글은 **수집기**가
+# 만드는 것이 더 많았고, 거기에 ".env의 UNIPASS_KEY_CUSTOMS 에 넣습니다" 같은
+# 글이 여섯 군데 남아 있었습니다. 수출자가 할 수 없는 일입니다.
+# 그래서 수집기·서비스를 전부 봅니다. (2026-09-27 keys_off.py 가 찾았습니다)
+USER_FACING = sorted(
+    str(path.relative_to(ROOT)).replace("\\", "/")
+    for folder in ("app/collectors", "app/services")
+    for path in (ROOT / folder).glob("*.py")
+    # 조회처 진단 화면은 운영자가 봅니다. 여기서는 키 이름을 적어야 맞습니다.
+    if path.name not in ("lookup_service.py", "base_client.py")
+)
+SETTING_WORDS = (".env", "AI_API_KEY", "환경변수를 넣", "config.py",
+                 "SERVICE_KEY", "UNIPASS_KEY", "EXCHANGE_API_KEY", "APP_ID")
 
 
 @pytest.mark.parametrize("where", USER_FACING)
@@ -41,6 +46,14 @@ def test_이용자에게_설정_이야기를_하지_않는다(where):
         if stripped.startswith("#") or stripped.startswith('"""'):
             continue
         if "logger" in line:                      # 서버 기록에는 적어도 됩니다
+            continue
+        # 조회처 안내 표(SIGNUP)는 **운영자 진단 화면**이 씁니다. 거기서는 어느
+        # 키를 어디에 넣는지 적어야 맞습니다. 이용자 화면으로는 나가지 않습니다.
+        if re.search(r'"(env|how|signup|gives|label|url)"\s*:', line):
+            continue
+        # 기관이 보내는 오류문을 알아보려고 적어 둔 상수입니다. 사람에게 보이는
+        # 글이 아닙니다. (NOT_SUBSCRIBED = ("SERVICE_KEY_IS_NOT_REGISTERED", …))
+        if re.match(r'^[A-Z_]{4,}\s*=', stripped):
             continue
         if not re.search(r'["\'].*[가-힣]', line):  # 한국어 글자열만 봅니다
             continue
