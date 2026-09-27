@@ -452,6 +452,180 @@ def _drop_page_furniture(text: str) -> str:
                      if not _PAGE_FURNITURE.match(line))
 
 
+# ── 전 세계 단위 독소조항 (2026-09-27 사용자 지시) ──────────────────────────────
+#
+# 위 열 가지는 **어느 나라에서나 위험한** 일반 조항입니다. 아래는 다릅니다.
+#
+#   ① 나라·지역의 **강행법**에서 오는 것
+#      계약서에 "준거법은 한국법" 이라고 적어도 **그 나라 법이 이깁니다.**
+#      중동 대리점법·EU 상업대리인 지침이 그렇습니다. 계약서만 보면 안전해
+#      보이는데 실제로는 물립니다. 그래서 "빠져 있음"을 위험으로 봅니다.
+#
+#   ② 국제매매 공통 규범(CISG)에서 오는 것
+#      우리나라와 상대국이 모두 CISG 가입국이면 **아무 말 안 해도 적용됩니다.**
+#      모르고 지나가면 내가 기대한 규칙과 다른 규칙으로 다투게 됩니다.
+#
+#   ③ 상대국 사법제도에서 오는 것
+#      미국의 배심재판·징벌적 손해배상, 중국의 중재기관 선택 문제가 그렇습니다.
+#
+# **법률 자문이 아닙니다.** 아래 내용은 "이런 것이 있으니 변호사에게 확인하라"는
+# 표시이지 판단이 아닙니다. 나라마다 법이 바뀌고 예외가 많습니다.
+#
+# 근거로 본 것 (2026-09-27 확인)
+#   EU 상업대리인 지침 86/653/EEC — 해지 통지기간과 보상권은 초강행 규정이고
+#     외국법을 골라도 배제되지 않습니다. 보상은 통상 연평균 수수료 1년치가 상한.
+#   UAE 상업대리법 제8·9조 — 정당한 사유 없이 해지 불가, 해지 시 보상 의무.
+#     등록된 대리점에는 외국법 선택이 통하지 않습니다.
+#   사우디 상업대리 규정 — 기간 정함 없는 계약은 근속 1년당 1개월 통지.
+#     보상 청구는 해지 후 1년 내에 해야 하고 지나면 소멸합니다.
+#   CISG 제39조 — 하자 통지는 합리적 기간 내에, **늦어도 인도 후 2년** 내.
+#     제38·39조는 계약으로 달리 정할 수 있습니다.
+
+_clause(
+    "agency_protection", "대리점 계약 — 그 나라 대리점 보호법 확인", "gain",
+    why="UAE·사우디 등에서 대리점이 등록되면, 계약서에 무엇을 적었든 그 나라 법이 "
+        "해지를 막고 보상을 물립니다. 준거법을 한국법으로 적어도 소용없습니다.",
+    risk="거래를 끊으려는데 해지가 안 되고, 끊으면 보상금을 물립니다. "
+         "그 나라에서 다른 대리점을 쓰지도 못합니다.",
+    text_en="""(확인할 것 — 대리점·총판 계약일 때)
+Registration of this Agreement with the local commercial agency registry shall
+require the prior written consent of the Principal.
+The Parties agree that this Agreement is non-exclusive and shall not be
+registered as a commercial agency.""",
+    text_ko="대리점 등록 여부와 해지·보상 조건을 반드시 확인하세요. 등록되면 되돌리기 어렵습니다.",
+    detect=[r"commercial agenc(y|ies)",
+            r"(sole|exclusive) (agent|distributor|representative)",
+            r"agency (registration|registry)",
+            r"(총판|독점\s*(대리점|판매권|대리인))",
+            r"대리점\s*등록"],
+    applies=("always",),
+    fix="중동·중남미로 대리점 계약을 맺기 전에 **그 나라 대리점법**을 변호사에게 확인하세요. "
+        "등록을 막거나 기간을 정한 계약으로 하고, 해지 사유와 보상 산정을 미리 적어 둡니다.",
+)
+
+_clause(
+    "agency_law_eu", "EU 상업대리인 보상 — 계약으로 못 없앱니다", "toxic",
+    why="EU 안에서 활동하는 대리인에게는 지침 86/653 의 통지기간과 영업권 보상이 "
+        "**초강행 규정**으로 적용됩니다. 비EU 법을 골라도 그 권리는 남습니다.",
+    risk="계약 종료 시 통상 **연평균 수수료 1년치**까지 보상 청구를 받을 수 있습니다.",
+    text_en="""(확인할 것 — EU 대리인·판매대리 계약일 때)
+Upon termination the Agent shall not be entitled to any indemnity or
+compensation whatsoever.""",
+    text_ko="'어떤 보상도 없다'고 적어 두어도 EU 안에서는 그대로 통하지 않습니다.",
+    detect=[r"not be entitled to any[^.]{0,30}(indemnity|compensation)",
+            r"no [^.]{0,20}(indemnity|compensation) (shall be|is) (due|payable)",
+            r"waive[^.]{0,40}(goodwill|indemnity|compensation)",
+            r"commercial agent",
+            r"보상[^.]{0,10}(청구)?[^.]{0,6}(권리)?[^.]{0,6}없"],
+    applies=("always",),
+    fix="보상이 발생한다는 전제로 **금액과 산정 방법을 미리 합의**하거나, 대리인이 아닌 "
+        "매매(판매점) 구조로 갈 수 있는지 변호사와 검토하세요.",
+)
+
+_clause(
+    "cisg_silent", "CISG 적용·배제를 적었는가", "gain",
+    why="우리나라와 상대국이 모두 가입국이면 **아무 말이 없어도 CISG 가 적용됩니다.** "
+        "내가 아는 국내법 규칙으로 다툴 생각이었다면 그때부터 어긋납니다.",
+    risk="하자 통지 기간·해제 요건·위험 이전이 내가 생각한 것과 다르게 판단됩니다.",
+    text_en="""(넣을 문구의 예 — 둘 중 하나를 고르세요)
+This Contract shall be governed by the United Nations Convention on Contracts
+for the International Sale of Goods (CISG).
+-- 또는 --
+The application of the United Nations Convention on Contracts for the
+International Sale of Goods (CISG) is hereby expressly excluded.""",
+    text_ko="쓸 것인지 뺄 것인지를 **문장으로 적어 두세요.** 안 적으면 자동으로 적용됩니다.",
+    detect=[r"CISG", r"Convention on Contracts for the International Sale of Goods",
+            r"(국제물품매매계약에\s*관한\s*)?유엔\s*협약", r"비엔나\s*협약"],
+    applies=("always",),
+    fix="준거법 조항 옆에 CISG 적용 또는 배제를 **한 문장으로** 적으세요. "
+        "어느 쪽이 유리한지는 품목과 거래 구조에 따라 다르니 변호사와 정합니다.",
+)
+
+
+
+_clause(
+    "china_domestic_arb", "중국 국내 중재기관 전속", "toxic",
+    why="중국 상대 계약에서 분쟁을 중국 국내 중재기관에만 맡기면, 우리가 고를 수 있는 "
+        "다른 길(홍콩·싱가포르·대한상사중재원)을 스스로 닫는 것입니다.",
+    risk="말이 통하지 않는 절차에서 다투게 되고, 비용과 기간을 가늠하기 어렵습니다.",
+    text_en="""(확인할 것)
+All disputes shall be submitted to arbitration in [city, PRC] under the rules
+of [domestic institution], whose award shall be final.""",
+    text_ko="중재지·중재기관·언어·중재인 수를 함께 적어야 합니다. 하나라도 비면 다툼이 됩니다.",
+    detect=[r"CIETAC",
+            r"arbitration.{0,40}(Beijing|Shanghai|Shenzhen|Guangzhou|PRC|China)",
+            r"(Beijing|Shanghai|Shenzhen|Guangzhou|China\w*)\s+Arbitration (Commission|Centre|Center)",
+            r"중국\s*국제경제무역중재",
+            r"중재[^.]{0,20}(북경|베이징|상해|상하이|심천|선전)"],
+    applies=("always",),
+    fix="홍콩(HKIAC)·싱가포르(SIAC)·대한상사중재원(KCAB) 같은 **제3지 중재**를 제안해 보세요. "
+        "중재지·기관·언어·중재인 수를 한 조항에 모두 적습니다.",
+)
+
+
+_clause(
+    "ip_assignment", "개발 결과물·금형의 권리가 넘어갑니다", "toxic",
+    why="OEM·주문생산에서 '이 거래로 만들어진 모든 것의 권리는 바이어에게 귀속' 이라고 "
+        "적으면, 우리가 쌓은 기술과 금형까지 함께 넘어갑니다.",
+    risk="거래가 끝난 뒤 그 바이어가 우리 금형과 도면으로 다른 공장에 맡깁니다.",
+    text_en="""(지울 문구의 예)
+All intellectual property rights in any designs, tooling, moulds, know-how or
+improvements arising from this Contract shall vest exclusively in the Buyer.""",
+    text_ko="금형·도면·개선 기술이 어디에 귀속되는지 문장으로 갈라 두세요.",
+    detect=[r"(intellectual property|IP) rights[^.]{0,120}(vest|assign|belong)[^.]{0,30}Buyer",
+            r"(tooling|moulds?|dies)[^.]{0,80}(vest|property of|owned by|belong)[^.]{0,30}Buyer",
+            r"work made for hire",
+            r"(지식재산권|지적재산권|금형|사출|치공구)[^.]{0,30}(갑|매수인|바이어)[^.]{0,10}(에게)?[^.]{0,6}(귀속|양도|이전)(?![^.]{0,40}(없|못하|아니하|아니한|금지))"],
+    applies=("always",),
+    fix="바이어가 비용을 댄 **금형 자체의 소유권**과 우리가 가진 **제조 노하우**를 갈라 "
+        "적으세요. 개선 기술은 우리에게 남기고 사용권만 주는 방식도 있습니다.",
+)
+
+
+
+_clause(
+    "buyer_set_off", "바이어가 마음대로 상계합니다", "toxic",
+    why="'어떤 사유로든 공제하고 지급할 수 있다'고 적으면, 상대가 클레임을 이유로 "
+        "대금을 깎아 보내고 우리는 받은 뒤에 다퉈야 합니다.",
+    risk="대금이 들어오지 않은 채 분쟁만 남습니다. 신용장 거래에서도 문제가 됩니다.",
+    text_en="""(지울 문구의 예)
+The Buyer may set off or deduct from any amounts due any claim it may have
+against the Seller, whether liquidated or not.""",
+    text_ko="상계·공제는 **확정된 금액**에 대해서만 가능하도록 좁혀야 합니다.",
+    detect=[r"Buyer (may|shall be entitled to|has the right to).{0,60}set[- ]?off",
+            r"Buyer.{0,40}(deduct|withhold).{0,40}(any|whatsoever)",
+            r"set[- ]?off.{0,40}(any|whatsoever).{0,30}claim",
+            r"(갑|매수인|바이어)[^.]{0,30}(상계|공제)(?![^.]{0,40}(없|못하|아니하|아니한|금지))"],
+    applies=("always",),
+    fix="상계를 **양 당사자가 서면으로 인정했거나 확정판결·중재판정이 있는 금액**으로 "
+        "한정하는 문장으로 바꿔 달라고 하세요.",
+)
+
+
+
+_clause(
+    "us_jury_punitive", "미국 법원 관할 — 배심재판·징벌적 손해배상", "toxic",
+    why="미국 법원으로 가면 배심원이 손해액을 정합니다. 주에 따라 실제 손해의 몇 배를 "
+        "물리는 징벌적 손해배상도 있습니다. 우리 기준으로는 가늠이 안 되는 금액이 나옵니다.",
+    risk="송장 금액과 무관한 배상 판결을 받고, 변호사 비용만으로도 거래 이익을 넘깁니다.",
+    text_en="""(확인할 것 — 이런 문구가 있으면 미국 법원으로 끌려갑니다)
+The Parties hereby submit to the exclusive jurisdiction of the courts of
+New York, and waive any objection to venue therein.""",
+    text_ko="배심재판 포기와 징벌적·간접 손해 배제를 **함께** 넣어야 뜻이 있습니다. "
+            "('trial by jury'·'punitive damages' 라는 낱말 자체는 찾지 않습니다 — "
+            "포기·면책 문장에도 똑같이 나와 편을 가릴 수 없습니다. 미국 관할이 "
+            "보이면 이 위험을 함께 알립니다)",
+    detect=[r"(courts?|jurisdiction) of .{0,40}(New York|California|Texas|Delaware|the United States)",
+            r"(submit|consent).{0,40}jurisdiction.{0,40}(United States|U\.S\.|New York)",
+            r"exclusive jurisdiction.{0,40}(United States|U\.S\.|New York|California)",
+            r"미국\s*법원[^.]{0,20}(관할|전속)(?![^.]{0,40}(없|못하|아니하|아니한))",
+            r"(뉴욕|캘리포니아|델라웨어)\s*(주)?\s*법원[^.]{0,20}관할"],
+    applies=("always",),
+    fix="중재(뉴욕협약)로 바꾸는 것이 가장 낫습니다. 미국 법원을 피할 수 없다면 "
+        "**배심재판 포기**와 **징벌적·간접손해 배제**를 반드시 넣으세요.",
+)
+
+
 def find_in(text: str) -> set[str]:
     """올린 계약서에서 **보이는** 조항의 key.
 
