@@ -138,6 +138,119 @@ def context(code: str) -> dict:
     return {"heading": heading, "subheading": " > ".join(name for name in below if name)}
 
 
+# ── 관세청 표준품명 ────────────────────────────────────────────────────────────
+#
+# 표준품명은 신고서에 적는 **정식 품명**입니다. 품목표의 계층형 이름과 달리
+# 구체적이라, 사람이 실제로 적는 말에 가깝습니다.
+#   품목표     "그 밖의 식용 어류 설육(건조한 것, 염장이나 염수장한 것, …)"
+#   표준품명   "북어(통북어)" · "건대구(두절대구)" · "건대구(통대구)"
+#
+# 순위를 이렇게 냅니다 (2026-09-27 사용자 결정)
+#   1순위      맞은 표준품명의 부호 — 신고에 쓸 정식 품명
+#   그다음     **같은 부호의 형제 표준품명** — "내 물건이 정말 이 부호인가"를
+#              스스로 확인하게 합니다. ("신선마늘(육쪽)" 옆에 "(다쪽)")
+#   그 뒤      **다른 부호의 표준품명** (부분 일치) — 부호를 견주게 합니다
+#
+# data/build_standard_names.py 가 만듭니다. 없으면 이 기능만 조용히 빠집니다.
+_STANDARD: dict | None = None
+# 형제와 다른 호를 각각 이만큼까지만 붙입니다. 화면이 끝없이 길어지지 않게.
+MAX_SIBLINGS = 6
+MAX_OTHER_CODES = 4
+
+
+def standard_names() -> dict:
+    """표준품명 표. 없으면 빈 표를 돌려줍니다."""
+
+    global _STANDARD
+    if _STANDARD is None:
+        try:
+            _STANDARD = load_mock("standard_names")
+        except (OSError, ValueError):
+            _STANDARD = {}
+    return _STANDARD or {}
+
+
+def _std_row(catalog: dict, code: str, std_name: str, kind: str) -> dict | None:
+    """품목표 줄에 표준품명과 **형제 품명**을 얹습니다.
+
+    형제를 따로 줄로 만들지 않고 줄 안에 담습니다. 부호가 같은 줄이 여럿이면
+    hs_suggestion_service 가 부호 단위로 중복을 걷어내면서 형제를 버리고,
+    rank() 가 다시 정렬하며 순서도 흩어집니다. 한 줄에 담으면 그 두 곳을
+    건드리지 않고도 화면이 1순위(정식 품명)와 2~5순위(형제)를 보여 줍니다.
+    (2026-09-27)
+    """
+
+    if code not in catalog["codes"]:
+        return None
+    table = standard_names()
+    english = table.get("english") or {}
+    siblings = [name for name in (table.get("by_code") or {}).get(code, [])
+                if name != std_name][:MAX_SIBLINGS]
+    return {**_row(catalog, code),
+            # 화면이 정식 품명을 굵게 보여 줄 수 있게 따로 답니다.
+            "std_name": std_name,
+            "std_name_en": english.get(std_name, ""),
+            # 같은 부호에 함께 묶인 다른 정식 품명. 2순위부터 보여 줍니다.
+            "std_siblings": [{"name": name, "name_en": english.get(name, "")}
+                             for name in siblings],
+            # "표준품명"(정확히 맞음) · "다른 호"(부분 일치)
+            "std_kind": kind,
+            "std_base_date": table.get("base_date", "")}
+
+
+def _by_standard(catalog: dict, text: str, limit: int, seen: list[dict]) -> list[dict]:
+    """표준품명으로 찾습니다. 맞는 것이 없으면 빈 목록.
+
+    순위 (2026-09-27 사용자 결정)
+      1순위   적어 준 말과 **정확히 맞는** 표준품명의 부호
+      그 뒤   그 말을 품고 있는 **다른 부호**의 표준품명
+      각 줄 안에 같은 부호의 형제 품명이 std_siblings 로 들어갑니다.
+    """
+
+    table = standard_names()
+    by_name = table.get("by_name") or {}
+    if not by_name:
+        return []
+
+    plain = _plain((text or "").strip())
+    index = table.get("_plain_index")
+    if index is None:
+        index = {_plain(name): name for name in by_name}
+        table["_plain_index"] = index
+
+    found: list[dict] = []
+    codes_taken: set[str] = set()
+
+    def add(code: str, name: str, kind: str) -> bool:
+        if code in codes_taken:
+            return False
+        row = _std_row(catalog, code, name, kind)
+        if not row or row in seen:
+            return False
+        codes_taken.add(code)
+        found.append(row)
+        return True
+
+    exact = index.get(plain)
+    if exact:
+        for code in by_name[exact]:
+            add(code, exact, "표준품명")
+
+    # 그 뒤 — 적어 준 말을 품고 있는 다른 부호의 표준품명.
+    # ("마늘" → 깐마늘(육쪽) · 냉동깐마늘(육쪽) · 일시저장깐마늘(육쪽))
+    if len(plain) >= MIN_KOREAN_LENGTH:
+        others = 0
+        for other_plain, name in index.items():
+            if others >= MAX_OTHER_CODES or len(found) >= limit:
+                break
+            if other_plain == plain or plain not in other_plain:
+                continue
+            for code in by_name[name][:1]:
+                if add(code, name, "다른 호"):
+                    others += 1
+    return found[:limit]
+
+
 def search(query: str, limit: int = MAX_RESULTS) -> list[dict] | None:
     """품명이나 10자리 부호로 찾습니다. 품목표가 없으면 None.
 
@@ -164,6 +277,14 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[dict] | None:
     # 수출 상위 품목은 **호로 바로 갑니다.** 이름 맞히기보다 확실합니다.
     # ('반도체' → 8542·8541. 이름으로 찾으면 2807 황산이 먼저 나왔습니다)
     rows: list[dict] = _by_heading(catalog, _plain(text), limit)
+
+    # 표준품명을 봅니다. **상위 품목표 바로 다음**입니다.
+    #
+    # 상위 품목표(HEADINGS)는 사람이 확인해 둔 일상어→호 표라 가장 확실합니다.
+    # 표준품명은 관세청이 정한 정식 품명이니 그다음으로 믿을 만하고, 품목표
+    # 이름 맞히기(_look)보다는 앞입니다 — 이름 맞히기는 "반도체"로 2807 황산이
+    # 걸리던 쪽입니다. (2026-09-27)
+    rows += _by_standard(catalog, text, limit, rows)
 
     hint = EVERYDAY.get(_plain(text), ())
     for word in hint:

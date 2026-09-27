@@ -110,6 +110,10 @@
     const notes = [relevance.reason,
       relevance.missing_details?.length && `확인할 정보: ${relevance.missing_details.join(" / ")}`,
       path && `분류: ${path}`, item.name_en,
+      item.std_kind && `관세청 표준품명${item.std_base_date ? ` · ${item.std_base_date} 기준` : ""}`
+        + (item.std_kind === "표준품명" ? " (이 이름으로 신고합니다)"
+          : item.std_kind === "형제" ? " (같은 부호의 다른 품명)" : " (부호가 다른 비슷한 품명)"),
+      item.std_name_en,
       item.base_date ? `관세청 품목표 · ${item.base_date} 기준` : (item.source === "api" ? "관세청 HS부호" : "예시 목록"),
       nav?.available && `조회 품목란 ${Number(nav.count).toLocaleString()}건` ,
       nav?.available && nav.share != null && `비교 후보 내 ${nav.share.toFixed(1)}% (적합 확률 아님)`,
@@ -120,8 +124,29 @@
     return `<div class="hs_candidate match_${match}"><div class="hs_candidate_head">`
       + `<span class="mono">${escapeHtml(item.code)}</span><span class="hs_match">${item.partial ? "6자리 · 확인 필요" : labels[match]}</span>`
       + infoTip("분류 근거·통계", notes) + `</div>`
-      + `<b class="hs_name">${escapeHtml(item.name || item.name_en || "품목명 미확인")}</b>`
-      + (path ? `<span class="hs_path">${escapeHtml(path)}</span>` : "")
+      + `<b class="hs_name">${escapeHtml(item.std_name || item.name || item.name_en || "품목명 미확인")}</b>`
+      // 관세청 표준품명으로 걸린 줄이면 그렇다고 밝힙니다.
+      //   표준품명  신고서에 적는 정식 품명입니다
+      //   형제      같은 부호에 함께 묶인 다른 품명 — 내 물건이 이 부호인지 견주는 데 씁니다
+      //   다른 호   부호가 다른 비슷한 품명 — 부호를 잘못 골랐는지 견주는 데 씁니다
+      + (item.std_kind
+        ? `<span class="hs_std hs_std_${item.std_kind === "표준품명" ? "main" : "other"}">`
+          + escapeHtml(item.std_kind)
+          + (item.std_kind === "표준품명" ? " · 신고용 정식 품명" : " · 부호가 다릅니다") + `</span>`
+          + `<span class="hs_path">${escapeHtml(item.name || "")}</span>`
+        : (path ? `<span class="hs_path">${escapeHtml(path)}</span>` : ""))
+      // 같은 부호에 함께 묶인 다른 정식 품명. 내 물건이 정말 이 부호인지
+      // 스스로 견주게 합니다. ("신선마늘(육쪽)" 옆에 "(다쪽)")
+      // 길어지면 상자 안에서 스크롤됩니다 — 줄이 화면을 밀어내지 않게.
+      + (item.std_siblings?.length
+        ? `<div class="hs_sibs"><span class="hs_sibs_head">같은 부호의 다른 정식 품명 `
+          + `${item.std_siblings.length}개 — 내 물건이 어느 쪽인지 확인하세요</span>`
+          + `<ul class="hs_sibs_list">`
+          + item.std_siblings.map((sib, i) => `<li><span class="hs_sibs_no">${i + 2}</span>`
+            + `${escapeHtml(sib.name)}`
+            + (sib.name_en ? `<small>${escapeHtml(sib.name_en)}</small>` : "") + `</li>`).join("")
+          + `</ul></div>`
+        : "")
       + `<div class="hs_metrics">${item.priority ? `${item.priority}순위` : ""}`
       + (tax?.available ? ` · ${escapeHtml(tax.country)} MFN 평균 ${escapeHtml(String(tax.rate))}%` : "")
       + (relevance.missing_details?.length ? ` · ${escapeHtml(relevance.missing_details[0])}` : "") + `</div></div>`;

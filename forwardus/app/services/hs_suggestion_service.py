@@ -152,6 +152,19 @@ def search(query: str, country: str = "", order: str = "frequency") -> dict:
     for row in rows:
         row["relevance"] = review["assessments"].get(_code(row["code"]), {
             "match": "unknown", "reason": "적합도를 확인하지 못했습니다.", "missing_details": []})
+        # 관세청 **표준품명이 정확히 맞으면** 적합도 높음으로 둡니다.
+        #
+        # 표준품명은 관세청이 신고용으로 정해 둔 정식 품명입니다. 적어 준 말과
+        # 글자까지 같으면 우리가 더 판단할 것이 없습니다. AI 적합도가 없을 때
+        # unknown 으로 남으면 rank() 가 뒤로 밀어, 정작 정답이 2·3순위로
+        # 내려갔습니다. ("신선마늘(육쪽)"이 "깐마늘(육쪽)" 뒤에 왔습니다)
+        # 이미 AI가 본 줄은 그 판단을 그대로 둡니다 — 덮어쓰지 않습니다.
+        if row.get("std_kind") == "표준품명" and row["relevance"]["match"] == "unknown":
+            row["relevance"] = {
+                "match": "high",
+                "reason": (f"관세청 표준품명 '{row.get('std_name', '')}'과 글자까지 같습니다"
+                           f"({row.get('std_base_date', '')} 기준). 신고용 정식 품명입니다."),
+                "missing_details": []}
     rows.sort(key=lambda row: MATCH_ORDER[row["relevance"]["match"]])
     offline = found.get("source") == "internal"
     result = {"success": True, "source": "internal" if offline else "api", "data": rows,

@@ -577,3 +577,32 @@ body.hs_modal_open { overflow: hidden; }
   .app_stage { width: 100%; }
   html, body { background: #fff; }
 }
+
+/* ===== 관세청 표준품명 (HS 찾기 결과) =====
+   표준품명은 신고서에 적는 정식 품명입니다. 품목표의 계층형 이름과 달리
+   구체적이라 사람이 적는 말에 가깝습니다.
+     1순위   글자까지 맞은 표준품명 — 이 이름으로 신고합니다
+     2순위~  같은 부호에 함께 묶인 다른 정식 품명 — 내 물건이 어느 쪽인지 견줍니다
+   형제가 여러 개면 목록이 길어져 뒤 후보를 화면 밖으로 밀어냅니다. 그래서
+   **상자 안에서만 스크롤**하게 둡니다. (2026-09-27 사용자 결정) */
+.hs_std { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; }
+.hs_std_main { background: #dcfce7; color: #15803d; }
+.hs_std_other { background: var(--surface); color: var(--muted); }
+.hs_sibs { margin-top: 6px; padding: 7px 9px; border: 1px solid #bfdbfe; border-radius: 10px;
+  background: #f5f9ff; }
+.hs_sibs_head { display: block; color: var(--blue_dark); font-size: 11.5px; font-weight: 800; }
+/* 세 줄쯤 보이고 그 아래는 스크롤합니다. 막대를 숨기지 않습니다 — 숨기면
+   아래 더 있다는 것을 알 수가 없습니다. */
+.hs_sibs_list { margin: 5px 0 0; padding: 0 2px 0 0; list-style: none;
+  max-height: 84px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: #93c5fd transparent; }
+.hs_sibs_list::-webkit-scrollbar { width: 6px; }
+.hs_sibs_list::-webkit-scrollbar-thumb { background: #93c5fd; border-radius: 3px; }
+.hs_sibs_list::-webkit-scrollbar-track { background: transparent; }
+.hs_sibs_list li { display: flex; align-items: baseline; gap: 6px; padding: 2px 0;
+  font-size: 12.5px; line-height: 1.5; }
+.hs_sibs_no { flex: 0 0 auto; min-width: 16px; height: 16px; border-radius: 4px;
+  background: #dbeafe; color: var(--blue_dark); font-size: 10.5px; font-weight: 800;
+  text-align: center; line-height: 16px; }
+.hs_sibs_list li small { color: var(--muted); font-size: 11.5px; }
