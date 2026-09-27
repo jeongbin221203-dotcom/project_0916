@@ -340,3 +340,26 @@ def test_CSV는_보고_있는_쪽이_아니라_전체를_내려준다(client, cr
 
     for shipment in made:
         assert shipment.shipment_id in body      # 2쪽을 보고 있어도 25건 모두
+
+
+# --- 인쇄 -----------------------------------------------------------------------------
+
+def test_인쇄하면_화면용_요소는_종이에_찍히지_않는다():
+    """서류를 인쇄한 종이는 거래처와 세관으로 갑니다. 화면을 쓰라고 띄워 둔 것은 빠져야 합니다.
+
+    실제로 Packing List 인쇄 미리보기에 고래 상담 단추와 사이드바가 같이 찍혔습니다.
+    규칙을 base.css에 두는 이유: 이것들은 base.html이 모든 화면에 붙이므로,
+    document.css에만 적으면 Shipment 상세·Dashboard를 인쇄할 때 그대로 찍힙니다.
+    """
+
+    css = (Path(__file__).parent.parent / "app/static/css/base.css").read_text(encoding="utf-8")
+    assert "@media print" in css, "base.css에 인쇄 규칙이 없습니다"
+    block = css[css.index("@media print"):]
+
+    for selector in (".support_fab", ".support_panel",      # 고래 상담 단추와 대화창
+                     ".home_rail", ".site_header", ".site_footer", ".flash_stack",
+                     ".draft_alert", ".hs_modal", ".fx_modal", ".no_print"):
+        assert selector in block, f"인쇄할 때 {selector}를 숨기지 않습니다"
+    assert "display: none !important" in block
+    # 사이드바가 빠진 자리를 내용이 넘겨받아야 서류가 종이 가운데에 옵니다.
+    assert ".app_shell" in block and ".app_stage" in block
