@@ -46,6 +46,9 @@ def base():
 
 
 # (이름, 어떻게 망가뜨리나, 반드시 막아야 하는가)
+# 통과해도 **남는 값이 없어** 알릴 것이 없는 것. 검사에서 그렇게 표시합니다.
+HARMLESS = {"항공인데 sea_mode 가 붙음"}   # 서버가 sea_mode 를 None 으로 지웁니다
+
 CASES = [
  ("순중량 > 총중량", lambda p: p["cargo"].update(net_weight_kg=999999), True),
  ("도착이 출발보다 빠름", lambda p: p.update(buyer_required_date=(TODAY - timedelta(days=5)).isoformat()), False),
@@ -70,6 +73,8 @@ CASES = [
  ("통화가 목록 밖", lambda p: p.update(currency="ZZZ"), True),
  ("인코텀즈가 목록 밖", lambda p: p.update(incoterms="ZZZ"), True),
  ("바이어 이름 없음", lambda p: p["buyer"].update(name=""), True),
+ # 항공에 sea_mode 를 붙여 보내도 서버가 None 으로 지웁니다(확인함).
+ # 남는 값이 없으니 알릴 것도 없습니다. 무해한 통과입니다.
  ("항공인데 sea_mode 가 붙음", lambda p: p.update(transport_mode="AIR", sea_mode="FCL",
                                               origin_code="ICN", destination_code="LAX",
                                               incoterms="FCA"), False),
@@ -109,12 +114,10 @@ with app.app_context():
         sid = made["shipment_id"] if isinstance(made, dict) else made.shipment_id
         from app.models import Shipment
         sh = Shipment.query.filter_by(shipment_id=sid).one()
-        notes = " ".join(filter(None, [
-            getattr(sh.cargo, "density_warning", "") if sh.cargo else "",
-            getattr(sh.cargo, "units_warning", "") if sh.cargo else "",
-            getattr(sh.cargo, "dg_warning", "") if sh.cargo else "",
-            getattr(sh, "incoterms_warning", "") or "",
-        ]))
+        # 값은 다 찼는데 앞뒤가 안 맞는 것은 **제출 전 점검**이 모읍니다.
+        # (customs_filing_service._mismatches — 관세사 전달용 자료 화면)
+        from app.services import customs_filing_service
+        notes = " ".join(customs_filing_service.filing_sheet(sh)["mismatches"])
         if notes.strip():
             warned[name] += 1
 
@@ -126,6 +129,8 @@ for name, _, must_block in CASES:
     if must_block:
         verdict = "OK" if p == 0 else "★ 막아야 하는데 통과"
     else:
-        verdict = "OK(경고)" if p == 0 or w == p else ("OK" if p == 0 else "☆ 말없이 통과")
+        verdict = ("OK(무해)" if name in HARMLESS
+                   else "OK(경고)" if p == 0 or w == p
+                   else "OK" if p == 0 else "☆ 말없이 통과")
     print(f"   {name:<26}{b:>7}{p:>7}{w:>12}   {verdict}")
 for b in bad[:6]: print("   ★", b)

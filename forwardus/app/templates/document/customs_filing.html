@@ -22,6 +22,18 @@
       <div class="alert ok">✓ {{ missing_summary }}</div>
     {% endif %}
 
+    {# 값은 다 찼는데 **앞뒤가 안 맞는** 것. 비어 있는 칸과는 다릅니다.
+       비어 있는 칸은 사람이 바로 알아챕니다. 이건 다 채워져 있어서 안 보이고,
+       그대로 신고된 뒤에 정정해야 합니다. (2026-09-27) #}
+    {% if sheet.mismatches %}
+      <div class="alert warn">
+        <b>값은 있는데 앞뒤가 안 맞습니다. 넘기기 전에 확인해 주세요.</b>
+        <ul class="filing_mismatch">
+          {% for row in sheet.mismatches %}<li>{{ row }}</li>{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
     <form method="post" class="filing_form"
           action="{{ url_for('document.save_customs_filing', shipment_id=shipment.shipment_id) }}">
       <div class="form_grid">

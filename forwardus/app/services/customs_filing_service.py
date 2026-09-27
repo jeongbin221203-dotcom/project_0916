@@ -274,6 +274,11 @@ def as_text(sheet: dict) -> str:
     if sheet["missing"]:
         lines += ["", "■ 아직 비어 있는 칸",
                   "  " + ", ".join(sheet["missing"])]
+    # 값은 다 차 있어서 눈에 안 띄는 것. 관세사가 화면을 안 보고 글만 복사해
+    # 가도 보여야 합니다. (2026-09-27)
+    if sheet.get("mismatches"):
+        lines += ["", "■ 값은 있는데 앞뒤가 안 맞는 것"]
+        lines += [f"  - {row}" for row in sheet["mismatches"]]
     return "\n".join(lines)
 
 
@@ -292,6 +297,56 @@ def _mismatches(shipment) -> list[str]:
             f"받는 분 나라({buyer})와 도착지 나라({place})가 다릅니다. "
             "삼각무역이면 맞습니다. 아니라면 둘 중 하나를 고쳐 주세요 — "
             "수출신고서 목적국과 선적서류 수하인이 서로 다르게 나갑니다.")
+
+    # 날짜가 앞뒤로 뒤집힌 것.
+    #
+    # 도착이 출발보다 빠르면 그 일정은 있을 수 없습니다. 스케줄을 고른 뒤에
+    # 날짜를 손으로 고치면 이렇게 됩니다. 값이 다 차 있어 눈에 안 띕니다.
+    if shipment.etd and shipment.eta and shipment.eta < shipment.etd:
+        found.append(
+            f"도착 예정일({shipment.eta})이 출항일({shipment.etd})보다 빠릅니다. "
+            "있을 수 없는 일정입니다. 스케줄을 다시 골라 주세요.")
+
+    # 바이어에게 약속한 날이 이미 지난 것. 그대로 두면 지키지 못할 약속으로
+    # 일정을 짜게 됩니다.
+    if shipment.buyer_required_date and shipment.eta             and shipment.buyer_required_date < shipment.eta:
+        late = (shipment.eta - shipment.buyer_required_date).days
+        found.append(
+            f"Buyer 요청 도착일({shipment.buyer_required_date})보다 "
+            f"도착 예정일({shipment.eta})이 {late}일 늦습니다. "
+            "바이어에게 미리 알리거나 더 빠른 스케줄을 찾아 주세요.")
+
+    # 출발 희망일이 이미 지난 것.
+    #
+    # 스케줄은 미래 것이 잡히므로 화면의 날짜는 멀쩡해 보입니다. 그런데 희망일
+    # 자체가 과거로 남아 있으면, 나중에 그 날짜로 일정을 다시 짜거나 서류에
+    # 적을 때 앞뒤가 안 맞습니다.
+    from datetime import date as _date
+
+    if shipment.requested_departure_date and shipment.requested_departure_date < _date.today():
+        found.append(
+            f"출발 희망일({shipment.requested_departure_date})이 이미 지난 날입니다. "
+            f"실제 출항일은 {shipment.etd or '미정'}입니다. 희망일을 고쳐 두시면 "
+            "나중에 일정을 다시 짤 때 헷갈리지 않습니다.")
+
+    # 화물 준비일이 출항일보다 늦은 것. 준비가 안 끝났는데 배가 떠납니다.
+    if shipment.cargo_ready_date and shipment.etd             and shipment.cargo_ready_date > shipment.etd:
+        found.append(
+            f"화물 준비일({shipment.cargo_ready_date})이 출항일({shipment.etd})보다 "
+            "늦습니다. 그 배에는 싣지 못합니다.")
+
+    # 부피와 무게가 서로 말이 안 되는 화물.
+    #
+    # 포장당 중량 칸에 전체 중량을 적는 것이 가장 흔한 실수입니다. 그러면
+    # 운임 기준이 100배 틀립니다. 화면에서는 적을 때 알려 주지만, 건이 만들어진
+    # 뒤에는 아무 데서도 안 보였습니다. 관세사에게 넘기기 전에 한 번 더 봅니다.
+    from app.processors import cargo_calculator
+
+    for index, cargo in enumerate(shipment.cargos, start=1):
+        note = cargo_calculator.density_note(cargo.total_cbm or 0, cargo.total_weight_kg or 0)
+        if note and cargo_calculator.density_suspect(cargo.total_cbm or 0,
+                                                    cargo.total_weight_kg or 0):
+            found.append(f"품목 {index}: {note}")
     return found
 
 

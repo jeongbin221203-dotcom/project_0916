@@ -46,11 +46,13 @@ LOG = ROOT / "data" / "cache" / "verify_log.md"
 # 돌릴 것. 이미 있는 도구입니다. 여기서 새로 만들지 않습니다.
 JOBS = [
     ("퍼즈 · 입력 자리", ["python", "tests/_fuzz_sweep.py"]),
-    ("퍼즈 · 서류·통관", ["python", "tests/_fuzz_docs.py"]),
+    # ⑩ 서류·통관 5,000건 (사용자 지시 숫자, 2026-09-27)
+    ("퍼즈 · 서류·통관", ["python", "tests/_fuzz_docs.py", "5000"]),
     ("퍼즈 · 바깥이 죽었을 때", ["python", "tests/_fuzz_chaos.py"]),
     ("퍼즈 · 보안", ["python", "tests/_fuzz_security.py"]),
     ("퍼즈 · 운송 계획 전체", ["python", "tests/_fuzz_deep.py"]),
-    ("적합성 100회", ["python", "scripts/check_document_conformance.py", "100"]),
+    # ⑨ 적합성 1만 건 (사용자 지시 숫자, 2026-09-27)
+    ("적합성 10,000회", ["python", "scripts/check_document_conformance.py", "10000"]),
     ("어려운 적합성 시험", ["python", "scripts/check_document_hard.py"]),
     ("전체 테스트", ["python", "-m", "pytest", "tests", "-q", "-m", "not live"]),
 
@@ -69,7 +71,7 @@ JOBS = [
     ("⑤ 계약서 조항", ["python", "scripts/checks/m_contract.py", "5000"]),
     ("⑤ 계약서 한국어", ["python", "scripts/checks/m_contract_ko.py"]),
     ("⑤ 계약서 오인", ["python", "scripts/checks/m_contract_cross.py"]),
-    ("⑥ 서로 모순되는 입력", ["python", "scripts/checks/m6_contradiction.py", "3000"]),
+    ("⑥ 서로 모순되는 입력", ["python", "scripts/checks/m6_contradiction.py", "10000"]),
     ("⑦ 서류 간 어긋남(넓힘)", ["python", "scripts/checks/m7_cross_wide.py", "5000"]),
     ("⑪ 일상어 HS", ["python", "scripts/checks/m11_hs.py"]),
     ("⑫ 역순·섞어 적기", ["python", "scripts/checks/m12_reverse.py", "3000"]),
