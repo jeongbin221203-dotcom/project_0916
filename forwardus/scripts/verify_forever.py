@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import hashlib
+import random
 import re
 import subprocess
 import sys
@@ -93,6 +94,17 @@ JOBS = [
     ("정적 점검", ["python", "scripts/checks/m_static.py"]),
     ("배선 점검", ["python", "scripts/checks/m_wiring.py"]),
     ("CSS 규칙 없는 class", ["python", "scripts/check_css_classes.py"]),
+
+    # 2026-09-27 에 만든 것들. 기관이 멈추는 세 모양과 굳혀 둔 표를 봅니다.
+    # 이것들도 바깥을 부르지 않습니다 — 스스로 망을 끊거나 키를 비우거나
+    # 흉내냅니다. (host_down 은 막지 않은 기관도 부르지 않습니다)
+    ("멈춤 · 망 전부 단절", ["python", "scripts/checks/cache_offline.py"]),
+    ("멈춤 · 키 없음·거부", ["python", "scripts/checks/keys_off.py"]),
+    ("멈춤 · 기관 한 곳씩", ["python", "scripts/checks/host_down.py", "--all"]),
+    ("HS · 기업·개인 상위", ["python", "scripts/checks/m26_biz_personal.py"]),
+    ("HS · 일상어", ["python", "scripts/checks/m11_hs.py"]),
+    ("JS 화면 테스트", ["node", "--test", "tests/hs_standard_names.test.cjs",
+                   "tests/doc_schedule_keep.test.cjs"]),
 ]
 
 # 바깥으로 나가려 한 흔적. 퍼즈가 이것을 찍으면 기록합니다.
@@ -129,6 +141,47 @@ def headline(output: str) -> str:
     return rows[-1][:80] if rows else "(아무것도 찍지 않았습니다)"
 
 
+# 검사 묶음이 돌고 있다는 표시. scripts/checks/run_all.py 도 이 파일을 씁니다.
+#
+# 왜 있나
+#   2026-09-27 에 이 묶음과 run_all.py 를 동시에 돌렸습니다. 둘이 같은 스크립트
+#   (m26_biz_personal 처럼 몇 분씩 걸리는 것)를 같은 시각에 띄워 하나가
+#   **출력도 없이** 죽었고, 이 묶음이 그것을 "처음 보는 실패"로 적었습니다.
+#   단독으로 다시 돌리니 100% 통과했습니다 — 제품에는 아무 문제가 없었고
+#   검사 설정이 만든 잡음이었습니다. 잡음을 한 번 적으면 그 뒤로 진짜 실패와
+#   구별할 수 없게 됩니다.
+LOCK = ROOT / "data" / "cache" / "checks_running.lock"
+LOCK_STALE = 6 * 3600
+
+
+def other_batch() -> str:
+    """다른 검사 묶음이 돌고 있으면 그 사실을 돌려줍니다."""
+
+    try:
+        if not LOCK.exists():
+            return ""
+        age = __import__("time").time() - LOCK.stat().st_mtime
+        who = LOCK.read_text(encoding="utf-8").strip() or "다른 묶음"
+    except OSError:
+        return ""
+    return "" if age > LOCK_STALE else f"{who} · 약 {age / 60:.0f}분 전에 시작"
+
+
+def hold() -> None:
+    try:
+        LOCK.parent.mkdir(parents=True, exist_ok=True)
+        LOCK.write_text("scripts/verify_forever.py", encoding="utf-8")
+    except OSError:
+        pass
+
+
+def release() -> None:
+    try:
+        LOCK.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def run(label: str, command: list[str]) -> tuple[bool, str]:
     try:
         done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True,
@@ -137,6 +190,14 @@ def run(label: str, command: list[str]) -> tuple[bool, str]:
     except subprocess.TimeoutExpired:
         return False, "한 시간을 넘겨 끊었습니다."
     output = (done.stdout or "") + (done.stderr or "")
+    # **출력이 한 글자도 없이 실패한 것은 잡음으로 봅니다.**
+    #
+    # 검사들은 실패해도 반드시 무엇인가 찍습니다. 아무것도 없이 죽는 것은
+    # 바깥 사정입니다 — 다른 묶음과 겹쳐 자원을 다투었거나, 컴퓨터가 잠들었거나,
+    # 사람이 끊은 것입니다. 그것을 "처음 보는 실패"로 적으면 진짜 실패와
+    # 구별할 수 없게 됩니다. (2026-09-27 실제로 한 번 그렇게 적었습니다)
+    if done.returncode != 0 and not output.strip():
+        return True, "(출력 없이 끝났습니다 — 겹침·잠자기·중단으로 보아 잡음으로 넘깁니다)"
     # 돌아간 값이 0이어도 "실패 N"처럼 본문에 적히는 도구가 있습니다.
     bad = done.returncode != 0 or re.search(
         r"실패\s*[1-9]|놓침\s*[1-9]|헛경보\s*[1-9]|FAILED"
@@ -167,6 +228,16 @@ def main() -> int:
         until = datetime.fromisoformat(args[args.index("--until") + 1])
         hours = max(0.0, (until - datetime.now()).total_seconds() / 3600)
 
+    # 다른 검사 묶음과 겹치면 시작하지 않습니다. 겹치면 무거운 스크립트가
+    # 출력도 없이 죽어, 있지도 않은 실패가 기록에 남습니다.
+    busy = other_batch()
+    if busy and "--force" not in args:
+        print("■ 다른 검사 묶음이 돌고 있어 시작하지 않습니다.")
+        print(f"   {busy}")
+        print("   겹치면 없는 실패가 기록됩니다. 그래도 돌리려면 --force 를 주세요.")
+        return 2
+    hold()
+
     deadline = time.monotonic() + hours * 3600
     seen: set[str] = set()
     turn = 0
@@ -185,15 +256,30 @@ def main() -> int:
         started = time.monotonic()
         fails = []
 
-        for label, command in JOBS:
+        # **회차마다 순서를 섞습니다.**
+        #
+        # 예전에는 늘 같은 순서로 돌았습니다. 그러면 뒤쪽 검사는 시간이
+        # 다 되어 건너뛰기 쉽고(--hours 로 끊을 때), 앞쪽만 여러 번 돌아
+        # "전부 돌렸다"는 말이 사실과 달라집니다. 섞으면 회차를 거듭할수록
+        # 모든 검사가 고르게 돕니다.
+        #
+        # 씨앗을 회차 번호로 둡니다. 같은 회차를 다시 돌리면 같은 순서가 나와
+        # 실패를 재현할 수 있습니다. (2026-09-27 사용자 지시: 교차로 돌리기)
+        order = list(JOBS)
+        random.Random(turn).shuffle(order)
+        note(f"  · {turn}회차 순서: " + " → ".join(name for name, _ in order[:6])
+             + (" → …" if len(order) > 6 else ""))
+
+        for label, command in order:
             if rounds is None and time.monotonic() > deadline:
                 break
             good, output = run(label, command)
             # 첫 회차는 작업마다 한 줄씩 남깁니다.
             # 어느 것이 실제로 돌았는지 적어 두지 않으면, 조용히 아무 일도 안 한
             # 작업이 섞여 있어도 "모두 통과"로 보입니다.
-            if turn == 1:
-                note(f"  - {label}: {headline(output)}")
+            # 회차마다 한 줄씩 남깁니다. 순서가 섞이므로 무엇이 언제 돌았는지
+            # 적어 두지 않으면 나중에 못 맞춥니다. (전에는 1회차만 남겼습니다)
+            note(f"  - {turn}회차 {label}: {headline(output)}")
             leak = [word for word in OUTSIDE if word in output]
             if leak:
                 mark = fingerprint(f"{label}·바깥", output)
@@ -212,10 +298,12 @@ def main() -> int:
             note(f"\n### {turn}회차 · {label} — 처음 보는 실패 `{mark}`\n"
                  f"{datetime.now():%H:%M}\n```\n{output[-1600:].strip()}\n```")
 
+        hold()          # 자물쇠가 살아 있음을 알립니다
         spent = (time.monotonic() - started) / 60
         note(f"- {turn}회차 끝 {datetime.now():%H:%M} · {spent:.1f}분 · "
              + ("모두 통과" if not fails else f"실패 {len(fails)}종 ({', '.join(fails)})"))
 
+    release()
     note(f"\n**{turn}회 돌렸습니다. 실패 {total_fail}번 · 처음 보는 것 {len(seen)}가지.**"
          + ("\n처음 보는 실패가 없습니다." if not seen else ""))
     return 0

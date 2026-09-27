@@ -7,7 +7,25 @@
   4. CBM·총중량이 손으로 다시 곱한 값과 같다
 """
 import sys, io, random, itertools
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+
+# **제품과 같은 반올림을 씁니다.**
+#
+# 파이썬 Decimal 의 기본은 은행가 반올림(ROUND_HALF_EVEN)이라 562.005 를
+# 562.00 으로 내립니다. 그런데 제품은 상업 송장 관행인 사사오입
+# (ROUND_HALF_UP)을 써서 562.01 로 올립니다 — 은행·세관이 그렇게 되셈합니다.
+#
+# 검사가 기본 반올림으로 금액을 만들어 보내면, 서버가 "단가 × 수량이 금액과
+# 맞지 않습니다"라고 막습니다. **서버가 맞습니다.** 검사 쪽 반올림이 틀렸던
+# 것이고, 2026-09-26 이후 이 검사가 계속 실패하던 원인이었습니다.
+# (2026-09-27 교차 무인 검증이 찾았습니다)
+CENT = Decimal("0.01")
+
+
+def money(value: Decimal) -> Decimal:
+    """제품과 같은 방식으로 센트 자리를 맞춥니다."""
+
+    return value.quantize(CENT, rounding=ROUND_HALF_UP)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 sys.path.insert(0, ".")
 from tests._fuzz_app import build_app
@@ -49,7 +67,7 @@ for round_no in range(ROUNDS):
         l, w, h = (random.choice([5, 12.5, 30, 40, 76.2, 100, 118]) for _ in range(3))
         kg = random.choice([0.25, 1, 12, 33.3, 250])
         price = Decimal(str(random.choice([0.01, 3.75, 12.5, 88.88, 4999.99])))
-        amount = (price * count).quantize(Decimal("0.01"))
+        amount = money(price * count)
         # **적는 모양에 맞춰 단가를 도로 맞춥니다.**
         #
         # 서버는 2026-09-26 부터 단가 × 수량 = 금액 을 맞대어 봅니다(은행이
@@ -63,7 +81,7 @@ for round_no in range(ROUNDS):
             shown = Decimal("1.00")
         amount = shown
         price = (amount / count).quantize(Decimal("0.0001"))
-        amount = (price * count).quantize(Decimal("0.01"))
+        amount = money(price * count)
         if Decimal(fmt.format(amount).replace(",", "").strip()) != amount:
             # 그 모양으로는 되곱해지지 않는 값입니다. 쉼표 두 자리로 적습니다.
             fmt = "{:,.2f}"
@@ -77,8 +95,8 @@ for round_no in range(ROUNDS):
                       "package_type": "carton",
                       "length_cm": str(l), "width_cm": str(w), "height_cm": str(h),
                       "weight_per_package_kg": str(kg),
-                      "gross_weight_kg": str((Decimal(str(kg))*count).quantize(Decimal("0.01"))),
-                      "net_weight_kg": str((Decimal(str(kg))*count*Decimal("0.9")).quantize(Decimal("0.01"))),
+                      "gross_weight_kg": str(money(Decimal(str(kg)) * count)),
+                      "net_weight_kg": str(money(Decimal(str(kg)) * count * Decimal("0.9"))),
                       "unit_price": str(price), "amount": fmt.format(amount)})
 
     # ── ⑫ 적는 순서를 섞어 초안에 넣습니다 ──────────────────────

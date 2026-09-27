@@ -103,12 +103,42 @@ def measure(host: str) -> list[tuple]:
     app = create_app(Config)
     real = httpx.request
     blocked = {"n": 0}
+    stubbed = {"n": 0}
+    live_others = "--live-others" in sys.argv
+
+    class Blank:
+        """닿기는 했지만 줄 것이 없는 응답. (기관을 실제로 부르지 않습니다)"""
+
+        status_code = 200
+        text = "<result/>"
+        content = b"<result/>"
+        headers = {"content-type": "text/xml"}
+
+        def json(self):
+            return {}
+
+        def raise_for_status(self):
+            return None
 
     def maybe(method, url, **kwargs):
-        # 막은 기관만 끊습니다. 나머지는 그대로 나갑니다.
+        # 막은 기관만 끊습니다.
         if host in str(url):
             blocked["n"] += 1
             raise httpx.ConnectError(f"{host} 에 닿지 않습니다 (검사)")
+        # **나머지 기관은 기본으로 부르지 않습니다.**
+        #
+        # 이 검사가 보려는 것은 "막은 기관과 무관한 조회가 같이 죽지 않는가"
+        # 입니다. 그걸 보는 데 실제 호출이 필요하지 않습니다. 그런데 처음에는
+        # 그대로 내보내서, --all 로 한 번 돌릴 때마다 기관 호출을 수십 회
+        # 썼습니다. 기관 서버가 불안정하고 키마다 한도가 있습니다.
+        #
+        # 그래서 기본은 "닿았지만 줄 것이 없다"로 흉내냅니다. 실패가 아니라
+        # 응답이므로 회로차단기도 켜지지 않고, 각 조회는 저장분·내부 표로
+        # 넘어가거나 빈손으로 답합니다. 둘 다 "같이 죽었다"와 구별됩니다.
+        # 진짜로 불러 보려면 --live-others 를 주세요. (2026-09-27)
+        if not live_others:
+            stubbed["n"] += 1
+            return Blank()
         return real(method, url, **kwargs)
 
     rows: list[tuple] = []
@@ -132,7 +162,8 @@ def measure(host: str) -> list[tuple]:
                     mark = "A"          # 기관에서 지금 받았습니다 (막은 곳이 아님)
                 rows.append((group, name, source or "(없음)", mark, tied))
         base_client.clear_outages()
-    print(f"   (막아서 끊은 호출 {blocked['n']}회)\n")
+    how = "실제로 불렀습니다" if live_others else "부르지 않고 흉내냈습니다"
+    print(f"   (막아서 끊은 호출 {blocked['n']}회 · 나머지 기관 {stubbed['n']}회는 {how})\n")
     return rows
 
 
