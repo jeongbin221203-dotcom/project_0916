@@ -18,8 +18,14 @@
 
 쓰는 법
     python scripts/verify_forever.py                # 6시간
+    python scripts/verify_forever.py --forever      # 마감 없이 계속
     python scripts/verify_forever.py --hours 1
     python scripts/verify_forever.py --rounds 2     # 횟수로 끊기
+    python scripts/verify_forever.py --status       # 돌고 있는지 보기
+    python scripts/verify_forever.py --seed 1759... # 그 판의 순서를 그대로 다시
+
+  두 판을 한꺼번에 띄우지 마세요. 같은 스크립트를 같이 돌리면 하나가 출력도
+  없이 죽어, 있지도 않은 실패가 기록에 남습니다. 자물쇠가 막아 줍니다.
 
 남는 것
     data/cache/verify_log.md   회차·시각·처음 보는 실패만
@@ -154,23 +160,61 @@ LOCK = ROOT / "data" / "cache" / "checks_running.lock"
 LOCK_STALE = 6 * 3600
 
 
+def alive(pid: int) -> bool:
+    """그 번호의 프로세스가 아직 살아 있는지.
+
+    자물쇠가 파일만 있으면 되는 것이었을 때, 제가 rm -f 로 지우고 두 번째 판을
+    띄웠습니다. 두 판이 **같은 순서로 같은 검사를** 동시에 돌았습니다.
+    (2026-09-27 20:00 · 20:24) 파일이 아니라 프로세스를 봐야 합니다.
+    """
+
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        done = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                              capture_output=True, text=True, errors="replace")
+        return str(pid) in (done.stdout or "")
+    import os
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    except OSError:
+        return False
+    return True
+
+
 def other_batch() -> str:
-    """다른 검사 묶음이 돌고 있으면 그 사실을 돌려줍니다."""
+    """다른 검사 묶음이 **정말 돌고 있으면** 그 사실을 돌려줍니다.
+
+    죽은 판이 남긴 자물쇠는 스스로 치웁니다. 사람이 rm 으로 치우게 두면
+    살아 있는 판까지 함께 밟습니다.
+    """
 
     try:
         if not LOCK.exists():
             return ""
-        age = __import__("time").time() - LOCK.stat().st_mtime
-        who = LOCK.read_text(encoding="utf-8").strip() or "다른 묶음"
+        age = time.time() - LOCK.stat().st_mtime
+        raw = LOCK.read_text(encoding="utf-8").strip()
     except OSError:
         return ""
-    return "" if age > LOCK_STALE else f"{who} · 약 {age / 60:.0f}분 전에 시작"
+    who, _, pid_text = raw.partition("|pid=")
+    who = who or "다른 묶음"
+    pid = int(pid_text) if pid_text.isdigit() else 0
+    if pid and not alive(pid):
+        # 죽은 판이 남긴 것입니다. 치우고 들어갑니다.
+        release()
+        return ""
+    if not pid and age > LOCK_STALE:
+        return ""
+    return f"{who} · pid {pid or '?'} · 약 {age / 60:.0f}분 전에 시작"
 
 
 def hold() -> None:
     try:
         LOCK.parent.mkdir(parents=True, exist_ok=True)
-        LOCK.write_text("scripts/verify_forever.py", encoding="utf-8")
+        LOCK.write_text(f"scripts/verify_forever.py|pid={__import__('os').getpid()}",
+                        encoding="utf-8")
     except OSError:
         pass
 
@@ -189,6 +233,11 @@ def run(label: str, command: list[str]) -> tuple[bool, str]:
                               env={**__import__("os").environ, "PYTHONIOENCODING": "utf-8"})
     except subprocess.TimeoutExpired:
         return False, "한 시간을 넘겨 끊었습니다."
+    except (FileNotFoundError, OSError) as error:
+        # 명령 자체를 못 띄운 것입니다 (node 가 없거나, 파일이 사라졌거나).
+        # 제품의 잘못이 아니므로 실패로 세지 않고, 판도 죽이지 않습니다.
+        # 마감 없이 돌라고 해 놓고 첫 회차에 죽으면 '계속'이 아닙니다.
+        return True, f"(못 띄웠습니다 — {type(error).__name__}: {error})"
     output = (done.stdout or "") + (done.stderr or "")
     # **출력이 한 글자도 없이 실패한 것은 잡음으로 봅니다.**
     #
@@ -213,14 +262,45 @@ def note(text: str) -> None:
     print(text)
 
 
+def status() -> int:
+    """지금 돌고 있는지 한 줄로 알려 줍니다.
+
+        python scripts/verify_forever.py --status
+    """
+
+    busy = other_batch()
+    if not busy:
+        print("■ 돌고 있지 않습니다.")
+    else:
+        print(f"■ 돌고 있습니다 — {busy}")
+    try:
+        rows = [line.rstrip() for line in
+                LOG.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError:
+        print("   (기록이 아직 없습니다)")
+        return 0
+    for line in rows[-6:]:
+        print("   " + line[:100])
+    return 0
+
+
 def main() -> int:
     args = sys.argv[1:]
+    if "--status" in args:
+        return status()
     hours = 6.0
     rounds = None
     if "--hours" in args:
         hours = float(args[args.index("--hours") + 1])
     if "--rounds" in args:
         rounds = int(args[args.index("--rounds") + 1])
+    # 마감 없이 돕니다. 멈추려면 창을 닫거나 프로세스를 끊습니다.
+    #     python scripts/verify_forever.py --forever
+    endless = "--forever" in args
+    # 판마다 섞는 순서를 정하는 씨앗. 안 주면 시각으로 정합니다.
+    # 기록에 적어 두므로, 그 번호를 --seed 로 주면 같은 순서가 다시 나옵니다.
+    run_seed = (args[args.index("--seed") + 1] if "--seed" in args
+                else f"{int(time.time())}")
     # 시계 시각으로 끊습니다. "내일 아침 7시까지" 처럼 정할 때 씁니다.
     #     python scripts/verify_forever.py --until 2026-09-27T07:00
     until = None
@@ -243,14 +323,16 @@ def main() -> int:
     turn = 0
     total_fail = 0
 
+    how = ("마감 없이" if endless else
+           ("%.1f시간" % hours if rounds is None else f"{rounds}회"))
     note(f"\n\n## 무인 검증 시작 {datetime.now():%Y-%m-%d %H:%M}"
-         f" · {'%.1f시간' % hours if rounds is None else f'{rounds}회'}"
+         f" · {how} · 판 `{run_seed}` · 검사 {len(JOBS)}가지"
          f" · 바깥 기관 안 부름")
 
     while True:
         if rounds is not None and turn >= rounds:
             break
-        if rounds is None and time.monotonic() > deadline:
+        if not endless and rounds is None and time.monotonic() > deadline:
             break
         turn += 1
         started = time.monotonic()
@@ -263,17 +345,28 @@ def main() -> int:
         # "전부 돌렸다"는 말이 사실과 달라집니다. 섞으면 회차를 거듭할수록
         # 모든 검사가 고르게 돕니다.
         #
-        # 씨앗을 회차 번호로 둡니다. 같은 회차를 다시 돌리면 같은 순서가 나와
-        # 실패를 재현할 수 있습니다. (2026-09-27 사용자 지시: 교차로 돌리기)
+        # 씨앗은 **판 번호 + 회차**입니다.
+        #
+        # 예전에는 회차 번호만 썼습니다. 그러면 판을 새로 띄워도 1회차는 늘
+        # 같은 순서였습니다. 짧게 여러 번 돌리면 뒤쪽 검사는 영영 안 돕니다 —
+        # 교차가 판 안에서만 되고 판 사이에서는 안 됐습니다. (2026-09-27)
+        #
+        # 판 번호는 시작할 때 기록에 적습니다. 같은 판 번호를 --seed 로 주면
+        # 그 순서가 그대로 다시 나와 실패를 재현할 수 있습니다.
         order = list(JOBS)
-        random.Random(turn).shuffle(order)
+        random.Random(f"{run_seed}-{turn}").shuffle(order)
         note(f"  · {turn}회차 순서: " + " → ".join(name for name, _ in order[:6])
              + (" → …" if len(order) > 6 else ""))
 
         for label, command in order:
-            if rounds is None and time.monotonic() > deadline:
+            if not endless and rounds is None and time.monotonic() > deadline:
                 break
-            good, output = run(label, command)
+            try:
+                good, output = run(label, command)
+            except Exception as error:            # noqa: BLE001
+                # 돌리는 쪽이 터진 것입니다. 적어 두고 다음 검사로 갑니다.
+                # 여기서 올라가게 두면 판이 죽어 밤새 아무것도 안 돕니다.
+                good, output = True, f"(돌리다 멈췄습니다 — {type(error).__name__}: {error})"
             # 첫 회차는 작업마다 한 줄씩 남깁니다.
             # 어느 것이 실제로 돌았는지 적어 두지 않으면, 조용히 아무 일도 안 한
             # 작업이 섞여 있어도 "모두 통과"로 보입니다.
