@@ -1,0 +1,57 @@
+/* 계약서 조항 점검 칸. 무역 상담과 서류 수정 두 화면이 같은 모양으로 씁니다.
+   색은 화면 전체와 같은 뜻으로 씁니다 — 빨강은 위험, 주황은 빠진 것, 파랑은 이득. */
+.cc_panel { display: grid; gap: 14px; }
+.cc_lead { margin: 0 0 4px; font-size: 13.5px; line-height: 1.7; }
+.cc_note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.cc_upload { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line);
+  border-radius: 14px; background: var(--surface); }
+.cc_file { display: grid; gap: 5px; font-size: 12.5px; font-weight: 700; }
+.cc_file input[type="file"] { font-size: 12.5px; }
+.cc_paste > summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.cc_paste textarea { width: 100%; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 10px; font: inherit; font-size: 13px; line-height: 1.6; resize: vertical; }
+.cc_actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cc_status { margin: 0; min-height: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+
+.cc_group { margin-top: 4px; }
+.cc_group h4 { margin: 0 0 8px; font-size: 14px; font-weight: 900; }
+.cc_count { margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--surface);
+  color: var(--muted); font-size: 12px; font-weight: 800; }
+.cc_list { margin: 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+.cc_row { padding: 12px 14px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+/* 계약서에서 실제로 **보인** 줄. 독소조항이면 빨간 테두리로 눈에 띄게 둡니다. */
+.cc_row.is_found { border-color: #fca5a5; background: #fffafa; }
+.cc_head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; cursor: pointer; }
+.cc_head b { font-size: 13.5px; }
+.cc_tag { padding: 1px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+.cc_must { background: #ffedd5; color: #9a3412; }
+.cc_gain { background: var(--blue_soft); color: var(--blue_dark); }
+.cc_toxic { background: #dc2626; color: #fff; }
+.cc_found { padding: 1px 8px; border-radius: 999px; background: #fee2e2; color: #b91c1c;
+  font-size: 11.5px; font-weight: 800; }
+.cc_why, .cc_risk, .cc_how, .cc_fix { margin: 6px 0 0; font-size: 12.5px; line-height: 1.7; }
+.cc_why { color: var(--ink); }
+.cc_risk { color: var(--muted); }
+.cc_how { color: var(--blue_dark); }
+.cc_fix { padding: 7px 10px; border-radius: 9px; background: #fef2f2; color: #b91c1c; }
+@media (max-width: 620px) {
+  .cc_head { align-items: flex-start; }
+}
+
+/* 계약서 창은 **창 안에서 굴립니다.**
+   HS 창은 후보 목록 하나만 굴리면 되어 .hs_modal_body가 overflow: hidden 입니다.
+   그 틀을 그대로 쓰니 판정 결과(빠진 조항·독소조항)가 창 밖으로 잘려 나가고,
+   굴릴 막대도 없어 아래를 볼 수가 없었습니다. (2026-09-26) */
+[data-contract-modal] .hs_modal_body {
+  overflow-y: auto; overscroll-behavior: contain; padding-right: 6px;
+  /* 막대를 늘 보여 줍니다. 숨기면 아래에 더 있다는 걸 알 수가 없습니다. */
+  scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
+}
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar { width: 8px; }
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar-thumb {
+  border-radius: 999px; background: #cbd5e1; }
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+[data-contract-modal] .hs_modal_body::-webkit-scrollbar-track { background: transparent; }
+/* 붙여 넣는 칸이 너무 길면 창을 통째로 밀어냅니다. 그 칸도 제 안에서 굴립니다. */
+.cc_paste textarea { max-height: 34vh; }

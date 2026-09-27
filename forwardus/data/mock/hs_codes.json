@@ -1,0 +1,62 @@
+[
+ {
+  "code": "3304.99",
+  "name": "기타 미용·메이크업·기초화장품",
+  "name_en": "Beauty or make-up preparations, other"
+ },
+ {
+  "code": "3304.10",
+  "name": "입술 화장용 제품",
+  "name_en": "Lip make-up preparations"
+ },
+ {
+  "code": "3305.10",
+  "name": "샴푸",
+  "name_en": "Shampoos"
+ },
+ {
+  "code": "3401.30",
+  "name": "피부 세정용 유기계면활성제품",
+  "name_en": "Organic surface-active washing preparations for skin"
+ },
+ {
+  "code": "2106.90",
+  "name": "기타 조제 식료품",
+  "name_en": "Food preparations n.e.s."
+ },
+ {
+  "code": "1905.90",
+  "name": "과자·베이커리 제품",
+  "name_en": "Bread, pastry, cakes, biscuits"
+ },
+ {
+  "code": "8471.30",
+  "name": "휴대용 컴퓨터",
+  "name_en": "Portable automatic data processing machines"
+ },
+ {
+  "code": "8517.62",
+  "name": "데이터 송수신 기기",
+  "name_en": "Machines for reception/transmission of data"
+ },
+ {
+  "code": "8516.31",
+  "name": "헤어드라이어",
+  "name_en": "Hair dryers"
+ },
+ {
+  "code": "6109.10",
+  "name": "면제 티셔츠",
+  "name_en": "T-shirts, of cotton, knitted"
+ },
+ {
+  "code": "9503.00",
+  "name": "완구",
+  "name_en": "Toys"
+ },
+ {
+  "code": "3923.30",
+  "name": "플라스틱 용기·병",
+  "name_en": "Plastic carboys, bottles, flasks"
+ }
+]

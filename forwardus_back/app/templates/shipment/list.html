@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge %}
+{% block title %}Shipments{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Shipments</p>
+      <h1>Shipment 목록</h1>
+    </div>
+    <a class="button primary" href="{{ url_for('planning.new') }}">새 운송 계획</a>
+  </div>
+
+  <nav class="chip_row" aria-label="상태 필터">
+    <a class="chip {{ 'active' if not status }}" href="{{ url_for('shipment.index') }}">전체</a>
+    {% for key, label in statuses.items() %}
+      <a class="chip {{ 'active' if status == key }}" href="{{ url_for('shipment.index', status=key) }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if shipments %}
+    <div class="card table_card">
+      <table class="table">
+        <thead>
+          <tr><th>Shipment ID</th><th>견적명</th><th>Route</th><th>Mode</th><th>Buyer</th><th>ETD</th><th>ETA</th><th>상태</th></tr>
+        </thead>
+        <tbody>
+          {% for s in shipments %}
+            <tr>
+              <td><a class="mono" href="{{ url_for('shipment.detail', shipment_id=s.shipment_id) }}">{{ s.shipment_id }}</a></td>
+              <td>{{ s.project_name }}</td>
+              <td>{{ s.origin_code }} → {{ s.destination_code }}</td>
+              <td>{{ s.mode_label }}</td>
+              <td>{{ s.buyer.name if s.buyer else '-' }}</td>
+              <td>{{ s.etd|d }}</td>
+              <td>{{ s.eta|d }}{% if s.delay_days > 0 %} <span class="badge warn">+{{ s.delay_days }}일</span>{% endif %}</td>
+              <td>{{ status_badge(s.status, s.status_label) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <section class="card empty_state">
+      <h2>Shipment가 없습니다</h2>
+      <p class="muted">운송 계획에서 스케줄을 선택하면 Shipment가 생성됩니다.</p>
+      <a class="button primary" href="{{ url_for('planning.new') }}">새 운송 계획 시작</a>
+    </section>
+  {% endif %}
+{% endblock %}

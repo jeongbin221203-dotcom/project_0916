@@ -1,0 +1,455 @@
+{
+  "summaries": [
+    {
+      "label": "before",
+      "samples": 20,
+      "questions": 10,
+      "p50_ms": 4610.1,
+      "p95_ms": 7474.0,
+      "route_ms_p50": 0.0,
+      "search_ms_p50": 0.0,
+      "lookup_ms_p50": 0.0,
+      "llm_ms_p50": 4610.1,
+      "llm_calls": 28,
+      "embed_calls": 0,
+      "llm_calls_per_question": 1.4,
+      "prompt_tokens": 161118,
+      "completion_tokens": 8374,
+      "tokens_per_question": 8475,
+      "errors": 0,
+      "routes": {
+        "llm": 20
+      }
+    },
+    {
+      "label": "after(캐시 빔→참 섞임)",
+      "samples": 20,
+      "questions": 10,
+      "p50_ms": 3488.5,
+      "p95_ms": 7549.8,
+      "route_ms_p50": 270.6,
+      "search_ms_p50": 229.6,
+      "lookup_ms_p50": 987.3,
+      "llm_ms_p50": 4969.2,
+      "llm_calls": 17,
+      "embed_calls": 13,
+      "llm_calls_per_question": 0.85,
+      "prompt_tokens": 110741,
+      "completion_tokens": 5261,
+      "tokens_per_question": 5800,
+      "errors": 0,
+      "routes": {
+        "clarification": 2,
+        "external_lookup": 2,
+        "faq_context": 4,
+        "general_guidance": 12
+      }
+    },
+    {
+      "label": "after(캐시 참)",
+      "samples": 10,
+      "questions": 10,
+      "p50_ms": 0.5,
+      "p95_ms": 5580.1,
+      "route_ms_p50": 257.3,
+      "search_ms_p50": 0.6,
+      "lookup_ms_p50": 650.9,
+      "llm_ms_p50": 4982.1,
+      "llm_calls": 5,
+      "embed_calls": 0,
+      "llm_calls_per_question": 0.5,
+      "prompt_tokens": 34432,
+      "completion_tokens": 1299,
+      "tokens_per_question": 3573,
+      "errors": 0,
+      "routes": {
+        "clarification": 1,
+        "external_lookup": 1,
+        "faq_context": 2,
+        "general_guidance": 6
+      }
+    }
+  ],
+  "before": [
+    {
+      "ok": true,
+      "total_ms": 4037.6,
+      "stages": {
+        "llm_ms": 4037.6
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 5578.2,
+      "stages": {
+        "llm_ms": 5578.2
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 5831.4,
+      "stages": {
+        "llm_ms": 5831.4
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 7474.0,
+      "stages": {
+        "llm_ms": 7474.0
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 4213.7,
+      "stages": {
+        "llm_ms": 4213.7
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 3920.7,
+      "stages": {
+        "llm_ms": 3920.7
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 4694.1,
+      "stages": {
+        "llm_ms": 4694.1
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 2797.3,
+      "stages": {
+        "llm_ms": 2797.3
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 5454.1,
+      "stages": {
+        "llm_ms": 5454.1
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 4816.6,
+      "stages": {
+        "llm_ms": 4816.6
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 3598.7,
+      "stages": {
+        "llm_ms": 3598.7
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 5828.5,
+      "stages": {
+        "llm_ms": 5828.5
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 5043.3,
+      "stages": {
+        "llm_ms": 5043.3
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 7494.2,
+      "stages": {
+        "llm_ms": 7494.2
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 3333.3,
+      "stages": {
+        "llm_ms": 3333.3
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 4488.8,
+      "stages": {
+        "llm_ms": 4488.8
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 4146.2,
+      "stages": {
+        "llm_ms": 4146.2
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 2456.7,
+      "stages": {
+        "llm_ms": 2456.7
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 5121.1,
+      "stages": {
+        "llm_ms": 5121.1
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 4526.2,
+      "stages": {
+        "llm_ms": 4526.2
+      },
+      "route": "llm"
+    }
+  ],
+  "after": [
+    {
+      "ok": true,
+      "total_ms": 5890.7,
+      "stages": {
+        "route_ms": 337.9,
+        "search_ms": 265.5,
+        "lookup_ms": 0.0,
+        "llm_ms": 4956.4
+      },
+      "route": "faq_context"
+    },
+    {
+      "ok": true,
+      "total_ms": 5275.8,
+      "stages": {
+        "route_ms": 293.2,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 4982.1
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 5110.0,
+      "stages": {
+        "route_ms": 298.6,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 4810.6
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 8941.5,
+      "stages": {
+        "route_ms": 270.6,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 8670.0
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 6305.1,
+      "stages": {
+        "route_ms": 757.1,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 5547.6
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 234.7,
+      "stages": {
+        "route_ms": 234.2,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0
+      },
+      "route": "clarification"
+    },
+    {
+      "ok": true,
+      "total_ms": 4471.6,
+      "stages": {
+        "route_ms": 234.5,
+        "search_ms": 232.1,
+        "lookup_ms": 1097.6,
+        "llm_ms": 2906.7
+      },
+      "route": "external_lookup"
+    },
+    {
+      "ok": true,
+      "total_ms": 3080.4,
+      "stages": {
+        "route_ms": 274.9,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 2805.1
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 7549.8,
+      "stages": {
+        "route_ms": 252.8,
+        "search_ms": 227.1,
+        "lookup_ms": 0.0,
+        "llm_ms": 7069.3
+      },
+      "route": "faq_context"
+    },
+    {
+      "ok": true,
+      "total_ms": 3362.4,
+      "stages": {
+        "route_ms": 244.0,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 3117.7
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.3,
+      "stages": {
+        "route_ms": 337.9,
+        "search_ms": 265.5,
+        "lookup_ms": 0.0,
+        "llm_ms": 4956.4
+      },
+      "route": "faq_context"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.3,
+      "stages": {
+        "route_ms": 293.2,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 4982.1
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 5076.7,
+      "stages": {
+        "route_ms": 1.4,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 5074.6
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.6,
+      "stages": {
+        "route_ms": 270.6,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 8670.0
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.2,
+      "stages": {
+        "route_ms": 757.1,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 5547.6
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.5,
+      "stages": {
+        "route_ms": 0.4,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0
+      },
+      "route": "clarification"
+    },
+    {
+      "ok": true,
+      "total_ms": 3614.6,
+      "stages": {
+        "route_ms": 0.9,
+        "search_ms": 0.4,
+        "lookup_ms": 877.1,
+        "llm_ms": 2735.3
+      },
+      "route": "external_lookup"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.5,
+      "stages": {
+        "route_ms": 274.9,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 2805.1
+      },
+      "route": "general_guidance"
+    },
+    {
+      "ok": true,
+      "total_ms": 7248.1,
+      "stages": {
+        "route_ms": 2.3,
+        "search_ms": 0.7,
+        "lookup_ms": 0.0,
+        "llm_ms": 7244.2
+      },
+      "route": "faq_context"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.7,
+      "stages": {
+        "route_ms": 244.0,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0,
+        "llm_ms": 3117.7
+      },
+      "route": "general_guidance"
+    }
+  ]
+}

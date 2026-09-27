@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shipment_tabs, shipment_header %}
+{% block title %}수출신고 자료 · {{ shipment.shipment_id }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
+{% block content %}
+  {{ shipment_header(shipment) }}
+  {{ shipment_tabs(shipment, 'document') }}
+
+  <section class="card">
+    <div class="row_between wrap">
+      <div>
+        <h2>관세사 전달용 수출신고 자료</h2>
+        <p class="muted">{{ sheet.note }}</p>
+      </div>
+      <a class="button ghost" href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}">서류 센터로</a>
+    </div>
+
+    {% if sheet.missing %}
+      <div class="alert warn">{{ missing_summary }}
+        아래에서 채운 뒤 넘기면 관세사가 다시 묻지 않습니다.</div>
+    {% else %}
+      <div class="alert ok">✓ {{ missing_summary }}</div>
+    {% endif %}
+
+    <form method="post" class="filing_form"
+          action="{{ url_for('document.save_customs_filing', shipment_id=shipment.shipment_id) }}">
+      <div class="form_grid">
+        <label class="field">
+          <span class="field_label">수출자 사업자등록번호</span>
+          <input class="text_input" type="text" name="exporter_business_no"
+                 value="{{ shipment.exporter_business_no }}" placeholder="000-00-00000"
+                 maxlength="20" data-business-no>
+          <small class="muted small">숫자 10자리. 수출신고서에 반드시 들어갑니다.</small>
+          <button type="button" class="button small ghost" data-find-ecm>통관고유부호 찾기</button>
+          <small class="muted small" data-ecm-result hidden></small>
+        </label>
+        <label class="field">
+          <span class="field_label">거래구분</span>
+          <select name="customs_trade_kind">
+            {% for code, label in sheet.trade_kinds.items() %}
+              <option value="{{ code }}" {{ 'selected' if code == sheet.trade_kind }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <small class="muted small">대부분의 유상 수출은 11입니다.</small>
+        </label>
+        <label class="field">
+          <span class="field_label">결제방법</span>
+          <select name="customs_payment_method">
+            {% for code, label in sheet.payment_methods.items() %}
+              <option value="{{ code }}" {{ 'selected' if code == sheet.payment_method }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <small class="muted small">대금을 어떻게 받는지입니다. Incoterms와 다른 항목입니다.</small>
+        </label>
+        <label class="field">
+          <span class="field_label">원산지</span>
+          <input class="text_input" type="text" name="country_of_origin"
+                 value="{{ shipment.country_of_origin }}" maxlength="60">
+        </label>
+      </div>
+      <div class="button_row">
+        <button class="button primary">저장</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>신고 자료</h2>
+    {% for section in sheet.sections %}
+      <h3 class="filing_section_title">{{ section.title }}</h3>
+      <dl class="filing_rows">
+        {% for row in section.rows %}
+          <div class="{{ 'blank' if not row.value }}">
+            <dt>{{ row.label }}</dt>
+            <dd>{{ row.value or '미입력' }}{% if row.hint %}<small class="muted">{{ row.hint }}</small>{% endif %}</dd>
+          </div>
+        {% endfor %}
+      </dl>
+    {% endfor %}
+
+    <h3 class="filing_section_title">품목 ({{ sheet.lines|length }}건)</h3>
+    <div class="table_scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th><th>HS CODE</th><th>품명</th><th>규격</th>
+            <th>수량</th><th>순중량</th><th>총중량</th><th>단가</th><th>금액</th><th>위험물</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in sheet.lines %}
+            <tr>
+              <td>{{ item.line_no }}</td>
+              <td class="mono">{{ item.hs_code or '미입력' }}</td>
+              <td>{{ item.product_description }}</td>
+              <td class="muted small">{{ item.spec }}</td>
+              <td>{{ '{:,}'.format(item.quantity) }} {{ item.unit }}</td>
+              <td>{{ '{:,.2f} kg'.format(item.net_weight_kg) if item.net_weight_kg is not none else '-' }}</td>
+              <td>{{ '{:,.2f} kg'.format(item.gross_weight_kg) }}</td>
+              <td>{{ '{:,.4f}'.format(item.unit_price) if item.unit_price is not none else '-' }}</td>
+              <td>{{ '{:,.2f}'.format(item.amount) if item.amount is not none else '-' }}</td>
+              <td class="mono small">{{ item.dangerous or '-' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# 따로 발급받은 서류. 관세사가 신고할 때 함께 첨부합니다.
+     여기가 비어 있으면 "챙길 서류가 없다"가 아니라 "아직 안 올렸다"입니다. #}
+  <section class="card">
+    <h2>함께 보내는 서류 <small class="muted">따로 발급받은 것</small></h2>
+    {% if sheet.papers %}
+      <ul class="filing_papers">
+        {% for paper in sheet.papers %}
+          <li>📎 <b>{{ paper.filename }}</b>
+            {% if paper.note %}<span class="muted">· {{ paper.note }}</span>{% endif %}
+            <span class="muted small">{{ paper.status }}</span></li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">아직 올려 두신 서류가 없습니다.
+        원산지증명서·인증서·검역증이 필요한 건이면
+        <a href="{{ url_for('document.new') }}">서류 작성 → 기타 필수 서류</a>에서 올려 주세요.</p>
+    {% endif %}
+  </section>
+
+  {% if refund.available or refund.company %}
+    <section class="card">
+      <h2>간이정액 환급 <small class="muted">관세청 환급율표</small></h2>
+      <p class="muted">{{ refund.note }}</p>
+
+      {% if refund.company %}
+        <div class="alert {{ 'ok' if refund.company.eligible else 'warn' }}">
+          {{ refund.company.name }}은(는) 간이정액 환급
+          {{ '대상입니다' if refund.company.eligible else '대상이 아닙니다' }}.
+          {% if refund.company.applied_on %}(적용 승인 {{ refund.company.applied_on }}){% endif %}
+          {% if refund.company.excluded_reason %}· {{ refund.company.excluded_reason }}{% endif %}
+        </div>
+      {% endif %}
+
+      {% if refund.rates %}
+        <div class="table_scroll">
+          <table class="table">
+            <thead><tr><th>품목</th><th>HS CODE</th><th>규격</th><th>환급액</th><th>기준</th><th>적용일</th></tr></thead>
+            <tbody>
+              {% for rate in refund.rates %}
+                <tr>
+                  <td>{{ rate.product_description }}</td>
+                  <td class="mono">{{ rate.hs_code }}</td>
+                  <td class="muted small">{{ rate.spec or '-' }}</td>
+                  <td><b>{{ rate.amount_krw }}원</b></td>
+                  <td class="muted small">{{ rate.basis or '-' }}</td>
+                  <td class="muted small">{{ rate.start_date or '-' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="row_between wrap">
+      <h2>그대로 보내기</h2>
+      <button type="button" class="button ghost" data-copy-filing>복사</button>
+    </div>
+    <p class="muted">메일이나 메신저에 붙여 넣으면 됩니다.
+      바이어에게 보낼 때는 아래에서 언어를 고르면 그 나라 말로 옮겨 드립니다.</p>
+
+    {# 번역. 숫자·금액·HS CODE는 그대로 두고 말만 옮깁니다. 계좌번호는 가린 채 보냅니다. #}
+    <div class="filing_translate">
+      <label class="filing_lang">
+        <span class="field_label">번역할 언어</span>
+        <select data-translate-language {{ 'disabled' if not translate_ready }}>
+          <option value="">원문 (한국어)</option>
+          {% for language in languages if language.code != 'ko' %}
+            <option value="{{ language.code }}">{{ language.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="button" class="button primary" data-translate-run
+              {{ 'disabled' if not translate_ready }}>번역하기</button>
+      <button type="button" class="link_button" data-translate-original hidden>원문 보기</button>
+      <p class="filing_translate_note muted small" data-translate-note>
+        {% if translate_ready %}
+          금액·수량·HS CODE·날짜는 바꾸지 않고 말만 옮깁니다. 보내기 전에 한 번 읽어 보세요.
+        {% else %}
+          번역은 AI 키(AI_API_KEY)가 있어야 씁니다. .env에 키를 넣으면 바로 됩니다.
+        {% endif %}
+      </p>
+    </div>
+
+    <pre class="filing_text" data-filing-text>{{ sheet_text }}</pre>
+  </section>
+
+  <script>
+    // 사업자등록번호로 통관고유부호를 관세청에서 찾아 줍니다.
+    document.querySelector("[data-find-ecm]")?.addEventListener("click", async (event) => {
+      const input = document.querySelector("[data-business-no]");
+      const slot = document.querySelector("[data-ecm-result]");
+      const button = event.currentTarget;
+      slot.hidden = false;
+      slot.textContent = "찾는 중…";
+      button.disabled = true;
+      try {
+        const url = "{{ url_for('document.api_clearance_code', shipment_id=shipment.shipment_id) }}"
+          + "?business_no=" + encodeURIComponent(input.value);
+        const body = await (await fetch(url)).json();
+        if (body.success && body.data.length) {
+          const row = body.data[0];
+          slot.textContent = `통관고유부호 ${row.clearance_code} · ${row.name}`;
+        } else {
+          slot.textContent = body.message || "관세청에 등록된 통관고유부호를 찾지 못했습니다.";
+        }
+      } catch (error) {
+        slot.textContent = "조회하지 못했습니다. 잠시 후 다시 눌러주세요.";
+      }
+      button.disabled = false;
+    });
+
+    // 번역. 원문은 그대로 두고 화면의 글만 바꿉니다. "원문 보기"로 되돌립니다.
+    (() => {
+      const box = document.querySelector("[data-filing-text]");
+      const select = document.querySelector("[data-translate-language]");
+      const run = document.querySelector("[data-translate-run]");
+      const back = document.querySelector("[data-translate-original]");
+      const note = document.querySelector("[data-translate-note]");
+      if (!box || !select || !run) return;
+
+      const original = box.textContent;
+      const url = "{{ url_for('document.api_translate_filing', shipment_id=shipment.shipment_id) }}";
+
+      function showOriginal() {
+        box.textContent = original;
+        box.removeAttribute("lang");
+        back.hidden = true;
+        select.value = "";
+        note.textContent = "원문(한국어)을 보고 있습니다.";
+      }
+
+      async function translate() {
+        const code = select.value;
+        if (!code) { showOriginal(); return; }
+        run.disabled = true;
+        const label = run.textContent;
+        run.textContent = "옮기는 중…";
+        note.textContent = "옮기는 중입니다. 글이 길면 십여 초 걸립니다.";
+        const answer = await window.Forwardus.postJson(url, { text: original, language: code }, 90000);
+        run.disabled = false;
+        run.textContent = label;
+        if (!answer.success) {
+          note.textContent = answer.message || "옮기지 못했습니다. 잠시 후 다시 눌러 주세요.";
+          return;
+        }
+        box.textContent = answer.data.text;
+        box.setAttribute("lang", answer.data.code);
+        back.hidden = false;
+        note.textContent = `${answer.data.language}로 옮겼습니다. 숫자·금액은 원문 그대로인지 확인해 주세요.`;
+      }
+
+      run.addEventListener("click", translate);
+      back.addEventListener("click", showOriginal);
+    })();
+
+    document.querySelector("[data-copy-filing]")?.addEventListener("click", async (event) => {
+      const text = document.querySelector("[data-filing-text]").textContent;
+      const button = event.currentTarget;
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "복사했습니다";
+      } catch (error) {
+        // 클립보드를 막아 둔 환경에서는 사람이 직접 고르도록 선택해 줍니다.
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector("[data-filing-text]"));
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        button.textContent = "직접 복사해주세요";
+      }
+      setTimeout(() => { button.textContent = "복사"; }, 2000);
+    });
+  </script>
+{% endblock %}

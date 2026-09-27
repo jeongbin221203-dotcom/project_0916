@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "tracking/_container.html" import container_result %}
+{% block title %}컨테이너·B/L 조회{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/tracking.css') }}">{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Tracking</p>
+      <h1>컨테이너 · B/L 조회</h1>
+      <p class="muted">관세청 UNI-PASS에 바로 물어봅니다. Shipment를 만들지 않아도 됩니다.</p>
+    </div>
+  </div>
+
+  <section class="card">
+    <form method="get" class="ctr_form">
+      <label class="field">
+        <span class="field_label">번호</span>
+        <input class="text_input" type="text" name="q" value="{{ query }}" maxlength="30"
+               placeholder="B/L번호 · 수출신고번호 15자리 · 화물관리번호" autocomplete="off" autofocus>
+      </label>
+      <label class="field ctr_year">
+        <span class="field_label">입항년도 <small class="muted">(수입 B/L만)</small></span>
+        <input class="text_input" type="text" name="year" value="{{ bl_year }}" maxlength="4"
+               inputmode="numeric" placeholder="2026" autocomplete="off">
+      </label>
+      <button class="button primary">조회</button>
+    </form>
+
+    <div class="ctr_help">
+      <p class="muted small"><b>어떤 번호를 넣으면 되나요</b></p>
+      <ul class="ctr_help_list">
+        <li><b>수출신고번호</b> (숫자 15자리) — 실제로 배에 실렸는지와 적재의무기한을 봅니다.</li>
+        <li><b>B/L번호</b> — 수출은 선적 여부를, 수입은 통관 진행과 컨테이너를 봅니다.
+          수입은 입항년도도 함께 넣어야 합니다.</li>
+        <li><b>화물관리번호</b> (15~19자리) — 통관 진행과 컨테이너 번호·봉인번호를 봅니다.</li>
+        <li><b>컨테이너번호</b>만으로는 조회되지 않습니다. 관세청이 그 번호를 입력으로 받지 않습니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>조회 결과</h2>
+    {{ container_result(result) }}
+  </section>
+{% endblock %}

@@ -1,0 +1,12 @@
+{
+ "_note": "Mock carrier ETA revision applied at in_transit; bucket chosen by shipment_id hash.",
+ "delay_days_by_bucket": [
+  0,
+  4,
+  0,
+  2,
+  0,
+  0,
+  3
+ ]
+}

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ForwardUs">
+  <!-- 기본 로고 마크. 배·비행기·지구를 두른 F입니다.
+       app/static/images/logo.png 를 올려 두면 그쪽(전체 로고)을 씁니다. -->
+  <defs>
+    <linearGradient id="fw_deep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6ae0"/><stop offset="1" stop-color="#16307e"/>
+    </linearGradient>
+    <linearGradient id="fw_sky" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#1f8bff"/><stop offset="1" stop-color="#63b3ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 지구를 두르는 궤도 -->
+  <path d="M50 17c6 6 7 15 2 22S36 51 24 51 4 45 4 36" fill="none"
+        stroke="url(#fw_sky)" stroke-width="3.4" stroke-linecap="round" opacity=".75"/>
+  <path d="M6 28C9 19 18 12 29 12c8 0 15 3 19 8" fill="none"
+        stroke="url(#fw_sky)" stroke-width="3.4" stroke-linecap="round" opacity=".45"/>
+
+  <!-- F 모양의 잎 -->
+  <path d="M20 46c-3-12 1-22 11-27 5-2 10-3 14-2-3 4-7 7-12 9 4 0 8 0 11-1
+           -2 5-7 9-13 11-3 1-6 1-8 1-1 3-2 6-3 9z" fill="url(#fw_deep)"/>
+
+  <!-- 비행기 -->
+  <path d="M40 10l10-3-6 7 4 1-2 3-5-2-4 4-1-4 4-6z" fill="url(#fw_sky)"/>
+
+  <!-- 컨테이너선 -->
+  <g fill="#16307e">
+    <rect x="35" y="36" width="4.4" height="4.4"/>
+    <rect x="40" y="36" width="4.4" height="4.4"/>
+    <rect x="35" y="31.2" width="4.4" height="4.4"/>
+    <path d="M31 41h25l-4 7c-1 2-3 3-5 3H37c-2 0-4-1-5-3z"/>
+  </g>
+  <!-- 물결 -->
+  <path d="M26 55c4-2 7-2 11 0s7 2 11 0" fill="none"
+        stroke="url(#fw_sky)" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

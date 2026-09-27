@@ -1,0 +1,67 @@
+  {# 실시간 환율 센터. 사이드바 [💱 환율]로 엽니다. 시세표와 다국가 계산기 두 탭. (fx_center.js) #}
+  <div class="fx_modal" data-fx-modal hidden>
+    <div class="fx_backdrop" data-fx-close></div>
+    <section class="fx_box" role="dialog" aria-modal="true" aria-labelledby="fx_title">
+      <header class="fx_head">
+        <div>
+          <h2 id="fx_title">💱 실시간 환율 센터</h2>
+          <p class="fx_meta" data-fx-meta>환율을 받아오는 중입니다…</p>
+        </div>
+        <button type="button" class="fx_close" data-fx-close aria-label="닫기">×</button>
+      </header>
+      <div class="fx_tabs" role="tablist" aria-label="환율 센터">
+        <button role="tab" type="button" class="active" aria-selected="true" data-fx-tab="board"
+                aria-controls="fx_panel_board">📋 환율 시세표</button>
+        <button role="tab" type="button" aria-selected="false" data-fx-tab="calc"
+                aria-controls="fx_panel_calc">🧮 다국가 환율 계산기</button>
+      </div>
+
+      <div class="fx_panel" id="fx_panel_board" role="tabpanel" data-fx-panel="board">
+        <label class="fx_search">
+          <span aria-hidden="true">🔎</span>
+          <input type="search" data-fx-search placeholder="국가·통화 검색 (예: 멕시코, MXN, 유로)"
+                 aria-label="국가·통화 검색" autocomplete="off">
+        </label>
+        <div class="fx_table_wrap">
+          <table class="fx_table">
+            <thead><tr>
+              <th>통화</th><th>통화명</th><th class="num">매매기준율</th><th class="num">전일 대비</th>
+              <th class="num">받을 때<small>TTB</small></th><th class="num">보낼 때<small>TTS</small></th>
+            </tr></thead>
+            <tbody data-fx-rows></tbody>
+          </table>
+        </div>
+        <p class="fx_note" data-fx-note></p>
+      </div>
+
+      <div class="fx_panel" id="fx_panel_calc" role="tabpanel" data-fx-panel="calc" hidden>
+        <div class="fx_calc">
+          <label class="fx_field fx_amount_field">
+            <span>금액</span>
+            <input type="text" inputmode="decimal" data-fx-amount value="1,000" aria-label="금액">
+          </label>
+          <div class="fx_pair">
+            <label class="fx_field"><span>기준 통화 (From)</span><select data-fx-from></select></label>
+            <button type="button" class="fx_swap_btn" data-fx-swap aria-label="기준·대상 통화 바꾸기"
+                    title="바꾸기">⇄</button>
+            <label class="fx_field"><span>대상 통화 (To)</span><select data-fx-to></select></label>
+          </div>
+          <fieldset class="fx_mode">
+            <legend>적용 환율</legend>
+            <label><input type="radio" name="fx_mode" value="deal" data-fx-mode checked>
+              <b>매매기준율</b><small>계약·견적 기준</small></label>
+            <label><input type="radio" name="fx_mode" value="ttb" data-fx-mode>
+              <b>수출 대금을 원화로 받을 때</b><small>전신환 매입률 TTB</small></label>
+            <label><input type="radio" name="fx_mode" value="tts" data-fx-mode>
+              <b>외화로 송금 보낼 때</b><small>전신환 매도율 TTS</small></label>
+          </fieldset>
+          <label class="fx_field fx_spread" data-fx-spread-box hidden>
+            <span>추정 스프레드 (매매기준율 ±%)</span>
+            <input type="text" inputmode="decimal" maxlength="5" data-fx-spread value="1" aria-label="추정 스프레드 (0~10%)">
+          </label>
+          <output class="fx_result" data-fx-result aria-live="polite">—</output>
+          <p class="fx_applied" data-fx-applied></p>
+        </div>
+      </div>
+    </section>
+  </div>

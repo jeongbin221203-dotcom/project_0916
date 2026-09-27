@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}새 운송 계획{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planning.css') }}">{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Shipment Planning</p>
+      <h1>새 운송 계획</h1>
+      <p class="muted">단계는 순서와 관계없이 자유롭게 이동할 수 있습니다. 필수 항목은 Shipment 생성 시 한 번에 확인합니다.</p>
+    </div>
+  </div>
+
+  <ol class="stepper" data-stepper>
+    <li data-step-tab="1" class="active"><span>1</span>Route</li>
+    <li data-step-tab="2"><span>2</span>Incoterms</li>
+    <li data-step-tab="3"><span>3</span>Cargo</li>
+    <li data-step-tab="4"><span>4</span>Schedule</li>
+    <li data-step-tab="5"><span>5</span>확인</li>
+  </ol>
+
+  <div class="form_error" data-form-error hidden></div>
+
+  <form id="planning_form" novalidate>
+    {# Step 1 — Route Setup #}
+    <section class="card step" data-step="1">
+      <div class="route_layout">
+        <div class="calendar_panel">
+          <label class="field_label">출발 희망일</label>
+          <div class="calendar" data-calendar></div>
+          <p class="selected_date">선택: <b data-selected-date>-</b></p>
+        </div>
+        <div class="route_fields">
+          <label class="field">
+            <span class="field_label">견적명</span>
+            <input type="text" name="project_name" maxlength="200" placeholder="예: 10월 LA 화장품 출하" required>
+          </label>
+
+          <div class="field">
+            <span class="field_label">운송 모드</span>
+            <div class="segmented" role="radiogroup" data-toggle="transport_mode">
+              <button type="button" data-value="SEA" class="active" aria-pressed="true">🚢 SEA</button>
+              <button type="button" data-value="AIR" aria-pressed="false">✈️ AIR</button>
+            </div>
+          </div>
+
+          <div class="field" data-sea-only>
+            <span class="field_label">해상 운송 방식</span>
+            <div class="segmented" role="radiogroup" data-toggle="sea_mode">
+              <button type="button" data-value="FCL" class="active" aria-pressed="true">FCL <small>컨테이너 단독</small></button>
+              <button type="button" data-value="LCL" aria-pressed="false">LCL <small>혼재</small></button>
+            </div>
+          </div>
+
+          <div class="field autocomplete" data-autocomplete="origin">
+            <span class="field_label">출발지 (국내 <span data-kind-label>항구</span>)</span>
+            <input type="text" autocomplete="off" placeholder="부산, KRPUS, 인천…" data-ac-input>
+            <ul class="ac_list" data-ac-list hidden></ul>
+          </div>
+
+          <div class="field autocomplete" data-autocomplete="destination">
+            <span class="field_label">도착지 (해외 <span data-kind-label>항구</span>)</span>
+            <input type="text" autocomplete="off" placeholder="Los Angeles, USLAX, 상하이…" data-ac-input>
+            <ul class="ac_list" data-ac-list hidden></ul>
+          </div>
+
+          <label class="field">
+            <span class="field_label">Buyer 요청 도착일 <small class="muted">(선택 · 납기 체크에 사용)</small></span>
+            <input type="date" name="buyer_required_date">
+          </label>
+        </div>
+      </div>
+      <div class="step_actions"><span></span><button type="button" class="button primary" data-next>다음</button></div>
+    </section>
+
+    {# Step 2 — Incoterms #}
+    <section class="card step" data-step="2" hidden>
+      <h2>Incoterms 선택</h2>
+      <p class="muted">비용과 위험이 Buyer에게 넘어가는 지점을 정합니다. 항공 운송에서는 FOB·CFR·CIF 대신 FCA·CPT·CIP를 사용합니다.</p>
+      <div class="incoterm_grid">
+        {% for term in options.incoterms %}
+          <label class="incoterm_card" data-incoterm="{{ term.code }}" {% if term.sea_only %}data-sea-only-term{% endif %}>
+            <input type="radio" name="incoterms" value="{{ term.code }}">
+            <b>{{ term.code }}</b>
+            <span>{{ term.label }}</span>
+            <small>위험 이전: {{ term.risk }}</small>
+            <small>수출자 부담: {{ term.seller_cost }}</small>
+          </label>
+        {% endfor %}
+      </div>
+      <div class="step_actions">
+        <button type="button" class="button ghost" data-prev>이전</button>
+        <button type="button" class="button primary" data-next>다음</button>
+      </div>
+    </section>
+
+    {# Step 3 — Cargo #}
+    <section class="card step" data-step="3" hidden>
+      <h2>화물 정보</h2>
+      <div class="cargo_layout">
+        <div class="form_grid">
+          <label class="field span2">
+            <span class="field_label">품명 (Product Description)</span>
+            <input type="text" name="product_description" maxlength="300" placeholder="예: Skin care cream 50ml">
+          </label>
+          <div class="field autocomplete span2" data-autocomplete="hs_code">
+            <span class="field_label">HS CODE <small class="muted">(선택)</small></span>
+            <input type="text" name="hs_code" autocomplete="off" placeholder="3304.99 또는 화장품" data-ac-input>
+            <ul class="ac_list" data-ac-list hidden></ul>
+          </div>
+          <label class="field">
+            <span class="field_label">포장 유형</span>
+            <select name="package_type">
+              {% for key, label in options.package_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span class="field_label">수량 (Quantity)</span>
+            <input type="number" name="quantity" min="1" step="1" inputmode="numeric" data-calc>
+          </label>
+          <label class="field">
+            <span class="field_label">가로 Length (cm)</span>
+            <input type="number" name="length_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+          </label>
+          <label class="field">
+            <span class="field_label">세로 Width (cm)</span>
+            <input type="number" name="width_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+          </label>
+          <label class="field">
+            <span class="field_label">높이 Height (cm)</span>
+            <input type="number" name="height_cm" min="0" step="0.1" inputmode="decimal" data-calc>
+          </label>
+          <label class="field">
+            <span class="field_label">포장당 총중량 (kg)</span>
+            <input type="number" name="weight_per_package_kg" min="0" step="0.01" inputmode="decimal" data-calc>
+          </label>
+          <label class="field">
+            <span class="field_label">총 순중량 Net Weight (kg) <small class="muted">(선택)</small></span>
+            <input type="number" name="net_weight_kg" min="0" step="0.01" inputmode="decimal">
+          </label>
+          <div class="field">
+            <span class="field_label">Invoice Value</span>
+            <div class="input_group">
+              <select name="currency">{% for c in options.currencies %}<option>{{ c }}</option>{% endfor %}</select>
+              <input type="number" name="invoice_value" min="0" step="0.01" inputmode="decimal">
+            </div>
+          </div>
+        </div>
+        <aside class="calc_panel" data-calc-panel>
+          <p class="eyebrow">자동 계산 <span class="badge source_calculated">Calculated</span></p>
+          <dl>
+            <div><dt>Total CBM</dt><dd data-metric="total_cbm">-</dd></div>
+            <div><dt>Total Weight</dt><dd data-metric="total_weight_kg">-</dd></div>
+            <div data-metric-sea><dt>Revenue Ton</dt><dd data-metric="revenue_ton">-</dd></div>
+            <div data-metric-fcl><dt>Container</dt><dd data-metric="container">-</dd></div>
+            <div data-metric-air><dt>Volume Weight</dt><dd data-metric="volume_weight_kg">-</dd></div>
+            <div data-metric-air><dt>Chargeable Weight</dt><dd data-metric="chargeable_weight_kg">-</dd></div>
+          </dl>
+          <p class="muted small" data-calc-message>치수·수량·중량을 입력하면 계산됩니다.</p>
+        </aside>
+      </div>
+      <div class="step_actions">
+        <button type="button" class="button ghost" data-prev>이전</button>
+        <button type="button" class="button primary" data-next>다음</button>
+      </div>
+    </section>
+
+    {# Step 4 — Schedule #}
+    <section class="card step" data-step="4" hidden>
+      <div class="row_between wrap">
+        <h2>Schedule 선택</h2>
+        <div class="segmented small" data-sort>
+          {% for key, label in options.sort_options.items() %}
+            <button type="button" data-value="{{ key }}" class="{{ 'active' if loop.first }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      <p class="muted" data-schedule-meta></p>
+      <div class="schedule_list" data-schedule-list></div>
+      <div class="step_actions">
+        <button type="button" class="button ghost" data-prev>이전</button>
+        <button type="button" class="button primary" data-next>다음</button>
+      </div>
+    </section>
+
+    {# Step 5 — Parties & Confirm #}
+    <section class="card step" data-step="5" hidden>
+      <h2>수출자·Buyer 정보</h2>
+      <div class="form_grid">
+        <label class="field"><span class="field_label">수출자(Exporter)명</span><input type="text" name="exporter_name" maxlength="200"></label>
+        <label class="field"><span class="field_label">수출자 주소</span><input type="text" name="exporter_address" maxlength="500"></label>
+        <label class="field"><span class="field_label">Buyer(Consignee)명</span><input type="text" name="buyer_name" maxlength="200"></label>
+        <label class="field"><span class="field_label">Buyer 국가</span><input type="text" name="buyer_country" maxlength="100" placeholder="비워두면 도착지 국가"></label>
+        <label class="field"><span class="field_label">Buyer 주소</span><input type="text" name="buyer_address" maxlength="500"></label>
+        <label class="field"><span class="field_label">Buyer 이메일</span><input type="email" name="buyer_email" maxlength="200"></label>
+        <label class="field span2"><span class="field_label">Notify Party</span><input type="text" name="notify_party" maxlength="300" placeholder="SAME AS CONSIGNEE"></label>
+      </div>
+      <h3>요약</h3>
+      <dl class="summary_list" data-summary></dl>
+      <div class="step_actions">
+        <button type="button" class="button ghost" data-prev>이전</button>
+        <button type="submit" class="button primary" data-submit>Shipment 생성</button>
+      </div>
+    </section>
+  </form>
+{% endblock %}
+{% block scripts %}
+  <script>
+    window.FORWARDUS_URLS = {
+      locations: "{{ url_for('planning.api_locations') }}",
+      hsCodes: "{{ url_for('planning.api_hs_codes') }}",
+      cargo: "{{ url_for('planning.api_cargo') }}",
+      schedules: "{{ url_for('planning.api_schedules') }}",
+      create: "{{ url_for('planning.api_create_shipment') }}"
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/planning.js') }}"></script>
+{% endblock %}

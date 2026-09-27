@@ -1,0 +1,102 @@
+"""사진 속 계좌번호를 지웁니다. 실제 OCR로 봅니다. (인터넷을 쓰지 않습니다)
+
+이용자가 사진으로 올려도 계좌번호는 OpenAI로 나가면 안 됩니다. 그림에 번호를
+그려 넣고, 지운 그림을 OCR로 다시 읽어 번호가 사라졌는지 봅니다. 오퍼 번호·
+날짜·금액은 남아 있어야 합니다. 그걸 지우면 AI가 서류를 못 읽습니다.
+"""
+
+from __future__ import annotations
+
+import io
+
+import pytest
+
+from app.processors import bank_redaction, ocr
+
+
+def _ocr_ready() -> bool:
+    """이 시험을 돌릴 수 있는 OCR이 있는지.
+
+    한글 이름표("입금계좌")를 읽어야 하고, 영문 오퍼 번호도 틀리지 않아야 합니다.
+    Tesseract는 한글 데이터(kor)가 있어야 그 둘이 됩니다. 영어만 깔린 곳에서는
+    "DS01227"을 "HM"으로 읽는 일이 있어, 실패가 아니라 건너뜁니다.
+    """
+
+    if ocr.available():
+        return bool(ocr.status().get("korean"))
+    return bank_redaction.ocr_available()        # RapidOCR만 있는 경우
+
+
+pytestmark = pytest.mark.skipif(not _ocr_ready(),
+                                reason="한글까지 읽는 OCR이 없습니다. python data/setup_tessdata.py")
+
+LINES = [
+    "OFFER SHEET",
+    "Offer No. DS01227 Date: 2026-12-27",
+    "Hair Shampoo 500ml 2,100 PCS US$ 1.80 US$ 3,780.00",
+    "TOTAL AMOUNT : USD 11,190.00",
+    "Bank: Shinhan Bank, SWIFT SHBKKRSE, A/C 100-200-300400",
+    # 이름표 없이 번호만 있어도 지워야 합니다. (RapidOCR는 한글 이름표를 못 읽습니다)
+    "110-123-456789",
+    "Validity: 2027-01-31",
+]
+
+
+def _page(lines=LINES) -> bytes:
+    from PIL import Image, ImageDraw, ImageFont
+
+    image = Image.new("RGB", (1400, 80 + 70 * len(lines)), "white")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype(r"C:\Windows\Fonts\arial.ttf", 30)
+    for index, line in enumerate(lines):
+        draw.text((40, 40 + 70 * index), line, font=font, fill="black")
+    buffer = io.BytesIO()
+    image.save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+def _text_of(png: bytes) -> str:
+    from PIL import Image
+
+    rows = bank_redaction._read(Image.open(io.BytesIO(png)))
+    # 줄마다 (자리, 글자, 자신감[, 낱말]). Tesseract는 낱말 목록이 더 붙습니다.
+    return "\n".join(row[1] for row in rows)
+
+
+@pytest.fixture(scope="module")
+def masked():
+    return bank_redaction.redact_image(_page())
+
+
+def test_지우기_전에는_번호가_읽힌다():
+    """시험 그림이 제대로인지부터. 처음부터 안 읽히면 아래 시험이 의미가 없습니다."""
+
+    before = _text_of(_page()).replace(" ", "")
+    assert "100-200-300400" in before and "110-123-456789" in before
+
+
+def test_계좌번호와_SWIFT가_지워진다(masked):
+    after = _text_of(masked["image"])
+    digits = "".join(ch for ch in after if ch.isdigit())
+
+    assert "100200300400" not in digits and "110123456789" not in digits
+    assert "SHBKKRSE" not in after.replace(" ", "")
+    assert masked["found"] >= 3
+
+
+def test_오퍼_번호와_날짜와_금액은_남는다(masked):
+    after = _text_of(masked["image"]).replace(" ", "")
+
+    for kept in ("DS01227", "2026-12-27", "3,780.00", "11,190.00", "2027-01-31"):
+        assert kept in after, kept
+
+
+def test_OCR이_잘못_읽은_숫자_줄은_통째로_지운다():
+    """칸을 넓게 띄운 줄을 이 OCR은 "H 00 00 0 0 00"으로 읽습니다(자신감 0.69).
+    그 줄에 계좌번호가 있어도 우리 규칙은 못 찾습니다. 그래서 줄째 지웁니다."""
+
+    garbled = "Hair Shampoo 500ml   2,100 PCS   A/C 100-200-300400   US$ 3,780.00"
+    result = bank_redaction.redact_image(_page([garbled]))
+
+    digits = "".join(ch for ch in _text_of(result["image"]) if ch.isdigit())
+    assert "300400" not in digits and "100200" not in digits

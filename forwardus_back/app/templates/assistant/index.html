@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% from "_macros.html" import source_badge, shipment_tabs, shipment_header %}
+{% block title %}AI Assistant · {{ shipment.shipment_id }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}">{% endblock %}
+{% block content %}
+  {{ shipment_header(shipment) }}
+  {{ shipment_tabs(shipment, 'assistant') }}
+
+  <section class="card ask_card">
+    <p class="eyebrow">AI Export Assistant</p>
+    <h2>이 Shipment에 대해 질문하기</h2>
+    <p class="muted small">답변은 Shipment 데이터, 계산 엔진 결과, 규제 데이터(Mock)만 사용해 규칙 기반으로 구성됩니다. 수출 가능 여부나 인증 면제를 단정하지 않습니다.</p>
+    <form class="ask_form" data-ask-form data-url="{{ url_for('assistant.api_ask', shipment_id=shipment.shipment_id) }}">
+      <input type="text" name="question" maxlength="500" placeholder="예: 이 화장품을 미국으로 수출하려면 무엇을 확인해야 해?" required>
+      <button class="button primary">질문</button>
+    </form>
+    <div class="chip_row">
+      <button type="button" class="chip" data-example>수출하려면 무엇을 확인해야 해?</button>
+      <button type="button" class="chip" data-example>물류비 구성이 어떻게 돼?</button>
+      <button type="button" class="chip" data-example>ETA가 지연되면 어떻게 해?</button>
+      <button type="button" class="chip" data-example>운전자금이 얼마나 필요해?</button>
+    </div>
+    <div class="answer" data-answer hidden></div>
+  </section>
+
+  <div class="grid two">
+    <section class="card" id="readiness">
+      <div class="row_between"><h2>① 수출 가능성 판단</h2>{% if readiness.source %}{{ source_badge(readiness.source) }}{% endif %}</div>
+      {% if readiness.available %}
+        {% for line in readiness.lines %}<p>{{ line }}</p>{% endfor %}
+        <ul class="check_list">
+          {% for item in readiness['items'] %}
+            <li class="req_{{ item.status }}">
+              <span class="badge req_{{ item.status }}">{{ item.status_label }}</span>
+              <div><b>{{ item.title }}</b><span class="muted small">{{ item.detail }}</span></div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">{{ readiness.message }}</p>
+      {% endif %}
+    </section>
+
+    <section class="card" id="cost">
+      <div class="row_between"><h2>② 비용·수익성 해석</h2><span class="badge source_calculated">Calculated</span></div>
+      {% if cost.available %}
+        <div class="share_bar" role="img" aria-label="비용 구성">
+          {% for s in cost.shares %}<span class="seg seg{{ loop.index }}" style="width: {{ s.share }}%" title="{{ s.category }} {{ s.share }}%"></span>{% endfor %}
+        </div>
+        <ul class="legend">
+          {% for s in cost.shares %}<li><i class="seg{{ loop.index }}"></i>{{ s.category }} <b>{{ s.total_krw|won }}</b> <span class="muted">{{ s.share }}%</span></li>{% endfor %}
+        </ul>
+      {% endif %}
+      {% for line in cost.lines %}<p>{{ line }}</p>{% endfor %}
+    </section>
+
+    <section class="card" id="exception">
+      <div class="row_between"><h2>③ 예외·리스크 대응</h2>{% if exception.has_exception %}<span class="badge warn">Delay</span>{% else %}<span class="badge ok">정상</span>{% endif %}</div>
+      {% for line in exception.lines %}<p>{{ line }}</p>{% endfor %}
+      {% if exception.actions %}
+        <p><b>확인 권장사항</b></p>
+        <ol class="action_list">{% for a in exception.actions %}<li>{{ a }}</li>{% endfor %}</ol>
+      {% endif %}
+    </section>
+
+    <section class="card" id="cashflow">
+      <div class="row_between"><h2>④ 결제·자금 관리</h2><span class="badge source_calculated">Calculated</span></div>
+      {% for line in cashflow.lines %}<p>{{ line }}</p>{% endfor %}
+      {% if cashflow.result %}
+        <table class="table compact">
+          <thead><tr><th>일자</th><th>항목</th><th class="num">금액</th><th class="num">누적</th><th></th></tr></thead>
+          <tbody>
+            {% for p in cashflow.result.timeline %}
+              <tr>
+                <td>{{ p.due_date|d }}</td>
+                <td>{{ p.label }} {% if p.source != 'manual' %}{{ source_badge(p.source) }}{% endif %}</td>
+                <td class="num {{ 'neg' if p.amount_krw < 0 else 'pos' }}">{{ '{:+,}'.format(p.amount_krw) }}</td>
+                <td class="num {{ 'neg' if p.balance_krw < 0 }}">{{ '{:,}'.format(p.balance_krw) }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('assistant.delete_payment', shipment_id=shipment.shipment_id, payment_id=p.id) }}">
+                    <button class="icon_button" aria-label="삭제">×</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      <form method="post" action="{{ url_for('assistant.add_payment', shipment_id=shipment.shipment_id) }}" class="payment_form">
+        <input type="text" name="label" maxlength="100" placeholder="항목 (예: 생산대금)" required>
+        <select name="direction"><option value="out">지출</option><option value="in">입금</option></select>
+        <input type="number" name="amount_krw" min="1" step="1" placeholder="금액(원)" required>
+        <input type="date" name="due_date" required>
+        <button class="button ghost small">추가</button>
+      </form>
+      <form method="post" action="{{ url_for('assistant.add_payment', shipment_id=shipment.shipment_id) }}">
+        <input type="hidden" name="preset" value="logistics">
+        <button class="link_button">+ 수출자 부담 물류비를 ETD 일자로 추가</button>
+      </form>
+    </section>
+  </div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/assistant.js') }}"></script>{% endblock %}

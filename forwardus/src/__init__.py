@@ -1,2 +1,0 @@
-"""Forwardus application package."""
-

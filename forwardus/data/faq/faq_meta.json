@@ -1,0 +1,36 @@
+{
+  "kb_version": "332c384037ae",
+  "count": 100,
+  "updated_on": "2026-09-24",
+  "categories": {
+    "수출 준비·거래처 검증": 10,
+    "견적·계약·Incoterms": 15,
+    "결제·신용장·대금 회수": 15,
+    "HS 코드·수출신고·통관": 15,
+    "원산지·FTA·인증·수출통제": 15,
+    "운송·포워딩·보험·선적 일정": 15,
+    "무역서류 작성·불일치·정정": 10,
+    "클레임·반품·사후관리": 5
+  },
+  "thresholds": {
+    "direct": 0.3,
+    "direct_high_risk": 0.3,
+    "margin": 0.0,
+    "coverage": 0.6,
+    "similarity": 0.7,
+    "context": 0.25,
+    "context_coverage": 0.4,
+    "context_similarity": 0.5
+  },
+  "tuning": {
+    "positives": 502,
+    "negatives": 30,
+    "direct_right": 0.5598,
+    "direct_wrong": 0.002,
+    "false_direct_out_of_scope": 0,
+    "max_wrong_allowed": 0.02,
+    "max_false_direct_allowed": 0
+  },
+  "approved": 0,
+  "approval_version": "0"
+}

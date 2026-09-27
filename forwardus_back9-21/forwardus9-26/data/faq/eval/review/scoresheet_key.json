@@ -1,0 +1,74 @@
+[
+  {
+    "no": 1,
+    "id": "FW-001",
+    "A": "after",
+    "mapping": {
+      "B": "after",
+      "A": "before"
+    }
+  },
+  {
+    "no": 2,
+    "id": "FW-009",
+    "A": "after",
+    "mapping": {
+      "B": "after",
+      "A": "before"
+    }
+  },
+  {
+    "no": 3,
+    "id": "FW-018",
+    "A": "after",
+    "mapping": {
+      "B": "after",
+      "A": "before"
+    }
+  },
+  {
+    "no": 4,
+    "id": "FW-027",
+    "A": "before",
+    "mapping": {
+      "A": "before",
+      "B": "after"
+    }
+  },
+  {
+    "no": 5,
+    "id": "FW-036",
+    "A": "before",
+    "mapping": {
+      "A": "before",
+      "B": "after"
+    }
+  },
+  {
+    "no": 6,
+    "id": "FW-044",
+    "A": "before",
+    "mapping": {
+      "A": "before",
+      "B": "after"
+    }
+  },
+  {
+    "no": 7,
+    "id": "FW-053",
+    "A": "before",
+    "mapping": {
+      "A": "before",
+      "B": "after"
+    }
+  },
+  {
+    "no": 8,
+    "id": "FW-062",
+    "A": "before",
+    "mapping": {
+      "A": "before",
+      "B": "after"
+    }
+  }
+]

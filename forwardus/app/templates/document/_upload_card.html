@@ -1,0 +1,58 @@
+{# 올린 증빙 서류 한 장. 세 화면이 함께 씁니다.
+   (서류 센터 · 수출요건 확인 · 제출 전 점검)
+
+   왜 조각으로 뺐나
+     같은 카드가 center.html과 requirements.html에 **거의 같은 코드로 두 벌**
+     있었습니다. 한쪽만 고치면 화면마다 다르게 보이고, 어느 쪽이 맞는지
+     알 수 없습니다.
+
+   쓰는 법
+     {% raw %}{% for doc in uploads %}{% include "document/_upload_card.html" %}{% endfor %}{% endraw %}
+     반복문의 `doc` 을 그대로 씁니다. include는 바깥 값을 그대로 보기 때문입니다.
+
+   부제(작은 글씨)
+     두 벌이 서로 다른 것을 적고 있었습니다. 센터는 협정 이름을, 요건 화면은
+     서류 이름과 파일 크기를 적었습니다. 둘 다 쓸모 있어 **합쳐서** 적습니다.
+     빈 것은 저절로 빠집니다. #}
+<article class="upload_card status_{{ doc.review_status }}">
+  <div class="row_between wrap">
+    <div>
+      <b>{{ doc.filename }}</b>
+      <span class="muted small">
+        {%- set bits = [] -%}
+        {%- if doc.requirement_title %}{% set _ = bits.append(doc.requirement_title) %}{% endif -%}
+        {%- if doc.agreement %}{% set _ = bits.append(doc.agreement) %}{% endif -%}
+        {%- if doc.size_bytes %}{% set _ = bits.append('{:,.0f} KB'.format(doc.size_bytes / 1024)) %}{% endif -%}
+        {%- if doc.uploaded_at %}{% set _ = bits.append(doc.uploaded_at.strftime('%Y-%m-%d %H:%M')) %}{% endif -%}
+        {{ bits | join(' · ') }}
+      </span>
+    </div>
+    <span class="badge review_{{ doc.review_status }}">{{ doc.review_label }}</span>
+  </div>
+
+  {% if doc.review_summary %}
+    <p class="upload_summary">{{ doc.review_summary }}</p>
+  {% endif %}
+
+  {% if doc.review_findings %}
+    <ul class="finding_list">
+      {% for finding in doc.review_findings %}
+        <li class="verdict_{{ finding.verdict }}">
+          <b>{{ finding.label }}</b>
+          <span>{{ finding.detail }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <div class="button_row">
+    <form method="post"
+          action="{{ url_for('document.analyze_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
+      <button class="button small ghost">다시 분석</button>
+    </form>
+    <form method="post"
+          action="{{ url_for('document.delete_requirement', shipment_id=shipment.shipment_id, document_id=doc.id) }}">
+      <button class="button small ghost danger">삭제</button>
+    </form>
+  </div>
+</article>

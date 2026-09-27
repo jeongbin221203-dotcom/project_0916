@@ -1,0 +1,120 @@
+{"question": "사업자등록만 있으면 수출 바로 되나요? 무역업고유번호 꼭 받아야 돼요?", "gold_faq_id": "EXP-001", "style": "casual"}
+{"question": "이번에 처음으로 해외에 물건을 팔게 됐습니다. 뭐부터 손대야 할지 순서를 전혀 모르겠어요.", "gold_faq_id": "EXP-002", "style": "verbose"}
+{"question": "메일로 주문하겠다는 외국 회사가 있는데 진짜 있는 회사인지 어떻게 알아보나요?", "gold_faq_id": "EXP-003", "style": "term_free"}
+{"question": "바이어 신용조사 어디에 의뢰", "gold_faq_id": "EXP-004", "style": "short"}
+{"question": "샘플보내달라는데 운송비는 누가내나여", "gold_faq_id": "EXP-005", "style": "typo"}
+{"question": "전시회에서 명함 잔뜩 받아왔는데 이거 어떻게 연락 돌려야 돼요?", "gold_faq_id": "EXP-006", "style": "casual"}
+{"question": "다음 주에 수출 계약서에 사인하기로 했습니다. 그 전에 상대방한테 미리 받아둬야 할 서류가 뭐가 있을까요?", "gold_faq_id": "EXP-007", "style": "verbose"}
+{"question": "값도 얼마 안 하는 물건인데 그냥 택배로 보내면 안 되나요? 세관에 따로 알려야 하나요?", "gold_faq_id": "EXP-008", "style": "term_free"}
+{"question": "수출초보 정부 지원기관", "gold_faq_id": "EXP-009", "style": "short"}
+{"question": "수출할나라에서 인증 필요한지 계약전에 어케확인해요", "gold_faq_id": "EXP-010", "style": "typo"}
+{"question": "fob랑 cif 뭐가 달라요?", "gold_faq_id": "EXP-011", "style": "casual"}
+{"question": "바이어가 EXW로 하자고 합니다. 공장에서 알아서 가져가겠다는 건데 저희한테 불리한 점이 있을까요?", "gold_faq_id": "EXP-012", "style": "verbose"}
+{"question": "관세까지 우리가 다 내고 문 앞까지 배달해 주는 조건, 이거 받아도 괜찮을까요?", "gold_faq_id": "EXP-013", "style": "term_free"}
+{"question": "컨테이너 화물 FOB FCA 차이", "gold_faq_id": "EXP-014", "style": "short"}
+{"question": "CPT CIP 랑 CFR CIF 구분이 잘안되요ㅠ", "gold_faq_id": "EXP-015", "style": "typo"}
+{"question": "인코텀즈 조건별로 적하보험은 누가 드는 거예요?", "gold_faq_id": "EXP-016", "style": "casual"}
+{"question": "인코텀즈 설명을 보면 위험이 넘어가는 시점이랑 비용을 내는 지점이 따로 나옵니다. 이 둘이 다른 건가요?", "gold_faq_id": "EXP-017", "style": "verbose"}
+{"question": "외국 회사에 가격을 적어 보내는 문서를 만드는데 뭘 빠뜨리면 안 되나요?", "gold_faq_id": "EXP-018", "style": "term_free"}
+{"question": "견적 유효기간 가격변동 조항", "gold_faq_id": "EXP-019", "style": "short"}
+{"question": "수출단가 계산할때 관세환급도 넣어야하나여", "gold_faq_id": "EXP-020", "style": "typo"}
+{"question": "MOQ랑 분할선적 조항은 보통 어떻게 잡아요?", "gold_faq_id": "EXP-021", "style": "casual"}
+{"question": "계약서 끝부분에 준거법이랑 분쟁해결 조항이 있습니다. 어느 나라 법으로 하고 어디서 다투기로 해야 하나요?", "gold_faq_id": "EXP-022", "style": "verbose"}
+{"question": "정식 계약서 없이 견적송장 한 장으로 거래를 끝내도 문제 없나요?", "gold_faq_id": "EXP-023", "style": "term_free"}
+{"question": "지체상금 조항 작성", "gold_faq_id": "EXP-024", "style": "short"}
+{"question": "계약서에 인코텀즈2020 표기 어케하는게맞나요", "gold_faq_id": "EXP-025", "style": "typo"}
+{"question": "티티 거래할 때 선수금 몇 프로 받는 게 보통이에요?", "gold_faq_id": "EXP-026", "style": "casual"}
+{"question": "바이어는 T/T로 하자는데 저희는 신용장이 안전할 것 같습니다. 어떤 기준으로 고르면 되나요?", "gold_faq_id": "EXP-027", "style": "verbose"}
+{"question": "은행에서 신용장이라는 게 왔는데 제일 먼저 어디를 봐야 하는지 모르겠어요.", "gold_faq_id": "EXP-028", "style": "term_free"}
+{"question": "신용장 하자 대응", "gold_faq_id": "EXP-029", "style": "short"}
+{"question": "앳사이트랑 유전스 뭐가다른건가요", "gold_faq_id": "EXP-030", "style": "typo"}
+{"question": "D/P랑 D/A 차이가 뭐예요? 우리가 위험한 건 어느 쪽이에요?", "gold_faq_id": "EXP-031", "style": "casual"}
+{"question": "은행에 선적서류를 넘길 때 네고로 할지 추심으로 할지 물어봅니다. 두 개가 어떻게 다른가요?", "gold_faq_id": "EXP-032", "style": "verbose"}
+{"question": "물건은 다 보냈는데 돈이 안 들어와요. 뭐부터 해야 하죠?", "gold_faq_id": "EXP-033", "style": "term_free"}
+{"question": "단기수출보험 언제 활용", "gold_faq_id": "EXP-034", "style": "short"}
+{"question": "환리스크 관리 선물환이랑 환변동보험 차이가머에요", "gold_faq_id": "EXP-035", "style": "typo"}
+{"question": "수출대금 받는 계좌나 외국환 신고 쪽에서 조심할 거 있어요?", "gold_faq_id": "EXP-036", "style": "casual"}
+{"question": "물량이 많아서 몇 번에 나눠 보내기로 했습니다. 대금도 나눠 받으려면 조건을 어떻게 써야 하나요?", "gold_faq_id": "EXP-037", "style": "verbose"}
+{"question": "신용장에 날짜가 여러 개 적혀 있는데 어느 날짜까지 뭘 해야 하는 건가요?", "gold_faq_id": "EXP-038", "style": "term_free"}
+{"question": "바이어 클레임 대금 보류", "gold_faq_id": "EXP-039", "style": "short"}
+{"question": "오픈어카운트 조건 위험한거 맞죠? 에스크로는 어떤가여", "gold_faq_id": "EXP-040", "style": "typo"}
+{"question": "우리 제품 hs코드 어디서 확인해요?", "gold_faq_id": "EXP-041", "style": "casual"}
+{"question": "바이어가 알려준 HS 코드가 저희가 쓰던 코드랑 다릅니다. 누가 틀린 건가요?", "gold_faq_id": "EXP-042", "style": "verbose"}
+{"question": "신고할 때 품목 번호를 잘못 적은 것 같은데 지금이라도 고칠 수 있나요?", "gold_faq_id": "EXP-043", "style": "term_free"}
+{"question": "수출신고 절차 필요서류", "gold_faq_id": "EXP-044", "style": "short"}
+{"question": "수출신고필증 왜중요하고 몇년보관해야되나요", "gold_faq_id": "EXP-045", "style": "typo"}
+{"question": "수출신고 수리되고 나면 언제까지 배에 실어야 해요?", "gold_faq_id": "EXP-046", "style": "casual"}
+{"question": "수출신고를 했는데 뒤늦게 내용이 바뀌었습니다. 정정이나 취하는 어떻게 하나요?", "gold_faq_id": "EXP-047", "style": "verbose"}
+{"question": "수출하면 냈던 세금 일부를 돌려준다던데 우리 회사도 받을 수 있나요?", "gold_faq_id": "EXP-048", "style": "term_free"}
+{"question": "무상샘플 수출신고 해야하나", "gold_faq_id": "EXP-049", "style": "short"}
+{"question": "온라인몰로 해외에 조금씩 파는데 수출신고 꼭해야되나여", "gold_faq_id": "EXP-050", "style": "typo"}
+{"question": "수출 물건도 세관 검사 나와요? 보세창고 꼭 거쳐야 돼요?", "gold_faq_id": "EXP-051", "style": "casual"}
+{"question": "품목에 따라 수출할 때 허가가 필요하다고 들었습니다. 저희 물건이 해당되는지 어디서 확인하나요?", "gold_faq_id": "EXP-052", "style": "verbose"}
+{"question": "신고서에 사업자등록번호 말고 다른 번호를 적으라는데 그게 뭔가요?", "gold_faq_id": "EXP-053", "style": "term_free"}
+{"question": "컷오프 뜻 마감시간", "gold_faq_id": "EXP-054", "style": "short"}
+{"question": "수출통관이 자꾸늦어지는데 보통 원인이뭔가요", "gold_faq_id": "EXP-055", "style": "typo"}
+{"question": "원산지증명서는 언제 꼭 떼야 하는 거예요?", "gold_faq_id": "EXP-056", "style": "casual"}
+{"question": "상공회의소에서 떼는 원산지증명서랑 FTA용 원산지증명서가 따로 있다고 합니다. 뭐가 다른 건가요?", "gold_faq_id": "EXP-057", "style": "verbose"}
+{"question": "원산지 서류는 어디 가서 받아야 하나요? 상공회의소인가요 세관인가요?", "gold_faq_id": "EXP-058", "style": "term_free"}
+{"question": "세번변경기준 부가가치기준 뜻", "gold_faq_id": "EXP-059", "style": "short"}
+{"question": "배 떠난다음에도 원산지증명서 발급되나여", "gold_faq_id": "EXP-060", "style": "typo"}
+{"question": "원산지 사후검증 나오면 뭘 갖고 있어야 돼요? 보관은 몇 년이에요?", "gold_faq_id": "EXP-061", "style": "casual"}
+{"question": "FTA를 쓰면 관세가 줄어든다는데 저희 제품도 실제로 효과가 있는지 궁금합니다. 어디서 비교해 보나요?", "gold_faq_id": "EXP-062", "style": "verbose"}
+{"question": "미국 쪽으로 보낼 때 원산지 서류는 우리가 직접 써서 줘도 되나요?", "gold_faq_id": "EXP-063", "style": "term_free"}
+{"question": "RCEP 한아세안 원산지증명 방식 차이", "gold_faq_id": "EXP-064", "style": "short"}
+{"question": "제품에 made in korea 표시 꼭해야하나요?", "gold_faq_id": "EXP-065", "style": "typo"}
+{"question": "수입국에서 요구하는 인증 같은 건 어디서 찾아봐요?", "gold_faq_id": "EXP-066", "style": "casual"}
+{"question": "저희 제품에 들어가는 부품이 군용으로도 쓸 수 있다고 합니다. 전략물자인지 어떻게 확인하나요?", "gold_faq_id": "EXP-067", "style": "verbose"}
+{"question": "허가를 받아야 하는 물건이라고 나왔는데 그 허가는 어디서 어떻게 받나요?", "gold_faq_id": "EXP-068", "style": "term_free"}
+{"question": "캐치올 상황허가 뜻", "gold_faq_id": "EXP-069", "style": "short"}
+{"question": "거래처나 도착국이 제재대상인지 어디서 조회하나여", "gold_faq_id": "EXP-070", "style": "typo"}
+{"question": "짐이 좀 애매한데 FCL로 가야 돼요 LCL로 가야 돼요?", "gold_faq_id": "EXP-071", "style": "casual"}
+{"question": "LCL 견적을 받았는데 R/T라는 단위로 나옵니다. CBM하고 어떤 식으로 계산되는 건가요?", "gold_faq_id": "EXP-072", "style": "verbose"}
+{"question": "비행기로 보내는데 가볍고 부피만 큰 물건은 운임을 어떻게 매기나요?", "gold_faq_id": "EXP-073", "style": "term_free"}
+{"question": "포워더 견적 비교 로컬차지", "gold_faq_id": "EXP-074", "style": "short"}
+{"question": "THC나 CFS비용 도착지비용은 누가내는건가요", "gold_faq_id": "EXP-075", "style": "typo"}
+{"question": "오리지널 비엘이랑 서렌더, 씨웨이빌 중에 뭘로 뽑아야 돼요?", "gold_faq_id": "EXP-076", "style": "casual"}
+{"question": "B/L 초안을 받아 봤는데 기재 내용에 오류가 있습니다. 지금 고칠 수 있나요?", "gold_faq_id": "EXP-077", "style": "verbose"}
+{"question": "바이어가 언제까지 받아야 한다고 날짜를 줬는데 배를 언제 잡아야 하는지 거꾸로 계산하는 방법이 있나요?", "gold_faq_id": "EXP-078", "style": "term_free"}
+{"question": "롤오버 선적지연 대응", "gold_faq_id": "EXP-079", "style": "short"}
+{"question": "적하보험 언제가입하고 ICC A B C 뭐가다른가여", "gold_faq_id": "EXP-080", "style": "typo"}
+{"question": "화물이 깨져서 도착했다는데 보험금 청구 어떻게 해요?", "gold_faq_id": "EXP-081", "style": "casual"}
+{"question": "리튬배터리가 들어간 제품을 보내려고 합니다. 위험물로 잡히면 뭘 준비해야 하나요?", "gold_faq_id": "EXP-082", "style": "verbose"}
+{"question": "나무 팔레트에 실어 보내려는데 소독 같은 걸 꼭 해야 한다던데요?", "gold_faq_id": "EXP-083", "style": "term_free"}
+{"question": "컨테이너 적입 쇼링 주의사항", "gold_faq_id": "EXP-084", "style": "short"}
+{"question": "유류할증료 성수기할증 같은거 견적에 어케반영하나요", "gold_faq_id": "EXP-085", "style": "typo"}
+{"question": "커머셜 인보이스에 꼭 들어가야 하는 항목이 뭐예요?", "gold_faq_id": "EXP-086", "style": "casual"}
+{"question": "패킹리스트를 처음 만들어 봅니다. 어떤 항목을 어떤 기준으로 적어야 하나요?", "gold_faq_id": "EXP-087", "style": "verbose"}
+{"question": "보낸 서류 두 장에 개수랑 무게가 서로 다르게 적혀 있어요. 어떻게 수습하나요?", "gold_faq_id": "EXP-088", "style": "term_free"}
+{"question": "인보이스 수출신고서 품명 불일치", "gold_faq_id": "EXP-089", "style": "short"}
+{"question": "화인 shipping mark 어떻게 표기해야되나여", "gold_faq_id": "EXP-090", "style": "typo"}
+{"question": "인보이스 금액이랑 수출신고 금액이 다른데 이거 괜찮아요?", "gold_faq_id": "EXP-091", "style": "casual"}
+{"question": "이미 바이어한테 보낸 서류에 오타가 있습니다. 정정하거나 다시 발행하려면 절차가 어떻게 되나요?", "gold_faq_id": "EXP-092", "style": "verbose"}
+{"question": "원본 서류를 외국 거래처에 보내야 하는데 그냥 우편으로 부쳐도 되나요?", "gold_faq_id": "EXP-093", "style": "term_free"}
+{"question": "수출서류 보관기간 전자문서", "gold_faq_id": "EXP-094", "style": "short"}
+{"question": "바이어가 검사증명서같은 추가서류 달라는데 어떻게해야하나요", "gold_faq_id": "EXP-095", "style": "typo"}
+{"question": "바이어가 품질 클레임 걸었는데 처음에 뭐부터 해야 돼요?", "gold_faq_id": "EXP-096", "style": "casual"}
+{"question": "클레임이 들어와서 대응 자료를 모으려고 합니다. 어떤 증빙을 어떤 식으로 챙겨야 하나요?", "gold_faq_id": "EXP-097", "style": "verbose"}
+{"question": "문제가 생긴 물건을 도로 받아오려는데 들여올 때 절차가 복잡한가요?", "gold_faq_id": "EXP-098", "style": "term_free"}
+{"question": "클레임 감액 합의서 정리", "gold_faq_id": "EXP-099", "style": "short"}
+{"question": "바이어랑 분쟁 협상이 안되는데 중재랑 소송중 뭐가나아여", "gold_faq_id": "EXP-100", "style": "typo"}
+{"question": "네고 넣었는데 은행이 하자 있다고 하네요. 이럴 땐 어떡해요?", "gold_faq_id": "EXP-029", "style": "casual"}
+{"question": "간이정액환급이랑 개별환급 중에 우리는 뭐가 해당돼요?", "gold_faq_id": "EXP-048", "style": "casual"}
+{"question": "CBM 몇 부터 컨테이너 통으로 쓰는 게 이득이에요?", "gold_faq_id": "EXP-071", "style": "casual"}
+{"question": "서렌더 치면 원본 비엘 안 보내도 되는 거 맞죠?", "gold_faq_id": "EXP-076", "style": "casual"}
+{"question": "수출신고 유니패스에서 직접해도되나여 관세사 꼭껴야하나요", "gold_faq_id": "EXP-044", "style": "typo"}
+{"question": "적재의무기한 이 뭔가여 30일 맞나요", "gold_faq_id": "EXP-046", "style": "typo"}
+{"question": "원산지증명서 씨오 신용장에도 필요한건가여", "gold_faq_id": "EXP-056", "style": "typo"}
+{"question": "적하보험 110프로로 드는게 맞는건가여", "gold_faq_id": "EXP-080", "style": "typo"}
+{"question": "DDP 위험", "gold_faq_id": "EXP-013", "style": "short"}
+{"question": "선수금 잔금 비율", "gold_faq_id": "EXP-026", "style": "short"}
+{"question": "도큐먼트 컷오프 VGM 마감", "gold_faq_id": "EXP-054", "style": "short"}
+{"question": "전략물자 자가판정", "gold_faq_id": "EXP-067", "style": "short"}
+{"question": "처음 연락 온 해외 업체가 선금 없이 물건부터 보내 달라고 합니다. 사기인지 아닌지 미리 확인할 방법이 있나요?", "gold_faq_id": "EXP-003", "style": "verbose"}
+{"question": "선적한 지 두 달이 지났는데 아직 대금이 안 들어왔습니다. 지금 단계에서 할 수 있는 조치가 뭔가요?", "gold_faq_id": "EXP-033", "style": "verbose"}
+{"question": "인보이스를 만드는 중인데 인코텀즈랑 원산지도 적어야 하는지 모르겠습니다. 필수 항목이 정해져 있나요?", "gold_faq_id": "EXP-086", "style": "verbose"}
+{"question": "바이어한테서 제품에 하자가 있다는 메일을 받았습니다. 바로 인정하면 안 된다던데 제일 먼저 뭘 해야 하나요?", "gold_faq_id": "EXP-096", "style": "verbose"}
+{"question": "공장 앞에서 바이어가 알아서 실어 간다는데, 그럼 우리는 신고 같은 거 아무것도 안 해도 되나요?", "gold_faq_id": "EXP-012", "style": "term_free"}
+{"question": "수출 가격 매길 때 나중에 돌려받는 세금도 빼고 계산해야 하나요?", "gold_faq_id": "EXP-020", "style": "term_free"}
+{"question": "인터넷으로 외국 손님한테 몇 개씩 파는 것도 나라에 신고해야 하나요?", "gold_faq_id": "EXP-050", "style": "term_free"}
+{"question": "상자마다 뭐가 몇 개 들었는지 적는 서류에서, 무게는 포장까지 합친 걸 적나요?", "gold_faq_id": "EXP-087", "style": "term_free"}

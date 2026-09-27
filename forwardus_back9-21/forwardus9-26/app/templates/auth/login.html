@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}로그인{% endblock %}
+{% block content %}
+  <div class="auth_wrap">
+    <section class="card">
+      <p class="eyebrow">계정</p>
+      <h1>로그인</h1>
+      <form method="post" action="{{ url_for('auth.login') }}">
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <label class="field">
+          <span class="field_label">이메일</span>
+          <input type="email" name="email" value="{{ email }}" autocomplete="email" required autofocus>
+        </label>
+        <label class="field">
+          <span class="field_label">비밀번호</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="button primary block" type="submit">로그인</button>
+      </form>
+      <p class="auth_switch muted">아직 계정이 없으신가요? <a href="{{ url_for('auth.signup') }}">회원가입</a></p>
+    </section>
+  </div>
+{% endblock %}

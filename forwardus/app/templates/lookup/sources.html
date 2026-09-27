@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}연결된 자료원{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Lookup</p>
+      <h1>연결된 자료원</h1>
+      <p class="muted">이 서비스가 바깥에서 받아오는 자료 {{ data.total }}가지 가운데
+        {{ data.ready }}가지가 지금 쓸 수 있습니다.</p>
+    </div>
+    <div class="button_row">
+      <a class="button primary" href="{{ url_for('lookup.sources_check') }}">지금 실제로 확인</a>
+      <a class="button ghost" href="{{ url_for('lookup.index') }}">관세청 조회로</a>
+    </div>
+  </div>
+
+  {% if health %}
+    <section class="card">
+      <h2>실제 호출 결과
+        <small class="muted">{{ health.live }}/{{ health.total }}곳에서 응답</small></h2>
+      <p class="muted">{{ health.note }}</p>
+      <div class="src_grid">
+        {% for row in health.rows %}
+          <div class="src_row {{ 'is_ready' if row.ok else 'no_key' }}">
+            <b>{{ row.label }}</b>
+            <span class="src_env mono">{{ row.detail or row.env }}</span>
+            <span class="src_state">
+              <span class="badge {{ 'ok' if row.ok else 'warn' }}">{{ row.state }}</span>
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {% for group in data.groups %}
+    <section class="card">
+      <div class="row_between wrap">
+        <div>
+          <h2>{{ group.title }}
+            <small class="muted">{{ group.rows|selectattr('ready')|list|length }}/{{ group.rows|length }}</small></h2>
+          <p class="muted">{{ group.note }}</p>
+        </div>
+        {% if group.signup %}
+          <a class="button small ghost" href="{{ group.signup }}" target="_blank"
+             rel="noopener noreferrer">키 발급 ↗</a>
+        {% endif %}
+      </div>
+
+      <div class="src_grid">
+        {% for item in group.rows %}
+          <div class="src_row {{ 'is_ready' if item.ready else 'no_key' }}">
+            <b>{{ item.label }}</b>
+            <span class="src_env mono">{{ item.env or '키 필요 없음' }}</span>
+            <span class="src_state">
+              {% if not item.ready %}
+                <span class="badge warn">키 없음</span>
+                {% if item.signup %}
+                  <a href="{{ item.signup }}" target="_blank" rel="noopener noreferrer">발급 ↗</a>
+                {% endif %}
+              {% elif item.used %}
+                <span class="badge ok">연결됨</span>
+              {% else %}
+                <span class="badge muted_badge">키만 있음</span>
+              {% endif %}
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+{% endblock %}

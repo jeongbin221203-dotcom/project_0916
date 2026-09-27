@@ -1,0 +1,124 @@
+{
+  "summaries": [
+    {
+      "label": "before",
+      "samples": 4,
+      "questions": 4,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "parse_ms_p50": 0.0,
+      "search_ms_p50": 0.0,
+      "lookup_ms_p50": 0.0,
+      "llm_ms_p50": 0.1,
+      "llm_calls": 4,
+      "embed_calls": 0,
+      "llm_calls_per_question": 1.0,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "tokens_per_question": 0,
+      "errors": 0,
+      "routes": {
+        "llm": 4
+      }
+    },
+    {
+      "label": "after(캐시 빔→참 섞임)",
+      "samples": 4,
+      "questions": 4,
+      "p50_ms": 490.4,
+      "p95_ms": 692.3,
+      "parse_ms_p50": 490.2,
+      "search_ms_p50": 246.1,
+      "lookup_ms_p50": 0.0,
+      "llm_ms_p50": 17.0,
+      "llm_calls": 1,
+      "embed_calls": 5,
+      "llm_calls_per_question": 0.25,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "tokens_per_question": 0,
+      "errors": 0,
+      "routes": {
+        "clarification": 3,
+        "faq_context": 1
+      }
+    }
+  ],
+  "before": [
+    {
+      "ok": true,
+      "total_ms": 0.0,
+      "stages": {
+        "llm_ms": 0.0
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.0,
+      "stages": {
+        "llm_ms": 0.0
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.1,
+      "stages": {
+        "llm_ms": 0.1
+      },
+      "route": "llm"
+    },
+    {
+      "ok": true,
+      "total_ms": 0.0,
+      "stages": {
+        "llm_ms": 0.0
+      },
+      "route": "llm"
+    }
+  ],
+  "after": [
+    {
+      "ok": true,
+      "total_ms": 1555.2,
+      "stages": {
+        "parse_ms": 939.9,
+        "search_ms": 246.1,
+        "lookup_ms": 0.0,
+        "llm_ms": 17.0
+      },
+      "route": "faq_context"
+    },
+    {
+      "ok": true,
+      "total_ms": 692.3,
+      "stages": {
+        "parse_ms": 692.1,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0
+      },
+      "route": "clarification"
+    },
+    {
+      "ok": true,
+      "total_ms": 194.2,
+      "stages": {
+        "parse_ms": 194.0,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0
+      },
+      "route": "clarification"
+    },
+    {
+      "ok": true,
+      "total_ms": 288.5,
+      "stages": {
+        "parse_ms": 288.3,
+        "search_ms": 0.0,
+        "lookup_ms": 0.0
+      },
+      "route": "clarification"
+    }
+  ]
+}

@@ -1,0 +1,5072 @@
+{
+  "summary": {
+    "mode": "after",
+    "llm": "stub",
+    "warm_cache": false,
+    "questions": 150,
+    "route": {
+      "api": 135,
+      "calculated": 8,
+      "faq": 7
+    },
+    "path": {
+      "faq_direct": 7,
+      "llm": 143
+    },
+    "p50_ms": 1.8,
+    "p95_ms": 3.8,
+    "mean_ms": 2.1,
+    "llm_calls": 135,
+    "llm_calls_per_question": 0.9,
+    "prompt_tokens": 723585,
+    "completion_tokens": 16200,
+    "tokens_per_question": 4932,
+    "recall@1": 0.7188,
+    "recall@3": 0.9062,
+    "recall@5": 0.9688,
+    "labelled_questions": 64,
+    "direct_returns": 7,
+    "direct_correct": 6,
+    "direct_wrong_faq": 1,
+    "direct_without_gold": 0,
+    "allowed_path_rate": 1.0,
+    "cache": {
+      "hit": 0,
+      "miss": 142,
+      "store": 119,
+      "skip": 23,
+      "entries": 119,
+      "hit_rate": 0.0
+    },
+    "kb_version": "0138e181d87a",
+    "thresholds": {
+      "direct": 0.3,
+      "direct_high_risk": 0.3,
+      "margin": 0.0,
+      "coverage": 0.6,
+      "context": 0.25
+    }
+  },
+  "rows": [
+    {
+      "id": "EV-A-001",
+      "type": "faq_typical",
+      "question": "FOB랑 CIF는 실무에서 정확히 뭐가 다른가요?",
+      "gold": "EXP-011",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-015",
+        "EXP-057"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-015",
+        "EXP-057",
+        "EXP-023",
+        "EXP-025"
+      ],
+      "top_scores": [
+        1.9726,
+        1.4555,
+        0.968,
+        0.9483,
+        0.9351
+      ],
+      "llm_calls": 1,
+      "ms": 18.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-002",
+      "type": "faq_typical",
+      "question": "Incoterms 2020에서 위험이 언제 바이어한테 넘어가는지 조건별로 알고 싶습니다.",
+      "gold": "EXP-017",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-017",
+        "EXP-016",
+        "EXP-011"
+      ],
+      "top_ids": [
+        "EXP-017",
+        "EXP-016",
+        "EXP-011",
+        "EXP-015",
+        "EXP-025"
+      ],
+      "top_scores": [
+        1.2642,
+        1.0027,
+        0.9362,
+        0.8928,
+        0.783
+      ],
+      "llm_calls": 1,
+      "ms": 2.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-003",
+      "type": "faq_typical",
+      "question": "L/C at sight랑 usance L/C는 수출자 입장에서 뭐가 다른가요?",
+      "gold": "EXP-030",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-030",
+        "EXP-023",
+        "EXP-057"
+      ],
+      "top_ids": [
+        "EXP-030",
+        "EXP-023",
+        "EXP-057",
+        "EXP-015",
+        "EXP-063"
+      ],
+      "top_scores": [
+        2.0366,
+        0.747,
+        0.6394,
+        0.6125,
+        0.5383
+      ],
+      "llm_calls": 1,
+      "ms": 1.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-004",
+      "type": "faq_typical",
+      "question": "신규 바이어랑 T/T로 거래할 때 선수금은 보통 어떻게 잡나요?",
+      "gold": "EXP-026",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-026",
+        "EXP-027",
+        "EXP-073"
+      ],
+      "top_ids": [
+        "EXP-026",
+        "EXP-027",
+        "EXP-073",
+        "EXP-003",
+        "EXP-087"
+      ],
+      "top_scores": [
+        1.8967,
+        0.6112,
+        0.5146,
+        0.4506,
+        0.3432
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-005",
+      "type": "faq_typical",
+      "question": "우리 제품 HS 코드는 어떻게 정하는 게 맞나요?",
+      "gold": "EXP-041",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-041",
+        "EXP-089",
+        "EXP-042"
+      ],
+      "top_ids": [
+        "EXP-041",
+        "EXP-089",
+        "EXP-042",
+        "EXP-010",
+        "EXP-062"
+      ],
+      "top_scores": [
+        1.4583,
+        1.2208,
+        1.096,
+        0.9522,
+        0.9086
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-006",
+      "type": "faq_typical",
+      "question": "수출신고필증은 어떤 절차로 받게 되나요?",
+      "gold": "EXP-044",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-045",
+        "EXP-044",
+        "EXP-005"
+      ],
+      "top_ids": [
+        "EXP-045",
+        "EXP-044",
+        "EXP-005",
+        "EXP-068",
+        "EXP-008"
+      ],
+      "top_scores": [
+        1.5492,
+        1.5178,
+        1.2379,
+        1.1554,
+        1.0117
+      ],
+      "llm_calls": 1,
+      "ms": 1.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-007",
+      "type": "faq_typical",
+      "question": "원산지증명서는 어디서 발급받나요?",
+      "gold": "EXP-058",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-057",
+        "EXP-058",
+        "EXP-056",
+        "EXP-060",
+        "EXP-064"
+      ],
+      "top_scores": [
+        1.8075,
+        1.7957,
+        1.73,
+        1.4796,
+        1.4508
+      ],
+      "llm_calls": 0,
+      "ms": 0.6,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-A-008",
+      "type": "faq_typical",
+      "question": "전략물자인지 아닌지는 어떻게 확인하나요?",
+      "gold": "EXP-067",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "faq",
+      "faq_id": "EXP-067",
+      "faq_context": [],
+      "top_ids": [
+        "EXP-067",
+        "EXP-052",
+        "EXP-003",
+        "EXP-070",
+        "EXP-069"
+      ],
+      "top_scores": [
+        2.0366,
+        1.3435,
+        1.1626,
+        1.0966,
+        0.9788
+      ],
+      "llm_calls": 0,
+      "ms": 1.1,
+      "answer_chars": 1412
+    },
+    {
+      "id": "EV-A-009",
+      "type": "faq_typical",
+      "question": "LCL이랑 FCL 중에 뭘로 보내는 게 유리한지 판단 기준이 궁금합니다.",
+      "gold": "EXP-071",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-071",
+        "EXP-100",
+        "EXP-058"
+      ],
+      "top_ids": [
+        "EXP-071",
+        "EXP-100",
+        "EXP-058",
+        "EXP-027",
+        "EXP-040"
+      ],
+      "top_scores": [
+        0.8918,
+        0.6088,
+        0.6076,
+        0.5829,
+        0.5373
+      ],
+      "llm_calls": 1,
+      "ms": 1.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-010",
+      "type": "faq_typical",
+      "question": "적하보험은 꼭 들어야 하는 건가요?",
+      "gold": "EXP-016",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "faq",
+      "faq_id": "EXP-016",
+      "faq_context": [],
+      "top_ids": [
+        "EXP-016",
+        "EXP-080",
+        "EXP-011",
+        "EXP-034",
+        "EXP-081"
+      ],
+      "top_scores": [
+        2.1895,
+        2.0194,
+        1.262,
+        0.9856,
+        0.9435
+      ],
+      "llm_calls": 0,
+      "ms": 0.9,
+      "answer_chars": 1566
+    },
+    {
+      "id": "EV-A-011",
+      "type": "faq_typical",
+      "question": "Commercial Invoice에 꼭 들어가야 하는 항목이 뭔가요?",
+      "gold": "EXP-086",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "faq",
+      "faq_id": "EXP-086",
+      "faq_context": [],
+      "top_ids": [
+        "EXP-086",
+        "EXP-023",
+        "EXP-018",
+        "EXP-074",
+        "EXP-005"
+      ],
+      "top_scores": [
+        3.4301,
+        1.6403,
+        1.1473,
+        0.8454,
+        0.8411
+      ],
+      "llm_calls": 0,
+      "ms": 1.4,
+      "answer_chars": 1731
+    },
+    {
+      "id": "EV-A-012",
+      "type": "faq_typical",
+      "question": "Original B/L이랑 Surrender B/L, Sea Waybill은 어떻게 다른가요?",
+      "gold": "EXP-076",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "faq",
+      "faq_id": "EXP-076",
+      "faq_context": [],
+      "top_ids": [
+        "EXP-076",
+        "EXP-093",
+        "EXP-080",
+        "EXP-077",
+        "EXP-017"
+      ],
+      "top_scores": [
+        3.036,
+        2.2778,
+        0.6086,
+        0.5965,
+        0.5559
+      ],
+      "llm_calls": 0,
+      "ms": 1.8,
+      "answer_chars": 1732
+    },
+    {
+      "id": "EV-A-013",
+      "type": "faq_typical",
+      "question": "도착지에서 화물이 파손됐다고 연락이 왔는데 무슨 순서로 처리해야 하나요?",
+      "gold": "EXP-081",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-081",
+        "EXP-033",
+        "EXP-071"
+      ],
+      "top_ids": [
+        "EXP-081",
+        "EXP-033",
+        "EXP-071",
+        "EXP-006",
+        "EXP-083"
+      ],
+      "top_scores": [
+        1.4249,
+        0.7832,
+        0.4429,
+        0.3637,
+        0.3603
+      ],
+      "llm_calls": 1,
+      "ms": 1.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-014",
+      "type": "faq_typical",
+      "question": "처음 거래하는 해외 바이어 신용도는 어떻게 확인하나요?",
+      "gold": "EXP-004",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-003",
+        "EXP-004",
+        "EXP-007"
+      ],
+      "top_ids": [
+        "EXP-003",
+        "EXP-004",
+        "EXP-007",
+        "EXP-010",
+        "EXP-053"
+      ],
+      "top_scores": [
+        1.4472,
+        1.0444,
+        0.8711,
+        0.7648,
+        0.7538
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-015",
+      "type": "faq_typical",
+      "question": "수출을 처음 시작하려면 사업자등록 말고 또 뭐가 필요한가요?",
+      "gold": "EXP-001",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-001",
+        "EXP-053",
+        "EXP-007"
+      ],
+      "top_ids": [
+        "EXP-001",
+        "EXP-053",
+        "EXP-007",
+        "EXP-050",
+        "EXP-010"
+      ],
+      "top_scores": [
+        2.1802,
+        1.3234,
+        0.8154,
+        0.636,
+        0.5351
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-016",
+      "type": "faq_typical",
+      "question": "바이어가 EXW로 하자는데 수출자한테 불리한 점이 있나요?",
+      "gold": "EXP-012",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-012",
+        "EXP-027"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-012",
+        "EXP-027",
+        "EXP-003",
+        "EXP-070"
+      ],
+      "top_scores": [
+        1.6403,
+        1.2547,
+        0.4552,
+        0.4285,
+        0.4104
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-017",
+      "type": "faq_typical",
+      "question": "수출 대금을 못 받을까 봐 걱정인데 보험 같은 게 있나요?",
+      "gold": "EXP-034",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-034",
+        "EXP-033",
+        "EXP-009"
+      ],
+      "top_ids": [
+        "EXP-034",
+        "EXP-033",
+        "EXP-009",
+        "EXP-031",
+        "EXP-012"
+      ],
+      "top_scores": [
+        1.0475,
+        0.61,
+        0.5746,
+        0.4989,
+        0.4775
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-018",
+      "type": "faq_typical",
+      "question": "수출신고한 내용에 오류가 있는데 정정이 되나요?",
+      "gold": "EXP-047",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-060",
+        "EXP-043",
+        "EXP-077"
+      ],
+      "top_ids": [
+        "EXP-060",
+        "EXP-043",
+        "EXP-077",
+        "EXP-091",
+        "EXP-047"
+      ],
+      "top_scores": [
+        1.0596,
+        1.0191,
+        0.7319,
+        0.5973,
+        0.5672
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-019",
+      "type": "faq_typical",
+      "question": "FTA 원산지증명서 발급하고 나면 서류는 얼마나 보관해야 하나요?",
+      "gold": "EXP-061",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-094",
+        "EXP-058",
+        "EXP-060",
+        "EXP-061",
+        "EXP-056"
+      ],
+      "top_scores": [
+        1.6515,
+        1.3971,
+        1.3185,
+        1.3025,
+        1.2936
+      ],
+      "llm_calls": 0,
+      "ms": 0.0,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-A-020",
+      "type": "faq_typical",
+      "question": "컨테이너 선적할 때 챙겨야 하는 마감 시한에는 어떤 게 있나요?",
+      "gold": "EXP-054",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-054",
+        "EXP-084",
+        "EXP-071"
+      ],
+      "top_ids": [
+        "EXP-054",
+        "EXP-084",
+        "EXP-071",
+        "EXP-014",
+        "EXP-009"
+      ],
+      "top_scores": [
+        1.1823,
+        0.9351,
+        0.7068,
+        0.6513,
+        0.6124
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-021",
+      "type": "paraphrase_typo",
+      "question": "인코텀즈가 모야",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-025",
+        "EXP-016",
+        "EXP-017"
+      ],
+      "top_ids": [
+        "EXP-025",
+        "EXP-016",
+        "EXP-017",
+        "EXP-018",
+        "EXP-075"
+      ],
+      "top_scores": [
+        1.3651,
+        1.3056,
+        1.27,
+        1.2132,
+        1.1925
+      ],
+      "llm_calls": 1,
+      "ms": 0.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-022",
+      "type": "paraphrase_typo",
+      "question": "엘씨 네고가 머에요 은행에서 하라는데 먼지 모르겟어요",
+      "gold": "EXP-032",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-032",
+        "EXP-029",
+        "EXP-036"
+      ],
+      "top_ids": [
+        "EXP-032",
+        "EXP-029",
+        "EXP-036",
+        "EXP-098",
+        "EXP-038"
+      ],
+      "top_scores": [
+        1.1601,
+        0.9487,
+        0.5622,
+        0.387,
+        0.3109
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-023",
+      "type": "paraphrase_typo",
+      "question": "수출할때 엘시 말고 디피 디에이 이런것도 있던데 먼차이인가요",
+      "gold": "EXP-031",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-001",
+        "EXP-021",
+        "EXP-056"
+      ],
+      "top_ids": [
+        "EXP-001",
+        "EXP-021",
+        "EXP-056",
+        "EXP-063",
+        "EXP-052"
+      ],
+      "top_scores": [
+        0.388,
+        0.3633,
+        0.3624,
+        0.3218,
+        0.2793
+      ],
+      "llm_calls": 1,
+      "ms": 1.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-024",
+      "type": "paraphrase_typo",
+      "question": "패킹리스트 꼭 만들어야되나요 인보이스랑 내용이 거의 똑같은데요",
+      "gold": "EXP-087",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-088",
+        "EXP-087",
+        "EXP-044"
+      ],
+      "top_ids": [
+        "EXP-088",
+        "EXP-087",
+        "EXP-044",
+        "EXP-089",
+        "EXP-086"
+      ],
+      "top_scores": [
+        1.3057,
+        1.176,
+        0.9964,
+        0.6124,
+        0.5616
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-025",
+      "type": "paraphrase_typo",
+      "question": "쉬핑마크 안찍어도 되나여?",
+      "gold": "EXP-090",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-090",
+        "EXP-097",
+        "EXP-056"
+      ],
+      "top_ids": [
+        "EXP-090",
+        "EXP-097",
+        "EXP-056",
+        "EXP-083",
+        "EXP-094"
+      ],
+      "top_scores": [
+        1.6786,
+        0.4167,
+        0.3993,
+        0.3823,
+        0.355
+      ],
+      "llm_calls": 1,
+      "ms": 0.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-026",
+      "type": "paraphrase_typo",
+      "question": "씨오랑 에프티에이씨오랑 다른거에요??",
+      "gold": "EXP-057",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-056",
+        "EXP-057",
+        "EXP-064"
+      ],
+      "top_ids": [
+        "EXP-056",
+        "EXP-057",
+        "EXP-064",
+        "EXP-058",
+        "EXP-060"
+      ],
+      "top_scores": [
+        1.2308,
+        1.2191,
+        1.2053,
+        1.156,
+        1.1187
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-027",
+      "type": "paraphrase_typo",
+      "question": "통관고유부호 이거 어디서 받는거에요 수출신고할때 필요하다던데",
+      "gold": "EXP-053",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-053",
+        "EXP-083",
+        "EXP-001"
+      ],
+      "top_ids": [
+        "EXP-053",
+        "EXP-083",
+        "EXP-001",
+        "EXP-052",
+        "EXP-044"
+      ],
+      "top_scores": [
+        1.2561,
+        0.7484,
+        0.6256,
+        0.5099,
+        0.5009
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-028",
+      "type": "paraphrase_typo",
+      "question": "선적서류 은행에 언제까지 내야되요? 기한 지나면 어케됨",
+      "gold": "EXP-038",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-046",
+        "EXP-054",
+        "EXP-032"
+      ],
+      "top_ids": [
+        "EXP-046",
+        "EXP-054",
+        "EXP-032",
+        "EXP-038",
+        "EXP-093"
+      ],
+      "top_scores": [
+        1.026,
+        0.939,
+        0.8795,
+        0.7049,
+        0.6973
+      ],
+      "llm_calls": 1,
+      "ms": 1.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-029",
+      "type": "paraphrase_typo",
+      "question": "포워더랑 관세사랑 하는일이 머가 다른가요 둘다 써야되요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-002",
+        "EXP-074",
+        "EXP-054"
+      ],
+      "top_ids": [
+        "EXP-002",
+        "EXP-074",
+        "EXP-054",
+        "EXP-071",
+        "EXP-057"
+      ],
+      "top_scores": [
+        0.5727,
+        0.5643,
+        0.5105,
+        0.4655,
+        0.437
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-030",
+      "type": "paraphrase_typo",
+      "question": "수출실적증명서 어디서 떼나요 은행에서 달라고 하는데요",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-057",
+        "EXP-045",
+        "EXP-050"
+      ],
+      "top_ids": [
+        "EXP-057",
+        "EXP-045",
+        "EXP-050",
+        "EXP-036",
+        "EXP-008"
+      ],
+      "top_scores": [
+        0.8727,
+        0.6647,
+        0.6409,
+        0.599,
+        0.5914
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-031",
+      "type": "paraphrase_typo",
+      "question": "인보이스 금액이랑 실제 입금된 금액이 환율때문에 좀 달라요 문제되나여",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-091",
+        "EXP-089",
+        "EXP-088"
+      ],
+      "top_ids": [
+        "EXP-091",
+        "EXP-089",
+        "EXP-088",
+        "EXP-049",
+        "EXP-092"
+      ],
+      "top_scores": [
+        1.087,
+        1.003,
+        0.8128,
+        0.4589,
+        0.437
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-032",
+      "type": "paraphrase_typo",
+      "question": "데모라지랑 디텐션 이거 뭐가 다른건지;; 둘다 청구되있는데요",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-087",
+        "EXP-057",
+        "EXP-015"
+      ],
+      "top_ids": [
+        "EXP-087",
+        "EXP-057",
+        "EXP-015",
+        "EXP-023",
+        "EXP-011"
+      ],
+      "top_scores": [
+        0.4133,
+        0.4021,
+        0.3926,
+        0.3842,
+        0.3561
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-033",
+      "type": "multi_condition",
+      "question": "베트남에 화장품을 DDP로 보내는데 결제는 L/C 90일 usance입니다. 뭘 조심해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-013",
+        "EXP-030",
+        "EXP-005"
+      ],
+      "top_ids": [
+        "EXP-013",
+        "EXP-030",
+        "EXP-005",
+        "EXP-015",
+        "EXP-049"
+      ],
+      "top_scores": [
+        0.589,
+        0.5505,
+        0.5388,
+        0.4486,
+        0.443
+      ],
+      "llm_calls": 1,
+      "ms": 1.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-034",
+      "type": "multi_condition",
+      "question": "미국에 김 스낵을 FOB 부산 조건으로 수출하고 T/T 30일 후불로 받기로 했습니다. 준비할 게 뭔가요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-026",
+        "EXP-027",
+        "EXP-014"
+      ],
+      "top_ids": [
+        "EXP-026",
+        "EXP-027",
+        "EXP-014",
+        "EXP-025",
+        "EXP-046"
+      ],
+      "top_scores": [
+        0.5279,
+        0.4563,
+        0.4134,
+        0.373,
+        0.3536
+      ],
+      "llm_calls": 1,
+      "ms": 1.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-035",
+      "type": "multi_condition",
+      "question": "독일 바이어한테 소형 가전을 CIF 함부르크로 보내려는데 T/T 선불 50%입니다. 인증은 어떻게 되나요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-026",
+        "EXP-015",
+        "EXP-011"
+      ],
+      "top_ids": [
+        "EXP-026",
+        "EXP-015",
+        "EXP-011",
+        "EXP-027",
+        "EXP-066"
+      ],
+      "top_scores": [
+        0.5176,
+        0.3992,
+        0.3219,
+        0.3179,
+        0.2851
+      ],
+      "llm_calls": 1,
+      "ms": 2.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-036",
+      "type": "multi_condition",
+      "question": "중국으로 자동차 부품을 CFR 상해, L/C at sight로 보냅니다. 한중 FTA 관세 혜택도 받고 싶은데요.",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-030",
+        "EXP-057",
+        "EXP-015"
+      ],
+      "top_ids": [
+        "EXP-030",
+        "EXP-057",
+        "EXP-015",
+        "EXP-063",
+        "EXP-073"
+      ],
+      "top_scores": [
+        0.7053,
+        0.5237,
+        0.3903,
+        0.3197,
+        0.2869
+      ],
+      "llm_calls": 1,
+      "ms": 2.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-037",
+      "type": "multi_condition",
+      "question": "일본 바이어가 화장품 샘플을 EXW로 소량만 가져가겠다는데 괜찮을까요? 대금은 T/T 전액 선불입니다.",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-012",
+        "EXP-076",
+        "EXP-031"
+      ],
+      "top_ids": [
+        "EXP-012",
+        "EXP-076",
+        "EXP-031",
+        "EXP-026",
+        "EXP-005"
+      ],
+      "top_scores": [
+        0.8761,
+        0.6919,
+        0.558,
+        0.5331,
+        0.5323
+      ],
+      "llm_calls": 1,
+      "ms": 2.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-038",
+      "type": "multi_condition",
+      "question": "인도 바이어가 기계를 CFR 뭄바이, D/A 60일로 요구합니다. 받아도 되나요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-013",
+        "EXP-011",
+        "EXP-093"
+      ],
+      "top_ids": [
+        "EXP-013",
+        "EXP-011",
+        "EXP-093",
+        "EXP-031",
+        "EXP-015"
+      ],
+      "top_scores": [
+        0.685,
+        0.5559,
+        0.5303,
+        0.5246,
+        0.4563
+      ],
+      "llm_calls": 1,
+      "ms": 1.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-039",
+      "type": "multi_condition",
+      "question": "인도네시아에 건강기능식품을 항공 DDP로 보내고 대금은 T/T 전액 후불로 하자고 합니다.",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-005",
+        "EXP-013",
+        "EXP-026"
+      ],
+      "top_ids": [
+        "EXP-005",
+        "EXP-013",
+        "EXP-026",
+        "EXP-076",
+        "EXP-073"
+      ],
+      "top_scores": [
+        0.7007,
+        0.5107,
+        0.4479,
+        0.3781,
+        0.3674
+      ],
+      "llm_calls": 1,
+      "ms": 1.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-040",
+      "type": "multi_condition",
+      "question": "두바이에 의료기기를 CIP 조건으로 보내는데 L/C 개설은행이 현지 은행입니다.",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-015",
+        "EXP-032",
+        "EXP-027"
+      ],
+      "top_ids": [
+        "EXP-015",
+        "EXP-032",
+        "EXP-027",
+        "EXP-028",
+        "EXP-023"
+      ],
+      "top_scores": [
+        0.5937,
+        0.5728,
+        0.5098,
+        0.4587,
+        0.427
+      ],
+      "llm_calls": 1,
+      "ms": 2.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-041",
+      "type": "multi_condition",
+      "question": "멕시코에 자동차 부품을 FCA 인천공항 조건으로 보내고 T/T 50% 선불입니다. 관세 혜택 받을 방법이 있나요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-057",
+        "EXP-026",
+        "EXP-012"
+      ],
+      "top_ids": [
+        "EXP-057",
+        "EXP-026",
+        "EXP-012",
+        "EXP-040",
+        "EXP-085"
+      ],
+      "top_scores": [
+        0.6169,
+        0.4589,
+        0.4398,
+        0.4138,
+        0.3534
+      ],
+      "llm_calls": 1,
+      "ms": 4.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-042",
+      "type": "multi_condition",
+      "question": "호주에 목재 포장재로 싼 기계를 DAP로 보내는데 해상 LCL입니다. 통관에서 문제 생길까요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-083",
+        "EXP-015",
+        "EXP-055"
+      ],
+      "top_ids": [
+        "EXP-083",
+        "EXP-015",
+        "EXP-055",
+        "EXP-072",
+        "EXP-071"
+      ],
+      "top_scores": [
+        0.7674,
+        0.422,
+        0.4101,
+        0.4049,
+        0.3599
+      ],
+      "llm_calls": 1,
+      "ms": 3.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-043",
+      "type": "multi_condition",
+      "question": "브라질에 화학제품을 CIF 산투스, L/C at sight로 보냅니다. 위험물이면 뭘 더 준비하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-030",
+        "EXP-015",
+        "EXP-073"
+      ],
+      "top_ids": [
+        "EXP-030",
+        "EXP-015",
+        "EXP-073",
+        "EXP-011",
+        "EXP-080"
+      ],
+      "top_scores": [
+        0.7179,
+        0.4616,
+        0.3622,
+        0.3583,
+        0.3087
+      ],
+      "llm_calls": 1,
+      "ms": 3.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-044",
+      "type": "multi_condition",
+      "question": "카자흐스탄에 산업용 계측장비를 CIP로 수출하려는데 T/T 후불 30일입니다. 수출허가가 필요한가요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-052",
+        "EXP-010",
+        "EXP-067"
+      ],
+      "top_ids": [
+        "EXP-052",
+        "EXP-010",
+        "EXP-067",
+        "EXP-082",
+        "EXP-034"
+      ],
+      "top_scores": [
+        0.5488,
+        0.4878,
+        0.4348,
+        0.4119,
+        0.387
+      ],
+      "llm_calls": 1,
+      "ms": 4.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-045",
+      "type": "needs_clarify",
+      "question": "우리 제품 수출하면 관세가 얼마나 나오나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-062",
+        "EXP-048",
+        "EXP-010"
+      ],
+      "top_ids": [
+        "EXP-062",
+        "EXP-048",
+        "EXP-010",
+        "EXP-067",
+        "EXP-073"
+      ],
+      "top_scores": [
+        2.0113,
+        0.9164,
+        0.7547,
+        0.7145,
+        0.7004
+      ],
+      "llm_calls": 1,
+      "ms": 2.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-046",
+      "type": "needs_clarify",
+      "question": "바이어가 L/C 보내왔는데 이거 받아도 괜찮은 건가요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-013",
+        "EXP-027"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-013",
+        "EXP-027",
+        "EXP-076",
+        "EXP-096"
+      ],
+      "top_scores": [
+        0.7815,
+        0.6316,
+        0.6124,
+        0.5765,
+        0.4777
+      ],
+      "llm_calls": 1,
+      "ms": 2.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-047",
+      "type": "needs_clarify",
+      "question": "포워더가 준 견적이 적정한지 봐주실 수 있나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-074",
+        "EXP-071",
+        "EXP-002"
+      ],
+      "top_ids": [
+        "EXP-074",
+        "EXP-071",
+        "EXP-002",
+        "EXP-077",
+        "EXP-079"
+      ],
+      "top_scores": [
+        0.8092,
+        0.7548,
+        0.6664,
+        0.6019,
+        0.4896
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-048",
+      "type": "needs_clarify",
+      "question": "바이어가 서류를 좀 고쳐달라는데 해줘도 되나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-095",
+        "EXP-013",
+        "EXP-099"
+      ],
+      "top_ids": [
+        "EXP-095",
+        "EXP-013",
+        "EXP-099",
+        "EXP-056",
+        "EXP-042"
+      ],
+      "top_scores": [
+        1.0744,
+        0.7522,
+        0.7019,
+        0.6281,
+        0.604
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-049",
+      "type": "needs_clarify",
+      "question": "원산지증명서 발급받고 싶은데 어떻게 하면 되나요?",
+      "gold": "EXP-058",
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-058",
+        "EXP-092",
+        "EXP-056",
+        "EXP-063",
+        "EXP-060"
+      ],
+      "top_scores": [
+        1.4035,
+        1.3423,
+        1.2679,
+        1.2475,
+        1.2238
+      ],
+      "llm_calls": 0,
+      "ms": 0.0,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-A-050",
+      "type": "needs_clarify",
+      "question": "수출신고를 꼭 해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-050",
+        "EXP-008",
+        "EXP-049"
+      ],
+      "top_ids": [
+        "EXP-050",
+        "EXP-008",
+        "EXP-049",
+        "EXP-005",
+        "EXP-065"
+      ],
+      "top_scores": [
+        1.7914,
+        1.2543,
+        1.1875,
+        1.1804,
+        1.0086
+      ],
+      "llm_calls": 1,
+      "ms": 2.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-051",
+      "type": "needs_clarify",
+      "question": "바이어가 클레임 걸었는데 어떻게 대응해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-039",
+        "EXP-096",
+        "EXP-033"
+      ],
+      "top_ids": [
+        "EXP-039",
+        "EXP-096",
+        "EXP-033",
+        "EXP-079",
+        "EXP-099"
+      ],
+      "top_scores": [
+        1.2664,
+        1.1602,
+        1.0919,
+        0.9222,
+        0.9095
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-052",
+      "type": "needs_clarify",
+      "question": "수출하려면 인증을 받아야 한다는데 뭘 받아야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-066",
+        "EXP-082",
+        "EXP-008"
+      ],
+      "top_ids": [
+        "EXP-066",
+        "EXP-082",
+        "EXP-008",
+        "EXP-010",
+        "EXP-067"
+      ],
+      "top_scores": [
+        1.4772,
+        1.1747,
+        0.6314,
+        0.5994,
+        0.5812
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-053",
+      "type": "needs_clarify",
+      "question": "결제조건은 뭐로 하는 게 제일 좋나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-026",
+        "EXP-018",
+        "EXP-027"
+      ],
+      "top_ids": [
+        "EXP-026",
+        "EXP-018",
+        "EXP-027",
+        "EXP-037",
+        "EXP-019"
+      ],
+      "top_scores": [
+        1.0882,
+        0.6927,
+        0.6145,
+        0.5831,
+        0.5689
+      ],
+      "llm_calls": 1,
+      "ms": 2.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-054",
+      "type": "needs_live_data",
+      "question": "부산에서 로테르담까지 40피트 컨테이너 해상운임이 요즘 얼마쯤 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-071",
+        "EXP-014",
+        "EXP-084"
+      ],
+      "top_ids": [
+        "EXP-071",
+        "EXP-014",
+        "EXP-084",
+        "EXP-072",
+        "EXP-085"
+      ],
+      "top_scores": [
+        1.3151,
+        0.6117,
+        0.5066,
+        0.4725,
+        0.4576
+      ],
+      "llm_calls": 1,
+      "ms": 2.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-055",
+      "type": "needs_live_data",
+      "question": "오늘 수출신고할 때 적용되는 관세청 고시환율이 얼마인가요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-044",
+        "EXP-050",
+        "EXP-053"
+      ],
+      "top_ids": [
+        "EXP-044",
+        "EXP-050",
+        "EXP-053",
+        "EXP-094",
+        "EXP-020"
+      ],
+      "top_scores": [
+        0.6428,
+        0.5615,
+        0.5318,
+        0.488,
+        0.4778
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-056",
+      "type": "needs_live_data",
+      "question": "베트남에서 우리 품목에 붙는 현재 수입관세율이 궁금합니다.",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-062",
+        "EXP-068",
+        "EXP-010"
+      ],
+      "top_ids": [
+        "EXP-062",
+        "EXP-068",
+        "EXP-010",
+        "EXP-031",
+        "EXP-058"
+      ],
+      "top_scores": [
+        0.6607,
+        0.5767,
+        0.559,
+        0.4759,
+        0.4694
+      ],
+      "llm_calls": 1,
+      "ms": 2.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-057",
+      "type": "needs_live_data",
+      "question": "다음 주 부산에서 LA 가는 배 스케줄 좀 알려주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-079",
+        "EXP-078",
+        "EXP-096"
+      ],
+      "top_ids": [
+        "EXP-079",
+        "EXP-078",
+        "EXP-096",
+        "EXP-044",
+        "EXP-082"
+      ],
+      "top_scores": [
+        0.9386,
+        0.7118,
+        0.6333,
+        0.5098,
+        0.5039
+      ],
+      "llm_calls": 1,
+      "ms": 2.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-058",
+      "type": "needs_live_data",
+      "question": "미국이 요즘 추가관세를 매긴다는데 우리 품목도 해당되나요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-089",
+        "EXP-048",
+        "EXP-056"
+      ],
+      "top_ids": [
+        "EXP-089",
+        "EXP-048",
+        "EXP-056",
+        "EXP-042",
+        "EXP-070"
+      ],
+      "top_scores": [
+        0.4525,
+        0.4451,
+        0.3116,
+        0.3051,
+        0.3031
+      ],
+      "llm_calls": 1,
+      "ms": 2.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-059",
+      "type": "needs_live_data",
+      "question": "EU 탄소국경조정제도(CBAM) 지금 어디까지 시행됐나요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-070",
+        "EXP-017",
+        "EXP-019"
+      ],
+      "top_ids": [
+        "EXP-070",
+        "EXP-017",
+        "EXP-019",
+        "EXP-024",
+        "EXP-060"
+      ],
+      "top_scores": [
+        0.4728,
+        0.3425,
+        0.3352,
+        0.3228,
+        0.2301
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-060",
+      "type": "needs_live_data",
+      "question": "항공으로 보낼 때 유류할증료가 지금 얼마나 붙나요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-073",
+        "EXP-085",
+        "EXP-015"
+      ],
+      "top_ids": [
+        "EXP-073",
+        "EXP-085",
+        "EXP-015",
+        "EXP-045",
+        "EXP-064"
+      ],
+      "top_scores": [
+        1.3161,
+        0.9967,
+        0.6139,
+        0.5741,
+        0.5521
+      ],
+      "llm_calls": 1,
+      "ms": 2.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-061",
+      "type": "needs_live_data",
+      "question": "전략물자 통제목록이 최근에 바뀌었다는데 우리 제품 판정에 영향이 있나요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup",
+        "ask_more",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-067",
+        "EXP-069",
+        "EXP-068"
+      ],
+      "top_ids": [
+        "EXP-067",
+        "EXP-069",
+        "EXP-068",
+        "EXP-070",
+        "EXP-052"
+      ],
+      "top_scores": [
+        1.0477,
+        0.7878,
+        0.5276,
+        0.5171,
+        0.488
+      ],
+      "llm_calls": 1,
+      "ms": 3.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-062",
+      "type": "out_of_scope",
+      "question": "국내 부가가치세 신고를 대신 해 주실 수 있나요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-012",
+        "EXP-045",
+        "EXP-008"
+      ],
+      "top_ids": [
+        "EXP-012",
+        "EXP-045",
+        "EXP-008",
+        "EXP-059",
+        "EXP-013"
+      ],
+      "top_scores": [
+        1.0737,
+        0.8869,
+        0.7285,
+        0.6512,
+        0.5642
+      ],
+      "llm_calls": 1,
+      "ms": 2.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-063",
+      "type": "out_of_scope",
+      "question": "해외 직구로 산 신발이 사이즈가 안 맞는데 반품은 어떻게 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-098",
+        "EXP-050",
+        "EXP-100"
+      ],
+      "top_ids": [
+        "EXP-098",
+        "EXP-050",
+        "EXP-100",
+        "EXP-003",
+        "EXP-072"
+      ],
+      "top_scores": [
+        0.695,
+        0.4502,
+        0.3776,
+        0.3721,
+        0.3226
+      ],
+      "llm_calls": 1,
+      "ms": 3.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-064",
+      "type": "out_of_scope",
+      "question": "엑셀 파일 여러 개를 파이썬으로 자동 합치는 코드 좀 짜 주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-064",
+        "EXP-037",
+        "EXP-042"
+      ],
+      "top_ids": [
+        "EXP-064",
+        "EXP-037",
+        "EXP-042",
+        "EXP-093",
+        "EXP-027"
+      ],
+      "top_scores": [
+        0.511,
+        0.2625,
+        0.2617,
+        0.2427,
+        0.2411
+      ],
+      "llm_calls": 1,
+      "ms": 2.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-065",
+      "type": "out_of_scope",
+      "question": "직원 연차수당이랑 4대보험 계산은 어떻게 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-073",
+        "EXP-020",
+        "EXP-022"
+      ],
+      "top_ids": [
+        "EXP-073",
+        "EXP-020",
+        "EXP-022",
+        "EXP-017",
+        "EXP-072"
+      ],
+      "top_scores": [
+        0.4191,
+        0.3408,
+        0.2995,
+        0.2769,
+        0.2511
+      ],
+      "llm_calls": 1,
+      "ms": 1.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-066",
+      "type": "out_of_scope",
+      "question": "베트남에 현지 법인을 세우면 법인세 신고는 어떻게 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-098",
+        "EXP-091",
+        "EXP-044"
+      ],
+      "top_ids": [
+        "EXP-098",
+        "EXP-091",
+        "EXP-044",
+        "EXP-008",
+        "EXP-077"
+      ],
+      "top_scores": [
+        0.6488,
+        0.3165,
+        0.3157,
+        0.2817,
+        0.2546
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-067",
+      "type": "out_of_scope",
+      "question": "국내 온라인몰 매출 늘리려면 광고를 어떻게 돌려야 할까요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-097",
+        "EXP-080",
+        "EXP-071"
+      ],
+      "top_ids": [
+        "EXP-097",
+        "EXP-080",
+        "EXP-071",
+        "EXP-050",
+        "EXP-049"
+      ],
+      "top_scores": [
+        0.6633,
+        0.5272,
+        0.5253,
+        0.5238,
+        0.2768
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-068",
+      "type": "out_of_scope",
+      "question": "유학 간 아들한테 생활비 송금하려는데 한도가 어떻게 되나요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-099",
+        "EXP-046",
+        "EXP-098"
+      ],
+      "top_ids": [
+        "EXP-099",
+        "EXP-046",
+        "EXP-098",
+        "EXP-044",
+        "EXP-040"
+      ],
+      "top_scores": [
+        0.4289,
+        0.3785,
+        0.3567,
+        0.3488,
+        0.3288
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-069",
+      "type": "out_of_scope",
+      "question": "사무실 임대차 계약이 끝났는데 보증금을 안 돌려줍니다. 어떻게 하죠?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-033",
+        "EXP-023",
+        "EXP-095"
+      ],
+      "top_ids": [
+        "EXP-033",
+        "EXP-023",
+        "EXP-095",
+        "EXP-091",
+        "EXP-039"
+      ],
+      "top_scores": [
+        0.5407,
+        0.4076,
+        0.387,
+        0.3683,
+        0.3551
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-070",
+      "type": "false_premise",
+      "question": "FOB면 수출자가 목적항 하역비까지 내는 거 맞죠?",
+      "gold": "EXP-011",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-075",
+        "EXP-025"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-075",
+        "EXP-025",
+        "EXP-014",
+        "EXP-030"
+      ],
+      "top_scores": [
+        0.8992,
+        0.6453,
+        0.4983,
+        0.4607,
+        0.4587
+      ],
+      "llm_calls": 1,
+      "ms": 1.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-071",
+      "type": "false_premise",
+      "question": "HS 코드는 전 세계가 10자리까지 똑같다던데 맞나요?",
+      "gold": "EXP-042",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-042",
+        "EXP-041",
+        "EXP-089"
+      ],
+      "top_ids": [
+        "EXP-042",
+        "EXP-041",
+        "EXP-089",
+        "EXP-002",
+        "EXP-062"
+      ],
+      "top_scores": [
+        1.7527,
+        0.6774,
+        0.5705,
+        0.4509,
+        0.3825
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-072",
+      "type": "false_premise",
+      "question": "L/C로 받으면 돈 떼일 일은 절대 없다던데 그렇죠?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-028",
+        "EXP-034",
+        "EXP-079"
+      ],
+      "top_ids": [
+        "EXP-028",
+        "EXP-034",
+        "EXP-079",
+        "EXP-023",
+        "EXP-011"
+      ],
+      "top_scores": [
+        0.6896,
+        0.4162,
+        0.4093,
+        0.3501,
+        0.2639
+      ],
+      "llm_calls": 1,
+      "ms": 1.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-073",
+      "type": "false_premise",
+      "question": "FTA 원산지증명서만 발급받으면 관세는 0%가 되는 거죠?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-057",
+        "EXP-056",
+        "EXP-060",
+        "EXP-058",
+        "EXP-063"
+      ],
+      "top_scores": [
+        1.2074,
+        1.1953,
+        1.1761,
+        1.1756,
+        1.1198
+      ],
+      "llm_calls": 0,
+      "ms": 0.0,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-A-074",
+      "type": "false_premise",
+      "question": "CIF로 보내면 운송 중 파손 위험도 수출자가 지는 거 맞나요?",
+      "gold": "EXP-011",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-081",
+        "EXP-005"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-081",
+        "EXP-005",
+        "EXP-014",
+        "EXP-017"
+      ],
+      "top_scores": [
+        0.899,
+        0.6837,
+        0.6711,
+        0.6609,
+        0.639
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-A-075",
+      "type": "false_premise",
+      "question": "수출은 어차피 영세율이라 수출신고 안 하고 세금계산서만 있으면 된다던데요?",
+      "gold": "EXP-045",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-012",
+        "EXP-050",
+        "EXP-053"
+      ],
+      "top_ids": [
+        "EXP-012",
+        "EXP-050",
+        "EXP-053",
+        "EXP-008",
+        "EXP-045"
+      ],
+      "top_scores": [
+        0.5531,
+        0.5265,
+        0.5128,
+        0.4609,
+        0.436
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-001",
+      "type": "faq_typical",
+      "question": "포워더가 THC를 내라는데 이게 뭔가요? 저희가 내는 게 맞나요?",
+      "gold": "EXP-075",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-075",
+        "EXP-074",
+        "EXP-014"
+      ],
+      "top_ids": [
+        "EXP-075",
+        "EXP-074",
+        "EXP-014",
+        "EXP-071",
+        "EXP-002"
+      ],
+      "top_scores": [
+        1.1375,
+        0.802,
+        0.583,
+        0.5124,
+        0.512
+      ],
+      "llm_calls": 1,
+      "ms": 1.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-002",
+      "type": "faq_typical",
+      "question": "화장품 샘플을 미국 바이어에게 보낼 때 특송(DHL 등)과 일반 항공화물 중 뭘 골라야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-093",
+        "EXP-005",
+        "EXP-006"
+      ],
+      "top_ids": [
+        "EXP-093",
+        "EXP-005",
+        "EXP-006",
+        "EXP-073",
+        "EXP-058"
+      ],
+      "top_scores": [
+        1.14,
+        0.8492,
+        0.6983,
+        0.6384,
+        0.5849
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-003",
+      "type": "faq_typical",
+      "question": "FOB와 CIF 견적은 무엇이 다른가요? 어디까지 저희가 부담하나요?",
+      "gold": "EXP-011",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-075",
+        "EXP-017"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-075",
+        "EXP-017",
+        "EXP-030",
+        "EXP-035"
+      ],
+      "top_scores": [
+        1.4215,
+        1.0316,
+        0.9215,
+        0.8523,
+        0.786
+      ],
+      "llm_calls": 1,
+      "ms": 2.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-004",
+      "type": "faq_typical",
+      "question": "계약서와 인보이스에 인코텀즈를 적을 때 어떤 형식으로 써야 하나요?",
+      "gold": "EXP-025",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-025",
+        "EXP-086",
+        "EXP-091"
+      ],
+      "top_ids": [
+        "EXP-025",
+        "EXP-086",
+        "EXP-091",
+        "EXP-087",
+        "EXP-023"
+      ],
+      "top_scores": [
+        1.2805,
+        0.7986,
+        0.7778,
+        0.6281,
+        0.5857
+      ],
+      "llm_calls": 1,
+      "ms": 3.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-005",
+      "type": "faq_typical",
+      "question": "T/T 사전송금과 사후송금은 뭐가 다르고 신규 바이어에는 뭐가 안전한가요?",
+      "gold": "EXP-026",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-040",
+        "EXP-026",
+        "EXP-093"
+      ],
+      "top_ids": [
+        "EXP-040",
+        "EXP-026",
+        "EXP-093",
+        "EXP-027",
+        "EXP-011"
+      ],
+      "top_scores": [
+        1.0164,
+        0.9919,
+        0.7145,
+        0.7094,
+        0.5627
+      ],
+      "llm_calls": 1,
+      "ms": 2.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-006",
+      "type": "faq_typical",
+      "question": "D/P와 D/A는 어떻게 다른가요?",
+      "gold": "EXP-031",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "faq",
+      "faq_id": "EXP-031",
+      "faq_context": [],
+      "top_ids": [
+        "EXP-031",
+        "EXP-015",
+        "EXP-017",
+        "EXP-032",
+        "EXP-080"
+      ],
+      "top_scores": [
+        2.9046,
+        1.045,
+        0.917,
+        0.8672,
+        0.841
+      ],
+      "llm_calls": 0,
+      "ms": 1.6,
+      "answer_chars": 1357
+    },
+    {
+      "id": "EV-B-007",
+      "type": "faq_typical",
+      "question": "HS 코드는 누가 정하고 몇 자리까지 전 세계가 같나요?",
+      "gold": "EXP-042",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-042",
+        "EXP-041",
+        "EXP-089"
+      ],
+      "top_ids": [
+        "EXP-042",
+        "EXP-041",
+        "EXP-089",
+        "EXP-002",
+        "EXP-062"
+      ],
+      "top_scores": [
+        1.1158,
+        0.834,
+        0.7059,
+        0.5016,
+        0.4738
+      ],
+      "llm_calls": 1,
+      "ms": 2.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-008",
+      "type": "faq_typical",
+      "question": "수출신고필증은 언제 나오고 잃어버리면 어디서 다시 받나요?",
+      "gold": "EXP-045",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-045",
+        "EXP-098",
+        "EXP-051"
+      ],
+      "top_ids": [
+        "EXP-045",
+        "EXP-098",
+        "EXP-051",
+        "EXP-092",
+        "EXP-049"
+      ],
+      "top_scores": [
+        0.8866,
+        0.6827,
+        0.619,
+        0.5561,
+        0.5431
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-009",
+      "type": "faq_typical",
+      "question": "기계부품 무상 샘플을 보내는데도 수출신고를 해야 하나요?",
+      "gold": "EXP-049",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-005",
+        "EXP-049",
+        "EXP-008"
+      ],
+      "top_ids": [
+        "EXP-005",
+        "EXP-049",
+        "EXP-008",
+        "EXP-050",
+        "EXP-099"
+      ],
+      "top_scores": [
+        1.8096,
+        1.7597,
+        0.8763,
+        0.7235,
+        0.5453
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-010",
+      "type": "faq_typical",
+      "question": "베트남에 수출할 때 한-베트남 FTA와 한-아세안 FTA 중 어느 쪽을 써야 하나요?",
+      "gold": "EXP-064",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-064",
+        "EXP-063",
+        "EXP-056"
+      ],
+      "top_ids": [
+        "EXP-064",
+        "EXP-063",
+        "EXP-056",
+        "EXP-072",
+        "EXP-014"
+      ],
+      "top_scores": [
+        1.5013,
+        0.6339,
+        0.526,
+        0.5124,
+        0.4443
+      ],
+      "llm_calls": 1,
+      "ms": 3.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-011",
+      "type": "faq_typical",
+      "question": "FTA 원산지증명서 기관발급과 자율발급은 뭐가 다른가요?",
+      "gold": "EXP-064",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-057",
+        "EXP-058",
+        "EXP-064",
+        "EXP-060",
+        "EXP-063"
+      ],
+      "top_scores": [
+        2.2062,
+        1.9621,
+        1.9453,
+        1.3895,
+        1.2617
+      ],
+      "llm_calls": 0,
+      "ms": 0.0,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-B-012",
+      "type": "faq_typical",
+      "question": "전자부품이 전략물자에 해당하는지 어떻게 확인하나요?",
+      "gold": "EXP-067",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-067",
+        "EXP-052",
+        "EXP-068"
+      ],
+      "top_ids": [
+        "EXP-067",
+        "EXP-052",
+        "EXP-068",
+        "EXP-082",
+        "EXP-070"
+      ],
+      "top_scores": [
+        1.5021,
+        1.1002,
+        0.9739,
+        0.8646,
+        0.7945
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-013",
+      "type": "faq_typical",
+      "question": "인도네시아 바이어가 먼저 메일을 보내왔는데 실제 존재하는 회사인지 어떻게 확인하나요?",
+      "gold": "EXP-003",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-003",
+        "EXP-070",
+        "EXP-006"
+      ],
+      "top_ids": [
+        "EXP-003",
+        "EXP-070",
+        "EXP-006",
+        "EXP-052",
+        "EXP-007"
+      ],
+      "top_scores": [
+        1.6506,
+        0.6011,
+        0.5562,
+        0.4867,
+        0.4866
+      ],
+      "llm_calls": 1,
+      "ms": 3.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-014",
+      "type": "faq_typical",
+      "question": "처음 수출을 시작하려는데 무역업고유번호는 어디서 받나요?",
+      "gold": "EXP-001",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-001",
+        "EXP-053",
+        "EXP-083"
+      ],
+      "top_ids": [
+        "EXP-001",
+        "EXP-053",
+        "EXP-083",
+        "EXP-051",
+        "EXP-002"
+      ],
+      "top_scores": [
+        2.4998,
+        1.0712,
+        0.7117,
+        0.6809,
+        0.6595
+      ],
+      "llm_calls": 1,
+      "ms": 3.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-015",
+      "type": "faq_typical",
+      "question": "Commercial Invoice와 Packing List에 반드시 들어가야 하는 항목은 무엇인가요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-086",
+        "EXP-018",
+        "EXP-087"
+      ],
+      "top_ids": [
+        "EXP-086",
+        "EXP-018",
+        "EXP-087",
+        "EXP-023",
+        "EXP-005"
+      ],
+      "top_scores": [
+        2.1484,
+        1.5076,
+        1.4329,
+        1.0391,
+        0.5499
+      ],
+      "llm_calls": 1,
+      "ms": 3.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-016",
+      "type": "faq_typical",
+      "question": "선하증권 원본 3부 중 1부를 분실했습니다. 남은 2부로 화물을 찾을 수 있나요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-077",
+        "EXP-092",
+        "EXP-093"
+      ],
+      "top_ids": [
+        "EXP-077",
+        "EXP-092",
+        "EXP-093",
+        "EXP-076",
+        "EXP-014"
+      ],
+      "top_scores": [
+        0.8214,
+        0.8135,
+        0.749,
+        0.6876,
+        0.3986
+      ],
+      "llm_calls": 1,
+      "ms": 1.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-017",
+      "type": "faq_typical",
+      "question": "의류를 수출했는데 바이어가 색상이 다르다며 클레임을 걸었습니다. 처음에 무엇부터 해야 하나요?",
+      "gold": "EXP-096",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-096",
+        "EXP-081",
+        "EXP-079"
+      ],
+      "top_ids": [
+        "EXP-096",
+        "EXP-081",
+        "EXP-079",
+        "EXP-039",
+        "EXP-002"
+      ],
+      "top_scores": [
+        1.4677,
+        0.7639,
+        0.6907,
+        0.6399,
+        0.5033
+      ],
+      "llm_calls": 1,
+      "ms": 3.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-018",
+      "type": "faq_typical",
+      "question": "수출한 물품이 반품되어 돌아옵니다. 다시 들여올 때 관세를 또 내야 하나요?",
+      "gold": "EXP-098",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-098",
+        "EXP-013",
+        "EXP-044"
+      ],
+      "top_ids": [
+        "EXP-098",
+        "EXP-013",
+        "EXP-044",
+        "EXP-049",
+        "EXP-005"
+      ],
+      "top_scores": [
+        1.0869,
+        0.3961,
+        0.3847,
+        0.3801,
+        0.379
+      ],
+      "llm_calls": 1,
+      "ms": 2.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-019",
+      "type": "faq_typical",
+      "question": "단기수출보험은 어떤 경우에 가입하나요?",
+      "gold": "EXP-034",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-034",
+        "EXP-040",
+        "EXP-013"
+      ],
+      "top_ids": [
+        "EXP-034",
+        "EXP-040",
+        "EXP-013",
+        "EXP-004",
+        "EXP-080"
+      ],
+      "top_scores": [
+        2.654,
+        1.0088,
+        0.8911,
+        0.7527,
+        0.6712
+      ],
+      "llm_calls": 1,
+      "ms": 1.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-020",
+      "type": "faq_typical",
+      "question": "LCL과 FCL 중 무엇으로 보내야 할지 어떻게 정하나요? CBM이 뭔가요?",
+      "gold": "EXP-071",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-071",
+        "EXP-076",
+        "EXP-014"
+      ],
+      "top_ids": [
+        "EXP-071",
+        "EXP-076",
+        "EXP-014",
+        "EXP-072",
+        "EXP-044"
+      ],
+      "top_scores": [
+        1.5568,
+        0.8998,
+        0.5021,
+        0.4783,
+        0.4673
+      ],
+      "llm_calls": 1,
+      "ms": 1.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-021",
+      "type": "paraphrase_typo",
+      "question": "lc 네고가 머에요",
+      "gold": "EXP-032",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-032",
+        "EXP-029",
+        "EXP-061"
+      ],
+      "top_ids": [
+        "EXP-032",
+        "EXP-029",
+        "EXP-061",
+        "EXP-030",
+        "EXP-028"
+      ],
+      "top_scores": [
+        2.1553,
+        2.1091,
+        0.3853,
+        0.3338,
+        0.3211
+      ],
+      "llm_calls": 1,
+      "ms": 0.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-022",
+      "type": "paraphrase_typo",
+      "question": "적재의무기한 이 뭔가여",
+      "gold": "EXP-046",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "faq",
+      "faq_id": "EXP-046",
+      "faq_context": [],
+      "top_ids": [
+        "EXP-046",
+        "EXP-015",
+        "EXP-055",
+        "EXP-016",
+        "EXP-024"
+      ],
+      "top_scores": [
+        3.504,
+        0.643,
+        0.492,
+        0.4666,
+        0.4648
+      ],
+      "llm_calls": 0,
+      "ms": 0.8,
+      "answer_chars": 1374
+    },
+    {
+      "id": "EV-B-023",
+      "type": "paraphrase_typo",
+      "question": "원산지증명서 발급 어디서받나여 화장품 베트남수출",
+      "gold": "EXP-058",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-058",
+        "EXP-056",
+        "EXP-060",
+        "EXP-092",
+        "EXP-057"
+      ],
+      "top_scores": [
+        1.6322,
+        1.3251,
+        1.2404,
+        1.0377,
+        1.0038
+      ],
+      "llm_calls": 0,
+      "ms": 0.0,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-B-024",
+      "type": "paraphrase_typo",
+      "question": "인보이스 랑 패킹리스트 차이 가머죠?",
+      "gold": "EXP-087",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "faq",
+      "faq_id": "EXP-088",
+      "faq_context": [],
+      "top_ids": [
+        "EXP-088",
+        "EXP-087",
+        "EXP-044",
+        "EXP-091",
+        "EXP-086"
+      ],
+      "top_scores": [
+        2.1902,
+        2.1354,
+        1.9026,
+        0.7788,
+        0.7096
+      ],
+      "llm_calls": 0,
+      "ms": 0.8,
+      "answer_chars": 1581
+    },
+    {
+      "id": "EV-B-025",
+      "type": "paraphrase_typo",
+      "question": "bl 에 shipper 랑 consignee 가 누구를 적는건가요 초보라 모르겠어요",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-030",
+        "EXP-098",
+        "EXP-090"
+      ],
+      "top_ids": [
+        "EXP-030",
+        "EXP-098",
+        "EXP-090",
+        "EXP-082",
+        "EXP-021"
+      ],
+      "top_scores": [
+        0.7884,
+        0.6484,
+        0.6026,
+        0.5004,
+        0.3783
+      ],
+      "llm_calls": 1,
+      "ms": 1.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-026",
+      "type": "paraphrase_typo",
+      "question": "FOB 조건인데 적하보험 누가드나요??",
+      "gold": "EXP-016",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-016",
+        "EXP-080",
+        "EXP-011"
+      ],
+      "top_ids": [
+        "EXP-016",
+        "EXP-080",
+        "EXP-011",
+        "EXP-081",
+        "EXP-075"
+      ],
+      "top_scores": [
+        1.8792,
+        1.5068,
+        1.3806,
+        0.9229,
+        0.7851
+      ],
+      "llm_calls": 1,
+      "ms": 1.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-027",
+      "type": "paraphrase_typo",
+      "question": "데모리지 랑 디텐션 차이좀 알려주세여",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-031",
+        "EXP-048",
+        "EXP-093"
+      ],
+      "top_ids": [
+        "EXP-031",
+        "EXP-048",
+        "EXP-093",
+        "EXP-033",
+        "EXP-087"
+      ],
+      "top_scores": [
+        0.5877,
+        0.54,
+        0.4327,
+        0.4216,
+        0.4196
+      ],
+      "llm_calls": 1,
+      "ms": 0.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-028",
+      "type": "paraphrase_typo",
+      "question": "수출신고필증 정정 되나여 수량을 잘못 적어서 보냈어요",
+      "gold": "EXP-047",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-091",
+        "EXP-008",
+        "EXP-094"
+      ],
+      "top_ids": [
+        "EXP-091",
+        "EXP-008",
+        "EXP-094",
+        "EXP-043",
+        "EXP-045"
+      ],
+      "top_scores": [
+        0.7675,
+        0.7471,
+        0.7368,
+        0.6644,
+        0.6539
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-029",
+      "type": "paraphrase_typo",
+      "question": "bl 이랑 서렌더bl 머가다른가요",
+      "gold": "EXP-076",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-076",
+        "EXP-017",
+        "EXP-092"
+      ],
+      "top_ids": [
+        "EXP-076",
+        "EXP-017",
+        "EXP-092",
+        "EXP-014",
+        "EXP-057"
+      ],
+      "top_scores": [
+        1.3012,
+        0.4931,
+        0.4491,
+        0.422,
+        0.4049
+      ],
+      "llm_calls": 1,
+      "ms": 0.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-030",
+      "type": "paraphrase_typo",
+      "question": "관세환급 이라는게 수출자도 받을수있나여",
+      "gold": "EXP-048",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-048",
+        "EXP-098",
+        "EXP-045"
+      ],
+      "top_ids": [
+        "EXP-048",
+        "EXP-098",
+        "EXP-045",
+        "EXP-020",
+        "EXP-012"
+      ],
+      "top_scores": [
+        1.4973,
+        1.0106,
+        0.947,
+        0.8088,
+        0.789
+      ],
+      "llm_calls": 1,
+      "ms": 1.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-031",
+      "type": "paraphrase_typo",
+      "question": "HS코드 6자리까지만 전세계가 같다던데 마즌가요?",
+      "gold": "EXP-042",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-042",
+        "EXP-055",
+        "EXP-041"
+      ],
+      "top_ids": [
+        "EXP-042",
+        "EXP-055",
+        "EXP-041",
+        "EXP-002",
+        "EXP-043"
+      ],
+      "top_scores": [
+        1.9004,
+        0.5501,
+        0.5112,
+        0.4816,
+        0.4813
+      ],
+      "llm_calls": 1,
+      "ms": 1.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-032",
+      "type": "paraphrase_typo",
+      "question": "FTA 원산지 사후검증 나오면 어캐해야되나요",
+      "gold": "EXP-061",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-061",
+        "EXP-094",
+        "EXP-045"
+      ],
+      "top_ids": [
+        "EXP-061",
+        "EXP-094",
+        "EXP-045",
+        "EXP-065",
+        "EXP-043"
+      ],
+      "top_scores": [
+        1.926,
+        1.3385,
+        0.7888,
+        0.6604,
+        0.6508
+      ],
+      "llm_calls": 1,
+      "ms": 1.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-033",
+      "type": "multi_condition",
+      "question": "가공식품을 일본에 FOB 부산 조건으로 보내고 T/T 30% 선수금·70% 선적 후 조건입니다. 원산지증명서는 어디서 받아야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-026",
+        "EXP-058",
+        "EXP-056",
+        "EXP-064",
+        "EXP-057"
+      ],
+      "top_scores": [
+        1.1171,
+        0.65,
+        0.573,
+        0.5434,
+        0.5388
+      ],
+      "llm_calls": 0,
+      "ms": 0.0,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-B-034",
+      "type": "multi_condition",
+      "question": "화장품을 중국 상하이에 CIF로 보내는데 결제는 90일 Usance L/C입니다. 통관 전에 뭘 준비해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-030",
+        "EXP-015",
+        "EXP-066"
+      ],
+      "top_ids": [
+        "EXP-030",
+        "EXP-015",
+        "EXP-066",
+        "EXP-049",
+        "EXP-011"
+      ],
+      "top_scores": [
+        0.6202,
+        0.4516,
+        0.4282,
+        0.422,
+        0.3948
+      ],
+      "llm_calls": 1,
+      "ms": 2.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-035",
+      "type": "multi_condition",
+      "question": "의료기기를 독일 바이어에게 DDP로 보내기로 했습니다. 인증과 세금은 어떻게 되나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-013",
+        "EXP-079",
+        "EXP-093"
+      ],
+      "top_ids": [
+        "EXP-013",
+        "EXP-079",
+        "EXP-093",
+        "EXP-005",
+        "EXP-006"
+      ],
+      "top_scores": [
+        0.7068,
+        0.6145,
+        0.6051,
+        0.5442,
+        0.4268
+      ],
+      "llm_calls": 1,
+      "ms": 1.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-036",
+      "type": "multi_condition",
+      "question": "기계부품을 인도에 CFR 뭄바이 조건, T/T 선적 후 60일로 팔려고 합니다. 위험 관리는 어떻게 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-015",
+        "EXP-027",
+        "EXP-026"
+      ],
+      "top_ids": [
+        "EXP-015",
+        "EXP-027",
+        "EXP-026",
+        "EXP-017",
+        "EXP-031"
+      ],
+      "top_scores": [
+        0.5788,
+        0.4963,
+        0.3999,
+        0.3451,
+        0.2841
+      ],
+      "llm_calls": 1,
+      "ms": 2.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-037",
+      "type": "multi_condition",
+      "question": "신선 농수산물을 UAE 두바이로 CPT 항공 운송합니다. 인증과 검역은 뭐가 필요한가요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-015",
+        "EXP-073",
+        "EXP-010"
+      ],
+      "top_ids": [
+        "EXP-015",
+        "EXP-073",
+        "EXP-010",
+        "EXP-044",
+        "EXP-050"
+      ],
+      "top_scores": [
+        0.6116,
+        0.4368,
+        0.3771,
+        0.3471,
+        0.3223
+      ],
+      "llm_calls": 1,
+      "ms": 1.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-038",
+      "type": "multi_condition",
+      "question": "전자부품을 멕시코에 FCA 조건으로 보내 미국을 육로로 통과시키려 합니다. 무엇을 챙겨야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-014",
+        "EXP-012",
+        "EXP-084"
+      ],
+      "top_ids": [
+        "EXP-014",
+        "EXP-012",
+        "EXP-084",
+        "EXP-074",
+        "EXP-031"
+      ],
+      "top_scores": [
+        0.5014,
+        0.3677,
+        0.3468,
+        0.3391,
+        0.2796
+      ],
+      "llm_calls": 1,
+      "ms": 1.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-039",
+      "type": "multi_condition",
+      "question": "화학제품을 호주에 해상 FCL로 보냅니다. 위험물 신고와 검역은 어떻게 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-082",
+        "EXP-071",
+        "EXP-015"
+      ],
+      "top_ids": [
+        "EXP-082",
+        "EXP-071",
+        "EXP-015",
+        "EXP-093",
+        "EXP-008"
+      ],
+      "top_scores": [
+        0.8058,
+        0.5887,
+        0.4395,
+        0.3652,
+        0.3245
+      ],
+      "llm_calls": 1,
+      "ms": 1.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-040",
+      "type": "multi_condition",
+      "question": "의류를 미국 아마존 FBA 창고로 DDP 조건으로 직접 입고하려 합니다. 문제가 없을까요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-013",
+        "EXP-012",
+        "EXP-031"
+      ],
+      "top_ids": [
+        "EXP-013",
+        "EXP-012",
+        "EXP-031",
+        "EXP-005",
+        "EXP-066"
+      ],
+      "top_scores": [
+        0.591,
+        0.5536,
+        0.4193,
+        0.2756,
+        0.2572
+      ],
+      "llm_calls": 1,
+      "ms": 1.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-041",
+      "type": "multi_condition",
+      "question": "식품을 베트남에 LCL, FOB 부산 조건으로 보내고 결제는 일람불 L/C입니다. 선적기일과 적재의무기한이 헷갈립니다.",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-046",
+        "EXP-030",
+        "EXP-014"
+      ],
+      "top_ids": [
+        "EXP-046",
+        "EXP-030",
+        "EXP-014",
+        "EXP-040",
+        "EXP-028"
+      ],
+      "top_scores": [
+        0.6833,
+        0.5228,
+        0.5098,
+        0.4989,
+        0.4372
+      ],
+      "llm_calls": 1,
+      "ms": 2.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-042",
+      "type": "multi_condition",
+      "question": "중고 기계를 인도네시아에 CIF로 수출하려고 합니다. 특별히 다른 절차가 있나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm",
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-066",
+        "EXP-034",
+        "EXP-011"
+      ],
+      "top_ids": [
+        "EXP-066",
+        "EXP-034",
+        "EXP-011",
+        "EXP-082",
+        "EXP-012"
+      ],
+      "top_scores": [
+        0.4644,
+        0.3926,
+        0.3778,
+        0.3227,
+        0.2974
+      ],
+      "llm_calls": 1,
+      "ms": 4.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-043",
+      "type": "multi_condition",
+      "question": "화장품을 미국에 DDP로 소액 다건 직배송하려고 합니다. 규제와 통관은 어떻게 되나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-013",
+        "EXP-005",
+        "EXP-050"
+      ],
+      "top_ids": [
+        "EXP-013",
+        "EXP-005",
+        "EXP-050",
+        "EXP-100",
+        "EXP-042"
+      ],
+      "top_scores": [
+        0.7213,
+        0.3536,
+        0.3317,
+        0.3253,
+        0.3089
+      ],
+      "llm_calls": 1,
+      "ms": 4.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-044",
+      "type": "multi_condition",
+      "question": "리튬배터리가 들어간 전자부품을 독일에 DAP 조건 항공으로 보냅니다. 무엇을 준비해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-082",
+        "EXP-013",
+        "EXP-015"
+      ],
+      "top_ids": [
+        "EXP-082",
+        "EXP-013",
+        "EXP-015",
+        "EXP-073",
+        "EXP-002"
+      ],
+      "top_scores": [
+        1.6089,
+        0.475,
+        0.367,
+        0.3621,
+        0.3334
+      ],
+      "llm_calls": 1,
+      "ms": 4.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-045",
+      "type": "needs_clarify",
+      "question": "저희 제품 수출하면 관세가 얼마나 나오나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-062",
+        "EXP-073",
+        "EXP-048"
+      ],
+      "top_ids": [
+        "EXP-062",
+        "EXP-073",
+        "EXP-048",
+        "EXP-094",
+        "EXP-045"
+      ],
+      "top_scores": [
+        1.6603,
+        0.7004,
+        0.6998,
+        0.6441,
+        0.6087
+      ],
+      "llm_calls": 1,
+      "ms": 1.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-046",
+      "type": "needs_clarify",
+      "question": "수출 서류는 어떤 걸 준비해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-055",
+        "EXP-082",
+        "EXP-002"
+      ],
+      "top_ids": [
+        "EXP-055",
+        "EXP-082",
+        "EXP-002",
+        "EXP-009",
+        "EXP-092"
+      ],
+      "top_scores": [
+        0.9085,
+        0.9053,
+        0.8702,
+        0.7603,
+        0.7167
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-047",
+      "type": "needs_clarify",
+      "question": "저희 제품도 수출하려면 인증을 받아야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-066",
+        "EXP-082",
+        "EXP-008"
+      ],
+      "top_ids": [
+        "EXP-066",
+        "EXP-082",
+        "EXP-008",
+        "EXP-010",
+        "EXP-067"
+      ],
+      "top_scores": [
+        1.4482,
+        1.1713,
+        0.7346,
+        0.6629,
+        0.6471
+      ],
+      "llm_calls": 1,
+      "ms": 1.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-048",
+      "type": "needs_clarify",
+      "question": "바이어가 FOB 말고 CIF로 해달라는데 단가를 얼마나 올려야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-013",
+        "EXP-085"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-013",
+        "EXP-085",
+        "EXP-056",
+        "EXP-061"
+      ],
+      "top_scores": [
+        1.0833,
+        0.9094,
+        0.5972,
+        0.5675,
+        0.5642
+      ],
+      "llm_calls": 1,
+      "ms": 2.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-049",
+      "type": "needs_clarify",
+      "question": "저희도 FTA 혜택을 받을 수 있나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-057",
+        "EXP-009",
+        "EXP-098"
+      ],
+      "top_ids": [
+        "EXP-057",
+        "EXP-009",
+        "EXP-098",
+        "EXP-048",
+        "EXP-060"
+      ],
+      "top_scores": [
+        1.417,
+        1.0286,
+        0.7545,
+        0.7427,
+        0.6134
+      ],
+      "llm_calls": 1,
+      "ms": 1.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-050",
+      "type": "needs_clarify",
+      "question": "선적을 언제까지 마쳐야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-078",
+        "EXP-054",
+        "EXP-046"
+      ],
+      "top_ids": [
+        "EXP-078",
+        "EXP-054",
+        "EXP-046",
+        "EXP-080",
+        "EXP-074"
+      ],
+      "top_scores": [
+        1.311,
+        1.2334,
+        1.1414,
+        0.614,
+        0.4431
+      ],
+      "llm_calls": 1,
+      "ms": 1.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-051",
+      "type": "needs_clarify",
+      "question": "이 건은 수출신고를 꼭 해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-050",
+        "EXP-008",
+        "EXP-049"
+      ],
+      "top_ids": [
+        "EXP-050",
+        "EXP-008",
+        "EXP-049",
+        "EXP-005",
+        "EXP-002"
+      ],
+      "top_scores": [
+        1.4172,
+        0.9923,
+        0.9394,
+        0.9338,
+        0.9164
+      ],
+      "llm_calls": 1,
+      "ms": 2.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-052",
+      "type": "needs_clarify",
+      "question": "바이어가 갑자기 연락이 끊겼어요. 어떻게 해야 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-033",
+        "EXP-096",
+        "EXP-003"
+      ],
+      "top_ids": [
+        "EXP-033",
+        "EXP-096",
+        "EXP-003",
+        "EXP-088",
+        "EXP-005"
+      ],
+      "top_scores": [
+        1.2164,
+        0.6855,
+        0.5295,
+        0.5258,
+        0.4777
+      ],
+      "llm_calls": 1,
+      "ms": 2.6,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-053",
+      "type": "needs_clarify",
+      "question": "선적은 이미 했는데 서류가 잘못된 걸 지금 발견했어요. 어떻게 하죠?",
+      "gold": "EXP-092",
+      "allowed_paths": [
+        "ask_more"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-077",
+        "EXP-043",
+        "EXP-092"
+      ],
+      "top_ids": [
+        "EXP-077",
+        "EXP-043",
+        "EXP-092",
+        "EXP-095",
+        "EXP-088"
+      ],
+      "top_scores": [
+        0.9048,
+        0.6971,
+        0.589,
+        0.5326,
+        0.4783
+      ],
+      "llm_calls": 1,
+      "ms": 2.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-054",
+      "type": "needs_live_data",
+      "question": "화장품(HS 3304) 중국 수출 시 지금 적용되는 관세율이 몇 퍼센트인가요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-066",
+        "EXP-026",
+        "EXP-062"
+      ],
+      "top_ids": [
+        "EXP-066",
+        "EXP-026",
+        "EXP-062",
+        "EXP-012",
+        "EXP-041"
+      ],
+      "top_scores": [
+        0.7128,
+        0.5545,
+        0.3662,
+        0.3441,
+        0.3291
+      ],
+      "llm_calls": 1,
+      "ms": 2.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-055",
+      "type": "needs_live_data",
+      "question": "이번 주 부산에서 로테르담까지 40피트 컨테이너 해상운임은 얼마인가요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-071",
+        "EXP-014",
+        "EXP-072"
+      ],
+      "top_ids": [
+        "EXP-071",
+        "EXP-014",
+        "EXP-072",
+        "EXP-084",
+        "EXP-021"
+      ],
+      "top_scores": [
+        1.31,
+        0.607,
+        0.5154,
+        0.4851,
+        0.4757
+      ],
+      "llm_calls": 1,
+      "ms": 3.1,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-056",
+      "type": "needs_live_data",
+      "question": "오늘 원달러 매매기준율이 얼마인가요? 인보이스 금액 환산에 필요합니다.",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-091",
+        "EXP-088",
+        "EXP-049"
+      ],
+      "top_ids": [
+        "EXP-091",
+        "EXP-088",
+        "EXP-049",
+        "EXP-087",
+        "EXP-028"
+      ],
+      "top_scores": [
+        0.9183,
+        0.5069,
+        0.5021,
+        0.4784,
+        0.4332
+      ],
+      "llm_calls": 1,
+      "ms": 2.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-057",
+      "type": "needs_live_data",
+      "question": "다음 주 부산에서 호치민 가는 배 스케줄 알려주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-079",
+        "EXP-078",
+        "EXP-096"
+      ],
+      "top_ids": [
+        "EXP-079",
+        "EXP-078",
+        "EXP-096",
+        "EXP-081",
+        "EXP-048"
+      ],
+      "top_scores": [
+        0.9386,
+        0.6492,
+        0.5648,
+        0.4702,
+        0.455
+      ],
+      "llm_calls": 1,
+      "ms": 2.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-058",
+      "type": "needs_live_data",
+      "question": "미국이 한국산 제품에 지금 추가로 매기는 관세가 몇 퍼센트인가요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-065",
+        "EXP-062",
+        "EXP-026"
+      ],
+      "top_ids": [
+        "EXP-065",
+        "EXP-062",
+        "EXP-026",
+        "EXP-059",
+        "EXP-066"
+      ],
+      "top_scores": [
+        0.5177,
+        0.5085,
+        0.4998,
+        0.4805,
+        0.4448
+      ],
+      "llm_calls": 1,
+      "ms": 2.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-059",
+      "type": "needs_live_data",
+      "question": "인도가 현재 BIS 강제인증을 요구하는 품목 목록을 알려주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-066",
+        "EXP-081",
+        "EXP-095"
+      ],
+      "top_ids": [
+        "EXP-066",
+        "EXP-081",
+        "EXP-095",
+        "EXP-059",
+        "EXP-014"
+      ],
+      "top_scores": [
+        1.0312,
+        0.846,
+        0.568,
+        0.5544,
+        0.4946
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-060",
+      "type": "needs_live_data",
+      "question": "저희가 어제 낸 수출신고 건이 지금 어디까지 진행됐는지 알려주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-044",
+        "EXP-082",
+        "EXP-002"
+      ],
+      "top_ids": [
+        "EXP-044",
+        "EXP-082",
+        "EXP-002",
+        "EXP-081",
+        "EXP-033"
+      ],
+      "top_scores": [
+        0.7067,
+        0.5009,
+        0.4866,
+        0.4755,
+        0.4612
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-061",
+      "type": "needs_live_data",
+      "question": "베트남 수입 부가세율이 지금 몇 퍼센트인가요?",
+      "gold": null,
+      "allowed_paths": [
+        "live_lookup"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-026",
+        "EXP-013",
+        "EXP-012"
+      ],
+      "top_ids": [
+        "EXP-026",
+        "EXP-013",
+        "EXP-012",
+        "EXP-059",
+        "EXP-066"
+      ],
+      "top_scores": [
+        0.8528,
+        0.8309,
+        0.6315,
+        0.3491,
+        0.2797
+      ],
+      "llm_calls": 1,
+      "ms": 2.0,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-062",
+      "type": "out_of_scope",
+      "question": "중국 공장에서 원재료를 들여오려고 하는데 수입통관을 대신 진행해 주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-098",
+        "EXP-013",
+        "EXP-048"
+      ],
+      "top_ids": [
+        "EXP-098",
+        "EXP-013",
+        "EXP-048",
+        "EXP-066",
+        "EXP-027"
+      ],
+      "top_scores": [
+        0.7362,
+        0.5763,
+        0.5719,
+        0.4727,
+        0.471
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-063",
+      "type": "out_of_scope",
+      "question": "수출 실적을 활용해서 법인세를 줄이는 절세 플랜을 짜주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-050",
+        "EXP-027",
+        "EXP-048"
+      ],
+      "top_ids": [
+        "EXP-050",
+        "EXP-027",
+        "EXP-048",
+        "EXP-008",
+        "EXP-045"
+      ],
+      "top_scores": [
+        0.4875,
+        0.3969,
+        0.37,
+        0.3697,
+        0.2517
+      ],
+      "llm_calls": 1,
+      "ms": 2.3,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-064",
+      "type": "out_of_scope",
+      "question": "대금을 떼먹은 바이어를 상대로 소송하려고 하는데 소장을 작성해 주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-100",
+        "EXP-093",
+        "EXP-033"
+      ],
+      "top_ids": [
+        "EXP-100",
+        "EXP-093",
+        "EXP-033",
+        "EXP-027",
+        "EXP-002"
+      ],
+      "top_scores": [
+        0.8083,
+        0.5481,
+        0.5052,
+        0.4515,
+        0.3443
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-065",
+      "type": "out_of_scope",
+      "question": "무역 담당 직원을 새로 뽑는데 근로계약서 양식을 만들어 주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-018",
+        "EXP-086",
+        "EXP-093"
+      ],
+      "top_ids": [
+        "EXP-018",
+        "EXP-086",
+        "EXP-093",
+        "EXP-056",
+        "EXP-027"
+      ],
+      "top_scores": [
+        0.2759,
+        0.2701,
+        0.2651,
+        0.2626,
+        0.2625
+      ],
+      "llm_calls": 1,
+      "ms": 2.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-066",
+      "type": "out_of_scope",
+      "question": "달러가 오를 것 같은데 선물환에 투자해서 환차익을 내려면 어떻게 하나요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-043",
+        "EXP-035",
+        "EXP-079"
+      ],
+      "top_ids": [
+        "EXP-043",
+        "EXP-035",
+        "EXP-079",
+        "EXP-067",
+        "EXP-047"
+      ],
+      "top_scores": [
+        0.5808,
+        0.5797,
+        0.4669,
+        0.3245,
+        0.3054
+      ],
+      "llm_calls": 1,
+      "ms": 3.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-067",
+      "type": "out_of_scope",
+      "question": "저희 회사 ERP에 들어 있는 이번 달 완제품 재고 수량을 알려주세요.",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-087",
+        "EXP-018",
+        "EXP-096"
+      ],
+      "top_ids": [
+        "EXP-087",
+        "EXP-018",
+        "EXP-096",
+        "EXP-048",
+        "EXP-059"
+      ],
+      "top_scores": [
+        0.596,
+        0.5042,
+        0.4799,
+        0.4794,
+        0.4511
+      ],
+      "llm_calls": 1,
+      "ms": 2.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-068",
+      "type": "out_of_scope",
+      "question": "해외 바이어 회사에 취업하려면 취업 비자를 어떻게 받나요?",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-003",
+        "EXP-004",
+        "EXP-007"
+      ],
+      "top_ids": [
+        "EXP-003",
+        "EXP-004",
+        "EXP-007",
+        "EXP-100",
+        "EXP-006"
+      ],
+      "top_scores": [
+        0.8638,
+        0.7964,
+        0.6028,
+        0.48,
+        0.4747
+      ],
+      "llm_calls": 1,
+      "ms": 2.7,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-069",
+      "type": "out_of_scope",
+      "question": "저희 브랜드 상표를 미국에 등록해 주세요. 출원 대리 부탁드립니다.",
+      "gold": null,
+      "allowed_paths": [
+        "out_of_scope"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-027",
+        "EXP-093",
+        "EXP-066"
+      ],
+      "top_ids": [
+        "EXP-027",
+        "EXP-093",
+        "EXP-066",
+        "EXP-044",
+        "EXP-048"
+      ],
+      "top_scores": [
+        0.3257,
+        0.3213,
+        0.2726,
+        0.1759,
+        0.1579
+      ],
+      "llm_calls": 1,
+      "ms": 2.5,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-070",
+      "type": "false_premise",
+      "question": "한국과 일본은 FTA가 있으니 화장품 특혜관세를 받으려면 한-일 FTA 원산지증명서를 발급하면 되는 거죠?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "calculated",
+      "faq_id": null,
+      "faq_context": [],
+      "top_ids": [
+        "EXP-056",
+        "EXP-060",
+        "EXP-057",
+        "EXP-063",
+        "EXP-058"
+      ],
+      "top_scores": [
+        1.1651,
+        1.1108,
+        1.085,
+        0.948,
+        0.9155
+      ],
+      "llm_calls": 0,
+      "ms": 0.0,
+      "answer_chars": 782
+    },
+    {
+      "id": "EV-B-071",
+      "type": "false_premise",
+      "question": "EXW 조건이면 수출통관은 저희가 해주는 거 맞죠?",
+      "gold": "EXP-012",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-012",
+        "EXP-030",
+        "EXP-044"
+      ],
+      "top_ids": [
+        "EXP-012",
+        "EXP-030",
+        "EXP-044",
+        "EXP-058",
+        "EXP-033"
+      ],
+      "top_scores": [
+        1.3169,
+        0.585,
+        0.5486,
+        0.357,
+        0.3158
+      ],
+      "llm_calls": 1,
+      "ms": 2.4,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-072",
+      "type": "false_premise",
+      "question": "FOB로 수출할 때는 적하보험을 수출자가 반드시 들어야 한다고 들었는데 맞나요?",
+      "gold": "EXP-016",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-011",
+        "EXP-080",
+        "EXP-016"
+      ],
+      "top_ids": [
+        "EXP-011",
+        "EXP-080",
+        "EXP-016",
+        "EXP-056",
+        "EXP-091"
+      ],
+      "top_scores": [
+        1.0211,
+        0.9257,
+        0.8552,
+        0.6921,
+        0.4515
+      ],
+      "llm_calls": 1,
+      "ms": 3.9,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-073",
+      "type": "false_premise",
+      "question": "수출신고필증만 있으면 바이어가 FTA 특혜관세를 자동으로 받는 거 아닌가요?",
+      "gold": null,
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-056",
+        "EXP-057",
+        "EXP-008"
+      ],
+      "top_ids": [
+        "EXP-056",
+        "EXP-057",
+        "EXP-008",
+        "EXP-020",
+        "EXP-094"
+      ],
+      "top_scores": [
+        1.0646,
+        0.9273,
+        0.6709,
+        0.6689,
+        0.6669
+      ],
+      "llm_calls": 1,
+      "ms": 3.2,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-074",
+      "type": "false_premise",
+      "question": "HS 코드는 전 세계가 10자리까지 동일하니 바이어가 알려준 10자리를 그대로 신고하면 되죠?",
+      "gold": "EXP-042",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-042",
+        "EXP-041",
+        "EXP-043"
+      ],
+      "top_ids": [
+        "EXP-042",
+        "EXP-041",
+        "EXP-043",
+        "EXP-095",
+        "EXP-089"
+      ],
+      "top_scores": [
+        1.4835,
+        0.6754,
+        0.5877,
+        0.47,
+        0.4633
+      ],
+      "llm_calls": 1,
+      "ms": 1.8,
+      "answer_chars": 49
+    },
+    {
+      "id": "EV-B-075",
+      "type": "false_premise",
+      "question": "Surrendered B/L을 쓰면 원본 없이도 화물을 찾을 수 있으니 대금 회수도 더 안전해지는 거죠?",
+      "gold": "EXP-076",
+      "allowed_paths": [
+        "faq_direct",
+        "llm"
+      ],
+      "source": "api",
+      "faq_id": null,
+      "faq_context": [
+        "EXP-076",
+        "EXP-093",
+        "EXP-014"
+      ],
+      "top_ids": [
+        "EXP-076",
+        "EXP-093",
+        "EXP-014",
+        "EXP-092",
+        "EXP-077"
+      ],
+      "top_scores": [
+        1.0603,
+        0.9485,
+        0.5464,
+        0.4207,
+        0.4116
+      ],
+      "llm_calls": 1,
+      "ms": 1.8,
+      "answer_chars": 49
+    }
+  ]
+}

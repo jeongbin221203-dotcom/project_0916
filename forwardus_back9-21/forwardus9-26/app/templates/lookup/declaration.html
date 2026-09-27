@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}수출신고필증 검증{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Lookup</p>
+      <h1>수출신고필증 검증</h1>
+      <p class="muted">받은 수출신고필증이 관세청 기록과 맞는지 대조합니다.
+        여섯 항목이 모두 같아야 일치로 나옵니다.</p>
+    </div>
+    <a class="button ghost" href="{{ url_for('lookup.index') }}">관세청 조회로</a>
+  </div>
+
+  <section class="card">
+    <form method="get" class="form_grid">
+      <label class="field">
+        <span class="field_label">발행번호</span>
+        <input class="text_input" type="text" name="publication_no"
+               value="{{ form.get('publication_no', '') }}" maxlength="13" autocomplete="off">
+        <small class="muted small">신고필증 오른쪽 위에 있습니다.</small>
+      </label>
+      <label class="field">
+        <span class="field_label">신고번호</span>
+        <input class="text_input" type="text" name="declaration_no"
+               value="{{ form.get('declaration_no', '') }}" maxlength="15" autocomplete="off">
+        <small class="muted small">숫자 15자리입니다.</small>
+      </label>
+      <label class="field">
+        <span class="field_label">수출화주 사업자등록번호</span>
+        <input class="text_input" type="text" name="business_no"
+               value="{{ form.get('business_no', '') }}" maxlength="20" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field_label">원산지 코드</span>
+        <input class="text_input" type="text" name="origin_country"
+               value="{{ form.get('origin_country', 'KR') }}" maxlength="2" autocomplete="off">
+        <small class="muted small">국가 두 자리. 한국산이면 KR입니다.</small>
+      </label>
+      <label class="field">
+        <span class="field_label">품명</span>
+        <input class="text_input" type="text" name="product_name"
+               value="{{ form.get('product_name', '') }}" maxlength="300" autocomplete="off">
+        <small class="muted small">신고필증에 적힌 그대로 넣어야 합니다.</small>
+      </label>
+      <label class="field">
+        <span class="field_label">순중량 (kg)</span>
+        <input class="text_input" type="text" name="net_weight_kg"
+               value="{{ form.get('net_weight_kg', '') }}" maxlength="20" autocomplete="off">
+      </label>
+      <div class="field span2">
+        <button class="button primary">관세청에 대조</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>대조 결과</h2>
+    {% if error %}
+      <div class="alert warn">{{ error }}</div>
+    {% elif not result %}
+      <p class="muted">여섯 항목을 모두 넣고 눌러주세요.</p>
+    {% elif not result.available %}
+      <div class="alert warn">{{ result.message }}</div>
+    {% elif result.system_error %}
+      <div class="alert warn">관세청 시스템 장애로 대조하지 못했습니다. 잠시 후 다시 해주세요.</div>
+    {% elif result.match %}
+      <div class="alert ok">✓ 관세청 기록과 일치합니다. ({{ result.label }})</div>
+      <p class="muted small">{{ result.note }}
+        <span class="badge source_api">Data Source: API</span></p>
+    {% else %}
+      <div class="alert warn">관세청 기록과 일치하지 않습니다. ({{ result.label }})</div>
+      <p class="muted small">{{ result.note }}</p>
+    {% endif %}
+  </section>
+{% endblock %}

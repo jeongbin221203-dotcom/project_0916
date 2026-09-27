@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}회원가입{% endblock %}
+{% block content %}
+  <div class="auth_wrap">
+    <section class="card">
+      <p class="eyebrow">계정</p>
+      <h1>회원가입</h1>
+      {% if error %}<div class="form_error" role="alert">{{ error }}</div>{% endif %}
+      <form method="post" action="{{ url_for('auth.signup') }}">
+        <label class="field">
+          <span class="field_label">이메일</span>
+          <input type="email" name="email" value="{{ form.email }}" maxlength="200" autocomplete="email" required autofocus>
+        </label>
+        <label class="field">
+          <span class="field_label">이름 (선택)</span>
+          <input type="text" name="name" value="{{ form.name }}" maxlength="100" autocomplete="name">
+        </label>
+        <label class="field">
+          <span class="field_label">비밀번호</span>
+          <input type="password" name="password" minlength="8" autocomplete="new-password" required>
+          <span class="muted small">8자 이상</span>
+        </label>
+        <label class="field">
+          <span class="field_label">비밀번호 확인</span>
+          <input type="password" name="password_confirm" minlength="8" autocomplete="new-password" required>
+        </label>
+        <button class="button primary block" type="submit">가입하기</button>
+      </form>
+      <p class="auth_switch muted">이미 계정이 있으신가요? <a href="{{ url_for('auth.login') }}">로그인</a></p>
+    </section>
+  </div>
+{% endblock %}

@@ -1,0 +1,24 @@
+# Claude Code가 이 컴퓨터에서 쓰는 설정.
+# 세션마다 쌓이는 권한 목록이라 C:\Users\...\AppData\Local\Temp\ 같은
+# 내 컴퓨터 경로가 그대로 들어 있습니다. 남이 받아도 쓸 수 없고, 경로만
+# 새어 나갑니다. 팀이 함께 쓸 설정을 두고 싶으면 그때 따로 추려 올립니다.
+.claude/
+
+# 파이썬
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.hypothesis/
+
+# 비밀값
+.env
+.env.*
+!.env.example
+
+# 편집기·운영체제가 만드는 것
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

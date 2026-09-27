@@ -1,0 +1,33 @@
+# 줄 끝(line ending)을 Git이 한 가지로 정합니다.
+#
+# 이것이 없으면 사람마다 core.autocrlf 값이 달라, 한 줄도 안 고친 파일이
+# "전부 바뀜"으로 올라옵니다. GitHub Desktop이 띄우는
+# "This file uses 'LF' line endings, but Git is configured to convert them to
+# 'CRLF'" 경고도 여기가 정해져 있지 않아서 나옵니다.
+#
+# text=auto  저장소 안(index)에는 늘 LF로 둡니다. 내려받을 때 각자 운영체제에
+#            맞게 풀립니다. Windows에서 편집해도 커밋에 CRLF가 섞이지 않습니다.
+* text=auto
+
+# 줄 끝이 정해져 있어야 도는 것들.
+# 셸 스크립트에 CRLF가 붙으면 리눅스에서 "bad interpreter"로 죽습니다.
+*.sh        text eol=lf
+Procfile    text eol=lf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# 글자가 아닌 파일. Git이 내용을 손대지 않습니다.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.otf       binary
+*.ttf       binary
+*.woff      binary
+*.woff2     binary
+*.zip       binary
+*.db        binary
+*.traineddata binary

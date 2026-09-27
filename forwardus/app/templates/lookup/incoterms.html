@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}인코텀즈 한눈에 보기{% endblock %}
+{% block head %}
+  {# 흐름 그림·조건 칸 모양은 운송 계획 화면과 같은 CSS를 씁니다. #}
+  <link rel="stylesheet" href="{{ static_url('css/planning.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/incoterm.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page_head">
+    <div>
+      <p class="eyebrow">Incoterms 2020</p>
+      <h1>인코텀즈 한눈에 보기</h1>
+      <p class="muted">조건을 누르면 비용과 위험이 <b>어느 단계에서 넘어가는지</b> 그림과 설명으로 보여 드립니다.
+        실제 계약에 쓸 때는 <code>FOB Busan Incoterms 2020</code>처럼 조건·장소·연도를 함께 적으세요.</p>
+    </div>
+  </div>
+
+  <section class="card incoterm_step">
+    {% with steps = flow %}{% include "_incoterm_flow.html" %}{% endwith %}
+
+    <hr class="incoterm_divider">
+
+    <div class="incoterm_area">
+      <div class="incoterm_grid" role="tablist" aria-label="Incoterms 2020 조건">
+        {% for term in terms %}
+          <div class="incoterm_card {{ 'active' if loop.first }}" data-incoterm="{{ term.code }}"
+               {% if term.sea_only %}data-sea-only-term{% endif %}>
+            <button type="button" class="incoterm_pick" role="tab" data-incoterm-view="{{ term.code }}"
+                    aria-selected="{{ 'true' if loop.first else 'false' }}"
+                    aria-controls="incoterm_detail">{{ term.code }}</button>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  {# 고른 조건의 세부 내용. 화면을 옮기지 않고 여기서 바뀝니다. #}
+  <section class="card incoterm_detail" id="incoterm_detail" data-incoterm-detail role="tabpanel" tabindex="0"></section>
+
+  <p class="muted incoterm_note">Incoterms는 <b>위험·비용·통관 의무</b>를 정합니다.
+    소유권 이전 시점, 대금 지급 조건, 분쟁 관할은 정하지 않으므로 계약서에 따로 적어야 합니다.
+    본문은 ICC Incoterms® 2020을 우리말로 정리한 것으로, 해석이 갈리는 건은 원문과 전문가 확인이 필요합니다.</p>
+{% endblock %}
+{% block scripts %}
+  <script>
+    window.FORWARDUS_INCOTERMS = {{ {"terms": terms, "steps": flow}|tojson }};
+  </script>
+  <script src="{{ static_url('js/incoterm_flow.js') }}"></script>
+  <script src="{{ static_url('js/incoterms_view.js') }}"></script>
+{% endblock %}

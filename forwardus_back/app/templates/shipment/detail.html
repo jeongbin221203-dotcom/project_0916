@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% from "_macros.html" import source_badge, doc_status, shipment_tabs, shipment_header %}
+{% block title %}{{ shipment.shipment_id }}{% endblock %}
+{% block content %}
+  {{ shipment_header(shipment) }}
+  {{ shipment_tabs(shipment, 'detail') }}
+
+  {% if exceptions %}
+    <div class="alert warn">
+      <b>ETA 변경 {{ exceptions|length }}건</b> — 최초 계획 대비 {{ shipment.delay_days }}일 지연.
+      <a href="{{ url_for('assistant.index', shipment_id=shipment.shipment_id) }}#exception">대응 가이드 보기 →</a>
+    </div>
+  {% endif %}
+
+  <div class="grid two">
+    <section class="card">
+      <h2>Shipment Summary</h2>
+      <dl class="summary_list">
+        <div><dt>Buyer</dt><dd>{{ shipment.buyer.name if shipment.buyer else '-' }}{% if shipment.buyer and shipment.buyer.country %} · {{ shipment.buyer.country }}{% endif %}</dd></div>
+        <div><dt>Exporter</dt><dd>{{ shipment.exporter_name }}</dd></div>
+        <div><dt>Incoterms</dt><dd>{{ shipment.incoterms }}</dd></div>
+        <div><dt>Invoice Value</dt><dd>{{ shipment.currency }} {{ shipment.invoice_value|num(2) }}</dd></div>
+        {% if shipment.cargo %}
+          <div><dt>Cargo</dt><dd>{{ shipment.cargo.product_description }}{% if shipment.cargo.hs_code %} · HS {{ shipment.cargo.hs_code }}{% endif %}</dd></div>
+          <div><dt>Quantity</dt><dd>{{ shipment.cargo.quantity|num }} pkg</dd></div>
+          <div><dt>Total CBM</dt><dd>{{ shipment.cargo.total_cbm|num(3) }} CBM</dd></div>
+          <div><dt>Gross Weight</dt><dd>{{ shipment.cargo.total_weight_kg|num(1) }} kg</dd></div>
+          {% if shipment.transport_mode == 'AIR' %}
+            <div><dt>Chargeable Weight</dt><dd>{{ shipment.cargo.chargeable_weight_kg|num(1) }} kg</dd></div>
+          {% else %}
+            <div><dt>Revenue Ton</dt><dd>{{ shipment.cargo.revenue_ton|num(3) }} R/T</dd></div>
+          {% endif %}
+          {% if shipment.cargo.container_quantity %}
+            <div><dt>Container</dt><dd>{{ shipment.cargo.container_quantity }} × {{ shipment.cargo.container_type }}</dd></div>
+          {% endif %}
+        {% endif %}
+      </dl>
+    </section>
+
+    <section class="card">
+      <div class="row_between"><h2>Selected Schedule</h2>{{ source_badge(shipment.schedule_source) }}</div>
+      <div class="schedule_route big">
+        <div><small>ETD</small><b>{{ shipment.etd|d }}</b><span class="muted">{{ shipment.origin_code }}</span></div>
+        <div class="line"><span>{{ shipment.transit_days }}일 · {{ 'Direct' if shipment.is_direct else 'Transshipment' }}</span></div>
+        <div><small>ETA</small><b>{{ shipment.eta|d }}</b><span class="muted">{{ shipment.destination_code }}</span></div>
+      </div>
+      <dl class="summary_list">
+        <div><dt>Carrier</dt><dd>{{ shipment.carrier }} · {{ shipment.vessel_or_flight }}</dd></div>
+        <div><dt>Cargo Ready Date</dt><dd>{{ shipment.cargo_ready_date|d }}</dd></div>
+        {% if shipment.delay_days %}<div><dt>최초 계획 ETA</dt><dd>{{ shipment.planned_eta|d }}</dd></div>{% endif %}
+        {% if deadline %}
+          <div><dt>Buyer Required Date</dt><dd>{{ shipment.buyer_required_date|d }}
+            {% if deadline.on_time %}<span class="badge ok">여유 {{ deadline.margin_days }}일</span>
+            {% else %}<span class="badge warn">{{ -deadline.margin_days }}일 초과 위험</span>{% endif %}</dd></div>
+        {% endif %}
+      </dl>
+      <div class="button_row">
+        {% if shipment.status == 'quoted' %}
+          <form method="post" action="{{ url_for('shipment.change_status', shipment_id=shipment.shipment_id) }}">
+            <input type="hidden" name="action" value="book"><button class="button primary">Booking 확정</button>
+          </form>
+        {% endif %}
+        {% if shipment.status == 'delivered' %}
+          <form method="post" action="{{ url_for('shipment.change_status', shipment_id=shipment.shipment_id) }}">
+            <input type="hidden" name="action" value="close"><button class="button primary">Shipment 종료</button>
+          </form>
+        {% endif %}
+        {% if shipment.status in ('draft', 'quoted', 'booked') %}
+          <form method="post" action="{{ url_for('shipment.change_status', shipment_id=shipment.shipment_id) }}" onsubmit="return confirm('이 Shipment를 취소할까요?');">
+            <input type="hidden" name="action" value="cancel"><button class="button ghost danger">취소</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="grid two">
+    <section class="card">
+      <div class="row_between"><h2>Document Status</h2><a href="{{ url_for('document.center', shipment_id=shipment.shipment_id) }}">Document Center →</a></div>
+      <ul class="status_list">
+        {% for item in documents %}
+          <li>
+            <span>{{ item.title }}</span>
+            {% if item.document %}{{ doc_status(item.document.status) }}{% else %}<span class="badge muted_badge">미작성</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section class="card">
+      <div class="row_between"><h2>Tracking Status</h2><a href="{{ url_for('tracking.detail', shipment_id=shipment.shipment_id) }}">Timeline →</a></div>
+      {% if latest_event %}
+        <p class="big_status">{{ latest_event.label }}</p>
+        <p class="muted">{{ latest_event.event_time.strftime('%Y-%m-%d') }} · {{ latest_event.location or '-' }}</p>
+        {{ source_badge(latest_event.source) }}
+      {% else %}
+        <p class="muted">아직 Tracking 이벤트가 없습니다. Booking 후 Tracking 화면에서 이벤트를 조회하세요.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="row_between wrap">
+      <h2>물류비 견적</h2>
+      <span class="muted small">계산: Python 비용 엔진 · 요율: Mock (예상값)</span>
+    </div>
+    <table class="table cost_table">
+      <thead><tr><th>항목</th><th>원화 금액</th><th>원금액</th><th>출처</th></tr></thead>
+      {% for group in cost_groups %}
+        <tbody>
+          <tr class="group_row"><th colspan="2">{{ group.category }}</th><th colspan="2" class="num">{{ group.total_krw|won }}</th></tr>
+          {% for line in group.lines %}
+            <tr>
+              <td>{{ line.name }}</td>
+              <td class="num">{{ line.krw_amount|won }}</td>
+              <td class="num muted">{{ line.original_currency }} {{ line.original_amount|num(2) }}</td>
+              <td>{{ source_badge(line.source) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      {% endfor %}
+      <tfoot><tr><th>Total Logistics Cost</th><th class="num">{{ shipment.total_cost_krw|won }}</th><th colspan="2"></th></tr></tfoot>
+    </table>
+    <a href="{{ url_for('assistant.index', shipment_id=shipment.shipment_id) }}#cost">AI 비용 해석 보기 →</a>
+  </section>
+{% endblock %}
