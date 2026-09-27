@@ -178,6 +178,63 @@ def ensure_master_account(database, email: str, password: str) -> None:
             raise                       # 없는데도 실패했다면 그건 진짜 문제입니다
 
 
+# 뜰 때 하는 데이터베이스 준비에 거는 자물쇠 번호. 아무 숫자나 되지만,
+# 이 앱의 준비 작업임을 가리키는 표지라 바꾸지 않습니다.
+SETUP_LOCK_KEY = 8711_0916
+
+
+def setup_database(flask_app) -> None:
+    """테이블을 만들고 옛 자료를 손본 뒤 마스터 계정을 둡니다.
+
+    **한 번에 하나씩만 합니다.**
+
+    왜 자물쇠가 필요한가
+      gunicorn 일꾼이 둘 이상이면 같은 순간에 다 같이 이 일을 합니다.
+      db.create_all() 은 "있나 보고 → 없으면 만드는" 모양이라 그 사이가
+      비어 있습니다. 둘 다 "없다"를 보고 둘 다 CREATE TABLE 을 던지면
+      뒤늦은 쪽이 터집니다.
+
+        psycopg.errors.UniqueViolation: pg_type_typname_nsp_index
+        DETAIL:  Key (typname, typnamespace)=(buyers, 2200) already exists.
+
+      일꾼 하나가 죽으면 gunicorn 이 "Worker failed to boot" 로 **앱 전체를
+      내립니다.** 첫 화면조차 안 뜹니다. (2026-09-27 Render 502)
+
+      뜰 때 하는 일이 여섯 가지인데 전부 같은 경합을 안고 있어, 하나씩
+      막으면 끝이 없습니다. 통째로 자물쇠 안에 넣습니다.
+
+    pg_advisory_xact_lock 은 거래가 끝나면 **스스로 풀립니다.** 풀어 주는 것을
+    잊거나, 중간에 터져서 자물쇠가 걸린 채 남는 일이 없습니다.
+
+    SQLite(로컬·시험)에는 이런 자물쇠가 없습니다. 거기서는 프로세스가 하나라
+    애초에 겹치지 않습니다.
+    """
+
+    from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
+
+    if db.engine.dialect.name == "postgresql":
+        db.session.execute(text("SELECT pg_advisory_xact_lock(:key)"),
+                           {"key": SETUP_LOCK_KEY})
+    try:
+        db.create_all()
+        migrate_cargo_lines(db)
+        migrate_shipment_columns(db)
+        migrate_cost_sources(db)
+        migrate_requirement_documents(db)
+        migrate_user_columns(db)
+        ensure_master_account(db, flask_app.config.get("MASTER_EMAIL", ""),
+                              flask_app.config.get("MASTER_PASSWORD", ""))
+    except (IntegrityError, ProgrammingError, OperationalError):
+        # 자물쇠를 쓸 수 없는 곳(SQLite 등)에서 그래도 겹쳤다면, 다른 쪽이
+        # 이미 만들어 둔 것입니다. 한 번 눈감고 있는 그대로 씁니다.
+        # 정말 못 만들었다면 첫 조회에서 곧바로 드러납니다.
+        db.session.rollback()
+        flask_app.logger.warning("데이터베이스 준비가 겹쳤습니다. 다른 일꾼이 "
+                                 "먼저 끝낸 것으로 보고 넘어갑니다.")
+    db.session.commit()          # 자물쇠는 여기서 풀립니다
+
+
 def create_app(config_class: type[Config] = Config) -> Flask:
     """Create and configure the Flask application."""
 
@@ -196,14 +253,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     register_blueprints(flask_app)
 
     with flask_app.app_context():
-        db.create_all()
-        migrate_cargo_lines(db)
-        migrate_shipment_columns(db)
-        migrate_cost_sources(db)
-        migrate_requirement_documents(db)
-        migrate_user_columns(db)
-        ensure_master_account(db, flask_app.config.get("MASTER_EMAIL", ""),
-                              flask_app.config.get("MASTER_PASSWORD", ""))
+        setup_database(flask_app)
 
     @flask_app.get("/health")
     def health():
