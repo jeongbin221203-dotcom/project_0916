@@ -214,7 +214,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 "support_icon": support_icon(),
                 "brand_logo": _pick_image("logo"),
                 "brand_mark": _pick_image("logo_mark"),
-                "home_locked": flask_app.config.get("HOME_LOCKED", False)}
+                "home_locked": flask_app.config.get("HOME_LOCKED", False),
+                "contract_on": flask_app.config.get("CONTRACT_CLAUSES_ON", False)}
 
     # 화면에 쓰는 그림은 파일만 올려 두면 바뀌도록 합니다.
     # app/static/images/ 에 아래 이름으로 넣으면 코드를 고치지 않아도 됩니다.

@@ -2,7 +2,7 @@
 {% from "_macros.html" import doc_status, source_badge %}
 {% block title %}{{ document.title }} · {{ shipment.shipment_id }}{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ static_url('css/document.css') }}">
-<link rel="stylesheet" href="{{ static_url('css/contract.css') }}">{% endblock %}
+{% if contract_on %}<link rel="stylesheet" href="{{ static_url('css/contract.css') }}">{% endif %}{% endblock %}
 
 {#- 서식 한 칸. 보기 모드는 값만, 수정 모드는 입력칸을 그립니다. -#}
 {% macro box(f, edit) %}
@@ -113,13 +113,17 @@
      서류가 다 맞아도 돈을 떼이거나 물리는 자리는 계약서입니다. 그런데 그 문장은
      서류 어디에도 안 나와, 이 화면만 보고는 알 수가 없었습니다. 이 건의
      인코텀즈로 걸리는 조항을 짚고, 올린 계약서를 읽어 판정합니다. #}
+  {# 지금은 꺼 두었습니다 — config.py 의 CONTRACT_CLAUSES_ON 을 보세요. #}
+  {% if contract_on %}
   <section class="card no_print" data-contract-card>
     <h2><span aria-hidden="true">📜</span> 계약서 조항 점검
       <small class="muted">{{ shipment.incoterms or '조건 미정' }} 기준</small></h2>
     <div data-contract-panel></div>
   </section>
+  {% endif %}
 {% endblock %}
 {% block scripts %}<script src="{{ static_url('js/document.js') }}"></script>
+{% if contract_on %}
 <script src="{{ static_url('js/contract_clauses.js') }}"></script>
 <script>
   (function () {
@@ -133,4 +137,5 @@
       });
     }
   })();
-</script>{% endblock %}
+</script>
+{% endif %}{% endblock %}

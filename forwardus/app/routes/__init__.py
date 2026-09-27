@@ -160,7 +160,13 @@ def register_blueprints(flask_app: Flask) -> None:
     from app.routes.tracking import tracking_bp
     from app.routes.work_draft import work_draft_bp
 
-    for blueprint in (home_bp, planning_bp, shipment_bp, document_bp, tracking_bp,
-                      assistant_bp, dashboard_bp, dashboard_api_bp, lookup_bp, auth_bp,
-                      work_draft_bp, contract_bp):
+    blueprints = [home_bp, planning_bp, shipment_bp, document_bp, tracking_bp,
+                  assistant_bp, dashboard_bp, dashboard_api_bp, lookup_bp, auth_bp,
+                  work_draft_bp]
+    # 계약서 조항 점검이 꺼져 있으면 /contract/* 를 아예 달지 않습니다.
+    # 단추만 감추고 길을 열어 두면 주소를 아는 사람은 그대로 쓸 수 있습니다.
+    # 길이 없으므로 url_for('contract.*') 도 화면 쪽에서 함께 감춰야 합니다.
+    if flask_app.config.get("CONTRACT_CLAUSES_ON", False):
+        blueprints.append(contract_bp)
+    for blueprint in blueprints:
         flask_app.register_blueprint(blueprint)
