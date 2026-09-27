@@ -20,6 +20,8 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import json
 from datetime import date
 
@@ -194,6 +196,63 @@ KR_CITY_AIRPORT = {
 }
 
 
+# 2000년 로마자 표기법이 바뀌기 전 이름. 바깥 바이어가 만든 서류에는 아직
+# 옛 표기가 나옵니다. **표기법이 바뀐 것만** 넣습니다 — 짐작으로 별명을 더하면
+# 그만큼 잘못 잡을 자리가 늘어납니다. (2026-09-27)
+OLD_ROMAN = {
+    "pusan": "Busan",
+    "inchon": "Incheon",
+    "kwangyang": "Gwangyang",
+    "ulsan": "Ulsan",          # 표기가 그대로인 곳. 찾기 쉬우라고 함께 둡니다.
+}
+
+
+# 항구 이름에 곁들여 적히는 낱말. 이것만 떼어 냅니다.
+# city · terminal · new 는 넣지 않습니다 — 지명의 일부일 수 있습니다
+# (Ho Chi Minh City, Angeles City, New York).
+PORT_WORDS = {"port", "ports", "of", "seaport", "harbour", "harbor", "항", "항구"}
+
+# 나라를 줄여 적는 말. 항구표의 나라 이름에는 없는 표기입니다.
+COUNTRY_SHORT = {"usa", "u.s.a.", "u.s.", "us", "uk", "u.k.", "prc", "rok", "rok.",
+                 "korea", "vietnam", "america"}
+
+
+@lru_cache(maxsize=1)
+def _country_words() -> frozenset[str]:
+    """항구표에 실제로 들어 있는 나라 이름을 낱말로 풀어 모읍니다.
+
+    표를 그대로 쓰므로 나라가 늘어도 따로 손볼 것이 없습니다.
+    '대한민국' · 'Korea, Republic of' · '미국' · 'United States of America' ...
+    """
+
+    words: set[str] = set(COUNTRY_SHORT) | set(PORT_WORDS)
+    for kind in ("port", "airport"):
+        result = location_client.search_locations("", kind, None, None)
+        for row in (result.get("data") or []):
+            for key in ("country", "country_en"):
+                name = str(row.get(key) or "")
+                for piece in name.replace(",", " ").split():
+                    piece = piece.strip().casefold()
+                    if len(piece) >= 2:
+                        words.add(piece)
+    return frozenset(words)
+
+
+def _drop_country_words(text: str) -> str:
+    """나라 이름과 항구 곁말만 떼어 냅니다. 뗄 것이 없으면 그대로 돌려줍니다.
+
+    남는 것이 없으면(=전부 나라 이름이면) 그대로 둡니다. 싱가포르·모나코처럼
+    나라와 항구 이름이 같은 곳을 통째로 지우면 안 됩니다.
+    """
+
+    known = _country_words()
+    pieces = [piece for piece in str(text or "").replace(",", " ").split() if piece]
+    kept = [piece for piece in pieces if piece.strip(".").casefold() not in known]
+    if not kept or len(kept) == len(pieces):
+        return str(text or "")
+    return " ".join(kept)
+
+
 def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
     """적힌 이름을 우리 항구·공항 목록에서 다시 찾습니다.
 
@@ -220,18 +279,42 @@ def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
         if head:
             again = planning_service.search_locations(head, transport_mode, role)
             rows = again["data"] if again["success"] else []
-    # "미국 로스앤젤레스", "Los Angeles USA"처럼 나라가 앞뒤에 붙은 경우.
-    # 앞 낱말이나 뒤 낱말을 떼고 한 번씩 더 찾습니다. 짐작이 섞이므로 그렇다고 적어 둡니다.
+    # "미국 로스앤젤레스", "Los Angeles USA", "Port of Busan"처럼 나라 이름이나
+    # 항구를 뜻하는 곁말이 붙은 경우. **그 낱말만** 떼고 한 번 더 찾습니다.
+    #
+    # 예전에는 앞 낱말·뒤 낱말을 가리지 않고 떼었습니다. 남은 한 낱말이 짧으면
+    # 아무 데나 들어맞아, 엉뚱한 나라의 항구가 조용히 채워졌습니다. (2026-09-27)
+    #     "Phong Nha, Vietnam"        -> 'Nha'  -> 나바셰바항(인도)
+    #     "Hai Duong, Vietnam"        -> 'Hai'  -> 하이퐁항
+    #     "Angeles City, Philippines" -> 'City' -> 호찌민항
+    # 뗄 것이 없으면 더 짐작하지 않고 빈 칸으로 둡니다.
     if not rows:
-        words = text.replace(",", " ").split()
-        for shorter in (" ".join(words[1:]), " ".join(words[:-1])):
-            if len(words) < 2 or len(shorter) < 2:
-                continue
+        shorter = _drop_country_words(text)
+        if shorter and shorter.casefold() != text.casefold():
             again = planning_service.search_locations(shorter, transport_mode, role)
             rows = again["data"] if again["success"] else []
             if rows:
                 notes.append(f"{label} '{text}'을(를) '{shorter}'(으)로 찾았습니다. 맞는지 봐 주세요.")
-                break
+    # 옛 로마자 표기(Pusan · Inchon)를 지금 이름으로 바꿔 한 번 더 봅니다.
+    if not rows:
+        renamed = OLD_ROMAN.get("".join(_drop_country_words(text).split()).casefold())
+        if renamed:
+            again = planning_service.search_locations(renamed, transport_mode, role)
+            rows = again["data"] if again["success"] else []
+            if rows:
+                notes.append(f"{label} '{text}'은(는) 옛 표기로 보고 "
+                             f"{rows[0]['name']}({rows[0]['code']})로 넣었습니다. 맞는지 봐 주세요.")
+
+    # 띄어쓰기만 다른 경우. 항구표는 VNHPH 를 'Haiphong' 한 낱말로 담고 있는데,
+    # 서류에는 'Hai Phong' 으로 적혀 옵니다(표본 다섯 장이 그렇습니다).
+    # 띄어쓰기를 지우고 한 번 더 봅니다. 낱말을 떼는 것과 달리 **글자가 하나도
+    # 줄지 않아** 엉뚱한 곳에 들어맞지 않습니다. (2026-09-27)
+    if not rows:
+        squashed = "".join(_drop_country_words(text).split())
+        if len(squashed) >= 3 and squashed.casefold() != text.casefold():
+            again = planning_service.search_locations(squashed, transport_mode, role)
+            rows = again["data"] if again["success"] else []
+
     # 공항은 **도시 이름으로 부르는데 자료에는 공항 이름만** 있습니다.
     # 부산 공항은 자료에 "김해국제공항"이라 "부산"으로는 안 나옵니다. 그래서
     # "부산에서 항공으로"라고 적으면 출발 공항이 통째로 비었습니다. (2026-09-26)
