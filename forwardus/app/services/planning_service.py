@@ -432,7 +432,16 @@ def tariff_guide(hs_code: str, country_code: str) -> dict:
         "agreements": sorted(best.values(), key=lambda row: _rate_value(row["rate"])),
         "general": general,
         "note": "세율은 한국으로 수입할 때 기준입니다. 도착국이 매기는 관세는 그 나라가 정합니다.",
-        "source": "api",
+        # **세율을 어디서 얻었는지 그대로 물려줍니다.**
+        #
+        # 예전에는 "api" 라고 못 박았습니다. 그런데 관세청이 막히면
+        # fetch_tariff_rates 가 저장분(stored)이나 굳혀 둔 관세율표(internal)로
+        # 답합니다. 그때도 "api" 라고 적으면 **며칠 전 값을 방금 받은 값**으로
+        # 화면에 내보냅니다. 세율은 돈이 걸린 값이라 더 위험합니다.
+        # (2026-09-27 scripts/checks/host_down.py 로 유니패스만 막아 보다 찾음)
+        "source": result.get("source", "api"),
+        # 내부 표로 답했으면 언제 자료인지 함께 알립니다.
+        "source_note": result.get("message", "") if result.get("source") != "api" else "",
     }
 
 
