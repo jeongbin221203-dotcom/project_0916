@@ -64,3 +64,39 @@ def test_사전이_가리키는_말은_모두_품목표에서_찾아진다(app):
         if not hsk_catalog.search(word):
             dead.append(f"{word} → {targets}")
     assert not dead, f"사전에 적어 두었는데 못 찾는 말: {dead}"
+
+
+# --- 관세청이 0건일 때도 품목표를 봅니다 ----------------------------------------------
+#
+# 관세청 HS부호검색은 품명을 **그대로** 찾습니다. 실제 키로 확인해 보니
+# '치약'은 나오는데 '리튬이온 축전지'·'폴리에틸렌 필름'·'스테인리스 열연강판'·
+# '냉동 고등어'는 0건이었습니다. 그런데 내부 품목표에는 다 있습니다.
+#
+# 예전에는 품목표를 **키가 없을 때만** 봤습니다. 그래서 키를 넣는 순간
+# 사람이 쓰는 말로는 아무것도 못 찾게 됐습니다. (2026-09-27 실키 검사)
+
+@pytest.mark.parametrize("word", [
+    "치약", "리튬이온 축전지", "폴리에틸렌 필름", "스테인리스 열연강판", "냉동 고등어",
+])
+def test_관세청이_0건이어도_품목표에서_찾는다(app, monkeypatch, word):
+    from app.collectors import customs_client
+    from app.collectors.base_client import ok
+    from app.services import planning_service
+
+    # 관세청이 "성공했지만 0건"으로 답하는 상황 (실제로 본 응답 모양)
+    monkeypatch.setattr(customs_client, "search_hs_codes", lambda q: ok([], "api"))
+    monkeypatch.setattr(planning_service, "_hs_name_hints", lambda q: [])
+
+    found = planning_service.search_hs_codes(word)
+    assert found.get("data"), f"'{word}' 로 아무것도 못 찾습니다"
+    assert found["source"] == "internal", "어디서 찾았는지 밝혀야 합니다"
+    assert "관세청" in (found.get("offline_note") or ""), "왜 품목표를 봤는지 적어야 합니다"
+
+
+def test_낱말을_다_갖춘_줄이_없으면_하나씩이라도_찾는다(app):
+    """'스테인리스 열연강판'은 그 둘이 한 줄에 같이 있는 이름이 없습니다.
+    따로는 각각 있으므로, 아무것도 안 주는 것보다 낫습니다."""
+
+    assert hsk_catalog.search("스테인리스 열연강판")
+    assert hsk_catalog.search("스테인리스")
+    assert hsk_catalog.search("열연강판")

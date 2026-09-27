@@ -195,6 +195,24 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[dict] | None:
     bare = [_strip_particle(word) for word in words]
     if bare != words:
         rows += _look(catalog, bare, korean, limit, rows, text)
+    if rows:
+        return rows[:limit]
+
+    # 낱말을 **다 갖춘 줄**이 없으면 하나씩이라도 찾습니다.
+    #
+    # 찾기는 적어 준 낱말이 모두 맞아야 합니다. 그래서 "스테인리스 열연강판"은
+    # 0건입니다 — 품목표에 그 둘이 한 줄에 같이 있는 이름이 없습니다.
+    # 그런데 "스테인리스"도 "열연강판"도 따로는 각각 12건씩 있습니다.
+    # 아무것도 안 주는 것보다 **가장 긴 낱말로 찾은 것**을 주는 편이 낫습니다.
+    # 긴 낱말이 더 구체적이라 엉뚱한 것이 덜 걸립니다.
+    # (2026-09-27 실키 검사에서 관세청이 0건을 주는 말들을 보고 넣었습니다)
+    if len(bare) > 1:
+        for word in sorted(bare, key=len, reverse=True):
+            if len(word) < MIN_KOREAN_LENGTH:
+                continue
+            rows += _look(catalog, [word], korean, limit, rows, text)
+            if rows:
+                break
     return rows[:limit]
 
 

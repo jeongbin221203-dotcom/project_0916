@@ -225,6 +225,26 @@ def search_hs_codes(query: str, *, compare_navigation: bool = False,
                 # 무슨 낱말로 바꿔 찾았는지 화면에서 밝혀 줍니다.
                 return {**retry, "searched_as": name, "original_query": text}
 
+        # **관세청이 0건이어도 내부 품목표를 봅니다.**
+        #
+        # 관세청 HS부호검색은 품명을 **그대로** 찾습니다. 그래서 사람이 쓰는
+        # 말로 적으면 0건이 나옵니다. 실키로 확인해 보니 이랬습니다.
+        #     '치약'              → 나옴
+        #     '리튬이온 축전지'     → 0건
+        #     '폴리에틸렌 필름'     → 0건
+        #     '스테인리스 열연강판'  → 0건
+        #     '냉동 고등어'        → 0건
+        # 그런데 내부 품목표에는 다 있습니다. 일상어 사전과 상위 수출품목
+        # 표(HEADINGS)가 그 말을 호로 이어 두었기 때문입니다.
+        #
+        # 예전에는 이 길이 **키가 없을 때만** 열려 있었습니다. 그래서 키를 넣는
+        # 순간 사람이 쓰는 말로는 아무것도 못 찾게 됐습니다. 키가 있든 없든
+        # 관세청이 못 찾으면 품목표를 봅니다. 어디서 찾았는지는 밝힙니다.
+        # (2026-09-27 실키 검사에서 확인)
+        offline = customs_client.search_hs_codes_offline(text, "관세청 품명 검색에 없어")
+        if offline.get("data"):
+            return offline
+
     # 관세청이 답하지 않거나 예시로 대체됐으면 국제 출처를 봅니다.
     fallback = _hs_from_open_sources(text)
     return fallback if fallback else found
