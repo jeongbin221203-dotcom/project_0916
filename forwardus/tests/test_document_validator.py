@@ -497,3 +497,70 @@ def test_net_weight_not_invented_when_missing(create_shipment, cargo_input):
     shipment = create_shipment(cargo={**cargo_input, "net_weight_kg": ""})
     document_service.generate_documents(shipment)
     assert document_service.get_document(shipment, "packing_list").data["net_weight_kg"] == ""
+
+
+# --- 기준값과 같은 서류는 지적하지 않습니다 --------------------------------------------
+#
+# 서류가 둘뿐이고 서로 다르면 어느 쪽을 기준으로 삼을지 정해지지 않아, **값이 맞는
+# 쪽**이 지적당하는 일이 있었습니다. 고치라고 해서 가 보면 값이 맞아서 무엇이
+# 문제인지 알 수가 없습니다. 기준값이 있으면 답은 정해져 있습니다.
+# (2026-09-27 · ⑦ 서류 간 어긋남 넓힌 조합에서 찾음)
+
+_REF = {"consignee": "SAMPLE CO., LTD.", "pod": "LOS ANGELES, USA",
+        "invoice_value": 1250.0, "currency": "USD"}
+_FORM = {"commercial_invoice": list(_REF), "packing_list": list(_REF)}
+_LABELS = {"commercial_invoice": "상업송장", "packing_list": "포장명세서"}
+
+
+def _run(docs):
+    return validate_documents(docs, _REF, _LABELS, _FORM)
+
+
+def test_틀린_서류만_지적하고_맞는_서류는_안_건드린다():
+    found = _run({
+        "commercial_invoice": {**_REF, "consignee": "SAMPLE CO.,LTD"},   # 틀림
+        "packing_list": dict(_REF),                                     # 맞음
+    })
+    flagged = {(row["document"], row["field"]) for row in found["findings"]}
+    assert ("commercial_invoice", "consignee") in flagged
+    assert ("packing_list", "consignee") not in flagged, \
+        "값이 맞는 서류를 고치라고 하면 무엇이 문제인지 알 수 없습니다"
+
+
+def test_둘_다_틀리면_둘_다_지적한다():
+    found = _run({
+        "commercial_invoice": {**_REF, "pod": "LOS ANGELES,USA"},
+        "packing_list": {**_REF, "pod": "LA, USA"},
+    })
+    flagged = {(row["document"], row["field"]) for row in found["findings"]}
+    assert ("commercial_invoice", "pod") in flagged
+    assert ("packing_list", "pod") in flagged
+
+
+def test_표기만_다른_같은_숫자는_어긋남이_아니다():
+    """송장에 '1,250.00' 으로 적고 명세서에 '1250' 으로 적는 것은 흔합니다.
+    이걸 경고로 띄우면 사람이 경고를 안 믿게 됩니다."""
+
+    found = _run({
+        "commercial_invoice": {**_REF, "invoice_value": "1,250.00"},
+        "packing_list": {**_REF, "invoice_value": " 1250 "},
+    })
+    assert not [row for row in found["findings"] if row["field"] == "invoice_value"]
+
+
+def test_대소문자와_앞뒤_공백만_다른_것도_어긋남이_아니다():
+    found = _run({
+        "commercial_invoice": {**_REF, "consignee": "sample co., ltd."},
+        "packing_list": {**_REF, "consignee": "  SAMPLE CO., LTD.  "},
+    })
+    assert not [row for row in found["findings"] if row["field"] == "consignee"]
+
+
+def test_눈에는_같아_보여도_글자가_다르면_잡는다():
+    """은행은 쉼표 뒤 빈칸 하나도 불일치로 봅니다."""
+
+    found = _run({
+        "commercial_invoice": {**_REF, "consignee": "SAMPLE CO.,LTD"},
+        "packing_list": dict(_REF),
+    })
+    assert [row for row in found["findings"] if row["field"] == "consignee"]

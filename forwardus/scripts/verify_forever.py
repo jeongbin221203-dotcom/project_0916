@@ -70,6 +70,7 @@ JOBS = [
     ("⑤ 계약서 한국어", ["python", "scripts/checks/m_contract_ko.py"]),
     ("⑤ 계약서 오인", ["python", "scripts/checks/m_contract_cross.py"]),
     ("⑥ 서로 모순되는 입력", ["python", "scripts/checks/m6_contradiction.py", "3000"]),
+    ("⑦ 서류 간 어긋남(넓힘)", ["python", "scripts/checks/m7_cross_wide.py", "5000"]),
     ("⑪ 일상어 HS", ["python", "scripts/checks/m11_hs.py"]),
     ("⑫ 역순·섞어 적기", ["python", "scripts/checks/m12_reverse.py", "3000"]),
     ("⑬ 인코텀즈 선택", ["python", "scripts/checks/m13_incoterms.py"]),

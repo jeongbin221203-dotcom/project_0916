@@ -163,14 +163,24 @@ def _raw(documents, doc_type, field):
     return documents[doc_type].get(field)
 
 
-def _cross_findings(documents, labels, form_fields, reported) -> list[dict]:
+def _cross_findings(documents, labels, form_fields, reported, reference=None) -> list[dict]:
     """서류끼리 맞대어 봅니다. 기준값이 없어도 서로는 같아야 합니다.
 
     ``reported``는 기준값 대조에서 이미 지적한 (서류, 칸)입니다. 같은 자리를
     두 번 알리지 않습니다. 기준값 쪽이 "무엇과 달라야 하는지"까지 알려 주므로
     더 쓸모 있고, 두 줄이 나란히 뜨면 고칠 곳이 둘인 줄 알게 됩니다.
+
+    ``reference``가 있으면 **기준값과 같은 서류는 지적하지 않습니다.**
+
+    왜 그렇게 하는가
+      서류가 둘뿐이고 서로 다르면 어느 쪽을 기준으로 삼을지 정해지지 않아,
+      **값이 맞는 쪽**이 지적당하는 일이 있었습니다. 고치라고 해서 가 보면
+      값이 맞아서 무엇이 문제인지 알 수가 없습니다. 기준값이 있으면 답은
+      정해져 있습니다 — 기준값과 같은 쪽이 맞고, 다른 쪽을 고치면 됩니다.
+      (2026-09-27)
     """
 
+    reference = reference or {}
     findings = []
     for field, field_label in VALIDATION_FIELDS.items():
         written = _written(documents, form_fields, field)
@@ -179,6 +189,16 @@ def _cross_findings(documents, labels, form_fields, reported) -> list[dict]:
         groups = _group(written)
         if len(groups) < 2:
             continue
+
+        # 기준값과 같은 묶음을 맨 앞으로. 그 묶음의 서류는 고칠 것이 없습니다.
+        if reference.get(field) not in (None, ""):
+            wanted = _normalize(reference[field], field)
+            right = [group for group in groups if _equal(group[0], wanted)]
+            if right:
+                groups = right + [group for group in groups if group not in right]
+                for _value, docs in right:
+                    for doc_type in docs:
+                        reported.add((doc_type, field))
 
         def entry(doc_type, other, message):
             return {
@@ -339,7 +359,8 @@ def validate_documents(documents: dict[str, dict], reference: dict,
 
     # 기준값이 없어 위에서 건너뛴 칸도 서류끼리는 같아야 합니다.
     reported = {(row["document"], row["field"]) for row in findings}
-    findings.extend(_cross_findings(documents, labels, form_fields, reported))
+    findings.extend(_cross_findings(documents, labels, form_fields, reported,
+                                    reference))
     findings.extend(_missing_findings(documents, labels, form_fields, reported))
 
     return {
