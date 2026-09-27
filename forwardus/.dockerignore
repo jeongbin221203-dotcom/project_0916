@@ -1,0 +1,28 @@
+# 이미지에 넣지 않을 것. 작을수록 배포가 빠릅니다.
+
+# 받아 둔 언어 데이터(37MB). 이미지에서는 apt 로 깐 것을 씁니다.
+data/tessdata/
+
+# 저장해 둔 조회 결과. 서버에서 다시 쌓입니다.
+data/cache/
+
+# 로컬 데이터베이스
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# 키. 절대 이미지에 넣지 않습니다 — 값은 Render 대시보드에서 넣습니다.
+.env
+
+# 시험·개발에만 쓰는 것
+tests/
+scripts/checks/
+.pytest_cache/
+__pycache__/
+*.pyc
+.git/
+.github/
+
+# 글꼴 원본 (app/static 안의 것만 씁니다)
+*.otf

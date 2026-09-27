@@ -46,7 +46,30 @@ python -c "from app.processors import ocr; print(ocr.status())"
 | `korean: False` | `python data/setup_tessdata.py`를 다시 돌립니다. 회사망에서 막히면 `kor.traineddata`를 받아 `data/tessdata/`에 둡니다 |
 | 사진을 올렸는데 거절됨 | 위 `ready`가 True인지. 서버를 다시 띄워야 반영됩니다 |
 
-## 서버에 올릴 때
+## 서버에 올릴 때 — **이미 되어 있습니다**
 
-배포 서버에도 같은 3단계가 필요합니다. 도커라면 이미지에 `tesseract-ocr`와
-`tesseract-ocr-kor`를 함께 넣고, 언어 데이터 경로를 `TESSDATA_DIR`로 맞추면 됩니다.
+`forwardus/Dockerfile` 이 위 3단계를 대신합니다. 손으로 할 것이 없습니다.
+
+| 로컬에서 하는 것 | 이미지에서 | |
+|---|---|---|
+| `winget install …TesseractOCR` | `apt-get install tesseract-ocr` | |
+| `python data/setup_tessdata.py` | `apt-get install tesseract-ocr-kor tesseract-ocr-eng` | 언어 데이터가 패키지에 들어 있습니다 |
+| `pip install -r requirements.txt` | 같음 | |
+| — | `ENV TESSDATA_DIR=/usr/share/tesseract-ocr/5/tessdata` | Debian bookworm 의 Tesseract 5 자리 |
+
+**한글 글꼴(`fonts-nanum`)도 함께 넣습니다.** 서류 PDF 를 그리는 데 필요하고,
+없으면 서류 만들기가 통째로 멈춥니다(네모로 찍힌 서류를 내주지 않도록
+그렇게 해 두었습니다). `document_form.py` 가 찾는 경로에 그대로 깔립니다.
+
+이미지를 만들 때 둘 다 확인합니다.
+
+```dockerfile
+RUN tesseract --list-langs 2>&1 | grep -qx 'kor'     && python -c "import sys; from app.processors import document_form as d; sys.exit(0 if d.fonts_ready() else 1)"
+```
+
+여기서 틀리면 **배포가 아니라 빌드가 실패합니다.** 사진을 못 읽거나 서류를 못
+만드는 서버가 조용히 떠 있는 일이 없습니다.
+
+> 2026-09-27 이전에는 `render.yaml` 이 python 런타임이라 `pip install` 만 했습니다.
+> 이 문서에는 "배포 서버에도 같은 3단계가 필요합니다"라고 적혀 있었지만 실제로는
+> 아무것도 되어 있지 않아, **배포 서버에서는 사진 서류를 늘 거절했습니다.**

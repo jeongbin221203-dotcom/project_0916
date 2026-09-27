@@ -1,20 +1,69 @@
+# Render 배포 설정
+#
+# python 런타임에서 docker 로 바꿨습니다. 까닭은 Dockerfile 첫머리에 적어
+# 두었습니다 — Tesseract 와 한글 글꼴은 pip 로 못 깝니다. (2026-09-27)
+#
+# 키는 여기에 적지 않습니다. `sync: false` 는 "값은 Render 대시보드에서
+# 넣는다"는 뜻입니다. 저장소에 키를 적으면 보는 사람이 모두 쓸 수 있습니다.
+
 services:
   - type: web
     name: forwardus
-    runtime: python
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     rootDir: forwardus
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn "app:create_app()"
     healthCheckPath: /health
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.7
       - key: SECRET_KEY
-        generateValue: true
+        generateValue: true          # Render 가 만들어 줍니다. 사람이 정하지 않습니다.
       - key: DATABASE_URL
         fromDatabase:
           name: forwardus-db
           property: connectionString
+
+      # --- 마스터 계정 -------------------------------------------------------
+      # 앱이 뜰 때 없으면 만듭니다. **기본 비밀번호 "1234" 를 그대로 두면 안 됩니다.**
+      # 대시보드에서 반드시 바꿔 넣으세요.
+      - key: MASTER_EMAIL
+        sync: false
+      - key: MASTER_PASSWORD
+        sync: false
+
+      # --- AI (서류 읽기 · HS 분류 · 수출 상담) --------------------------------
+      # 비우면 AI 기능만 꺼지고 나머지는 그대로 돕니다.
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_DOC_MODEL
+        sync: false
+      - key: AI_HS_MODEL
+        sync: false
+
+      # --- 관세청 UNI-PASS ---------------------------------------------------
+      # 비워도 굳혀 둔 관세율표·표준품명으로 답합니다. (data/mock/*.json)
+      - key: CUSTOMS_API_KEY
+        sync: false
+      - key: UNIPASS_KEY_CUSTOMS
+        sync: false
+      - key: DATA_PORTAL_KEY_CUSTOMS
+        sync: false
+
+      # --- 공공데이터포털 공통 키 ---------------------------------------------
+      - key: DATA_GO_KR_SERVICE_KEY
+        sync: false
+
+      # --- 환율 · 스케줄 · 추적 ------------------------------------------------
+      - key: EXCHANGE_API_KEY
+        sync: false
+      - key: SCHEDULE_API_KEY
+        sync: false
+      - key: TRACKING_API_KEY
+        sync: false
+
+      # --- 화면에서 내려 둔 기능 ----------------------------------------------
+      # 계약서 조항 점검. 되살리려면 1 로 바꿉니다. (2026-09-27 사용자 결정)
+      - key: CONTRACT_CLAUSES_ON
+        value: "0"
 
 databases:
   - name: forwardus-db
