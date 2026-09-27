@@ -156,7 +156,12 @@ def payment_info(country_code: str = "") -> dict:
     cache_name = f"ksure_payment_{code or 'all'}"
     cached = file_cache.read(cache_name)
     if cached and cached[1] < CACHE_DAYS:
-        return ok(cached[0], "api")
+        # 받아 둔 파일에서 꺼낸 것이라 "cache" 입니다.
+        # 예전에는 "api" 라고 적었습니다. 같은 파일 아래쪽(실패 시 폴백)은
+        # 이미 "cache" 라고 바르게 적고 있어, 한 함수 안에서 관례가 둘이었습니다.
+        # "api" 는 이 프로젝트에서 **방금 기관에서 받았다**는 뜻입니다.
+        # (2026-09-27)
+        return ok(cached[0], "cache")
 
     params = {"serviceKey": key}
     if code:

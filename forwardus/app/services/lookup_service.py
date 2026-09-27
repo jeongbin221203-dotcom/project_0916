@@ -502,8 +502,10 @@ def health_check() -> dict:
     rows.sort(key=lambda row: order.get(row["label"], 999))
     live = sum(1 for row in rows if row["ok"])
     return {"rows": rows, "live": live, "total": len(rows),
-            "note": ("'응답함'은 기관에서 실제 값이 온 것입니다. "
-                     "'예시 데이터로 대체'는 기관이 멈춰 우리 예시를 보여 준 것이고, "
+            "note": ("'응답함'은 기관에서 실제 값이 지금 온 것입니다. "
+                     "'받아 둔 값으로 답함'은 기관이 멈춰 예전에 받아 둔 실제 값을 쓴 것입니다 "
+                     "— 예시가 아니라 며칠 지난 값입니다. "
+                     "'예시 데이터로 대체'는 받아 둔 것도 없어 우리 예시를 보여 준 것이고, "
                      "'안 됨'과 '응답 없음'은 키가 없거나 기관이 막은 것입니다.")}
 
 
@@ -520,7 +522,12 @@ def _probe(label: str, env: str, call) -> dict:
     return {
         "label": label, "env": env,
         "ok": ok_now and source == "api",
-        "state": ({"api": "응답함", "internal": "내부 품목표로 대체"}.get(source, "예시 데이터로 대체")
+        # 받아 둔 값(stored·cache·market)은 **예시가 아닙니다.** 실제로 받아 낸
+        # 값이고 며칠 지났을 뿐입니다. 전에는 이 셋이 전부 "예시 데이터로 대체"로
+        # 찍혀, 진단 화면이 실데이터를 예시라고 말했습니다. (2026-09-27)
+        "state": ({"api": "응답함", "internal": "내부 품목표로 대체",
+                   "stored": "받아 둔 값으로 답함", "cache": "받아 둔 값으로 답함",
+                   "market": "시장 환율로 환산"}.get(source, "예시 데이터로 대체")
                   if ok_now else "안 됨"),
         "detail": result.get("message", "") or
                   (f"{len(result['data'])}건" if isinstance(result.get("data"), list) else ""),

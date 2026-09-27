@@ -10,7 +10,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from copy import deepcopy
 
-from app.collectors import hsk_catalog
+from app.collectors import hsk_catalog, snapshot
 from app.collectors.base_client import fail, get_config, load_mock, ok, request_text
 
 REQUIREMENT_STATUSES = ["confirmed", "check_required", "not_applicable", "unknown"]
@@ -226,7 +226,13 @@ def fetch_tariff_rates(hs_code: str) -> dict:
 
     result = request_text("GET", UNIPASS_TARIFF_URL, params={"crkyCn": key, "hsSgn": digits})
     if not result["success"]:
-        return result
+        # 세율은 **돈이 걸린 값**입니다. 기관이 멈췄다고 빈손으로 답하면 견적에서
+        # 관세를 못 냅니다. 지난번에 받아 둔 것으로 답하고, 화면은 그것이
+        # 저장분(source="stored")임을 보고 "언제 받은 값"인지 밝힙니다.
+        # 세율은 법이 바뀔 때만 바뀌므로 law(90일) 수명을 씁니다.
+        # (2026-09-27 이 파일에는 저장·꺼내기가 한 줄도 없었습니다. collectors
+        #  가운데 유일했습니다 — scripts/checks/cache_offline.py 가 찾았습니다)
+        return snapshot.recall(f"tariff_{digits}", "law") or result
     try:
         root = ET.fromstring(result["data"])
     except ET.ParseError:
@@ -242,8 +248,10 @@ def fetch_tariff_rates(hs_code: str) -> dict:
         "end_date": (row.findtext("aplyEndDt") or "").strip(),
     } for row in root.findall("trrtQryRsltVo")]
     if not rows and notice:
-        return fail("API_NO_DATA", "api", notice)
-    return ok(rows, "api")
+        # 기관이 "없다"고 답한 것도 실패가 아닙니다. 다만 예전에 세율이 있었다면
+        # 그것을 주는 편이 낫습니다 — 미등재는 우리 쪽 조회 범위 문제일 수 있습니다.
+        return snapshot.recall(f"tariff_{digits}", "law") or fail("API_NO_DATA", "api", notice)
+    return snapshot.remember(f"tariff_{digits}", ok(rows, "api"))
 
 
 # 관세청 "통계부호"(API019). 국가코드 부호는 statsSgnTp=A06 입니다.
@@ -264,7 +272,9 @@ def fetch_country_codes() -> dict:
     result = request_text("GET", UNIPASS_STATS_URL,
                           params={"crkyCn": key, "statsSgnTp": COUNTRY_CODE_GROUP})
     if not result["success"]:
-        return result
+        # 국가코드는 거의 안 바뀝니다. 나라 이름을 못 찾으면 협정세율 구분명에서
+        # 대상국을 못 읽어, 화면이 "한ㆍ칠레FTA협정세율"을 그냥 글자로 보여 줍니다.
+        return snapshot.recall("country_codes", "registry") or result
     try:
         root = ET.fromstring(result["data"])
     except ET.ParseError:
@@ -277,5 +287,7 @@ def fetch_country_codes() -> dict:
         if len(code) == 2 and name:
             names[name] = code
     if not names:
-        return fail("API_NO_DATA", "api", (root.findtext("ntceInfo") or "").strip() or "국가코드를 받지 못했습니다.")
-    return ok(names, "api")
+        return snapshot.recall("country_codes", "registry") or fail(
+            "API_NO_DATA", "api",
+            (root.findtext("ntceInfo") or "").strip() or "국가코드를 받지 못했습니다.")
+    return snapshot.remember("country_codes", ok(names, "api"))

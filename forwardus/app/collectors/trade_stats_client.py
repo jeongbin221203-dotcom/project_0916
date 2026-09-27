@@ -220,8 +220,17 @@ def top_destinations(hs_code: str, limit: int = 10, year: int | None = None) -> 
 
     rows = sorted((row for row in by_country.values() if row["export_usd_thousand"] > 0),
                   key=lambda row: -row["export_usd_thousand"])[:max(1, limit)]
+    # 출처는 item_trade 가 준 것을 그대로 물려줍니다.
+    #
+    # 예전에는 "api" 라고 못 박았습니다. 그런데 이 함수는 조회를 하지 않고
+    # item_trade 의 결과를 나라별로 더하기만 합니다. item_trade 가 저장분으로
+    # 답했는데 여기서 "api" 라고 덮어쓰면, **며칠 전 값을 방금 받은 값으로**
+    # 화면에 내보냅니다. lookup_service 의 진단 화면도 source == "api" 를
+    # "응답함"으로 읽으므로, 기관이 죽었는데 살아 있다고 보고했습니다.
+    # (2026-09-27 scripts/checks/cache_offline.py 가 찾았습니다)
     return ok({**result["data"], "rows": rows,
-               "note": f"{result['data']['from'][:4]}년에 실제로 신고된 수출 실적입니다."}, "api")
+               "note": f"{result['data']['from'][:4]}년에 실제로 신고된 수출 실적입니다."},
+              result.get("source", "api"))
 
 
 # 기간별 나라별 합계는 달이 끝나야 바뀝니다. 하루 동안은 받아 둔 것을 씁니다.

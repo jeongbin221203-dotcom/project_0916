@@ -132,7 +132,11 @@ def container_throughput(months: int = 6) -> dict:
     start, end = _period(months)
     result = _call(CONTAINER_URL, {"sym": start, "eym": end}, "외내항컨테이너처리실적")
     if not result["success"]:
-        return result
+        # 같은 파일의 port_traffic 은 저장분으로 답하는데 이 함수만 빠져 있었습니다.
+        # busiest_ports 가 이 함수를 부르므로, 한 군데가 비어 세 가지가 함께
+        # 죽었습니다. (컨테이너 처리실적 · 물동량 많은 항구 · 권역별 물동량)
+        # (2026-09-27 scripts/checks/cache_offline.py 가 찾았습니다)
+        return snapshot.recall(f"container_teu_{months}", "stats") or result
 
     rows = []
     for row in _flatten(result["data"]):
@@ -147,8 +151,9 @@ def container_throughput(months: int = 6) -> dict:
             "total_teu": round(full + empty, 1),
         })
     rows = [row for row in rows if row["port"]]
-    return ok({"from": start, "to": end, "rows": rows,
-               "note": "TEU는 20피트 컨테이너 한 대를 1로 센 단위입니다."}, "api")
+    return snapshot.remember(f"container_teu_{months}", ok(
+        {"from": start, "to": end, "rows": rows,
+         "note": "TEU는 20피트 컨테이너 한 대를 1로 센 단위입니다."}, "api"))
 
 
 def busiest_ports(months: int = 6, limit: int = 10) -> dict:
@@ -180,7 +185,7 @@ def region_traffic(months: int = 6) -> dict:
     start, end = _period(months)
     result = _call(AREA_URL, {"sym": start, "eym": end}, "지역별 선박입출항실적")
     if not result["success"]:
-        return result
+        return snapshot.recall(f"region_traffic_{months}", "stats") or result
 
     rows = [{
         "period": row.get("useYm", ""),
@@ -192,5 +197,6 @@ def region_traffic(months: int = 6) -> dict:
         "ocean_tonnage": _number(row.get("fnshpGrtg")),
     } for row in _flatten(result["data"])]
     rows = [row for row in rows if row["port"] and row["region"]]
-    return ok({"from": start, "to": end, "rows": rows,
-               "note": "외항선 척수가 많을수록 그 지역으로 가는 배가 많습니다."}, "api")
+    return snapshot.remember(f"region_traffic_{months}", ok(
+        {"from": start, "to": end, "rows": rows,
+         "note": "외항선 척수가 많을수록 그 지역으로 가는 배가 많습니다."}, "api"))

@@ -289,10 +289,12 @@ def _from_open_exchange_rates() -> dict | None:
             body = json.loads(result["data"])
         except ValueError:
             body = None
+    from_file = False
     if not isinstance(body, dict) or body.get("error") or not (body.get("rates") or {}).get("KRW"):
         # 받지 못했으면 fx 시세표가 받아 둔 파일이라도 씁니다.
         found = file_cache.read("fx_oxr_latest")
         body = found[0] if found else None
+        from_file = bool(found)
     per_usd = (body or {}).get("rates") or {}
     krw = per_usd.get("KRW")
     if not krw:
@@ -308,6 +310,19 @@ def _from_open_exchange_rates() -> dict | None:
         rates[code] = krw / value
     stamp = body.get("timestamp")
     applied = (date.fromtimestamp(int(stamp)).isoformat() if stamp else date.today().isoformat())
+    if from_file:
+        # **파일에서 꺼낸 것은 "market" 이 아닙니다.**
+        #
+        # "market" 은 SOURCE_LABELS 에서 "실제 시장 환율로 환산"이라고 읽힙니다.
+        # 며칠 전 파일을 그렇게 적으면 지금 시세인 척하게 됩니다.
+        #
+        # 더 나쁜 것이 있었습니다. _read_krw_rates 가 이 결과를 받아
+        # _save_last_good(..., "market") 으로 **다시 저장**했습니다. 그러면
+        # saved_date 가 오늘로 새로 찍혀, STORED_MAX_DAYS(30일) 가 영영 오지
+        # 않습니다. 한 달 지난 환율이 계속 "0일 전"으로 보였습니다.
+        # 그래서 from_file 을 함께 넘겨 다시 저장하지 않게 합니다.
+        # (2026-09-27 scripts/checks/cache_offline.py 가 찾았습니다)
+        return {**ok(rates, "stored"), "applied_date": applied, "from_file": True}
     return {**ok(rates, "market"), "applied_date": applied}
 
 
@@ -329,7 +344,10 @@ def _read_krw_rates() -> tuple[dict, float]:
     market = _from_open_exchange_rates()
     sound = sound_rates(market["data"]) if market else None
     if sound:
-        _save_last_good(sound, market.get("applied_date", ""), "market")
+        # 파일에서 꺼낸 것이면 다시 저장하지 않습니다. 저장하면 saved_date 가
+        # 오늘로 찍혀 낡은 값이 새 값처럼 보입니다. (위 from_file 설명 참고)
+        if not market.get("from_file"):
+            _save_last_good(sound, market.get("applied_date", ""), "market")
         return {**market, "data": sound}, LIVE_TTL
 
     stored = _last_good()
