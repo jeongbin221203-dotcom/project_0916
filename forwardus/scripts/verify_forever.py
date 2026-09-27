@@ -108,6 +108,8 @@ JOBS = [
     ("멈춤 · 키 없음·거부", ["python", "scripts/checks/keys_off.py"]),
     ("멈춤 · 기관 한 곳씩", ["python", "scripts/checks/host_down.py", "--all"]),
     ("HS · 기업·개인 상위", ["python", "scripts/checks/m26_biz_personal.py"]),
+    # 오퍼시트는 표준 서식이 없어 회사마다 같은 값을 다르게 적습니다.
+    ("오퍼시트 양식 50가지", ["python", "scripts/checks/m_offer_formats.py"]),
     ("HS · 일상어", ["python", "scripts/checks/m11_hs.py"]),
     ("JS 화면 테스트", ["node", "--test", "tests/hs_standard_names.test.cjs",
                    "tests/doc_schedule_keep.test.cjs"]),

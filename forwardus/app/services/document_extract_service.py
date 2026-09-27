@@ -30,7 +30,7 @@ from app.processors import bank_redaction, ocr
 from app.processors import lc_schedule as lc_schedule_module
 from app.services import ServiceError, document_start_service
 from app.services.intake_service import (INCOTERMS, PACKAGE_TYPES, _amount, _currencies,
-                                         _date, _pick, _place)
+                                         _date, _incoterms_word, _pick, _place)
 from app.validators import ValidationError
 from app.validators.shipment_validator import optional_text, parse_date
 
@@ -480,7 +480,8 @@ def to_form(raw: dict) -> dict:
         "other_references": _references(raw),
     })
 
-    incoterms = _pick(raw.get("incoterms"), INCOTERMS)
+    # "C.I.F." · "FOB Incoterms 2020" · "FOB Busan" 처럼 붙어 오는 군더더기를 뗍니다.
+    incoterms = _incoterms_word(raw.get("incoterms"))
     if raw.get("incoterms") and not incoterms:
         notes.append(f"Incoterms '{raw['incoterms']}'는 Incoterms 2020 조건이 아니라 비워 두었습니다.")
     fields["incoterms"] = incoterms

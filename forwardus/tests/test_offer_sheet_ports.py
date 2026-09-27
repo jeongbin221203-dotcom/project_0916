@@ -97,3 +97,62 @@ def test_표본_오퍼시트_다섯_거래가_그대로_들어간다(app):
             assert form.get("destination_code") == want_dest, (pod, form.get("destination_code"))
             assert form.get("requested_departure_date") == when, (when, form)
             assert form.get("incoterms", "") == terms
+
+
+# --- 짐작이 섞였으면 그렇다고 말하는가 ------------------------------------------------
+
+def test_줄여서_찾았으면_그렇다고_적는다(app):
+    """이름을 줄여서 찾았으면 **줄였다고 알려야** 합니다.
+
+    값만 맞으면 된 것이 아닙니다. 'Los Angeles USA' 를 'Los Angeles' 로 줄여
+    찾은 것은 짐작이 섞인 것이고, 사람이 한 번 봐야 합니다. 알림이 없으면
+    그냥 서류에 그렇게 적혀 있던 것처럼 보입니다.
+
+    (이 테스트가 없으면 줄이는 길을 통째로 지워도 아무도 울지 않습니다 —
+     띄어쓰기를 지워 찾는 다른 길이 같은 답을 내기 때문입니다. 2026-09-27)
+    """
+
+    notes: list[str] = []
+    found = extract._port("Los Angeles USA", "SEA", "destination", notes)
+    assert found and found["code"] == "USLAX"
+    assert any("Los Angeles" in note and "찾았습니다" in note for note in notes), notes
+
+
+def test_일월_차례를_모르는_날짜는_까닭을_적는다(app):
+    """02/06/2027 은 2월 6일인지 6월 2일인지 알 수 없습니다.
+
+    비워 두는 것만으로는 부족합니다. **왜** 비웠는지 적어야 사람이 달력에서
+    고릅니다. 그냥 "읽지 못했다"고만 하면 서류가 잘못된 줄 압니다.
+    """
+
+    notes: list[str] = []
+    from app.services.intake_service import _date
+
+    assert _date("02/06/2027", notes, "선적일") == ""
+    assert any("일/월" in note for note in notes), notes
+
+
+def test_뜻이_하나인_날짜는_읽는다(app):
+    """연도가 앞에 오거나 달이 글자면 뜻이 하나로 정해집니다."""
+
+    from app.services.intake_service import _date
+
+    for written, want in (("2027-03-24", "2027-03-24"), ("2027.04.28", "2027-04-28"),
+                          ("29-SEP-2027", "2027-09-29"), ("July 23, 2027", "2027-07-23"),
+                          ("20270428", "2027-04-28")):
+        notes: list[str] = []
+        assert _date(written, notes, "선적일") == want, (written, notes)
+
+
+def test_가격조건에_붙은_군더더기를_뗀다(app):
+    """C.I.F. · "FOB Incoterms 2020" · "FOB Busan" 전부 오퍼시트에 나오는 모양입니다."""
+
+    from app.services.intake_service import _incoterms_word
+
+    for written, want in (("CIF", "CIF"), ("cif", "CIF"), ("C.I.F.", "CIF"),
+                          ("C.F.R.", "CFR"), ("FOB Incoterms 2020", "FOB"),
+                          ("FOB Busan", "FOB"), (" CIF ", "CIF")):
+        assert _incoterms_word(written) == want, written
+    # 모르는 말은 비워 둡니다. 지어내면 안 됩니다.
+    for written in ("XYZ", "FOBB", "", "Incoterms 2020"):
+        assert _incoterms_word(written) == "", written

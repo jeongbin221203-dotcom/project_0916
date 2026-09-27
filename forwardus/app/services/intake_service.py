@@ -23,6 +23,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 import json
+import re
 from datetime import date
 
 from app.collectors import ai_client, location_client
@@ -157,13 +158,86 @@ def _pick(value, allowed: set, *, upper: bool = True) -> str:
     return code if code in allowed else ""
 
 
+# 달 이름. 서류에는 SEP · Sept · September 가 섞여 나옵니다.
+MONTH_WORDS = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+# 숫자만으로 적어 뜻이 두 가지인 날짜. 이런 모양이면 비워 둡니다.
+AMBIGUOUS_DATE = re.compile(r"^\s*\d{1,2}\s*[/.\-]\s*\d{1,2}\s*[/.\-]\s*\d{2,4}\s*$")
+
+
+def _as_iso(text: str) -> str:
+    """서류에 적힌 날짜를 ISO 로 바꿉니다. 뜻이 하나로 정해질 때만 바꿉니다.
+
+    못 바꾸면 받은 글을 그대로 돌려줍니다 (parse_date 가 다시 봅니다).
+    """
+
+    raw = str(text or "").strip()
+    if not raw:
+        return raw
+
+    # 연도가 앞: 2027.04.28 · 2027/04/28 · 2027-04-28
+    head = re.match(r"^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$", raw)
+    if head:
+        year, month, day = (int(part) for part in head.groups())
+        return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # 여덟 자리 숫자: 20270428
+    if re.fullmatch(r"\d{8}", raw):
+        return f"{raw[:4]}-{raw[4:6]}-{raw[6:]}"
+
+    # 달이 글자: 29-SEP-2027 · 29 Sep 2027 · September 29, 2027 · 29 September 2027
+    words = re.findall(r"[A-Za-z]+|\d+", raw)
+    month = next((MONTH_WORDS[word[:3].lower()] for word in words
+                  if word[:3].lower() in MONTH_WORDS and word.isalpha()), 0)
+    if month:
+        numbers = [int(word) for word in words if word.isdigit()]
+        years = [n for n in numbers if n >= 1000]
+        days = [n for n in numbers if 1 <= n <= 31]
+        if len(years) == 1 and days:
+            return f"{years[0]:04d}-{month:02d}-{days[0]:02d}"
+    return raw
+
+
+def _incoterms_word(value) -> str:
+    """가격조건 칸에 붙어 오는 군더더기를 떼어 냅니다.
+
+    서류에는 이렇게 적혀 옵니다.
+        C.I.F.               점을 찍습니다
+        FOB Incoterms 2020   규칙 이름을 붙입니다
+        FOB Busan            지명을 붙입니다 (지명은 incoterms_place 가 따로 받습니다)
+    맨 앞 낱말만 보고, 그것이 우리가 아는 조건일 때만 씁니다.
+    """
+
+    raw = str(value or "").replace(".", " ").strip()
+    if not raw:
+        return ""
+    if raw.upper() in INCOTERMS:
+        return raw.upper()
+    # 점을 떼면 "C I F" 가 되므로 한 글자씩인 경우를 먼저 붙여 봅니다.
+    letters = "".join(raw.split())
+    if letters.upper() in INCOTERMS:
+        return letters.upper()
+    first = raw.split()[0].upper()
+    return first if first in INCOTERMS else ""
+
+
 def _date(value, notes: list, label: str) -> str:
     """날짜로 읽히고 지난 날이 아닐 때만 씁니다."""
 
     if not value:
         return ""
+    if AMBIGUOUS_DATE.match(str(value)):
+        # 02/06/2027 은 영국식이면 6월 2일, 미국식이면 2월 6일입니다.
+        # 서류만 보고는 알 수 없습니다. 넉 달을 잘못 잡으면 선적이 어긋납니다.
+        notes.append(f"{label} '{str(value).strip()}'은(는) 일/월 차례를 알 수 없어 "
+                     "비워 두었습니다. (2월 6일인지 6월 2일인지 서류만으로는 "
+                     "가릴 수 없습니다) 달력에서 직접 골라 주세요.")
+        return ""
     try:
-        parsed = parse_date(value, label)
+        parsed = parse_date(_as_iso(value), label)
     except ValidationError:
         notes.append(f"{label}을(를) 날짜로 읽지 못했습니다. 달력에서 직접 골라 주세요.")
         return ""
@@ -217,6 +291,16 @@ COUNTRY_SHORT = {"usa", "u.s.a.", "u.s.", "us", "uk", "u.k.", "prc", "rok", "rok
                  "korea", "vietnam", "america"}
 
 
+def _drop_words(text: str, known: frozenset[str] | set[str]) -> str:
+    """주어진 낱말만 떼어 냅니다. 뗄 것이 없거나 남는 것이 없으면 그대로 둡니다."""
+
+    pieces = [piece for piece in str(text or "").replace(",", " ").split() if piece]
+    kept = [piece for piece in pieces if piece.strip(".").casefold() not in known]
+    if not kept or len(kept) == len(pieces):
+        return str(text or "")
+    return " ".join(kept)
+
+
 @lru_cache(maxsize=1)
 def _country_words() -> frozenset[str]:
     """항구표에 실제로 들어 있는 나라 이름을 낱말로 풀어 모읍니다.
@@ -238,19 +322,81 @@ def _country_words() -> frozenset[str]:
     return frozenset(words)
 
 
-def _drop_country_words(text: str) -> str:
-    """나라 이름과 항구 곁말만 떼어 냅니다. 뗄 것이 없으면 그대로 돌려줍니다.
+def _collapse_repeats(text: str) -> str:
+    """같은 낱말이 잇따르면 한 번만 남깁니다.
 
-    남는 것이 없으면(=전부 나라 이름이면) 그대로 둡니다. 싱가포르·모나코처럼
-    나라와 항구 이름이 같은 곳을 통째로 지우면 안 됩니다.
+    싱가포르·모나코·파나마처럼 **항구 이름과 나라 이름이 같은 곳**은
+    "Singapore Singapore" 로 적혀 옵니다. 쉼표가 있으면 앞만 잘라 쓰면 되지만,
+    쉼표 없이 붙여 적는 서류도 있습니다. (2026-09-27)
     """
 
-    known = _country_words()
-    pieces = [piece for piece in str(text or "").replace(",", " ").split() if piece]
-    kept = [piece for piece in pieces if piece.strip(".").casefold() not in known]
-    if not kept or len(kept) == len(pieces):
-        return str(text or "")
+    pieces = str(text or "").split()
+    kept = [piece for no, piece in enumerate(pieces)
+            if no == 0 or piece.casefold() != pieces[no - 1].casefold()]
     return " ".join(kept)
+
+
+def _shorter_names(text: str) -> list[str]:
+    """해 볼 만한 짧은 이름들. 찾을 때까지 차례로 써 봅니다.
+
+    한 가지만 고르면 안 됩니다. 곁말과 나라 이름은 서로 겹칩니다 —
+    'of' 는 곁말("Port of Busan")이면서 나라 이름의 일부("Republic of Korea")
+    입니다. 곁말만 떼고 멈추면 "Busan Republic Korea" 가 되어 어디에도
+    없습니다. 그래서 셋을 다 내놓습니다. (2026-09-27)
+
+    셋 다 **글자를 덜어내기만** 합니다. 새로 짓지 않으므로 엉뚱한 곳에
+    들어맞는 길이 늘어나지 않습니다.
+
+    싱가포르·모나코·파나마처럼 나라와 항구 이름이 같은 곳은 나라 이름을
+    떼면 남는 글자가 없어, _drop_words 가 원래 글을 그대로 돌려줍니다.
+    """
+
+    original = str(text or "")
+    tries = [
+        _drop_words(original, PORT_WORDS),                   # "Port of Singapore" -> "Singapore"
+        _drop_words(original, _country_words()),             # "Los Angeles USA"   -> "Los Angeles"
+        _drop_words(_drop_words(original, PORT_WORDS),
+                    _country_words()),                       # "Busan Republic of Korea" -> "Busan"
+        _collapse_repeats(original),                         # "Singapore Singapore" -> "Singapore"
+    ]
+    found: list[str] = []
+    for name in tries:
+        if name and name.casefold() != original.casefold() and name not in found:
+            found.append(name)
+    return found
+
+
+def _drop_country_words(text: str) -> str:
+    """가장 짧게 줄인 이름 하나. (띄어쓰기를 지워 견줄 때 씁니다)"""
+
+    tries = _shorter_names(text)
+    return min(tries, key=len) if tries else str(text or "")
+
+
+@lru_cache(maxsize=2)
+def _squashed_index(kind: str) -> dict:
+    """띄어쓰기를 지운 이름 -> 그 곳. 서류마다 띄어쓰기가 달라서 필요합니다.
+
+    "Los Angeles" 와 "LosAngeles", "Hai Phong" 과 "Haiphong" 을 같은 곳으로
+    봅니다. 글자는 그대로라 엉뚱한 곳에 들어맞지 않습니다.
+    먼저 들어온 것을 남깁니다 (표가 물동량 순서라 큰 항구가 앞에 옵니다).
+    """
+
+    found: dict = {}
+    result = location_client.search_locations("", kind, None, None)
+    for row in (result.get("data") or []):
+        for key in ("name", "name_en", "city", "city_en"):
+            name = "".join(str(row.get(key) or "").split()).casefold()
+            if len(name) >= 3:
+                found.setdefault(name, row)
+    return found
+
+
+def _fits_role(row: dict, role: str) -> bool:
+    """수출이라 출발은 국내, 도착은 바깥입니다. (planning_service 와 같은 규칙)"""
+
+    korean = str(row.get("country_code") or "") == "KR"
+    return korean if role == "origin" else not korean
 
 
 def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
@@ -289,12 +435,12 @@ def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
     #     "Angeles City, Philippines" -> 'City' -> 호찌민항
     # 뗄 것이 없으면 더 짐작하지 않고 빈 칸으로 둡니다.
     if not rows:
-        shorter = _drop_country_words(text)
-        if shorter and shorter.casefold() != text.casefold():
+        for shorter in _shorter_names(text):
             again = planning_service.search_locations(shorter, transport_mode, role)
             rows = again["data"] if again["success"] else []
             if rows:
                 notes.append(f"{label} '{text}'을(를) '{shorter}'(으)로 찾았습니다. 맞는지 봐 주세요.")
+                break
     # 옛 로마자 표기(Pusan · Inchon)를 지금 이름으로 바꿔 한 번 더 봅니다.
     if not rows:
         renamed = OLD_ROMAN.get("".join(_drop_country_words(text).split()).casefold())
@@ -314,6 +460,12 @@ def _place(query, transport_mode: str, role: str, notes: list) -> dict | None:
         if len(squashed) >= 3 and squashed.casefold() != text.casefold():
             again = planning_service.search_locations(squashed, transport_mode, role)
             rows = again["data"] if again["success"] else []
+        # 표 쪽 띄어쓰기도 지우고 견줍니다. 서류가 "LosAngeles" 라고 붙여 쓰면
+        # 표의 'Los Angeles' 와 안 맞기 때문입니다. 위와 반대 방향입니다.
+        if not rows and len(squashed) >= 3:
+            hit = _squashed_index(kind).get(squashed.casefold())
+            if hit and _fits_role(hit, role):
+                rows = [hit]
 
     # 공항은 **도시 이름으로 부르는데 자료에는 공항 이름만** 있습니다.
     # 부산 공항은 자료에 "김해국제공항"이라 "부산"으로는 안 나옵니다. 그래서
@@ -383,7 +535,7 @@ def read(text: str) -> dict:
         "transport_mode": mode,
         "sea_mode": _pick(raw.get("sea_mode"), {"FCL", "LCL"}),
         "departure_date": _date(raw.get("departure_date"), notes, LABELS["departure_date"]),
-        "incoterms": _pick(raw.get("incoterms"), INCOTERMS),
+        "incoterms": _incoterms_word(raw.get("incoterms")),
         "origin": _place(raw.get("origin"), mode, "origin", notes),
         "destination": _place(raw.get("destination"), mode, "destination", notes),
         "fields": {},
