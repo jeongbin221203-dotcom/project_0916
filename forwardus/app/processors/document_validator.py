@@ -108,6 +108,15 @@ def _normalize(value, field: str = ""):
     멀쩡한 서류에 경고가 뜨면 사람이 경고를 안 믿게 됩니다. (2026-09-26)
     """
 
+    # **HS부호는 6자리까지만 맞댑니다.**
+    #
+    # 바이어에게 나가는 송장에는 6자리를 찍고(6601.91), 기록에는 10자리가
+    # 있습니다(6601910000). 6자리까지는 세계 공통이고 그 아래는 나라마다
+    # 다르므로, 앞 6자리가 같으면 같은 분류입니다. 자릿수가 다르다고
+    # "값이 다릅니다"를 띄우면 멀쩡한 서류에 경고가 붙습니다. (2026-09-28)
+    if field == "hs_code":
+        digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+        return digits[:6] if len(digits) >= 6 else " ".join(str(value or "").split()).upper()
     if field in NUMERIC_FIELDS:
         number = _as_number(value)
         if number is not None:

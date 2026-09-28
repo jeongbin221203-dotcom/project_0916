@@ -225,7 +225,7 @@ def render(kind: str, draft: dict) -> dict:
 
     stand_in = _as_shipment(draft)
     # 서식마다 쓰는 칸이 달라도, 값은 한 벌에서 꺼냅니다.
-    reference = document_service.build_reference(stand_in)
+    reference = document_service.build_reference(stand_in, kind)
     reference.update(_draft_numbers(draft))
     reference.update(_extras(draft))
 

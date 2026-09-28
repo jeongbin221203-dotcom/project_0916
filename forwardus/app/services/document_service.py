@@ -318,7 +318,40 @@ def _headline(cargos, attribute: str) -> str:
     return f"{first} 외 {len(cargos) - 1}건"
 
 
-def build_reference(shipment) -> dict:
+# 바이어·선사·해외 세관이 보는 서류. 여기에는 HS 6자리만 찍습니다.
+# 우리 세관에 내는 신고자료는 10자리 그대로입니다(customs_filing_service).
+HS6_DOCUMENTS = frozenset({"commercial_invoice", "proforma_invoice",
+                           "packing_list", "shipping_instruction",
+                           "booking_request"})
+
+
+def hs_for_document(code, doc_type: str = "") -> str:
+    """서류에 찍을 HS부호. 바깥으로 나가는 서류면 6자리로 줄입니다.
+
+    왜 줄이나
+      HS 는 6자리까지만 세계 공통입니다. 그 아래는 나라마다 다르고, 숫자가
+      같아도 뜻이 다를 수 있습니다.
+          한국 HSK  6601.99-2000 = 양산
+          터키 GTIP 6601.99.20   = 기타 중 캐노피가 직물인 것
+      한국 10자리를 송장에 찍어 보내면 받는 쪽이 자기 나라 코드로 읽어
+      엉뚱한 세번으로 신고할 수 있습니다. (2026-09-28)
+
+    저장된 값은 건드리지 않습니다. 보여 줄 때만 줄입니다.
+    "6601910000 외 1건" 처럼 뒤에 말이 붙은 것도 앞자리만 줄입니다.
+    """
+
+    text = str(code or "").strip()
+    if not text or doc_type not in HS6_DOCUMENTS:
+        return text
+    head, _, tail = text.partition(" ")
+    digits = "".join(ch for ch in head if ch.isdigit())
+    if len(digits) < 6:
+        return text
+    short = f"{digits[:4]}.{digits[4:6]}"
+    return f"{short} {tail}".rstrip() if tail else short
+
+
+def build_reference(shipment, doc_type: str = "") -> dict:
     """Expected values for every shared field, taken from the Shipment record."""
 
     cargo = shipment.cargo
@@ -361,7 +394,7 @@ def build_reference(shipment) -> dict:
         "eta": shipment.eta.isoformat() if shipment.eta else "",
         # 품명·HS부호는 더할 수 없습니다. 대표를 쓰되 여러 줄이면 "외 N건".
         "product_description": _headline(lines, "product_description"),
-        "hs_code": _headline(lines, "hs_code"),
+        "hs_code": hs_for_document(_headline(lines, "hs_code"), doc_type),
         "quantity": _summed(lines, "quantity"),
         "package_type": PACKAGE_UNITS.get(cargo.package_type, cargo.package_type) if cargo else "",
         "unit_price": _summary_unit_price(shipment, cargo),
@@ -473,7 +506,9 @@ def build_items(shipment, doc_type: str) -> list[dict]:
         dangerous = (f"{cargo.un_number} · {cargo.proper_shipping_name}"
                      if cargo.is_dangerous and cargo.un_number else "")
         row = {
-            "item_number": cargo.hs_code or "",
+            # 포장명세서의 ITEM NUMBER 에는 HS 를 적습니다. 바깥으로 나가는
+            # 서류이므로 6자리로 줄입니다.
+            "item_number": hs_for_document(cargo.hs_code or "", doc_type),
             "shipped": cargo.quantity if cargo.quantity is not None else "",
             "backordered": 0,
             "unit_weight": cargo.weight_per_package_kg,
@@ -575,10 +610,12 @@ def generate_documents(shipment, doc_types: list[str] | None = None, *, overwrit
     locked_documents()를 함께 보세요.
     """
 
-    reference = build_reference(shipment)
     generated = []
     for doc_type in doc_types or list(DOCUMENT_TYPES):
         _require_document_type(doc_type)
+        # **서류마다 한 벌씩 냅니다.** HS 자릿수가 서류에 따라 다릅니다 —
+        # 바이어에게 가는 송장은 6자리, 우리 세관 신고자료는 10자리입니다.
+        reference = build_reference(shipment, doc_type)
         existing = document_repository.get(shipment, doc_type)
         # 확정(final)한 서류는 다시 만들지 않습니다.
         #
@@ -656,6 +693,9 @@ def check_documents(shipment) -> dict | None:
                  if doc.doc_type in DOCUMENT_TYPES]
     if not documents:
         return None
+    # 기준값은 한 벌입니다(10자리 HS). 송장에는 6자리가 찍히지만, 검증기가
+    # HS 를 6자리로 맞대므로 "어긋남"으로 잡히지 않습니다.
+    # (processors/document_validator._normalize)
     return validate_documents(
         {doc.doc_type: doc.data for doc in documents},
         build_reference(shipment),
