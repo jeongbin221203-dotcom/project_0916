@@ -870,11 +870,12 @@ Route / View
 5명이 동시에 개발하므로 기능별로 파일을 분리합니다.
 
 ```text
+README.md                 저장소 루트 (GitHub 첫 화면)
+
 forwardus/
 ├── run.py
 ├── config.py
 ├── requirements.txt
-├── README.md
 ├── .env.example
 ├── .gitignore
 │
