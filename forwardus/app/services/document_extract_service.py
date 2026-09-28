@@ -98,7 +98,10 @@ def _object(properties: dict) -> dict:
             "properties": properties, "required": list(properties)}
 
 
-_PARTY = _object({"name": _STR, "address": _STR, "country": _STR})
+# 당사자 한 곳. 화면에 칸이 있는 것은 다 받습니다 — 서류에 적힌 것을
+# 사람에게 다시 묻지 않으려고요. (2026-09-28)
+_PARTY = _object({"name": _STR, "address": _STR, "country": _STR,
+                  "city_zip": _STR, "email": _STR, "attention": _STR})
 
 EXTRACT_SCHEMA = _object({
     "document_type": {"type": "string", "enum": list(DOCUMENT_LABELS)},
@@ -174,6 +177,11 @@ Packing List 중 하나)의 그림과, 읽을 수 있으면 본문 글자를 받
   document_type    서류 종류
   shipper/consignee/notify_party  name은 회사명, address는 주소, country는 두 글자 국가 코드(US, CN…)
                    Notify가 "SAME AS CONSIGNEE"이면 name에 그 글자를 그대로 적으세요.
+      city_zip    도시·주·우편번호만. "Sisli, Istanbul 34363" · "Los Angeles, CA 90001"
+                  **address 에 적은 것을 여기 또 적지 마세요.** 송장에 두 번 찍힙니다.
+                  address 는 거리 주소까지, city_zip 은 도시부터입니다.
+      email       그 당사자의 이메일. 보내는 쪽(수출자) 것과 섞지 마세요.
+      attention   담당자. "Attention: Deniz Kaya / Import Manager" -> 그대로
   transport_mode   배(B/L, 선박명)면 SEA, 항공(AWB, 편명)이면 AIR, 모르면 null
   incoterms        EXW FCA FAS FOB CFR CIF CPT CIP DAP DPU DDP 중 하나. "FOB BUSAN"이면 incoterms=FOB, incoterms_place=BUSAN
   currency         USD KRW EUR JPY CNY 같은 세 글자 통화 코드
@@ -427,6 +435,16 @@ def _clean(value, limit: int = 300) -> str:
     return optional_text(value, max_length=limit) if isinstance(value, str) else ""
 
 
+def _party_extra(raw) -> dict:
+    """당사자의 도시·이메일·담당자. 없으면 빈 값입니다."""
+
+    if not isinstance(raw, dict):
+        return {"city_zip": "", "email": "", "attention": ""}
+    return {"city_zip": _clean(raw.get("city_zip"), 200),
+            "email": _clean(raw.get("email"), 200),
+            "attention": _clean(raw.get("attention"), 120)}
+
+
 def _party(raw) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     country = _clean(raw.get("country"), 2).upper()
@@ -647,11 +665,16 @@ def to_form(raw: dict) -> dict:
 
     shipper, consignee, notify = (_party(raw.get(key))
                                   for key in ("shipper", "consignee", "notify_party"))
+    buyer_extra = _party_extra(raw.get("consignee"))
     fields.update({
         "exporter_name": shipper["name"], "exporter_address": shipper["address"],
         "buyer_name": consignee["name"], "buyer_address": consignee["address"],
         "buyer_country": consignee["country"],
         "notify_party": ", ".join(part for part in (notify["name"], notify["address"]) if part),
+        # 화면에 칸이 있는 것은 서류에서 읽어 채웁니다. 다시 묻지 않습니다.
+        "consignee_city_zip": buyer_extra["city_zip"],
+        "buyer_email": buyer_extra["email"],
+        "attention": buyer_extra["attention"],
         "payment_terms": _payment_terms(raw.get("payment_terms")),
         "container_no": _clean(raw.get("container_no"), 100),
         "shipping_marks": _clean(raw.get("shipping_marks"), 500),
@@ -687,6 +710,10 @@ def to_form(raw: dict) -> dict:
         items = items[:MAX_ITEMS]
     lines = [line for line in (_item(item, notes, no) for no, item in enumerate(items, 1)) if line]
 
+    # 서류에 치수가 있으면 FCL·LCL 도 정해 줍니다. 짐작이 아니라 계산입니다.
+    sea_mode = _sea_mode(lines, mode, notes)
+    if sea_mode:
+        fields["sea_mode"] = sea_mode
     _check_amounts(lines, raw.get("total_amount"), notes)
     _check_packages(lines, raw.get("total_packages"), notes)
     if lines and not any(line.get("length_cm") for line in lines):
@@ -823,6 +850,39 @@ def lc_plan(raw: dict, fields: dict, mode: str, notes: list) -> dict | None:
                          if key == "lc_transshipment"
                          else f"L/C가 {label}을(를) 금지합니다. 한 번에 모두 실어야 합니다.")
     return result
+
+
+def _sea_mode(lines: list[dict], mode: str, notes: list) -> str:
+    """서류에 적힌 치수로 FCL·LCL 을 정합니다. 모르면 빈 값입니다.
+
+    화면에 칸이 있는데 서류를 읽어도 비어 있었습니다. 그런데 이건 짐작이
+    아니라 **계산**입니다 — 부피와 무게로 정해집니다. (2026-09-28)
+
+    치수·상자 수·무게가 다 있는 줄만 셉니다. 하나라도 빠지면 정하지 않습니다.
+    반쪽 숫자로 FCL 이라고 했다가 컨테이너를 통째로 빌리면 큰돈이 나갑니다.
+    """
+
+    if mode != "SEA" or not lines:
+        return ""
+    from app.processors import sea_mode_advisor
+
+    need = ("length_cm", "width_cm", "height_cm", "quantity", "weight_per_package_kg")
+    total_cbm = total_kg = 0.0
+    for line in lines:
+        if not all(line.get(key) for key in need):
+            return ""                       # 한 줄이라도 모르면 셈을 접습니다
+        try:
+            length, width, height, count, each = (float(line[key]) for key in need)
+        except (TypeError, ValueError):
+            return ""
+        if min(length, width, height, count, each) <= 0:
+            return ""
+        total_cbm += length * width * height / 1_000_000 * count
+        total_kg += each * count
+    advice = sea_mode_advisor.recommend(round(total_cbm, 3), round(total_kg, 2))
+    notes.append(f"{advice['mode']}로 봤습니다 — 서류의 치수로 재면 "
+                 f"{total_cbm:,.3f} CBM · {total_kg:,.0f}kg 입니다. {advice['reason']}")
+    return advice["mode"]
 
 
 def _check_amounts(lines: list[dict], total, notes: list) -> None:
