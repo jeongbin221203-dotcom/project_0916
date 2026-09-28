@@ -110,6 +110,8 @@ JOBS = [
     ("HS · 기업·개인 상위", ["python", "scripts/checks/m26_biz_personal.py"]),
     # 오퍼시트는 표준 서식이 없어 회사마다 같은 값을 다르게 적습니다.
     ("오퍼시트 양식 50가지", ["python", "scripts/checks/m_offer_formats.py"]),
+    # 돈·수량·중량은 틀려도 안 보입니다. 송장에 그대로 찍혀 나갑니다.
+    ("오퍼시트 값 표기", ["python", "scripts/checks/m_offer_values.py"]),
     ("HS · 일상어", ["python", "scripts/checks/m11_hs.py"]),
     ("JS 화면 테스트", ["node", "--test", "tests/hs_standard_names.test.cjs",
                    "tests/doc_schedule_keep.test.cjs"]),
