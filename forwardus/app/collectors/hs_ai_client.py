@@ -63,7 +63,13 @@ unknown과 low를 헷갈리지 마라. reason에 '관련이 없다'·'다른 품
 예: 중고 의류 호(6309)의 세번은 새 의류가 아니다.
 입력 물품을 이름으로 구체적으로 지칭하는 세번(예: 의자 입력에 '회전의자')이 있으면 그것을 high로 하고,
 같은 소호의 '기타'는 medium 이하로 둔다.
+소호가 **물건의 구조**로 갈리고 그 구조가 입력에 적혀 있으면 그대로 따른다.
+예: 우산 6601은 '대가 절첩식(접는 대)'과 '그 밖의 것'으로 갈린다. 입력이 3단·접이식이면
+절첩식이 high이고 '기타'는 medium 이하다. 반대로 straight·장우산이면 절첩식은 low다.
+접이·신축·자동·수동·휴대용·거치형처럼 품명에 적힌 구조는 추측이 아니라 주어진 사실이다.
 광고명 하나만으로 확정하지 말고 reason과 missing_details에 필요한 조건을 적는다.
+**입력에 이미 적혀 있는 것은 missing_details에 넣지 않는다.** 그것은 확인할 것이 아니라
+이미 아는 것이다. 예: 입력이 'automatic-open umbrella'인데 '자동 개폐 기능'을 묻지 않는다.
 세율이나 신고빈도는 분류 적합도의 근거가 아니다. 적합도를 확률이나 법적 확정으로 표현하지 않는다.
 reason은 한국어 한 문장으로, missing_details는 최대 2개로 쓴다."""
 
@@ -147,6 +153,59 @@ def _settle(match: str, reason: str) -> str:
     return match
 
 
+# 품명은 영어인데 확인 요청은 한국어로 옵니다. 같은 것을 가리키는 말을
+# 이어 둡니다. **구조·재질처럼 소호를 가르는 말만** 넣습니다 — 넓게 잡으면
+# 정말 확인해야 할 것까지 지워집니다. (2026-09-28)
+# 뜻을 더하지 않는 꼬리말. "자동 개폐 **기능**"에서 기능은 봐도 그만입니다.
+TAIL_WORDS = frozenset({"기능", "소재", "재질", "여부", "종류", "구조", "형태", "정보", "확인"})
+
+SAME_WORD = {
+    "자동": ("automatic", "auto"), "수동": ("manual",),
+    "개폐": ("open", "opening", "close"), "접이": ("fold", "folding", "folded"),
+    "절첩": ("fold", "folding"), "신축": ("telescopic",),
+    "휴대": ("portable", "pocket"), "폴리에스터": ("polyester",),
+    "폴리에스테르": ("polyester",), "유리섬유": ("fiberglass", "fibreglass"),
+    "강철": ("steel",), "알루미늄": ("aluminium", "aluminum"),
+    "면": ("cotton",), "가죽": ("leather",), "스테인리스": ("stainless",),
+    "플라스틱": ("plastic",), "우산": ("umbrella",), "양산": ("parasol",),
+}
+
+
+def _known_already(details: list[str], query: str) -> list[str]:
+    """품명에 이미 적힌 것은 "확인 필요"에서 뺍니다.
+
+    입력이 "Straight automatic-open umbrella" 인데 "자동 개폐 기능"을 확인하라고
+    하면, 서류에 적힌 것을 다시 묻는 셈입니다. 세 후보에 다 붙으면 화면이
+    노랗게 물들어 **진짜로 확인해야 할 것이 묻힙니다.** (2026-09-28)
+
+    글자만 겹치는 것으로는 빼지 않습니다. 한글 낱말 하나하나가 품명 안에
+    들어 있거나, 영문 낱말이 그대로 있을 때만 뺍니다.
+    """
+
+    text = str(query or "").lower()
+    if not text:
+        return details
+    # 품명을 낱말로 풀어 둡니다. ("automatic-open" -> automatic, open)
+    words = {word for word in re.split(r"[^0-9a-z가-힣]+", text) if len(word) >= 2}
+
+    def seen(part: str) -> bool:
+        if part.lower() in words or part in text:
+            return True
+        # 품명이 영어이고 확인 요청이 한국어일 때. ("자동 개폐" <- automatic-open)
+        return any(mate in words for mate in SAME_WORD.get(part, ()))
+
+    def already(detail: str) -> bool:
+        parts = [part for part in re.split(r"[^0-9A-Za-z가-힣]+", str(detail)) if len(part) >= 2]
+        if not parts:
+            return False
+        # 한 낱말이라도 품명에 없으면 아직 모르는 것입니다.
+        # (다만 "기능"·"소재"처럼 뜻이 없는 꼬리말은 세지 않습니다)
+        meaty = [part for part in parts if part not in TAIL_WORDS]
+        return bool(meaty) and all(seen(part) for part in meaty)
+
+    return [detail for detail in details if not already(detail)]
+
+
 def review(query: str, analysis: dict, rows: list[dict]) -> dict:
     allowed = {re.sub(r"\D", "", row["code"]) for row in rows}
     payload = {"product": query[:200], "interpretation": analysis.get("summary", ""),
@@ -166,6 +225,7 @@ def review(query: str, analysis: dict, rows: list[dict]) -> dict:
         if code in allowed and code not in assessments and row.get("match") in ("high", "medium", "low", "unknown"):
             reason = str(row.get("reason", ""))[:300]
             assessments[code] = {"match": _settle(row["match"], reason), "reason": reason,
-                                 "missing_details": _strings(row.get("missing_details"), 2)}
+                                 "missing_details": _known_already(
+                                     _strings(row.get("missing_details"), 2), query)}
     return {"available": bool(assessments), "assessments": assessments,
             "message": "" if assessments else "AI 적합도 평가를 확인할 수 없습니다."}

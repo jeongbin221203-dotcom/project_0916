@@ -84,9 +84,17 @@
   }
 
   function renderChips(queries) {
+    // **무엇인지 적어 줍니다.**
+    //
+    // 설명 없이 품명만 늘어놓으면 "지금 찾는 품목"처럼 보입니다. 품목 2를
+    // 찾는 중인데 바로 밑에 품목 1의 품명이 떠 있어, 화면이 엉뚱한 품목을
+    // 찾는 줄 알았다는 이야기가 있었습니다. (2026-09-28)
     const current = input.value.trim();
-    chipsEl.innerHTML = queries.filter((row) => row !== current).slice(0, 5)
-      .map((row) => `<button type="button" class="hs_chip">${escapeHtml(row)}</button>`).join("");
+    const rows = queries.filter((row) => row !== current).slice(0, 5);
+    chipsEl.innerHTML = rows.length
+      ? `<span class="hs_chips_label">최근 찾은 품명</span>` + rows
+        .map((row) => `<button type="button" class="hs_chip">${escapeHtml(row)}</button>`).join("")
+      : "";
   }
 
   chipsEl.addEventListener("click", (event) => {

@@ -160,7 +160,19 @@ def _item_fields(options: dict) -> list[dict]:
         {"name": "hs_code", "label": "HS부호", "placeholder": "3305100000"},
         {"name": "package_type", "label": "포장", "kind": "select", "required": True,
          "options": options["package_type"]},
-        {"name": "quantity", "label": "포장 개수", "kind": "number", "required": True},
+        {"name": "quantity", "label": "포장 개수 (상자·팰릿)", "kind": "number",
+         "required": True, "hint": "CBM과 중량이 이 값으로 정해집니다"},
+        # **낱개 수량은 포장 개수와 다릅니다.**
+        #
+        # 오퍼시트는 "1,200 PCS · 단가 4.50 · 금액 5,400" 으로 적고, 포장은
+        # "50 PCS per carton, 40 cartons" 으로 따로 적습니다. 두 숫자가 한 칸에
+        # 섞이면 CBM 이 50배가 되거나 단가가 어긋납니다.
+        # 칸이 없던 동안은 서류에서 읽어 놓고도 화면에서 사라졌습니다. (2026-09-28)
+        {"name": "unit_quantity", "label": "낱개 수량", "kind": "number",
+         "placeholder": "1200",
+         "hint": "단가가 낱개 기준일 때 적습니다. 상자 단위로 팔면 비워 두세요"},
+        {"name": "price_unit", "label": "단가 단위", "placeholder": "PCS",
+         "hint": "PCS · KG · SET 처럼 낱개를 세는 말"},
         {"name": "length_cm", "label": "가로(cm)", "kind": "number", "required": True},
         {"name": "width_cm", "label": "세로(cm)", "kind": "number", "required": True},
         {"name": "height_cm", "label": "높이(cm)", "kind": "number", "required": True},

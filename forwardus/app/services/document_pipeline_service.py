@@ -135,6 +135,10 @@ TEXT_KEYS = ("exporter_name", "exporter_address", "buyer_name", "buyer_address",
 EXTRA_TEXT_KEYS = ("buyer", "shipping_marks", "lc_no", "other_references", "container_no",
                    "remarks", "incoterms_place", "project_name", "buyer_email",
                    "comments", "consignee_city_zip", "attention", "customer_order_no")
+# sea_mode(FCL·LCL)와 buyer_required_date 는 여기 넣지 않습니다.
+# 이 목록은 **채팅으로 받은 글자를 그대로** 초안에 넣는 자리입니다. 날짜와
+# 선택지를 여기 두면 검증을 거치지 않은 글이 칸에 들어갑니다.
+# 둘은 서류에서 읽어 채우므로 DRAFT_KEYS 에만 둡니다. (2026-09-28)
 
 MERGE_PROMPT = """사용자가 무역 서류의 내용을 채팅으로 적었습니다.
 올린 파일에서 이미 읽어 둔 값이 아래에 있습니다. 사용자가 **고쳐 달라고 하거나
@@ -377,9 +381,16 @@ DRAFT_KEYS = ("transport_mode", "exporter_name", "exporter_address", "buyer_name
               # "CIF 마이애미"의 장소. 가격 조건은 장소와 함께 적는 것이 맞습니다.
               "incoterms_place",
               # 포장명세서 쪽 칸. 서류 작성 화면의 input name과 이름이 같습니다.
-              "comments", "consignee_city_zip", "attention", "customer_order_no")
+              "comments", "consignee_city_zip", "attention", "customer_order_no",
+              # 서류에서 읽어 채우는 칸. 여기 없으면 대화 흐름이 버립니다.
+              "sea_mode", "buyer_required_date")
 ITEM_KEYS = ("product_description", "hs_code", "package_type", "quantity", "length_cm",
              "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg", "unit_price",
+             # **낱개 수량은 단가의 기준입니다.** 여기 없으면 초안이 들고 다니지
+             # 못하고, 검증기가 포장 개수(24상자)에 낱개 단가(4.50)를 곱해
+             # "24 × 4.5 = 108 인데 금액은 5,400" 이라고 틀렸다고 합니다.
+             # 서류에서 제대로 읽어 놓고도 여기서 버려졌습니다. (2026-09-28)
+             "unit_quantity", "price_unit",
              "amount")
 
 
