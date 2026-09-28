@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import base64
 import io
+import math
 import re
 
 from app.collectors import ai_client
@@ -109,6 +110,8 @@ EXTRACT_SCHEMA = _object({
     "incoterms_place": _STR,
     "currency": _STR,
     "total_amount": _NUM,
+    # 서류가 적어 둔 총 상자 수. 우리가 낸 값을 **검산**하는 데 씁니다.
+    "total_packages": _NUM,
     "payment_terms": _STR,
     "port_of_loading": _STR,
     "port_of_discharge": _STR,
@@ -130,6 +133,10 @@ EXTRACT_SCHEMA = _object({
         "hs_code": _STR,
         "package_count": _NUM,
         "package_unit": _STR,
+        # 오퍼시트의 Quantity 열은 대개 **낱개**입니다. 상자 수와 섞이면
+        # 화물이 수십 배로 부푸므로 칸을 따로 둡니다. (2026-09-28)
+        "pieces": _NUM,
+        "units_per_package": _NUM,
         "package_type": {"type": ["string", "null"], "enum": sorted(PACKAGE_TYPES) + [None]},
         "gross_weight_kg": _NUM,
         "net_weight_kg": _NUM,
@@ -168,6 +175,8 @@ Packing List 중 하나)의 그림과, 읽을 수 있으면 본문 글자를 받
   incoterms        EXW FCA FAS FOB CFR CIF CPT CIP DAP DPU DDP 중 하나. "FOB BUSAN"이면 incoterms=FOB, incoterms_place=BUSAN
   currency         USD KRW EUR JPY CNY 같은 세 글자 통화 코드
   total_amount     서류 전체 합계 금액
+  total_packages   서류 전체 **포장 개수**(상자·팰릿 수). "Total: 40 cartons" -> 40
+                   낱개 합계(2,000 PCS)가 아닙니다.
   payment_terms    물품 대금의 결제 조건 (T/T 30 days, L/C at sight 같은 것).
                    B/L의 "FREIGHT PREPAID/COLLECT"는 운임 지급 조건이라 여기에 넣지 않습니다.
   shipment_date    선적(예정)일. B/L이면 On Board Date
@@ -182,8 +191,13 @@ Packing List 중 하나)의 그림과, 읽을 수 있으면 본문 글자를 받
       44C가 없고 44D(Shipment period)만 있으면 그 기간의 마지막 날을 lc_latest_shipment_date에 적으세요.
       상업송장·오퍼시트에 "Latest shipment date"만 적혀 있어도 그 날을 여기에 적습니다.
   items            품목 줄마다 하나. 합계 줄(TOTAL)은 품목이 아닙니다.
-      package_count  포장 개수 (예: 500 CTNS -> 500)
-      package_unit   서류에 찍힌 포장 단위 글자 그대로 (CTNS, PLTS…)
+      package_count  **포장 개수**(상자·팰릿의 수). 낱개가 아닙니다.
+                     "500 CTNS" -> 500.   "1,200 PCS" 는 낱개이므로 여기 적지 마세요.
+                     서류에 상자 수가 없으면 null 로 두세요.
+      package_unit   서류에 찍힌 포장 단위 글자 그대로 (CTNS, PLTS, PCS…)
+      pieces         **낱개 수량**. "1,200 PCS" -> 1200
+      units_per_package  한 포장에 몇 개인지. "50 PCS per carton" -> 50
+                     포장 설명 줄에 적혀 있는 경우가 많습니다.
       package_type   carton pallet wooden_crate drum flexible_bag uld bulk 중 하나, 모르면 null
       gross_weight_kg / net_weight_kg  그 줄 전체의 총중량 / 순중량
       measurement_cbm  그 줄 전체의 용적 (CBM)
@@ -415,6 +429,77 @@ def _package_type(raw: dict) -> str:
     return _pick(raw.get("package_type"), PACKAGE_TYPES, upper=False)
 
 
+# 낱개를 세는 단위. 이 단위로 적힌 수는 **상자 수가 아닙니다.**
+PIECE_UNITS = frozenset({"PCS", "PC", "PIECE", "PIECES", "EA", "EACH",
+                         "UNIT", "UNITS", "SET", "SETS", "개", "매", "장"})
+
+
+def _package_count(raw: dict, label: str, notes: list, style: str) -> str:
+    """이 줄의 **포장 개수**(상자 수). 낱개가 들어오면 계산해서 바꿉니다.
+
+    왜 이렇게까지 하나
+      우리 quantity 칸은 상자 수이고 CBM·한 포장 무게를 여기서 냅니다.
+      오퍼시트의 Quantity 열은 대개 낱개(PCS)라, 그대로 넣으면 화물이 수십
+      배로 부풉니다. 화면에는 아무 경고도 안 뜹니다. (2026-09-28 우산 오퍼시트)
+
+    짐작하지 않습니다. 한 포장에 몇 개인지 서류에 적혀 있을 때만 계산하고,
+    없으면 비워 두고 무엇이 필요한지 적습니다.
+    """
+
+    written = _amount(raw.get("package_count"), f"{label} 포장 개수", notes, style)
+    unit = re.sub(r"[\s.]+", " ", str(raw.get("package_unit") or "")).strip().upper()
+    pieces = _amount(raw.get("pieces"), f"{label} 낱개 수량", [], style)
+    per = _amount(raw.get("units_per_package"), f"{label} 한 포장 개수", [], style)
+
+    # 상자 수가 제대로 적혀 있으면 그대로 씁니다.
+    if written and unit not in PIECE_UNITS:
+        return written
+
+    # 낱개 단위로 적혔거나 상자 수가 없으면, 낱개 ÷ 한 포장 개수로 냅니다.
+    count = pieces or (written if unit in PIECE_UNITS else "")
+    if count and per and float(per) > 0:
+        boxes = math.ceil(float(count) / float(per))
+        if float(count) % float(per):
+            notes.append(f"{label}: 낱개 {float(count):,.0f}개를 한 상자 {float(per):,.0f}개로 "
+                         f"나누면 딱 떨어지지 않아 {boxes}상자로 올렸습니다. "
+                         "마지막 상자가 덜 찬 것으로 봤습니다.")
+        else:
+            notes.append(f"{label}: 서류의 수량은 낱개({float(count):,.0f}개)라, "
+                         f"한 상자 {float(per):,.0f}개로 나눈 {boxes}상자를 넣었습니다.")
+        return str(boxes)
+
+    if count:
+        # 낱개는 알지만 한 상자에 몇 개인지 모릅니다. **비워 둡니다.**
+        notes.append(f"{label}: 서류의 수량 {float(count):,.0f}은(는) 낱개"
+                     f"{'(' + unit + ')' if unit else ''}라 포장 개수가 아닙니다. "
+                     "몇 상자인지 직접 적어 주세요 — 운임과 CBM이 이 값으로 정해집니다.")
+        return ""
+    return written
+
+
+def _check_packages(lines: list[dict], total, notes: list) -> None:
+    """줄마다 낸 상자 수의 합이 서류의 총 상자 수와 맞는지 봅니다.
+
+    맞으면 계산이 옳았다는 뜻입니다 — 서류가 스스로 확인해 줍니다.
+    (1,200/50=24 · 800/50=16 · 24+16=40 = 서류의 "Total: 40 cartons")
+    안 맞으면 우리가 잘못 나눈 것이니 그렇다고 적습니다.
+    """
+
+    counted = [line.get("quantity") for line in lines if line.get("quantity")]
+    if not counted or len(counted) != len(lines) or total in (None, ""):
+        return
+    try:
+        ours = sum(float(value) for value in counted)
+        stated = float(total)
+    except (TypeError, ValueError):
+        return
+    if abs(ours - stated) < 0.5:
+        notes.append(f"포장 개수의 합({ours:,.0f}상자)이 서류의 총 상자 수와 맞습니다.")
+    else:
+        notes.append(f"포장 개수의 합({ours:,.0f}상자)이 서류에 적힌 총 상자 수"
+                     f"({stated:,.0f})와 다릅니다. 줄마다 확인해 주세요.")
+
+
 def _item(raw, notes: list, no: int) -> dict:
     if not isinstance(raw, dict):
         return {}
@@ -429,7 +514,7 @@ def _item(raw, notes: list, no: int) -> dict:
         "product_description": _clean(raw.get("product_description")),
         "hs_code": "".join(ch for ch in str(raw.get("hs_code") or "") if ch.isdigit())[:10],
         "package_type": _package_type(raw),
-        "quantity": _amount(raw.get("package_count"), f"{label} 포장 개수", notes, style),
+        "quantity": _package_count(raw, label, notes, style),
         "net_weight_kg": _amount(raw.get("net_weight_kg"), f"{label} 순중량", notes, style),
         "unit_price": _amount(raw.get("unit_price"), f"{label} 단가", notes, style),
         "amount": _amount(raw.get("amount"), f"{label} 금액", notes, style),
@@ -553,6 +638,7 @@ def to_form(raw: dict) -> dict:
     lines = [line for line in (_item(item, notes, no) for no, item in enumerate(items, 1)) if line]
 
     _check_amounts(lines, raw.get("total_amount"), notes)
+    _check_packages(lines, raw.get("total_packages"), notes)
     if lines and not any(line.get("length_cm") for line in lines):
         notes.append("포장 치수(가로·세로·높이)는 서류에 없어 비워 두었습니다. "
                      "CBM 계산과 스케줄 조회에 필요하니 직접 적어 주세요.")
