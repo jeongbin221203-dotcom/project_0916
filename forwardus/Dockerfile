@@ -52,7 +52,21 @@ RUN tesseract --list-langs 2>&1 | grep -qx 'kor' \
 # Render 가 $PORT 를 줍니다. exec 꼴로 쓰면 $PORT 가 안 풀리므로 shell 꼴로 둡니다.
 # --timeout 은 AI 서류 읽기(최대 90초)보다 넉넉해야 합니다. 짧으면 큰 PDF 를
 # 읽는 도중에 일꾼이 끊겨 "읽지 못했습니다"가 됩니다.
+# **일꾼은 하나입니다.** 실타래(threads)로 여러 요청을 받습니다.
+#
+# 일꾼마다 굳혀 둔 자료를 통째로 메모리에 올립니다 — 관세율표 11,326개,
+# 품목표 11,327개, 항구표. 파이썬 객체만 88MB 이고 실제 차지하는 자리는
+# 그 두세 배입니다. 일꾼이 둘이면 440MB 쯤 되는데 Render 무료 한도가
+# 512MB 라, HS 검색처럼 자료를 더 올리는 요청이 겹치면 넘어갑니다.
+# 실제로 502(Bad Gateway)가 났습니다. (2026-09-28)
+#
+# 이 프로그램은 바깥 기관을 기다리는 시간이 대부분이라(I/O) 실타래로도
+# 충분히 여러 사람을 받습니다. 일꾼을 늘리는 것은 계산이 많을 때 이롭습니다.
+#
+# --max-requests 는 요청 1,000번마다 일꾼을 새로 띄워, 조금씩 새는 메모리가
+# 쌓여 한도에 닿는 것을 막습니다.
 CMD gunicorn --bind "0.0.0.0:${PORT:-10000}" \
-    --workers 2 --threads 4 --timeout 150 \
+    --workers 1 --threads 8 --timeout 150 \
+    --max-requests 1000 --max-requests-jitter 100 \
     --access-logfile - --error-logfile - \
     "app:create_app()"
