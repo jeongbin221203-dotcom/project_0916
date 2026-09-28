@@ -127,3 +127,72 @@ def test_기준일_없는_상대_날짜는_비운다(app):
 
     form = extract.to_form({"shipment_date": "Within 60 calendar days after payment"})["fields"]
     assert not form.get("requested_departure_date")
+
+
+# --- 단가의 기준은 낱개, CBM 의 기준은 상자 -------------------------------------------
+
+def test_낱개_수량과_단위를_함께_넣는다(app):
+    """**제가 만든 문제입니다.**
+
+    "낱개가 포장 개수 칸에 들어간다"를 고치며 수량을 1,200 -> 24상자로
+    바꿨습니다. CBM·중량은 맞아졌는데 **단가의 기준이 무너졌습니다.**
+
+        서류:  1,200 PCS × 4.50 = 5,400.00
+        우리:  quantity 24(상자) · unit_price 4.50
+
+    이 프로그램은 둘을 갈라 둡니다.
+        quantity       포장 개수    CBM·중량의 기준
+        unit_quantity  낱개 수량    단가의 기준
+        price_unit     낱개의 단위
+    priced_by_units() 는 **뒤의 둘이 다 있을 때만** 참입니다. 하나라도 비면
+    단가 칸이 금액÷상자수로 채워져, 오퍼시트·L/C 와 다른 단가가 송장에 나갑니다.
+
+    고치기 전에는 quantity 에 1,200 이 들어가 단가가 **우연히** 맞았습니다.
+    CBM 이 50배 틀린 대가로요. 둘 다 맞아야 합니다.
+    """
+
+    from app.validators.cargo_validator import priced_by_units
+
+    line = extract._item({"product_description": "3단 우산", "pieces": 1200,
+                          "units_per_package": 50, "piece_unit": "PCS",
+                          "package_unit": "CTN", "unit_price": 4.50,
+                          "amount": 5400}, [], 1)
+    assert line["quantity"] == "24"                      # CBM·중량의 기준
+    assert line["unit_quantity"] == "1200"               # 단가의 기준
+    assert line["price_unit"] == "PCS"
+    assert float(line["unit_quantity"]) * float(line["unit_price"]) == pytest.approx(5400)
+
+    holder = type("Cargo", (), dict(unit_quantity=1200, price_unit="PCS"))()
+    assert priced_by_units(holder) is True
+
+
+def test_상자_단위를_낱개_단위로_쓰지_않는다(app):
+    """package_unit 은 상자를 세는 말입니다.
+
+    그것을 단가의 단위로 쓰면 송장에 "1,200 **CTN** × 4.50" 으로 찍힙니다.
+    서류에는 "1,200 PCS" 라고 적혀 있는데요.
+    """
+
+    line = extract._item({"product_description": "우산", "pieces": 1200,
+                          "units_per_package": 50, "package_unit": "CTN",
+                          "unit_price": 4.50}, [], 1)
+    assert line["price_unit"] == "PCS", line.get("price_unit")
+
+
+@pytest.mark.parametrize("piece_unit,want", [("PCS", "PCS"), ("KG", "KG"), ("", "PCS")])
+def test_서류에_적힌_낱개_단위를_따른다(app, piece_unit, want):
+    raw = {"product_description": "시험", "pieces": 500, "units_per_package": 25,
+           "package_unit": "BAG"}
+    if piece_unit:
+        raw["piece_unit"] = piece_unit
+    assert extract._item(raw, [], 1)["price_unit"] == want
+
+
+def test_낱개를_모르면_단가_기준을_안_만든다(app):
+    """반쪽만 넣으면 priced_by_units 가 거짓이라 넣으나 마나입니다."""
+
+    line = extract._item({"product_description": "상자로만", "package_count": 40,
+                          "package_unit": "CTNS", "unit_price": 265}, [], 1)
+    assert line["quantity"] == "40"
+    assert "unit_quantity" not in line
+    assert "price_unit" not in line

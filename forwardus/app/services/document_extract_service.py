@@ -138,6 +138,7 @@ EXTRACT_SCHEMA = _object({
         # 오퍼시트의 Quantity 열은 대개 **낱개**입니다. 상자 수와 섞이면
         # 화물이 수십 배로 부푸므로 칸을 따로 둡니다. (2026-09-28)
         "pieces": _NUM,
+        "piece_unit": _STR,
         "units_per_package": _NUM,
         "package_type": {"type": ["string", "null"], "enum": sorted(PACKAGE_TYPES) + [None]},
         "gross_weight_kg": _NUM,
@@ -207,6 +208,8 @@ Packing List 중 하나)의 그림과, 읽을 수 있으면 본문 글자를 받
                      서류에 상자 수가 없으면 null 로 두세요.
       package_unit   서류에 찍힌 포장 단위 글자 그대로 (CTNS, PLTS, PCS…)
       pieces         **낱개 수량**. "1,200 PCS" -> 1200
+      piece_unit     낱개의 단위 글자 그대로. "1,200 PCS" -> "PCS"
+                     상자 단위(CTN·PLT)가 아니라 **세는 단위**입니다.
       units_per_package  한 포장에 몇 개인지. "50 PCS per carton" -> 50
                      포장 설명 줄에 적혀 있는 경우가 많습니다.
       package_type   carton pallet wooden_crate drum flexible_bag uld bulk 중 하나, 모르면 null
@@ -511,6 +514,31 @@ def _check_packages(lines: list[dict], total, notes: list) -> None:
                      f"({stated:,.0f})와 다릅니다. 줄마다 확인해 주세요.")
 
 
+def _unit_basis(raw: dict, label: str, style: str) -> dict:
+    """단가의 기준이 되는 낱개 수량과 단위.
+
+    둘은 **함께** 있어야 뜻이 있습니다. priced_by_units() 가 둘 다 보므로,
+    하나만 넣으면 넣으나 마나입니다. 그래서 짝이 맞을 때만 돌려줍니다.
+    """
+
+    from app.validators.cargo_validator import price_unit_of
+
+    pieces = _amount(raw.get("pieces"), f"{label} 낱개 수량", [], style)
+    if not pieces:
+        return {}
+    # **포장 단위를 낱개 단위로 쓰면 안 됩니다.**
+    #
+    # package_unit 은 상자·팰릿을 세는 말(CTN·PLT)입니다. 그것을 단가의
+    # 단위로 쓰면 송장에 "1,200 CTN × 4.50" 으로 찍힙니다. 서류에는
+    # "1,200 PCS" 라고 적혀 있는데요. (2026-09-28)
+    unit = price_unit_of(raw.get("piece_unit"))
+    if not unit:
+        written = re.sub(r"[\s.]+", " ", str(raw.get("package_unit") or "")).strip().upper()
+        # 상자를 세는 말이면 쓰지 않습니다. 낱개의 기본은 PCS 입니다.
+        unit = "" if written in _UNIT_LOOKUP else price_unit_of(written)
+    return {"unit_quantity": pieces, "price_unit": unit or "PCS"}
+
+
 def _item(raw, notes: list, no: int) -> dict:
     if not isinstance(raw, dict):
         return {}
@@ -526,6 +554,15 @@ def _item(raw, notes: list, no: int) -> dict:
         "hs_code": "".join(ch for ch in str(raw.get("hs_code") or "") if ch.isdigit())[:10],
         "package_type": _package_type(raw),
         "quantity": _package_count(raw, label, notes, style),
+        # 단가의 기준은 **낱개**입니다. 포장 개수가 아닙니다.
+        #
+        #   quantity       24상자   <- CBM·중량의 기준
+        #   unit_quantity  1,200개  <- 단가의 기준 (1,200 × 4.50 = 5,400)
+        #
+        # 둘 다 있어야 priced_by_units() 가 참이 되고 송장에 "1,200 PCS ×
+        # 4.50" 으로 찍힙니다. 하나라도 비면 단가 칸이 금액÷상자수로 채워져,
+        # 오퍼시트·L/C 와 **다른 단가**가 송장에 나갑니다. (2026-09-28)
+        **_unit_basis(raw, label, style),
         "net_weight_kg": _amount(raw.get("net_weight_kg"), f"{label} 순중량", notes, style),
         "unit_price": _amount(raw.get("unit_price"), f"{label} 단가", notes, style),
         "amount": _amount(raw.get("amount"), f"{label} 금액", notes, style),
