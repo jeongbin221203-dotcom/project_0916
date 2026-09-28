@@ -151,19 +151,96 @@ CONTRACT_TITLES = (
     "sales agreement", "purchase order terms", "terms and conditions of sale",
     "매매계약", "수출계약", "공급계약", "판매계약", "대리점계약", "총판계약", "계약서",
 )
+# 스스로 **계약서가 아니라고** 적어 둔 서류. 그 말을 믿습니다.
+#
+# 오퍼시트·견적서·송장은 가격조건과 결제·선적·보험을 다 적습니다. 그래서
+# 조항 개수만 보면 전부 계약서로 걸립니다. 실제로 오퍼시트 세 장이 모두
+# 계약서로 판정되어, 서류 칸이 빈 채로 "13가지가 누락되었습니다"가 떴습니다.
+# (2026-09-28)
+NOT_CONTRACT_TITLES = (
+    "offer sheet", "firm offer", "quotation", "proforma invoice",
+    "commercial invoice", "packing list", "bill of lading", "air waybill",
+    "certificate of origin", "purchase order",
+    "오퍼시트", "견적서", "상업송장", "포장명세서", "선하증권", "원산지증명서",
+    "주문서", "발주서",
+)
+
+# **계약서다운** 조항. 제목이 없을 때는 이것들로 셉니다.
+#
+# incoterms · payment · shipment · insurance · packing · inspection 은
+# 장사 서류면 다 있으므로 여기에 넣지 않습니다. 넣으면 오퍼시트가 계약서가
+# 됩니다 — 실제로 그랬습니다.
+CONTRACT_ONLY_CLAUSES = frozenset({
+    # 필수·이익 조항 가운데 **계약서에만** 나오는 것
+    "governing_law", "arbitration", "force_majeure", "title",
+    "liability_cap", "late_interest", "ip", "cisg_silent", "agency_protection",
+    # 독소조항. 이런 문구는 오퍼시트에 안 적습니다.
+    "evergreen", "foreign_forum", "full_return", "mfn_price", "open_warranty",
+    "payment_on_resale", "term_conflict", "termination_at_will",
+    "uncapped_ld", "unlimited_damages", "us_jury_punitive",
+    "buyer_set_off", "ip_assignment", "china_domestic_arb", "agency_law_eu",
+})
+
+# 여기에 **넣지 않은** 것 — 장사 서류면 다 있습니다.
+#   incoterms · payment · shipment · insurance · inspection · goods
+#   min_order · price_adjust · export_licence
+# 실제로 오퍼시트 세 장에서 걸린 것이 incoterms·insurance·payment·shipment
+# 넷이었고, 그것만으로 계약서 판정이 나 서류 칸이 통째로 비었습니다.
+
 # 이만큼은 돼야 계약서 한 장으로 봅니다. 짧은 인용은 질문이지 계약서가 아닙니다.
+# 제목을 찾는 범위. 무역서류는 **첫 몇 줄에** 무엇인지 적습니다.
+#
+# 글자 수로 자르면 안 됩니다. 짧은 계약서는 600자 안에 이미 "commercial
+# invoice, packing list" 같은 본문이 들어옵니다. 그 언급에 걸려 진짜
+# 계약서를 놓쳤습니다. 줄로 셉니다. (2026-09-28)
+TITLE_LOOKUP_LINES = 3
+
+
+def _title_area(text: str) -> str:
+    """서류가 스스로 무엇이라고 적어 둔 자리. 빈 줄을 뺀 첫 몇 줄입니다."""
+
+    rows = [row.strip() for row in str(text or "").splitlines() if row.strip()]
+    return " ".join(rows[:TITLE_LOOKUP_LINES]).lower()
+
 CONTRACT_MIN_CHARS = 400
 CONTRACT_MIN_CLAUSES = 2
 
+# 제목이 없을 때 필요한 **계약서다운** 조항 수.
+#
+# 조항 종류를 좁혔으니 문턱도 다시 잡습니다. 예전에는 아무 조항이나 넷이었고,
+# 그래서 오퍼시트(incoterms·insurance·payment·shipment)가 전부 걸렸습니다.
+# 지금은 준거법·중재·불가항력 같은 것만 셉니다. 오퍼시트에는 이런 조항이
+# **하나도 없습니다.** 셋이면 계약서로 봐도 됩니다. (2026-09-28)
+CONTRACT_MIN_ONLY_CLAUSES = 3
+
 
 def looks_like_contract(text: str) -> bool:
-    """이 글이 계약서인가. 확실하지 않으면 False입니다(평소대로 상담으로 답합니다)."""
+    """이 글이 계약서인가. 확실하지 않으면 False입니다(평소대로 상담으로 답합니다).
+
+    잘못 보면 두 가지가 한꺼번에 나빠집니다.
+      계약서를 놓치면  조항을 못 짚어 줍니다 (아쉽지만 상담은 됩니다)
+      계약서로 잘못 보면 **서류 칸이 통째로 비고** "13가지가 누락되었습니다"가
+                      뜹니다. 멀쩡히 읽히는 서류인데도요.
+    뒤쪽이 더 나쁩니다. 그래서 확실할 때만 계약서로 봅니다.
+    """
 
     body = str(text or "")
     if len(body) < CONTRACT_MIN_CHARS:
         return False
     lowered = body.lower()
-    titled = any(word in lowered for word in CONTRACT_TITLES)
-    clauses = len(contract_clauses.find_in(body))
-    # 제목이 있으면 조항 둘, 제목이 없으면 조항 넷을 봅니다.
-    return clauses >= (CONTRACT_MIN_CLAUSES if titled else CONTRACT_MIN_CLAUSES * 2)
+    # **제목은 첫 몇 줄에서만 찾습니다.**
+    #
+    # 본문까지 뒤지면 안 됩니다. 계약서는 "each party shall provide the
+    # commercial invoice, packing list, and transport documents" 처럼 다른
+    # 서류를 본문에서 언급합니다. 그것 때문에 진짜 계약서를 놓쳤습니다.
+    # (2026-09-28 — 본문 2,038번째 글자의 "commercial invoice" 에 걸렸습니다)
+    head = _title_area(body)
+    # 스스로 오퍼시트·송장이라고 적어 둔 것은 계약서가 아닙니다.
+    if any(word in head for word in NOT_CONTRACT_TITLES):
+        return False
+    if any(word in head for word in CONTRACT_TITLES):
+        return len(contract_clauses.find_in(body)) >= CONTRACT_MIN_CLAUSES
+    # 제목이 없으면 **계약서다운 조항**만 셉니다.
+    # 가격조건·결제·선적은 장사 서류면 다 있어 세지 않습니다.
+    found = set(contract_clauses.find_in(body)) & CONTRACT_ONLY_CLAUSES
+    return len(found) >= CONTRACT_MIN_ONLY_CLAUSES

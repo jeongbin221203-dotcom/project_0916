@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+from app.collectors.base_client import get_config
 from app.services import (ServiceError, contract_clause_service,
                           document_extract_service,
                           document_pipeline_service as pipe, support_chat_service)
@@ -102,6 +103,14 @@ def _contract_answer(filename: str, data: bytes, message: str) -> dict | None:
 
     # 읽다가 잘못되면 **조용히 넘어갑니다.** 계약서가 아닐 때 여기서 막히면
     # 멀쩡한 서류까지 못 읽게 됩니다. (깨진 PDF 하나에 서류 읽기가 통째로 멈췄습니다)
+    # 화면에서 내린 기능이면 이 길도 가지 않습니다.
+    #
+    # 사용자가 계약서 조항 점검을 내렸는데(CONTRACT_CLAUSES_ON=0) /contract/* 는
+    # 404 이면서 올린 파일은 여전히 조항 점검으로 갔습니다. 내린 기능의 답이
+    # 대화창에 나옵니다. (2026-09-28)
+    if not get_config("CONTRACT_CLAUSES_ON", False):
+        _refuse_plain_text(filename)
+        return None
     try:
         text = contract_clause_service.read_file(filename, data)
     except Exception:                                   # noqa: BLE001

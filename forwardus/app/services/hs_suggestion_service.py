@@ -20,6 +20,11 @@ MATCH_ORDER = {"high": 0, "medium": 1, "unknown": 2, "low": 3}
 MATCH_LABELS = {"high": "적합도 높음", "medium": "조건 확인 필요", "unknown": "적합도 미확인", "low": "관련성 낮음"}
 
 
+# 한 호(4자리) 아래에서 후보로 올릴 세번 수. 우산(6601)은 넷, 넥타이(6215)는
+# 셋처럼 대개 열 아래입니다. 너무 크게 잡으면 다른 해석이 밀립니다.
+HEADING_SIBLING_LIMIT = 12
+
+
 def keywords(query: str) -> list[str]:
     """Small deterministic fallback; retain the original phrase separately."""
     words = re.findall(r"[가-힣A-Za-z]{2,}", query)
@@ -30,6 +35,36 @@ def keywords(query: str) -> list[str]:
 
 def _code(value):
     return re.sub(r"[.\-\s]", "", value)
+
+
+def _heading_group(hypotheses: dict[str, str]) -> list[dict]:
+    """AI 가 짚은 **호(4자리)** 아래 세번들. 한 묶음으로 냅니다.
+
+    왜 소호가 아니라 호인가
+      우산은 6601 호 아래에서 갈립니다.
+          6601.10    정원용 산류 (마당 파라솔)
+          6601.91    대가 절첩식인 것 (3단·접이식)
+          6601.99-2000  양산
+          6601.99-9000  기타 (장우산 따위)
+      6601.99 의 형제만 보면 절첩식(6601.91)이 영영 안 보입니다. 실제로
+      3단 우산에 6601.10(마당 파라솔)이 1순위로 나왔습니다. (2026-09-28)
+
+      호가 맞으면 그 안에서 고르는 것은 사람이 할 수 있습니다. 호가 틀리면
+      어차피 다 버리므로 넣어서 손해 볼 것이 없습니다.
+    """
+
+    if not hsk_catalog.available():
+        return []
+    rows, seen = [], set()
+    for code in hypotheses:
+        heading = _code(code)[:4]
+        if len(heading) < 4 or heading in seen:
+            continue
+        seen.add(heading)
+        for row in hsk_catalog.children(heading, HEADING_SIBLING_LIMIT):
+            rows.append({**row, "matched_terms": [heading],
+                         "hypothesis": f"AI가 제안한 HS {heading} 호의 세번"})
+    return rows
 
 
 def _hypothesis_groups(hypotheses: dict[str, str], fetch) -> list[list[dict]]:
@@ -114,6 +149,11 @@ def search(query: str, country: str = "", order: str = "frequency") -> dict:
     with ThreadPoolExecutor(max_workers=5) as executor:
         word_responses = list(executor.map(fetch, words))
     code_groups = _hypothesis_groups(hypotheses, fetch)
+    # AI 가 짚은 호(4자리)의 형제를 한 묶음으로 더합니다. 소재 낱말보다 앞에
+    # 놓아야 잘리지 않습니다. (2026-09-28 — 3단 우산에서 6601.91 이 잘렸습니다)
+    heading_rows = _heading_group(hypotheses)
+    if heading_rows:
+        code_groups.append(heading_rows)
     terms = [text, *hypotheses, *words]
     searched_as = " · ".join(terms[1:])
     groups, failures = [], []
