@@ -121,6 +121,8 @@ EXTRACT_SCHEMA = _object({
     "container_no": _STR,
     "shipping_marks": _STR,
     "shipment_date": _STR,
+    # 바이어가 받고 싶다고 한 날. 운송 계획에서 스케줄을 고를 때 씁니다.
+    "buyer_required_date": _STR,
     # 신용장 조건. 여기 날짜로 안전한 선적예정일을 계산합니다. (processors/lc_schedule.py)
     "lc_no": _STR,
     "lc_latest_shipment_date": _STR,
@@ -179,7 +181,16 @@ Packing List 중 하나)의 그림과, 읽을 수 있으면 본문 글자를 받
                    낱개 합계(2,000 PCS)가 아닙니다.
   payment_terms    물품 대금의 결제 조건 (T/T 30 days, L/C at sight 같은 것).
                    B/L의 "FREIGHT PREPAID/COLLECT"는 운임 지급 조건이라 여기에 넣지 않습니다.
-  shipment_date    선적(예정)일. B/L이면 On Board Date
+  shipment_date    **화물이 나가는 날.** 아래가 모두 같은 날을 가리킵니다.
+                   B/L이면 On Board Date · "Seller dispatch" · "cargo ready date"
+                   · "ex-works date" · "Planned shipment on ..." · 선적예정일
+                   **기준일이 없는 상대 날짜는 넣지 마세요.**
+                   ("입금 후 60일 이내" 처럼 언제부터인지 모르는 것은 null)
+                   날짜가 "February 26, 2027 (2027-02-26)" 처럼 두 번 적혀
+                   있으면 괄호 안의 ISO 날짜를 씁니다.
+  buyer_required_date  바이어가 받고 싶다고 한 날. "Buyer delivery" ·
+                   "requested delivery date" · "buyer required date".
+                   도착 예정(ETA)이 아니라 **바이어가 요청한 날**입니다.
   lc_*             신용장(L/C)일 때만 채웁니다. SWIFT 전문이면 필드 번호가 붙어 있습니다.
       lc_no                     20 Documentary credit number
       lc_latest_shipment_date   44C Latest date of shipment (Shipment must be effected on or before)
@@ -622,6 +633,8 @@ def to_form(raw: dict) -> dict:
     fields["currency"] = currency
 
     fields["requested_departure_date"] = _date(raw.get("shipment_date"), notes, "선적일")
+    fields["buyer_required_date"] = _date(raw.get("buyer_required_date"), notes,
+                                          "Buyer 요청 도착일")
     fields["lc_no"] = _clean(raw.get("lc_no"), 100)
 
     for role, key in (("origin", "port_of_loading"), ("destination", "port_of_discharge")):
