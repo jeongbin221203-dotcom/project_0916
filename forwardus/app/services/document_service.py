@@ -285,12 +285,51 @@ def _port(name: str, code: str) -> str:
     return f"{name} ({code})"
 
 
+def _summed(cargos, attribute: str):
+    """모든 품목을 더합니다. 하나라도 비어 있으면 합계를 내지 않습니다.
+
+    반쪽 합계가 가장 위험합니다. 세 줄 중 두 줄만 더한 중량이 B/L 에 찍히면
+    아무도 못 알아챕니다. 모르면 비워 두고 사람이 채우게 합니다.
+    """
+
+    values = [getattr(item, attribute, None) for item in cargos]
+    if not values or any(value in (None, "") for value in values):
+        return None
+    try:
+        total = sum(float(value) for value in values)
+    except (TypeError, ValueError):
+        return None
+    # 0.1 + 0.2 = 0.30000000000000004 이 서류에 찍히면 안 됩니다.
+    return round(total, 3)
+
+
+def _headline(cargos, attribute: str) -> str:
+    """여러 품목을 대표하는 한 줄. 더할 수 없는 값(품명·HS부호)에 씁니다.
+
+    "합계" 라는 이름 아래 첫 줄만 적으면 그것이 전부인 줄 압니다.
+    여러 줄이면 "외 N건" 을 붙여 대표임을 밝힙니다. (2026-09-28)
+    """
+
+    if not cargos:
+        return ""
+    first = str(getattr(cargos[0], attribute, "") or "")
+    if len(cargos) <= 1 or not first:
+        return first
+    return f"{first} 외 {len(cargos) - 1}건"
+
+
 def build_reference(shipment) -> dict:
     """Expected values for every shared field, taken from the Shipment record."""
 
     cargo = shipment.cargo
     buyer = shipment.buyer
-    gross = cargo.total_weight_kg if cargo else None
+    # **모든 품목을 더합니다.**
+    #
+    # 예전에는 첫 품목(shipment.cargo)의 값을 "합계"라는 이름으로 찍었습니다.
+    # 품목이 하나면 같아서 안 보였고, 둘 이상이면 첫 줄만 나갔습니다.
+    # 포장명세서의 중량·용적은 그대로 B/L 과 통관 신고로 갑니다. (2026-09-28)
+    lines = list(shipment.cargos or [])
+    gross = _summed(lines, "total_weight_kg")
     equipment = ""
     if shipment.sea_mode == "FCL" and cargo and cargo.container_quantity:
         equipment = f"{cargo.container_quantity} x {cargo.container_type}"
@@ -320,17 +359,19 @@ def build_reference(shipment) -> dict:
         "vessel_or_flight": shipment.vessel_or_flight or "",
         "etd": shipment.etd.isoformat() if shipment.etd else "",
         "eta": shipment.eta.isoformat() if shipment.eta else "",
-        "product_description": cargo.product_description if cargo else "",
-        "hs_code": cargo.hs_code if cargo else "",
-        "quantity": cargo.quantity if cargo else None,
+        # 품명·HS부호는 더할 수 없습니다. 대표를 쓰되 여러 줄이면 "외 N건".
+        "product_description": _headline(lines, "product_description"),
+        "hs_code": _headline(lines, "hs_code"),
+        "quantity": _summed(lines, "quantity"),
         "package_type": PACKAGE_UNITS.get(cargo.package_type, cargo.package_type) if cargo else "",
         "unit_price": _summary_unit_price(shipment, cargo),
         "invoice_value": shipment.invoice_value,
         "currency": shipment.currency,
         "gross_weight_kg": gross,
         # Net weight is only filled when the user entered it; never invented.
-        "net_weight_kg": cargo.net_weight_kg if cargo and cargo.net_weight_kg is not None else "",
-        "total_cbm": cargo.total_cbm if cargo else None,
+        # 한 줄이라도 비어 있으면 합계를 내지 않습니다 — 반쪽 합계가 가장 위험합니다.
+        "net_weight_kg": _summed(lines, "net_weight_kg") or "",
+        "total_cbm": _summed(lines, "total_cbm"),
         "freight_term": "FREIGHT PREPAID" if prepaid else "FREIGHT COLLECT",
         "equipment": equipment,
         "remarks": "",
