@@ -1,0 +1,500 @@
+<meta charset="utf-8">
+<title>ForwardUs 브랜드 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f4f7fb;
+    --ink: #0f172a;
+    --ink-2: #475569;
+    --ink-3: #64748b;
+    --line: #e2e8f0;
+    --accent: #2b66f6;
+    --navy: #003679;
+    --ok: #0a9f78;
+    --ok-soft: #e6f7f1;
+    --bad: #d93b3b;
+    --bad-soft: #fdecec;
+    --paper: #ffffff;
+    --sans: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0c111b;
+      --surface: #151c29;
+      --ink: #e7ecf3;
+      --ink-2: #b2bccb;
+      --ink-3: #8390a4;
+      --line: #263041;
+      --accent: #6b95ff;
+      --ok: #3fcaa1;
+      --ok-soft: #10302a;
+      --bad: #f07a7a;
+      --bad-soft: #3a1c1f;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0c111b;
+    --surface: #151c29;
+    --ink: #e7ecf3;
+    --ink-2: #b2bccb;
+    --ink-3: #8390a4;
+    --line: #263041;
+    --accent: #6b95ff;
+    --ok: #3fcaa1;
+    --ok-soft: #10302a;
+    --bad: #f07a7a;
+    --bad-soft: #3a1c1f;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.65;
+    padding-inline: 20px; padding-block: 48px 80px; word-break: keep-all;
+  }
+  .page { max-width: 880px; margin: 0 auto; display: grid; gap: 64px; }
+  p { margin: 0; }
+  h1, h2, h3 { margin: 0; text-wrap: balance; }
+
+  header { display: grid; gap: 20px; }
+  .logo-hero { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 36px 28px; display: grid; place-items: center; }
+  .logo-hero img { width: min(420px, 100%); height: auto; display: block; }
+  .head-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 24px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .meta { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  nav { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav a {
+    font-size: 13px; color: var(--ink-2); text-decoration: none;
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
+  }
+  nav a:hover, nav a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+
+  section { display: grid; gap: 24px; scroll-margin-top: 24px; }
+  .sec-head { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 2px solid var(--ink); }
+  .sec-head h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .sec-head p { color: var(--ink-3); font-size: 14px; }
+  h3 { font-size: 16px; font-weight: 600; }
+  .label { font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.06em; }
+  .block { display: grid; gap: 12px; }
+
+  /* 1. 철학 */
+  .defs { display: grid; grid-template-columns: 120px minmax(0, 1fr); border-top: 1px solid var(--line); }
+  .defs > * { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .defs dt { font-weight: 600; font-size: 14px; color: var(--ink-3); }
+  .defs dd { margin: 0; font-size: 16px; }
+  .defs dd small { display: block; font-size: 14px; color: var(--ink-2); }
+  .slogan { font-size: 20px; font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
+  .values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .value { background: var(--surface); border-radius: 6px; padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+  .value p { font-size: 14px; color: var(--ink-2); }
+
+  /* 2. 로고 */
+  .logo-types { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+  .specimen { display: grid; gap: 8px; }
+  .tile {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
+    min-height: 160px; display: grid; place-items: center; padding: 20px;
+  }
+  .tile img { display: block; height: auto; max-width: 100%; }
+  .cap { font-size: 13px; color: var(--ink-2); }
+  .cap b { color: var(--ink); font-weight: 600; }
+
+  .clear-demo { position: relative; display: inline-block; padding: 26px; outline: 1px dashed #2b66f6; outline-offset: 0; }
+  .clear-demo img { width: 260px; outline: 1px solid rgba(43, 102, 246, .35); }
+  .clear-demo .x { position: absolute; font-family: var(--mono); font-size: 11px; color: #2b66f6; }
+  .clear-demo .x.t { top: 6px; left: 50%; transform: translateX(-50%); }
+  .clear-demo .x.l { left: 6px; top: 50%; transform: translateY(-50%); }
+
+  .rules { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .table-wrap { overflow-x: auto; }
+  .rules th, .rules td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .rules th { background: var(--surface); font-size: 13px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
+  .rules td:first-child { font-weight: 600; white-space: nowrap; }
+  .num { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  .bg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .bg-grid .tile { min-height: 120px; }
+  .bg-grid .tile img { width: 88%; }
+  .on-navy { background: #003679; border-color: #003679; }
+  .on-navy img, .on-photo img { filter: brightness(0) invert(1); }
+  .on-photo { background: linear-gradient(135deg, #3d5a73, #7d93a3 55%, #a9b6bf); border-color: transparent; }
+
+  .dont-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .dont .tile { min-height: 110px; position: relative; overflow: hidden; }
+  .dont .tile img { width: 80%; }
+  .dont .tile::after {
+    content: "✕"; position: absolute; top: 6px; right: 10px;
+    color: #d93b3b; font-weight: 700; font-size: 14px;
+  }
+  .d-stretch img { transform: scaleX(1.35) scaleY(.7); }
+  .d-rotate img { transform: rotate(-12deg); }
+  .d-color img { filter: hue-rotate(150deg) saturate(1.4); }
+  .d-shadow img { filter: drop-shadow(4px 5px 3px rgba(0,0,0,.45)); }
+  .d-lowc { background: #108ef6 !important; }
+  .d-crop img { width: 170% !important; max-width: none; transform: translateX(22%); }
+
+  /* 3. 색 */
+  .swatches { display: grid; gap: 12px; }
+  .swatches.primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .swatches.secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .swatches.neutral, .swatches.status { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sw { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: grid; }
+  .sw .chip { height: 88px; }
+  .swatches.primary .chip { height: 128px; }
+  .sw .info { padding: 10px 12px 12px; display: grid; gap: 2px; background: var(--bg); }
+  .sw .name { font-weight: 600; font-size: 14px; }
+  .sw .use { font-size: 12px; color: var(--ink-3); margin-bottom: 4px; }
+  .sw .code { font-family: var(--mono); font-size: 12px; color: var(--ink-2); display: grid; grid-template-columns: 40px 1fr; font-variant-numeric: tabular-nums; }
+  .sw .code span:first-child { color: var(--ink-3); }
+  .ratio { display: flex; height: 18px; border-radius: 3px; overflow: hidden; }
+  .ratio div { display: grid; place-items: center; font-family: var(--mono); font-size: 10px; color: #fff; }
+
+  /* 4. 타이포 */
+  .fonts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .font-card { border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: grid; gap: 8px; }
+  .font-card .big { font-size: 34px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; }
+  .font-card .big.mono { font-family: var(--mono); font-weight: 500; letter-spacing: 0; font-size: 28px; }
+  .scale { border-top: 1px solid var(--line); }
+  .scale-row {
+    display: grid; grid-template-columns: 90px minmax(0, 1fr) 200px; gap: 16px; align-items: baseline;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .scale-row .tok { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .scale-row .spec { font-family: var(--mono); font-size: 12px; color: var(--ink-3); text-align: right; }
+  .s-h1 { font-size: 32px; font-weight: 700; line-height: 1.3; letter-spacing: -0.02em; }
+  .s-h2 { font-size: 24px; font-weight: 700; line-height: 1.35; letter-spacing: -0.01em; }
+  .s-h3 { font-size: 18px; font-weight: 600; line-height: 1.4; }
+  .s-body { font-size: 15px; font-weight: 400; line-height: 1.6; }
+  .s-cap { font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--ink-2); }
+  .s-num { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+  /* 5. 톤 */
+  .voice { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .voice .value h3 { font-size: 17px; }
+  .compare { display: grid; gap: 10px; }
+  .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .say { border-radius: 6px; padding: 12px 14px; font-size: 14px; display: grid; gap: 4px; }
+  .say .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+  .say.no { background: var(--bad-soft); }
+  .say.no .tag { color: var(--bad); }
+  .say.yes { background: var(--ok-soft); }
+  .say.yes .tag { color: var(--ok); }
+  .pair-title { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+  .list { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+  .list b { font-weight: 600; }
+
+  footer { font-size: 12px; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 16px; font-family: var(--mono); }
+
+  @media (max-width: 680px) {
+    body { padding-inline: 16px; padding-block: 32px 56px; }
+    .values, .voice, .fonts, .logo-types, .pair, .swatches.primary { grid-template-columns: 1fr; }
+    .bg-grid, .dont-grid, .swatches.secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .swatches.neutral, .swatches.status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .defs { grid-template-columns: 1fr; }
+    .defs dt { padding-bottom: 0; border-bottom: 0; }
+    .scale-row { grid-template-columns: 1fr; gap: 2px; }
+    .scale-row .spec { text-align: left; }
+    .clear-demo img { width: 180px; }
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="logo-hero"><img src="forwardus/app/static/images/logo.png" alt="ForwardUs 로고"></div>
+    <div class="head-row">
+      <h1>ForwardUs 브랜드 가이드</h1>
+      <span class="meta">v1.0 · 2026-09-28</span>
+    </div>
+    <nav aria-label="목차">
+      <a href="#brand">브랜드 철학</a>
+      <a href="#logo">로고</a>
+      <a href="#color">컬러</a>
+      <a href="#type">타이포그래피</a>
+      <a href="#tone">톤 앤 매너</a>
+    </nav>
+  </header>
+
+  <!-- 1 -->
+  <section id="brand">
+    <div class="sec-head"><h2>브랜드 철학</h2><p>ForwardUs가 무엇을 하는지, 무엇을 지키는지</p></div>
+    <dl class="defs">
+      <dt>비전</dt>
+      <dd>소규모 수출기업을 위한 수출 운영 시스템</dd>
+      <dt>미션</dt>
+      <dd>물류 담당자가 없는 기업도 운송 계획, 무역서류, 화물 추적을 직접 처리할 수 있게 한다.</dd>
+      <dt>슬로건</dt>
+      <dd><span class="slogan">Global Trade, Smarter Quotes</span><small>로고에 포함된 공식 슬로건. 국문 병기가 필요하면 "수출 업무를 더 간단하게"를 쓴다.</small></dd>
+    </dl>
+    <div class="block">
+      <span class="label">핵심 가치</span>
+      <div class="values">
+        <div class="value"><h3>한 번 입력</h3><p>입력한 정보는 견적, 서류, 추적까지 이어서 쓴다. 같은 값을 두 번 묻지 않는다.</p></div>
+        <div class="value"><h3>정확한 숫자</h3><p>운임, CBM, 일정은 코드로 계산한다. AI는 계산 결과를 설명만 한다.</p></div>
+        <div class="value"><h3>출처 공개</h3><p>데이터마다 출처(API, Mock, 직접 입력)를 표시한다. 예시 데이터를 실제처럼 보여주지 않는다.</p></div>
+        <div class="value"><h3>Shipment 단위</h3><p>화물, 서류, 일정, 비용을 하나의 Shipment ID로 묶어 관리한다.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section id="logo">
+    <div class="sec-head"><h2>로고 사용 규정</h2><p>원본 파일: app/static/images/logo.png, logo_mark.png</p></div>
+
+    <div class="block">
+      <span class="label">기본 형태</span>
+      <div class="logo-types">
+        <div class="specimen">
+          <div class="tile"><img src="forwardus/app/static/images/logo.png" alt="가로형 로고" style="width: 92%"></div>
+          <p class="cap"><b>가로형 (기본)</b> — 심볼 + 워드마크 + 슬로건. 웹 헤더, 문서 표지, 명함에 사용.</p>
+        </div>
+        <div class="specimen">
+          <div class="tile"><img src="forwardus/app/static/images/logo_mark.png" alt="심볼" style="width: 120px"></div>
+          <p class="cap"><b>심볼</b> — 공간이 좁을 때. 앱 아이콘, 파비콘, SNS 프로필에 사용.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">여백과 최소 크기</span>
+      <div class="tile" style="min-height: 0; padding: 28px 16px;">
+        <div class="clear-demo">
+          <span class="x t">X</span><span class="x l">X</span>
+          <img src="forwardus/app/static/images/logo.png" alt="여백 규정 예시">
+        </div>
+      </div>
+      <p class="cap">X = 로고 높이의 1/4. 로고 사방에 X 이상 비워 두고, 이 영역에는 글자나 다른 그래픽을 두지 않는다.</p>
+      <div class="table-wrap">
+        <table class="rules">
+          <thead><tr><th>구분</th><th>디지털</th><th>인쇄</th></tr></thead>
+          <tbody>
+            <tr><td>가로형 최소 폭</td><td class="num">120 px</td><td class="num">30 mm</td></tr>
+            <tr><td>가로형 (슬로건 생략 권장)</td><td class="num">180 px 미만</td><td class="num">45 mm 미만</td></tr>
+            <tr><td>심볼 최소 폭</td><td class="num">24 px</td><td class="num">8 mm</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">배경별 적용</span>
+      <div class="bg-grid">
+        <div class="specimen">
+          <div class="tile"><img src="forwardus/app/static/images/logo.png" alt="흰 배경"></div>
+          <p class="cap"><b>흰색·밝은 배경</b> — 원본 컬러 로고</p>
+        </div>
+        <div class="specimen">
+          <div class="tile on-navy"><img src="forwardus/app/static/images/logo.png" alt="네이비 배경"></div>
+          <p class="cap"><b>네이비·어두운 배경</b> — 흰색 단색 로고</p>
+        </div>
+        <div class="specimen">
+          <div class="tile on-photo"><img src="forwardus/app/static/images/logo.png" alt="사진 배경"></div>
+          <p class="cap"><b>사진 배경</b> — 흰색 단색. 복잡한 사진이면 흰 박스 위에 원본 사용</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">금지 사항</span>
+      <div class="dont-grid">
+        <div class="specimen dont"><div class="tile d-stretch"><img src="forwardus/app/static/images/logo.png" alt=""></div><p class="cap">비율 변경</p></div>
+        <div class="specimen dont"><div class="tile d-rotate"><img src="forwardus/app/static/images/logo.png" alt=""></div><p class="cap">회전</p></div>
+        <div class="specimen dont"><div class="tile d-color"><img src="forwardus/app/static/images/logo.png" alt=""></div><p class="cap">임의 색 변경</p></div>
+        <div class="specimen dont"><div class="tile d-shadow"><img src="forwardus/app/static/images/logo.png" alt=""></div><p class="cap">그림자·효과 추가</p></div>
+        <div class="specimen dont"><div class="tile d-lowc"><img src="forwardus/app/static/images/logo.png" alt=""></div><p class="cap">대비가 낮은 배경</p></div>
+        <div class="specimen dont"><div class="tile d-crop"><img src="forwardus/app/static/images/logo.png" alt=""></div><p class="cap">잘라내기·요소 분리</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section id="color">
+    <div class="sec-head"><h2>브랜드 컬러</h2><p>로고와 서비스 화면에서 추출한 값</p></div>
+
+    <div class="block">
+      <span class="label">주조색</span>
+      <div class="swatches primary">
+        <div class="sw"><div class="chip" style="background:#003679"></div><div class="info">
+          <span class="name">Forward Navy</span><span class="use">워드마크, 제목, 인쇄물 기본색</span>
+          <span class="code"><span>HEX</span><span>#003679</span></span>
+          <span class="code"><span>RGB</span><span>0, 54, 121</span></span>
+          <span class="code"><span>CMYK</span><span>100, 55, 0, 53</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#2B66F6"></div><div class="info">
+          <span class="name">Forward Blue</span><span class="use">버튼, 링크, 선택 상태 등 화면 강조색</span>
+          <span class="code"><span>HEX</span><span>#2B66F6</span></span>
+          <span class="code"><span>RGB</span><span>43, 102, 246</span></span>
+          <span class="code"><span>CMYK</span><span>83, 59, 0, 4</span></span>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">보조색</span>
+      <div class="swatches secondary">
+        <div class="sw"><div class="chip" style="background:#108EF6"></div><div class="info">
+          <span class="name">Sky</span><span class="use">로고 "Us", 그래프, 아이콘</span>
+          <span class="code"><span>HEX</span><span>#108EF6</span></span>
+          <span class="code"><span>RGB</span><span>16, 142, 246</span></span>
+          <span class="code"><span>CMYK</span><span>93, 42, 0, 4</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#EDF3FF"></div><div class="info">
+          <span class="name">Blue Soft</span><span class="use">강조 영역 배경, 선택된 카드</span>
+          <span class="code"><span>HEX</span><span>#EDF3FF</span></span>
+          <span class="code"><span>RGB</span><span>237, 243, 255</span></span>
+          <span class="code"><span>CMYK</span><span>7, 5, 0, 0</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#0F172A"></div><div class="info">
+          <span class="name">Ink</span><span class="use">본문 글자</span>
+          <span class="code"><span>HEX</span><span>#0F172A</span></span>
+          <span class="code"><span>RGB</span><span>15, 23, 42</span></span>
+          <span class="code"><span>CMYK</span><span>64, 45, 0, 84</span></span>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">중립색</span>
+      <div class="swatches neutral">
+        <div class="sw"><div class="chip" style="background:#64748B"></div><div class="info">
+          <span class="name">Muted</span><span class="use">보조 설명</span>
+          <span class="code"><span>HEX</span><span>#64748B</span></span>
+          <span class="code"><span>RGB</span><span>100, 116, 139</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#E2E8F0"></div><div class="info">
+          <span class="name">Line</span><span class="use">구분선, 테두리</span>
+          <span class="code"><span>HEX</span><span>#E2E8F0</span></span>
+          <span class="code"><span>RGB</span><span>226, 232, 240</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#F4F7FB"></div><div class="info">
+          <span class="name">Surface</span><span class="use">페이지 배경</span>
+          <span class="code"><span>HEX</span><span>#F4F7FB</span></span>
+          <span class="code"><span>RGB</span><span>244, 247, 251</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="info">
+          <span class="name">White</span><span class="use">카드 배경</span>
+          <span class="code"><span>HEX</span><span>#FFFFFF</span></span>
+          <span class="code"><span>RGB</span><span>255, 255, 255</span></span>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">상태색 — 상태 표시에만 사용</span>
+      <div class="swatches status">
+        <div class="sw"><div class="chip" style="background:#0A9F78"></div><div class="info">
+          <span class="name">Green</span><span class="use">완료, 검증 통과</span>
+          <span class="code"><span>HEX</span><span>#0A9F78</span></span>
+          <span class="code"><span>CMYK</span><span>94, 0, 25, 38</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#B86E00"></div><div class="info">
+          <span class="name">Amber</span><span class="use">주의, 확인 필요</span>
+          <span class="code"><span>HEX</span><span>#B86E00</span></span>
+          <span class="code"><span>CMYK</span><span>0, 40, 100, 28</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#D93B3B"></div><div class="info">
+          <span class="name">Red</span><span class="use">오류, 지연</span>
+          <span class="code"><span>HEX</span><span>#D93B3B</span></span>
+          <span class="code"><span>CMYK</span><span>0, 73, 73, 15</span></span>
+        </div></div>
+        <div class="sw"><div class="chip" style="background:#64748B"></div><div class="info">
+          <span class="name">Gray</span><span class="use">Mock 데이터 표시</span>
+          <span class="code"><span>HEX</span><span>#64748B</span></span>
+          <span class="code"><span>CMYK</span><span>28, 17, 0, 45</span></span>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">화면 내 사용 비율</span>
+      <div class="ratio" aria-label="White·Surface 70%, Navy·Ink 20%, Blue 10%">
+        <div style="flex:70; background:#F4F7FB; color:#64748B; border:1px solid #E2E8F0">70%</div>
+        <div style="flex:20; background:#003679">20%</div>
+        <div style="flex:10; background:#2B66F6">10%</div>
+      </div>
+      <p class="cap">배경(White·Surface) 70% · 글자와 제목(Navy·Ink) 20% · 강조(Blue) 10%. 파란색은 누를 수 있는 곳에만 쓴다.</p>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section id="type">
+    <div class="sec-head"><h2>타이포그래피</h2><p>국문과 영문 모두 같은 서체를 쓴다</p></div>
+
+    <div class="fonts">
+      <div class="font-card">
+        <span class="label">기본 서체</span>
+        <div class="big">Pretendard 가나다 Aa</div>
+        <p class="cap">제목과 본문 전체. 굵기는 Regular 400, SemiBold 600, Bold 700만 사용.<br>대체 서체: Noto Sans KR → 시스템 기본 산세리프</p>
+      </div>
+      <div class="font-card">
+        <span class="label">숫자·코드</span>
+        <div class="big mono">EXP-2026-00031</div>
+        <p class="cap">Shipment ID, HS CODE, 항구 코드(KRPUS), 표 안의 숫자. 고정폭 서체로 자릿수를 맞춘다.</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <span class="label">크기 규칙 (웹 기준)</span>
+      <div class="scale">
+        <div class="scale-row"><span class="tok">H1</span><span class="s-h1">운송 계획</span><span class="spec">32px · 700 · 1.3 · -0.02em</span></div>
+        <div class="scale-row"><span class="tok">H2</span><span class="s-h2">스케줄 선택</span><span class="spec">24px · 700 · 1.35 · -0.01em</span></div>
+        <div class="scale-row"><span class="tok">H3</span><span class="s-h3">부산항 → 로스앤젤레스항</span><span class="spec">18px · 600 · 1.4 · 0</span></div>
+        <div class="scale-row"><span class="tok">Body</span><span class="s-body">출발 희망일과 화물 정보를 입력하면 가능한 스케줄을 보여줍니다.</span><span class="spec">15px · 400 · 1.6 · 0</span></div>
+        <div class="scale-row"><span class="tok">Caption</span><span class="s-cap">Data Source: Mock · 실제 운임과 다를 수 있습니다.</span><span class="spec">13px · 400 · 1.5 · 0</span></div>
+        <div class="scale-row"><span class="tok">Number</span><span class="s-num">12.50 CBM · KRW 1,649,000</span><span class="spec">14px · mono · tabular</span></div>
+      </div>
+      <p class="cap">표기 순서: 크기 · 굵기 · 행간 · 자간. 인쇄물은 본문 10pt, 제목 16–24pt를 기준으로 한다. 한 화면에 쓰는 크기는 4단계를 넘기지 않는다.</p>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section id="tone">
+    <div class="sec-head"><h2>톤 앤 매너</h2><p>화면 문구, 알림, 안내 메일에 공통 적용</p></div>
+
+    <div class="voice">
+      <div class="value"><h3>정확하게</h3><p>숫자, 날짜, 단위를 그대로 쓴다. "곧", "약간" 대신 "4일", "2026-11-16".</p></div>
+      <div class="value"><h3>짧게</h3><p>한 문장에 한 가지 내용. 수식어와 감탄 표현은 쓰지 않는다.</p></div>
+      <div class="value"><h3>단정하지 않게</h3><p>규정·인증은 판단하지 않고 "확인이 필요합니다"로 안내한다.</p></div>
+    </div>
+
+    <div class="block">
+      <span class="label">문체 기준</span>
+      <ul class="list">
+        <li><b>존댓말</b> — "~합니다", "~하세요". 반말과 과한 높임("~해 주시기 바랍니다")은 쓰지 않는다.</li>
+        <li><b>날짜</b> — YYYY-MM-DD. <b>금액</b> — 통화 코드 + 천 단위 쉼표 (KRW 1,649,000 / USD 1,250).</li>
+        <li><b>전문 용어</b> — ETA, CBM, Incoterms 등은 그대로 쓰고, 처음 나올 때 한 줄 설명을 붙인다.</li>
+        <li><b>버튼</b> — 동작을 그대로 쓴다. "확인" 대신 "스케줄 선택", "서류 생성".</li>
+        <li><b>쓰지 않는 것</b> — 이모지, 느낌표, "혁신적인", "스마트한" 같은 꾸밈말.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <span class="label">예시</span>
+      <div class="compare">
+        <span class="pair-title">ETA 지연 알림</span>
+        <div class="pair">
+          <div class="say no"><span class="tag">사용하지 않음</span>앗! 화물 도착이 조금 늦어질 것 같아요 😢 걱정 마세요!</div>
+          <div class="say yes"><span class="tag">사용</span>ETA가 2026-11-12에서 2026-11-16으로 4일 늦어졌습니다. Buyer 납기일을 확인하세요.</div>
+        </div>
+        <span class="pair-title">수출 규제 안내</span>
+        <div class="pair">
+          <div class="say no"><span class="tag">사용하지 않음</span>이 제품은 미국으로 수출 가능합니다. 인증은 필요 없어요.</div>
+          <div class="say yes"><span class="tag">사용</span>현재 HS CODE 기준으로 미국 수출 시 확인이 필요한 규제 항목이 2건 있습니다.</div>
+        </div>
+        <span class="pair-title">입력 오류</span>
+        <div class="pair">
+          <div class="say no"><span class="tag">사용하지 않음</span>오류가 발생했습니다. 다시 시도해 주세요.</div>
+          <div class="say yes"><span class="tag">사용</span>중량은 0보다 커야 합니다. 박스 1개의 무게를 kg 단위로 입력하세요.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>ForwardUs Brand Guide v1.0 · 색상 값은 logo.png, base.css 기준</footer>
+</div>

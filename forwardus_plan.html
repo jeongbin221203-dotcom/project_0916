@@ -1,0 +1,318 @@
+<meta charset="utf-8">
+<title>FORWARDUS 계획서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f4f6fa;
+    --ink: #151b26;
+    --ink-2: #4a5466;
+    --ink-3: #7a8497;
+    --line: #dfe4ec;
+    --accent: #2b66f6;
+    --accent-soft: #e8efff;
+    --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Consolas", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0f131a;
+      --surface: #171d27;
+      --ink: #e6eaf1;
+      --ink-2: #aab3c3;
+      --ink-3: #7d879a;
+      --line: #28303d;
+      --accent: #6b95ff;
+      --accent-soft: #1a2640;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f131a;
+    --surface: #171d27;
+    --ink: #e6eaf1;
+    --ink-2: #aab3c3;
+    --ink-3: #7d879a;
+    --line: #28303d;
+    --accent: #6b95ff;
+    --accent-soft: #1a2640;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    padding-inline: 20px;
+    padding-block: 56px 80px;
+    word-break: keep-all;
+  }
+  .page { max-width: 760px; margin: 0 auto; display: grid; gap: 56px; }
+
+  header { display: grid; gap: 12px; padding-bottom: 32px; border-bottom: 2px solid var(--ink); }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+    letter-spacing: 0.04em;
+  }
+  h1 { margin: 0; font-size: 34px; line-height: 1.25; font-weight: 700; letter-spacing: -0.01em; }
+  h1 span { color: var(--accent); }
+  .lede { margin: 0; font-size: 17px; color: var(--ink-2); max-width: 60ch; }
+
+  section { display: grid; gap: 20px; }
+  h2 {
+    margin: 0; font-size: 20px; font-weight: 700; text-wrap: balance;
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  h2 .no { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); }
+  h3 { margin: 0; font-size: 16px; font-weight: 600; }
+  p { margin: 0; }
+  .muted { color: var(--ink-2); }
+
+  /* 비전 */
+  .statement {
+    background: var(--accent-soft); color: var(--ink);
+    padding: 20px 22px; border-radius: 6px;
+    font-size: 18px; font-weight: 600;
+  }
+  .statement small { display: block; font-size: 14px; font-weight: 400; color: var(--ink-2); margin-top: 4px; }
+
+  .flow-wrap { overflow-x: auto; }
+  .flow {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 8px 6px; align-items: center;
+    font-size: 13px;
+  }
+  .flow li { display: flex; align-items: center; gap: 6px; }
+  .flow li span {
+    border: 1px solid var(--line); border-radius: 4px; padding: 3px 10px; background: var(--bg);
+    white-space: nowrap;
+  }
+  .flow li:not(:last-child)::after { content: "→"; color: var(--ink-3); }
+
+  /* 사용자 */
+  .users { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+
+  /* 핵심 가치 */
+  .values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .value { background: var(--bg); padding: 18px 20px; display: grid; gap: 6px; align-content: start; }
+  .value p { color: var(--ink-2); font-size: 14px; }
+
+  /* 기능 */
+  .core { display: grid; gap: 0; border-top: 1px solid var(--line); }
+  .feature {
+    display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 8px 24px;
+    padding: 20px 0; border-bottom: 1px solid var(--line);
+  }
+  .feature .name { display: grid; gap: 2px; align-content: start; }
+  .feature .en { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .feature .body { display: grid; gap: 10px; }
+  .feature ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; color: var(--ink-2); font-size: 14px; }
+  .feature ul b { color: var(--ink); font-weight: 600; }
+
+  .tag {
+    display: inline-block; font-size: 12px; font-weight: 600;
+    padding: 2px 8px; border-radius: 3px; letter-spacing: 0.02em;
+  }
+  .tag.core-t { background: var(--accent); color: #fff; }
+  .tag.sub-t { background: var(--surface); color: var(--ink-2); border: 1px solid var(--line); }
+  .layer-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .table-wrap { overflow-x: auto; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; font-size: 13px; color: var(--ink-3); background: var(--surface); }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  td.mono { font-family: var(--mono); font-size: 13px; color: var(--ink-2); }
+
+  .principle {
+    border-left: 3px solid var(--accent); padding: 4px 0 4px 16px;
+    display: grid; gap: 2px; font-weight: 600;
+  }
+
+  /* 단계 */
+  .phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+  .phases li {
+    display: grid; grid-template-columns: 72px 180px minmax(0, 1fr); gap: 4px 16px;
+    padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px;
+  }
+  .phases .ph { font-family: var(--mono); font-size: 12px; color: var(--accent); padding-top: 2px; }
+  .phases .t { font-weight: 600; }
+  .phases .d { color: var(--ink-2); }
+
+  .stack { display: flex; flex-wrap: wrap; gap: 6px; }
+  .stack span { font-family: var(--mono); font-size: 12px; padding: 3px 8px; background: var(--surface); border-radius: 3px; color: var(--ink-2); }
+
+  footer { font-size: 12px; color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 16px; font-family: var(--mono); }
+
+  @media (max-width: 600px) {
+    body { padding-inline: 16px; padding-block: 36px 56px; }
+    h1 { font-size: 27px; }
+    .values { grid-template-columns: 1fr; }
+    .feature { grid-template-columns: 1fr; }
+    .phases li { grid-template-columns: 64px minmax(0, 1fr); }
+    .phases .d { grid-column: 2; }
+  }
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="meta"><span>FORWARDUS</span><span>프로젝트 계획서</span><span>2026-09-28</span></div>
+    <h1>Forwardus<br><span>수출자를 위한 종합 물류 AI 서류 매니저</span></h1>
+    <p class="lede">물류 전담 인력이 없는 중소기업과 1인사업자가 운송 계획, 무역서류, 화물 추적을 한 곳에서 처리하도록 돕는 웹 서비스.</p>
+  </header>
+
+  <section>
+    <h2><span class="no">1</span>배경</h2>
+    <p>소규모 수출 실무자는 매 건마다 같은 세 가지 문제를 반복해서 겪는다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>단계</th><th>실무자의 질문</th></tr></thead>
+        <tbody>
+          <tr><td>운송 계획</td><td>해상/항공, FCL/LCL 중 무엇을 고르나. 납기에 맞추려면 언제 출고해야 하나.</td></tr>
+          <tr><td>서류·통관</td><td>어떤 서류가 필요한가. 서류 간 수량·중량·금액이 맞는가.</td></tr>
+          <tr><td>실제 운송</td><td>화물이 지금 어디 있나. ETA가 바뀌었나. 납기에 영향이 있나.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="no">2</span>비전</h2>
+    <div class="statement">
+      소규모 수출기업을 위한 Export Operating System
+      <small>한 번 입력한 데이터를 견적, 서류, 운송, 추적, 분석까지 다시 입력하지 않고 이어서 쓴다.</small>
+    </div>
+    <div class="flow-wrap">
+      <ol class="flow" aria-label="업무 흐름">
+        <li><span>Route·Cargo 입력</span></li>
+        <li><span>운송 계획</span></li>
+        <li><span>스케줄 선택</span></li>
+        <li><span>Shipment 생성</span></li>
+        <li><span>무역서류</span></li>
+        <li><span>Booking·출항</span></li>
+        <li><span>Tracking</span></li>
+        <li><span>ETA 모니터링</span></li>
+        <li><span>이력·분석</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="no">3</span>대상 사용자</h2>
+    <ul class="users">
+      <li>수출 경험이 적은 중소기업</li>
+      <li>물류 담당자가 없는 소규모 제조업체</li>
+      <li>해외 판매를 시작하는 1인사업자</li>
+      <li>해외 B2B 거래를 하는 스타트업</li>
+      <li>반복적인 소량 수출을 처리하는 실무자</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="no">4</span>핵심 가치</h2>
+    <div class="values">
+      <div class="value">
+        <h3>한 번 입력</h3>
+        <p>견적 단계에서 넣은 정보를 서류, 운송, 추적에 그대로 재사용한다. 같은 값을 두 번 입력하지 않는다.</p>
+      </div>
+      <div class="value">
+        <h3>Shipment 단위 관리</h3>
+        <p>화물, 스케줄, 서류, 이벤트, 비용, 결제를 하나의 Shipment ID로 묶는다.</p>
+      </div>
+      <div class="value">
+        <h3>계산은 코드, 설명은 AI</h3>
+        <p>운임·CBM·자금 계산과 규정 판정은 코드와 데이터가 맡는다. AI는 결과를 풀어서 설명한다.</p>
+      </div>
+      <div class="value">
+        <h3>출처 표시</h3>
+        <p>모든 데이터에 api / mock / manual 등 출처를 남기고, Mock 데이터를 실제 데이터처럼 보여주지 않는다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="no">5</span>주요 기능</h2>
+
+    <div class="layer-head"><span class="tag core-t">Core</span><span class="muted">제품의 중심 기능</span></div>
+    <div class="core">
+      <div class="feature">
+        <div class="name"><h3>운송 계획</h3><span class="en">Shipment Planning</span></div>
+        <div class="body">
+          <p>화물 정보와 목적지를 받아 운송 방식과 스케줄을 고르게 한다.</p>
+          <ul>
+            <li><b>Route Setup</b> — 출발 희망일, SEA(FCL/LCL)/AIR, 출발·도착 항구 자동완성</li>
+            <li><b>Cargo 계산</b> — CBM, Revenue Ton, Chargeable Weight, 컨테이너 수량</li>
+            <li><b>스케줄 조회</b> — 선사/항공편, ETD·ETA, 운송기간, 운임. 추천·최저가·최단순 정렬</li>
+            <li><b>역산 플래너</b> — Buyer 요청일에서 거꾸로 ETA, ETD, 출고 준비일 계산</li>
+          </ul>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="name"><h3>서류·통관</h3><span class="en">Trade Document Center</span></div>
+        <div class="body">
+          <p>Shipment에 이미 있는 값으로 무역서류를 작성하고 서류 간 불일치를 잡는다.</p>
+          <ul>
+            <li><b>자동 작성</b> — Commercial Invoice, Packing List, Proforma Invoice, Shipping Instruction, Booking Request</li>
+            <li><b>교차 검증</b> — 수량, 중량, 금액, 통화, Incoterms, HS CODE, Consignee, POL/POD 비교</li>
+            <li><b>상태 관리</b> — draft → generated → validated → final</li>
+          </ul>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="name"><h3>HS Code 검색</h3><span class="en">HS Code Search/Recommand</span></div>
+        <div class="body">
+          <p>입력한 물품에 따른 적합한 HS Code를 제시해준다.</p>
+          <ul>
+            <li><b>HS Code 적합도 표시</b> — 정렬 기준에 따른 HS Code 적합도 추천 기능</li>
+            <li><b>관세 비교</b> — 수입국 기준에 따른 관세 협정 등 분석하여 제시</li>
+            <li><b>필요 서류 안내</b> — 선택한 물품에 따른 규정 및 필요 서류 안내</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="layer-head"><span class="tag sub-t">AI 보조</span><span class="muted">Core 데이터를 해석하고 안내</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>기능</th><th>하는 일</th></tr></thead>
+        <tbody>
+          <tr><td>수출 가능성 확인</td><td>HS CODE와 도착국 기준으로 확인할 규제·인증 항목 안내. "수출 가능"처럼 단정하지 않음.</td></tr>
+          <tr><td>비용 해석</td><td>계산된 물류비 구성을 설명하고 비교가 필요한 조건 제시</td></tr>
+          <tr><td>예외 대응</td><td>ETA 지연 등 이상 이벤트 발생 시 확인할 항목 정리</td></tr>
+          <tr><td>자금 흐름</td><td>생산비·운임·대금 수령 시점을 기준으로 필요 운전자금 설명</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="principle">
+      <span>숫자를 계산하는 것은 코드, 숫자를 설명하는 것은 AI</span>
+      <span>규정을 판정하는 것은 데이터와 규칙, 확인사항을 안내하는 것은 AI</span>
+    </div>
+
+    <div class="layer-head"><span class="tag sub-t">분석</span><span class="muted">운영 데이터가 쌓이면 확장</span></div>
+    <p class="muted">Shipment 이력, 항로별 평균 운임·운송기간·지연율, Buyer별 출하 이력, 재견적, 비용 변화 분석.</p>
+  </section>
+
+  <section>
+    <h2><span class="no">6</span>개발 단계</h2>
+    <ol class="phases">
+      <li><span class="ph">PHASE 1</span><span class="t">운송 계획</span><span class="d">Route, Cargo, Incoterms, 스케줄 선택, Shipment ID 생성</span></li>
+      <li><span class="ph">PHASE 2</span><span class="t">무역서류</span><span class="d">Shipment 데이터 재사용, 서류 자동 작성, 필드 교차 검증</span></li>
+      <li><span class="ph">PHASE 3</span><span class="t">화물 추적</span><span class="d">타임라인, ETA 저장·변경 감지, 출처 표시</span></li>
+      <li><span class="ph">PHASE 4</span><span class="t">AI 어시스턴트</span><span class="d">수출 가능성, 비용, 예외, 자금 흐름 설명</span></li>
+      <li><span class="ph">PHASE 5</span><span class="t">분석</span><span class="d">이력, 항로·Buyer KPI, 운임 추이, 지연율</span></li>
+    </ol>
+    <div class="stack">
+      <span>Python 3.11</span><span>Flask</span><span>Jinja2</span><span>SQLAlchemy</span><span>Pandas</span><span>SQLite → PostgreSQL</span><span>Gunicorn</span><span>Render</span>
+    </div>
+  </section>
+
+  <footer>FORWARDUS · readme_forwardus_core_v2.md 기준 요약</footer>
+</div>
