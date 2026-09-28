@@ -229,12 +229,26 @@ def release() -> None:
 
 
 def run(label: str, command: list[str]) -> tuple[bool, str]:
+    # 두 시계를 함께 잽니다. 벽시계는 잠든 시간도 세고, monotonic 은 안 셉니다.
+    # 검사가 오래 걸린 것인지 컴퓨터가 잠든 것인지 이것으로 가립니다.
+    wall_at, tick_at = time.time(), time.monotonic()
     try:
         done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True,
                               encoding="utf-8", errors="replace", timeout=3600,
                               env={**__import__("os").environ, "PYTHONIOENCODING": "utf-8"})
     except subprocess.TimeoutExpired:
-        return False, "한 시간을 넘겨 끊었습니다."
+        wall = time.time() - wall_at
+        tick = time.monotonic() - tick_at
+        # **컴퓨터가 잠들었으면 잡음으로 넘깁니다.**
+        #
+        # subprocess 의 timeout 은 벽시계로 잽니다. 밤새 잠들어 있으면 실제로는
+        # 몇 분만 돌았는데도 "한 시간을 넘겼다"가 됩니다. 실제로 ㉖ 품목표 전체가
+        # 1회차에는 몇 분 만에 끝나고 2회차에는 시간 초과로 적혔습니다 — 씨앗이
+        # 고정이라 똑같은 일을 하는데도요. (2026-09-28)
+        if wall - tick > 300:
+            return True, (f"(컴퓨터가 잠든 사이에 시간이 지났습니다 — 벽시계 {wall / 60:.0f}분 "
+                          f"· 실제로 흐른 시간 {tick / 60:.0f}분. 잡음으로 넘깁니다)")
+        return False, f"한 시간을 넘겨 끊었습니다. (실제로 흐른 시간 {tick / 60:.0f}분)"
     except (FileNotFoundError, OSError) as error:
         # 명령 자체를 못 띄운 것입니다 (node 가 없거나, 파일이 사라졌거나).
         # 제품의 잘못이 아니므로 실패로 세지 않고, 판도 죽이지 않습니다.

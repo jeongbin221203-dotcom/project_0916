@@ -247,13 +247,118 @@ def _date(value, notes: list, label: str) -> str:
     return parsed.isoformat()
 
 
-def _amount(value, label: str, notes: list) -> str:
+# 서류에서 숫자 옆에 붙어 오는 말. 떼어 내고 읽습니다.
+# **무게 단위는 킬로그램 계열만** 넣습니다. MT·TON 은 1000을 곱해야 하는데
+# 그건 짐작이라, 못 읽고 빈 칸으로 두는 편이 낫습니다.
+NUMBER_WORDS = (
+    "USD", "US$", "U.S.$", "KRW", "EUR", "JPY", "CNY", "GBP", "AUD", "SGD",
+    "PCS", "PC", "EA", "SET", "SETS", "UNIT", "UNITS", "DOZ", "DOZEN",
+    "CTN", "CTNS", "CARTON", "CARTONS", "BOX", "BOXES", "PLT", "PLTS",
+    "PALLET", "PALLETS", "BAG", "BAGS", "DRUM", "DRUMS", "CASE", "CASES",
+    "KG", "KGS", "KGM", "KILOGRAM", "KILOGRAMS",
+    "CBM", "M3", "원", "개", "박스",
+)
+
+# 숫자 안에 쓰이는 구분 기호만 남긴 모양인지 봅니다.
+# 마침표가 천 단위로 쓰인 모양. **세 자리씩 묶여 있어야** 합니다.
+#   1.800 · 1.234.567   (O)      1.8 · 1.80   (X — 소수점입니다)
+EURO_THOUSANDS = re.compile(r"^\d{1,3}(\.\d{3})+$")
+
+NUMBER_ONLY = re.compile(r"^[\d.,  ]+$")
+
+
+def _decimal_comma(body: str) -> str | None:
+    """쉼표가 소수점인 숫자면 마침표로 바꿔 돌려줍니다. 아니면 None.
+
+    가리는 법 — **미국식 천 단위 쉼표는 반드시 세 자리씩 묶습니다.**
+        2,40       뒤가 한두 자리 -> 소수점 (240 을 "2,40"으로 적지 않습니다)
+        8,616      뒤가 세 자리   -> 천 단위
+        8.616,00   마침표가 앞    -> 유럽식, 쉼표가 소수점
+        8,616.00   마침표가 뒤    -> 미국식, 쉼표가 천 단위
+    마침표와 쉼표가 둘 다 있으면 **뒤에 오는 쪽이 소수점**입니다.
+    """
+
+    if "," not in body:
+        return None
+    if "." in body:
+        # 둘 다 있으면 뒤에 오는 쪽이 소수점입니다.
+        if body.rfind(",") < body.rfind("."):
+            return None                      # 미국식 — 쉼표는 천 단위
+        return body.replace(" ", "").replace(".", "").replace(",", ".")
+    tail = body.rsplit(",", 1)[1]
+    if len(tail) == 3 and tail.isdigit():
+        return None                          # 천 단위 묶음 (8,616 · 1,234,567)
+    if 1 <= len(tail) <= 2 and tail.isdigit():
+        # 세 자리가 아니므로 천 단위일 수 없습니다. 소수점입니다.
+        return body.replace(" ", "").replace(".", "").replace(",", ".")
+    return None
+
+
+def _strip_number_words(text: str) -> str:
+    """통화 기호와 단위 낱말을 떼어 냅니다. ($8,616.00 · 720 PCS · 500 KG)"""
+
+    body = str(text or "")
+    for word in sorted(NUMBER_WORDS, key=len, reverse=True):
+        body = re.sub(rf"(?<![A-Za-z]){re.escape(word)}(?![A-Za-z])", " ", body,
+                      flags=re.IGNORECASE)
+    body = body.replace("$", " ").replace("₩", " ").replace("€", " ").replace("¥", " ")
+    return re.sub(r"\s+", " ", body).strip()
+
+
+def _as_number(text, style: str = "") -> str:
+    """서류에 적힌 숫자를 파이썬이 읽을 수 있는 글로 바꿉니다.
+
+    바꿀 수 없으면 받은 글을 그대로 돌려줍니다(parse_number 가 다시 봅니다).
+    **뜻이 하나로 정해질 때만** 바꿉니다 — 애매하면 그대로 두어 빈 칸이 되게
+    합니다. 빈 칸은 사람이 채우지만, 틀린 값은 아무도 못 알아챕니다.
+
+    style="euro" 는 **그 줄의 다른 숫자를 보고** 유럽식이라고 정해진 경우입니다.
+    그때만 마침표를 천 단위로 봅니다. (1.800 -> 1800)
+    """
+
+    raw = str(text or "").strip()
+    if not raw:
+        return raw
+    body = _strip_number_words(raw)
+    if not body or not NUMBER_ONLY.match(body):
+        return raw if not body else body
+
+    decimal = _decimal_comma(body)
+    if decimal is not None:
+        return decimal
+    # 이 줄이 유럽식이면 마침표는 천 단위입니다. 세 자리씩 묶여 있을 때만
+    # 그렇게 봅니다 — 1.8 처럼 묶음이 아닌 것까지 건드리면 안 됩니다.
+    if style == "euro" and EURO_THOUSANDS.match(body):
+        return body.replace(".", "").replace(" ", "")
+    return body
+
+
+def line_number_style(values) -> str:
+    """이 줄이 어느 나라 식으로 숫자를 적었는지 한 번만 가립니다.
+
+    "euro"  쉼표를 소수점으로 쓴 숫자가 하나라도 있음 -> 마침표는 천 단위
+    ""      단서 없음 -> 짐작하지 않습니다 (지금까지대로 미국식으로 읽습니다)
+
+    왜 줄 단위인가
+      숫자 하나만 보면 '1.800' 이 1.8 인지 1800 인지 못 가립니다. 그런데
+      같은 줄에 '2,40' 이 있으면 이 줄은 유럽식이고, 그러면 '1.800' 은
+      1800 입니다. 사람이 서류를 읽는 방식과 같습니다. (2026-09-28)
+    """
+
+    for value in values:
+        text = str(value or "").strip()
+        if text and _decimal_comma(_strip_number_words(text)) is not None:
+            return "euro"
+    return ""
+
+
+def _amount(value, label: str, notes: list, style: str = "") -> str:
     """숫자로 읽히면 글자로 돌려줍니다. 칸에 그대로 넣을 값입니다."""
 
     if value in (None, ""):
         return ""
     try:
-        number = parse_number(value, label)
+        number = parse_number(_as_number(value, style), label)
     except ValidationError:
         notes.append(f"{label}을(를) 숫자로 읽지 못했습니다. 직접 적어 주세요.")
         return ""

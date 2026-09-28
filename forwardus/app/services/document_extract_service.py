@@ -30,7 +30,8 @@ from app.processors import bank_redaction, ocr
 from app.processors import lc_schedule as lc_schedule_module
 from app.services import ServiceError, document_start_service
 from app.services.intake_service import (INCOTERMS, PACKAGE_TYPES, _amount, _currencies,
-                                         _date, _incoterms_word, _pick, _place)
+                                         _date, _incoterms_word, _pick, _place,
+                                         line_number_style)
 from app.validators import ValidationError
 from app.validators.shipment_validator import optional_text, parse_date
 
@@ -418,20 +419,26 @@ def _item(raw, notes: list, no: int) -> dict:
     if not isinstance(raw, dict):
         return {}
     label = f"품목 {no}"
+    # 이 줄이 어느 나라 식으로 숫자를 적었는지 먼저 가립니다.
+    # 숫자 하나만 보면 '1.800' 이 1.8 인지 1800 인지 모릅니다. 같은 줄에
+    # '2,40' 이 있으면 유럽식이고, 그러면 1800 입니다. (2026-09-28)
+    style = line_number_style([raw.get(key) for key in
+                               ("unit_price", "amount", "package_count",
+                                "net_weight_kg", "gross_weight_kg")])
     line = {
         "product_description": _clean(raw.get("product_description")),
         "hs_code": "".join(ch for ch in str(raw.get("hs_code") or "") if ch.isdigit())[:10],
         "package_type": _package_type(raw),
-        "quantity": _amount(raw.get("package_count"), f"{label} 포장 개수", notes),
-        "net_weight_kg": _amount(raw.get("net_weight_kg"), f"{label} 순중량", notes),
-        "unit_price": _amount(raw.get("unit_price"), f"{label} 단가", notes),
-        "amount": _amount(raw.get("amount"), f"{label} 금액", notes),
+        "quantity": _amount(raw.get("package_count"), f"{label} 포장 개수", notes, style),
+        "net_weight_kg": _amount(raw.get("net_weight_kg"), f"{label} 순중량", notes, style),
+        "unit_price": _amount(raw.get("unit_price"), f"{label} 단가", notes, style),
+        "amount": _amount(raw.get("amount"), f"{label} 금액", notes, style),
     }
     for key, name in (("length_cm", "가로"), ("width_cm", "세로"), ("height_cm", "높이")):
-        line[key] = _amount(raw.get(key), f"{label} {name}", notes)
+        line[key] = _amount(raw.get(key), f"{label} {name}", notes, style)
 
     # 서류에는 줄 전체의 총중량이 찍힙니다. 우리 칸은 한 포장 무게라 나눠 넣습니다.
-    gross = _amount(raw.get("gross_weight_kg"), f"{label} 총중량", notes)
+    gross = _amount(raw.get("gross_weight_kg"), f"{label} 총중량", notes, style)
     if gross and line["quantity"] and float(line["quantity"]) > 0:
         each = float(gross) / float(line["quantity"])
         line["weight_per_package_kg"] = f"{each:.3f}".rstrip("0").rstrip(".")
