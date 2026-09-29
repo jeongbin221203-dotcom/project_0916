@@ -1,12 +1,12 @@
-"""기관이 살아 있을 때 받아서 파일로 남깁니다. **키 하나당 최대 5회**입니다.
+"""기관이 살아 있을 때 받아서 파일로 남깁니다. **키당 상한은 없습니다.** (9-27 5회 -> 9-29 10회 -> 9-29 해지)
 
 왜 상한이 있나
   기관 서버가 불안정합니다. 한 번에 몰아치면 잠시 막히고, 그러면 다음 사람이
   쓰려 할 때 안 됩니다. 기존 prime_cache.py 는 한 번에 수십 번 부릅니다.
-  이 스크립트는 **코드로 세어서** 5회를 넘기면 아예 안 보냅니다.
+  이 스크립트는 **코드로 세어서** 상한을 넘기면 아예 안 보냅니다.
   (2026-09-27 사용자 지시)
 
-무엇을 받나 — 값어치 순으로 5개씩
+무엇을 받나 — 값어치 순으로 열 개씩
   같은 키로 다섯 번만 부를 수 있으니, **자주 쓰이고 잘 안 바뀌는 것**부터
   받습니다. 화물 추적처럼 움직이는 값은 일부러 받지 않습니다. 어제 "부산
   출항"이었다고 오늘도 그렇게 답하면 거짓말이 됩니다.
@@ -34,7 +34,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-MAX_PER_KEY = 5
+# 상한 없음. 2026-09-29 사용자 지시로 해지했습니다 (9-27 5회 -> 9-29 10회 -> 해지).
+#
+# 해지해도 지금 호출 수는 그대로입니다 — 받을 대상이 키마다 열 개 안쪽이라
+# 상한이 막고 있던 자리가 없었습니다 (9/29 실행 116회, 막힌 것 0건).
+# 앞으로 대상을 열 개 넘게 늘리면 그때부터 실제로 늘어납니다.
+#
+# **PAUSE 는 남겨 둡니다.** 상한과 다른 장치입니다. 한꺼번에 몰아치면 기관이
+# 잠시 막고, 그러면 다음 사람이 쓰려 할 때 안 됩니다.
+MAX_PER_KEY = None     # None = 상한 없음
 PAUSE = 1.2
 
 used: dict[str, int] = defaultdict(int)
@@ -43,7 +51,11 @@ missed: list[str] = []
 
 
 def budget(key: str) -> bool:
-    if used[key] >= MAX_PER_KEY:
+    """보낼지 정하고 횟수를 셉니다. 상한이 없어도 **세는 것은 계속합니다** —
+    끝에 키별 호출 수를 적어야 얼마나 두드렸는지 눈으로 볼 수 있습니다.
+    """
+
+    if MAX_PER_KEY is not None and used[key] >= MAX_PER_KEY:
         return False
     used[key] += 1
     time.sleep(PAUSE)
@@ -102,26 +114,35 @@ def main() -> int:
         from app.collectors import (carrier_client, customs_client, customs_extra_client,
                                     exchange_client, port_stats_client, trade_stats_client)
 
-        print(f"■ 기관이 살아 있을 때 받아 둡니다 · 키당 최대 {MAX_PER_KEY}회\n")
+        cap = "상한 없음" if MAX_PER_KEY is None else f"키당 최대 {MAX_PER_KEY}회"
+        print(f"■ 기관이 살아 있을 때 받아 둡니다 · {cap}\n")
 
         # ── 환율 — 가장 값어치 있습니다. 견적 금액에 그대로 곱해집니다 ──────
-        print("── 관세환율 (하루 한 번이면 충분합니다)")
-        grab("CUSTOMS_EXCHANGE_RATE", "오늘 고시환율",
+        print("── 환율 (하루 한 번 고시라 같은 것을 열 번 불러도 같은 답입니다.\n   그래서 횟수를 늘리지 않고 서로 다른 세 곳을 받습니다)")
+        grab("CUSTOMS_EXCHANGE_RATE", "관세청 고시환율",
              exchange_client.fetch_krw_rates)
+        grab("CUSTOMS_EXCHANGE_RATE", "통화 이름표",
+             exchange_client.fetch_currency_names)
+        from app.collectors import fx_board_client
+        grab("CUSTOMS_EXCHANGE_RATE", "환율 시세표 (수출입은행 → OXR → 관세청)",
+             fx_board_client.board)
 
         # ── 업체 등록부 — 거의 안 바뀝니다. 화면 자동완성이 씁니다 ─────────
         print("\n── 선박회사 등록부 (registry · 180일)")
-        for name in ("에이치엠엠", "고려해운", "장금상선", "팬오션", "흥아라인"):
+        for name in ("에이치엠엠", "고려해운", "장금상선", "팬오션", "흥아라인",
+                     "남성해운", "천경해운", "범주해운", "태영상선", "동영해운"):
             grab("SHIPPING_COMPANY_LIST", f"선사 · {name}",
                  lambda n=name: carrier_client.search_shipping_companies(n))
 
         print("\n── 항공사 등록부 (registry · 180일)")
-        for name in ("대한항공", "아시아나항공", "제주항공", "에어인천", "페덱스"):
+        for name in ("대한항공", "아시아나항공", "제주항공", "에어인천", "페덱스",
+                     "진에어", "티웨이항공", "에어부산", "유피에스", "디에이치엘"):
             grab("AIRLINE_LIST", f"항공사 · {name}",
                  lambda n=name: customs_extra_client.search_airlines(n))
 
         print("\n── 포워더 등록부 (registry · 180일)")
-        for name in ("판토스", "현대글로비스", "씨제이대한통운", "롯데글로벌로지스", "한진"):
+        for name in ("판토스", "현대글로비스", "씨제이대한통운", "롯데글로벌로지스", "한진",
+                     "동방", "세방", "인터지스", "케이씨티시", "유수로지스틱스"):
             grab("FORWARDER_LIST", f"포워더 · {name}",
                  lambda n=name: customs_extra_client.search_forwarders(n))
 
@@ -136,7 +157,16 @@ def main() -> int:
                   "8507602000",    # 리튬이온 축전지 (전기차용)
                   "3306100000",    # 치약
                   "1902301010",    # 라면
-                  "8708290000")    # 자동차 차체부품 (기타)
+                  "8708290000",    # 자동차 차체부품 (기타)
+                  # 2026-09-29 추가. 다섯 개 모두 품목표(2026-01-01 기준)에서
+                  # 실재를 확인했습니다. 지어낸 부호를 넣으면 기관이 "조회된
+                  # 정보가 없습니다"로 답하고, 우리는 그것을 "미등재"로 잘못
+                  # 적어 두게 됩니다. (2026-09-27 에 실제로 그랬습니다)
+                  "8542311000",    # 모노리식 집적회로 — 수출 1위 품목
+                  "8517130000",    # 스마트폰
+                  "4011101000",    # 래디알 타이어
+                  "2710121000",    # 자동차 휘발유
+                  "3902100000")    # 폴리프로필렌
         print("\n── 세관장확인대상 법령 (law · 90일)")
         for hs in TOP_HS:
             grab("REQUIREMENT_APPROVAL", f"수출요건 · {hs}",
@@ -171,7 +201,7 @@ def main() -> int:
              port_stats_client.port_traffic)
         grab("DATA_GO_KR_SERVICE_KEY", "컨테이너 처리실적",
              port_stats_client.container_throughput)
-        for hs4 in ("3304", "8507"):
+        for hs4 in ("3304", "8507", "8542", "8517", "8703", "7208", "2710"):
             grab("DATA_GO_KR_SERVICE_KEY", f"품목 수출입실적 · {hs4}",
                  lambda h=hs4: trade_stats_client.item_trade(h))
 
@@ -190,18 +220,21 @@ def main() -> int:
         grab("PORT_BUSIEST", "권역별 물동량", port_stats_client.region_traffic)
 
         print("\n── 수출 상대국 (stats · 45일)")
-        for hs4 in ("3304", "8507", "1902"):
+        for hs4 in ("3304", "8507", "1902", "8542", "8517",
+                    "8703", "7208", "4011", "2710", "3902"):
             grab("TRADE_TOP_DEST", f"어디로 나가나 · {hs4}",
                  lambda h=hs4: trade_stats_client.top_destinations(h))
 
         print("\n── 무역보험공사 결제정보 (나라별 대금 회수 위험)")
-        for country in ("US", "CN", "JP", "VN", "DE"):
+        for country in ("US", "CN", "JP", "VN", "DE",
+                        "IN", "ID", "TR", "MX", "PL"):
             grab("KSURE", f"결제정보 · {country}",
                  lambda c=country: ksure_client.payment_info(c))
 
-    print(f"\n■ 키별 호출 횟수 (상한 {MAX_PER_KEY})")
+    cap = "없음" if MAX_PER_KEY is None else f"{MAX_PER_KEY}회"
+    print(f"\n■ 키별 호출 횟수 (상한 {cap})")
     for key in sorted(used):
-        over = "!" if used[key] > MAX_PER_KEY else " "
+        over = "!" if MAX_PER_KEY is not None and used[key] > MAX_PER_KEY else " "
         print(f"   {over} {key:<36} {used[key]}회")
 
     print(f"\n■ 마무리 · 총 {sum(used.values())}회")
@@ -209,7 +242,8 @@ def main() -> int:
     print(f"   못 받은 것      {len(missed)}건   (예전에 받아 둔 값은 그대로 둡니다)")
     for row in missed[:10]:
         print(f"   △ {row}")
-    if any(n > MAX_PER_KEY for n in used.values()):
+    # 상한이 없으면 넘길 수도 없습니다. None 과 크기를 견주면 TypeError 입니다.
+    if MAX_PER_KEY is not None and any(n > MAX_PER_KEY for n in used.values()):
         print("\n★ 상한을 넘긴 키가 있습니다.")
         return 1
     return 0
