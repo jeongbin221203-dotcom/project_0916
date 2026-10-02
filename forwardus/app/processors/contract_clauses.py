@@ -468,7 +468,11 @@ expenses of whatever nature, including loss of profit, without limitation.""",
     # 실무 계약서 대부분에 들어가서, 전에는 **거의 매번** 이 조항이 떴습니다.
     #   "The Goods shall include, without limitation, packaging and manuals."
     # 책임·손해 이야기일 때만 봅니다.
-    detect=[r"(liability|liabilities|damages|indemnit|indemnif|responsib)"
+    detect=[r"liabilit(?:y|ies)[^.]{0,40}(?:shall be |is )?unlimited",
+            r"no[^.]{0,25}(?:financial\s+)?(?:ceiling|cap)\b",
+            r"(?:배상|책임)[^.]{0,30}(?:상한|한도)[^.]{0,20}(?:두지|정하지)[^.]{0,10}(?:아니|않)",
+            r"제한\s*없이[^.]{0,20}배상",
+            r"(liability|liabilities|damages|indemnit|indemnif|responsib)"
             r"[^.]{0,60}without limitation",
             r"without limitation[^.]{0,60}"
             r"(liability|liabilities|damages|indemnit|indemnif)",
@@ -489,7 +493,11 @@ _clause(
 The Buyer may terminate this Contract at any time for convenience upon written
 notice, without liability.""",
     text_ko="for convenience · at any time · without liability 가 붙어 있으면 이 조항입니다.",
-    detect=[r"terminate.{0,60}for convenience", r"at any time.{0,40}without (liability|cause)",
+    detect=[r"(?:cancel|terminate|end)[^.]{0,70}(?:sole|absolute)\s+discretion",
+            r"(?:walk away|withdraw)[^.]{0,70}(?:for convenience|at any time)",
+            r"재량[^.]{0,30}(?:해지|해제|종료)",
+            r"사유[^.]{0,15}없(?:이|어도)[^.]{0,30}(?:해지|종료|취소)",
+            r"terminate.{0,60}for convenience", r"at any time.{0,40}without (liability|cause)",
             r"일방적으로\s*해지", r"사유[^.]{0,10}불문[^.]{0,40}해지",
             r"언제든지[^.]{0,40}해지", r"이유\s*없이[^.]{0,30}해지",
             r"임의\s*로[^.]{0,20}해지"],
@@ -531,7 +539,11 @@ _clause(
 Payment shall be made within 30 days after the Buyer receives payment from its
 end customer.""",
     text_ko="after the Buyer receives payment · upon resale 이 나오면 이 조항입니다.",
-    detect=[r"after the buyer .{0,20}receive[sd]? payment", r"upon resale",
+    detect=[r"payment[^.]{0,50}due only (?:once|after|when)",
+            r"proceeds of (?:the )?resale",
+            r"(?:최종\s*수요자|최종\s*고객|제3자)[^.]{0,40}(?:회수|수령)[^.]{0,40}(?:지급|정산)",
+            r"(?:판매|회수)[^.]{0,20}대금[^.]{0,30}회수[^.]{0,20}후[^.]{0,20}(?:지급|정산)",
+            r"after the buyer .{0,20}receive[sd]? payment", r"upon resale",
             r"from its (end )?customer",
             r"재판매[^.]{0,30}(대금|수령|지급)",
             r"최종\s*(고객|수요자|구매자)[^.]{0,30}(대금|수령|지급)"],
@@ -552,7 +564,12 @@ The Seller warrants the Goods against any defect without time limitation.""",
     #
     # 기간을 **정한** 문장("하자보증기간은 12개월로 한다")은 그대로 통과해야 하므로
     # '없' 또는 '영구'가 함께 있을 때만 봅니다.
-    detect=[r"warrant.{0,80}without (any )?(time )?limit",
+    detect=[r"(?:warrant|guarantee)[^.]{0,50}indefinite",
+            r"indefinite[^.]{0,30}period[^.]{0,30}(?:warrant|defect)",
+            r"no time bar",
+            r"(?:하자|담보)\s*책임[^.]{0,30}기간[^.]{0,20}정하지[^.]{0,10}아니",
+            r"기한[^.]{0,10}(?:의\s*)?정함\s*없",
+            r"warrant.{0,80}without (any )?(time )?limit",
             r"perpetual warranty",
             r"(warrant|defects?)[^.]{0,60}in perpetuity",
             r"무기한\s*(보증|하자)",
@@ -570,7 +587,11 @@ _clause(
 The Seller shall pay liquidated damages of 1% of the contract value for each
 day of delay.""",
     text_ko="지연배상금에 **상한(cap)** 이 없으면 이 조항입니다.",
-    detect=[r"liquidated damages", r"penalt(y|ies) .{0,30}per day", r"지연\s*배상금"],
+    detect=[r"liquidated damages[^.]{0,70}(?:without|no)[^.]{0,25}(?:maximum|cap|ceiling|limit)",
+            r"(?:accumulate|accrue)[^.]{0,50}no\s+(?:ceiling|cap|maximum|limit)",
+            r"지체상금[^.]{0,40}(?:상한|한도)[^.]{0,25}(?:두지|없|아니)",
+            r"(?:지연|납기)[^.]{0,20}배상금[^.]{0,40}한도[^.]{0,25}(?:아니|없)",
+            r"liquidated damages", r"penalt(y|ies) .{0,30}per day", r"지연\s*배상금"],
     fix="“**총 계약금액의 5%를 넘지 않는다**”는 상한 문장을 반드시 붙이세요.",
 )
 
@@ -582,7 +603,9 @@ _clause(
 Notwithstanding the trade term, the Seller shall bear all risks and costs until
 the Goods are delivered to the Buyer's warehouse.""",
     text_ko="notwithstanding the trade term · regardless of Incoterms 가 보이면 그 뒤를 꼭 읽으세요.",
-    detect=[r"notwithstanding .{0,40}(trade term|incoterms)",
+    detect=[r"irrespective of[^.]{0,50}(?:trade term|incoterm)",
+            r"(?:인코텀즈|가격조건|무역조건)[^.]{0,25}(?:와\s*)?(?:무관|불구)",
+            r"notwithstanding .{0,40}(trade term|incoterms)",
             r"regardless of .{0,30}incoterms",
             r"bear all risks? and costs? until",
             r"인코텀즈[^.]{0,30}불구하고", r"(가격|거래)\s*조건[^.]{0,20}불구하고",
@@ -598,7 +621,14 @@ _clause(
 This Contract shall be automatically renewed for successive one-year periods
 unless either party gives written notice at least 180 days before expiry.""",
     text_ko="automatically renewed 와 함께 **90일이 넘는 예고기간**이 붙어 있으면 조심하세요.",
-    detect=[r"automatically renew", r"successive .{0,30}periods", r"자동\s*(연장|갱신)"],
+    detect=[r"\d+\s*일\s*전[^.]{0,30}통지[^.]{0,20}없으면",
+            r"(?:통지|통보)[^.]{0,15}없으면[^.]{0,30}(?:갱신|연장)",
+            r"renew[^.]{0,70}(?:successive|further|additional|annual)",
+            r"roll(?:s|ed|ing)?\s+over",
+            r"자동[^.]{0,12}(?:으로\s*)?(?:연장|갱신)(?![^.]{0,25}(?:되지\s*아니|되지\s*않|하지\s*아니|하지\s*않))",
+            r"\d+\s*일\s*전[^.]{0,45}(?:통지|통보)[^.]{0,25}없으면",
+            r"(?:해지|종료)\s*(?:통보|통지)[^.]{0,25}없는\s*한",
+            r"automatically renew", r"successive .{0,30}periods", r"자동\s*(연장|갱신)(?![^.]{0,25}(?:되지\s*아니|되지\s*않|하지\s*아니))"],
     fix="예고기간을 **30~60일**로 줄이거나, 자동 연장을 빼고 **합의 연장**으로 바꾸세요.",
 )
 
@@ -610,7 +640,14 @@ _clause(
 The Seller shall not sell the Goods to any third party at a price lower than
 that offered to the Buyer, and shall refund the difference if it does so.""",
     text_ko="most favoured · no less favourable · price lower than 이 나오면 이 조항입니다.",
-    detect=[r"most favou?red", r"no less favou?rable",
+    detect=[r"(?:타|다른)\s*거래처[^.]{0,40}(?:낮은|유리한)[^.]{0,20}(?:가격|조건)",
+            r"소급[^.]{0,25}(?:차액|차익)[^.]{0,20}(?:보전|환급|지급)",
+            r"no other (?:customer|buyer|purchaser|party)[^.]{0,70}(?:more favourable|more favorable|better|lower)",
+            r"more favo(?:u)?rable[^.]{0,35}(?:pricing|price|terms)",
+            r"(?:lower|better)[^.]{0,35}(?:figure|price|quote)[^.]{0,45}elsewhere",
+            r"제3자[^.]{0,35}(?:더\s*)?유리한[^.]{0,25}(?:조건|가격)",
+            r"(?:타|다른)\s*거래처[^.]{0,35}(?:낮은|유리한)\s*(?:가격|조건)",
+            r"most favou?red", r"no less favou?rable",
             r"price lower than that (offered|charged)",
             r"최혜[^.]{0,10}(대우|가격|조건)",
             r"불리하지\s*아니?하?[^.]{0,20}(가격|조건)",
@@ -633,7 +670,13 @@ shipment and the Seller shall bear all return freight, duties and storage.""",
     #   "물품 전량을 매도인에게 반품할 수 있으며"  간격 8자 -> 놓침  (미탐)
     # 자연스러운 한국어는 "전량을 매도인에게 반품"처럼 사이에 말이 들어갑니다.
     # 그리고 "전량 반품을 요구할 수 없다"는 **우리를 보호하는** 문장입니다.
-    detect=[r"reject the entire", r"return freight",
+    detect=[r"(?:일부|한 ?건)[^.]{0,20}불합격[^.]{0,30}(?:전체|전부|전량)",
+            r"(?:전체|전부)\s*로트",
+            r"(?:send back|return)[^.]{0,45}(?:the )?(?:whole|entire)[^.]{0,25}(?:consignment|shipment|lot|quantity|delivery)",
+            r"(?:entire|whole) lot[^.]{0,45}(?:refused|rejected|returned)",
+            r"(?:전체|전부)\s*(?:로트|수량|물량|납품분)[^.]{0,25}반송",
+            r"반송[^.]{0,15}(?:드는\s*)?(?:운임|비용|보관료)",
+            r"reject the entire", r"return freight",
             r"전량[^.]{0,20}반품" + NO_NEG_KO,
             r"전부[^.]{0,20}반품" + NO_NEG_KO,
             r"반송\s*(운임|비용)[^.]{0,30}매도인"],
@@ -669,7 +712,13 @@ materials and manufacturing process documentation for the Products.""",
     #
     # 영어는 낱말 순서가 둘입니다 — 자료가 먼저("drawings shall be provided"),
     # 동사가 먼저("shall provide ... drawings"). 둘 다 봅니다.
-    detect=[# 자료가 먼저 — 주는 쪽/받는 쪽을 뒤에서 확인
+    detect=[r"(?:manufacturing|production|technical) documentation[^.]{0,60}(?:released|disclosed|provided|made available)",
+            r"(?:released|disclosed|made available)[^.]{0,60}(?:manufacturing|production|technical) documentation",
+            r"hand(?:s|ed)? over[^.]{0,70}(?:drawings?|documentation|know-how)",
+            r"(?:released|disclosed|made available)[^.]{0,40}to the (?:buyer|purchaser)[^.]{0,70}(?:documentation|drawings?|know-how)",
+            r"(?:설계)?도면[^.]{0,25}일체[^.]{0,40}(?:넘긴|넘겨|교부|제공)",
+            r"(?:공정|기술)\s*(?:기술)?자료[^.]{0,40}(?:교부|제공|넘긴|넘겨)",
+            # 자료가 먼저 — 주는 쪽/받는 쪽을 뒤에서 확인
             r"(technical|engineering) (drawings?|documentation|data|specifications?)"
             r"[^.]{0,60}(?:shall )?be (?:provided|furnished|delivered|disclosed)"
             r"[^.]{0,20}(?:by the seller|to the buyer)",
@@ -707,7 +756,13 @@ _clause(
 The Buyer shall register the Seller's trademarks in the Territory in the Buyer's
 own name and shall be the sole registrant thereof.""",
     text_ko="register ... trademark ... in the Buyer's own name 이 나오면 이 조항입니다.",
-    detect=[r"register[^.]{0,60}(trademarks?|trade marks?|brand)[^.]{0,60}"
+    detect=[r"(?:등록|출원)\s*명의자[^.]{0,25}(?:바이어|매수인|대리점|판매점)",
+            r"(?:브랜드|상표)[^.]{0,25}(?:등록|출원)\s*명의",
+            r"(?:trade ?marks?|brand)[^.]{0,70}(?:filed|registered|stand)[^.]{0,45}in the (?:name of the )?(?:buyer|purchaser|distributor|agent)",
+            r"in the (?:distributor|buyer|purchaser|agent)\'?s? (?:own )?name",
+            r"(?:상표|브랜드)[^.]{0,35}(?:출원|등록)[^.]{0,25}(?:판매점|대리점|바이어|매수인)[^.]{0,12}명의",
+            r"(?:등록|출원)\s*명의자[^.]{0,25}(?:바이어|매수인|대리점|판매점)",
+            r"register[^.]{0,60}(trademarks?|trade marks?|brand)[^.]{0,60}"
             r"(in (its|the buyer'?s) own name|as (the )?(sole )?registrant)",
             r"(trademarks?|brand)[^.]{0,40}shall be registered[^.]{0,40}buyer",
             r"상표[^.]{0,40}(매수인|바이어|대리점)[^.]{0,20}명의[^.]{0,20}등록" + NO_NEG_KO],
@@ -731,7 +786,14 @@ penalties imposed under the General Data Protection Regulation.""",
     # "The Buyer shall indemnify the Seller against GDPR fines" 는 우리에게
     # 유리합니다. 전에는 방향을 안 봐서 이것도 독소로 짚었습니다.
     # 보호받는 쪽이 Buyer 인 꼴만 봅니다.
-    detect=[rf"(GDPR|General Data Protection Regulation)[^.]{{0,100}}{INDEMNIFY_BUYER}",
+    detect=[r"hold[^.]{0,25}(?:the )?(?:buyer|purchaser)[^.]{0,15}harmless[^.]{0,90}(?:GDPR|General Data Protection|data protection)",
+            r"(?:GDPR|General Data Protection|data protection)[^.]{0,90}(?:hold[^.]{0,25}(?:the )?(?:buyer|purchaser)[^.]{0,15}harmless|indemnif\w*[^.]{0,25}(?:the )?(?:buyer|purchaser)|reimbursed by the (?:seller|supplier)|borne by the (?:seller|supplier))",
+            # 방향을 봐야 합니다. "The **Buyer** shall indemnify the **Seller**
+            # against fines under the GDPR" 은 우리에게 유리합니다.
+            r"(?:penalt|fine)[^.]{0,60}(?:GDPR|General Data Protection)[^.]{0,80}(?:borne by|reimbursed by|at the expense of)[^.]{0,25}(?:seller|supplier)",
+            r"(?:과징금|제재금|과태료)[^.]{0,45}(?:매도인|공급자)[^.]{0,25}(?:부담|보전)",
+            r"(?:GDPR|개인정보보호규정)[^.]{0,45}(?:위반\s*)?(?:과징금|제재금)",
+            rf"(GDPR|General Data Protection Regulation)[^.]{{0,100}}{INDEMNIFY_BUYER}",
             rf"{INDEMNIFY_BUYER}[^.]{{0,100}}(GDPR|General Data Protection)",
             r"(GDPR|개인정보보호규정|일반\s*데이터\s*보호)[^.]{0,60}"
             r"(과징금|과태료)[^.]{0,40}(매도인|공급자)[^.]{0,20}(부담|배상)" + NO_NEG_KO],
@@ -752,7 +814,10 @@ product liability claims, including class actions, without limitation.""",
     text_ko="product liability · class action 과 indemnify · without limitation 이 "
             "함께 나오면 이 조항입니다.",
     # **방향을 봅니다.** 바이어가 우리를 면책하는 것은 유리한 조항입니다.
-    detect=[rf"class action[^.]{{0,100}}{INDEMNIFY_BUYER}",
+    detect=[r"hold[^.]{0,30}(?:the )?(?:purchaser|buyer)[^.]{0,20}harmless[^.]{0,90}(?:product liability|class action)",
+            r"(?:defence|defense) costs[^.]{0,70}class action",
+            r"(?:제조물\s*책임|집단\s*소송)[^.]{0,45}(?:면책|부담|방어비용)",
+            rf"class action[^.]{{0,100}}{INDEMNIFY_BUYER}",
             rf"{INDEMNIFY_BUYER}[^.]{{0,100}}class action",
             r"product liability[^.]{0,80}(without limitation|unlimited|all claims)",
             r"(제조물\s*책임|집단\s*소송)[^.]{0,60}(매도인|공급자)[^.]{0,30}"
@@ -772,7 +837,9 @@ _clause(
 The Seller warrants that neither the Goods nor the transaction is subject to any
 sanctions, and shall indemnify the Buyer for all consequences thereof.""",
     text_ko="sanctions 와 warrant · indemnify 가 함께 나오면 이 조항입니다.",
-    detect=[r"sanctions?[^.]{0,80}(warrant|indemnif|hold harmless)",
+    detect=[r"(?:represents?|guarantees?)[^.]{0,50}(?:no sanction|sanction[- ]free)",
+            r"(?:제재|수출통제)[^.]{0,30}(?:비해당|저촉)[^.]{0,30}(?:보증|담보)",
+            r"sanctions?[^.]{0,80}(warrant|indemnif|hold harmless)",
             r"(warrant|represent)[^.]{0,60}not[^.]{0,40}subject to[^.]{0,40}sanctions?",
             r"(제재|수출\s*통제)[^.]{0,60}(보증|담보|면책|배상)" + NO_NEG_KO],
     fix="보증을 **계약 시점 기준**으로 한정하고, 뒤에 목록이 바뀌면 "
@@ -796,7 +863,10 @@ written consent.""",
     # 실제 계약서는 독점을 한 문장, 해지 제한을 다음 문장에 적습니다.
     # 다른 규칙이 쓰는 `[^.]` 는 문장에서 끊기므로 이 조항만 `.`(re.S) 로 넘깁니다.
     # 독점만 있고 해지가 자유로우면 짚지 않습니다 — 그건 흔한 독점 조항입니다.
-    detect=[r"(sole|exclusive) (agent|distributor|right to (import|distribute))"
+    detect=[r"(?:독점\s*판매권|독점\s*수입권|독점\s*대리)[^.]{0,40}(?:승낙|동의)[^.]{0,25}없(?:이|으면)[^.]{0,40}(?:종료|해지)",
+            r"(?:sole|exclusive)[^.]{0,50}(?:right to import|importation rights?).{0,200}(?:terminat|consent|approval)",
+            r"(?:독점\s*수입권|독점\s*판매권)[^.]{0,90}(?:해지|종료)[^.]{0,25}(?:할 수 없|못|동의|승낙)",
+            r"(sole|exclusive) (agent|distributor|right to (import|distribute))"
             r".{0,240}(may not be terminated|shall not be terminated|"
             r"without the (agent|distributor)'?s.{0,20}consent)",
             r"(독점|배타적)[^.]{0,30}(대리인|대리점|수입|판매)[^.]{0,80}"
@@ -804,7 +874,6 @@ written consent.""",
     fix="독점을 **기간·실적 조건부**로 하고(최소 구매량 미달 시 자동 해제), "
         "현지 **등록 전에** 조건을 확정합니다. 등록되면 바꾸기 어렵습니다.",
     countries=("GULF",),
-    avoid=NEGATION,
 )
 
 
@@ -822,7 +891,11 @@ The Buyer may deduct any agreed rebate, markdown allowance or promotional
 funding from any payment due, including retroactively.""",
     text_ko="rebate · markdown · allowance · promotional funding 과 deduct 가 "
             "함께 나오면 이 조항입니다.",
-    detect=[r"(rebate|markdown|allowance|promotional (funding|support)|co-?op)"
+    detect=[r"(?:netted off|net(?:ted)? off|offset)[^.]{0,50}(?:against )?(?:any )?invoice",
+            r"withhold[^.]{0,50}(?:trade )?allowance",
+            r"(?:리베이트|판매장려금|장려금)[^.]{0,40}(?:차감|공제)",
+            r"소급[^.]{0,25}단가",
+            r"(rebate|markdown|allowance|promotional (funding|support)|co-?op)"
             r"[^.]{0,80}deduct",
             r"deduct[^.]{0,80}(rebate|markdown|allowance|promotional)",
             r"retroactive(ly)?[^.]{0,60}(price|discount|rebate)",
@@ -847,7 +920,11 @@ which the Buyer may deduct from any invoice then outstanding.""",
     # "No chargebacks shall be permitted" 는 **좋은 문장**인데 전에는 짚었습니다.
     # 부정이 앞에 있어 뒤를 보는 가드로는 못 걸립니다. 파이썬 정규식은 길이가
     # 변하는 뒤돌아보기를 못 하지만 "no " 는 길이가 고정이라 됩니다.
-    detect=[r"(?<!no )charge-?backs?",
+    detect=[r"(?:수량\s*부족|납기\s*미준수|지연)[^.]{0,30}(?:벌과금|위약벌|위약금)[^.]{0,30}(?:송장|대금)",
+            r"penalt\w*[^.]{0,70}set[- ]?off[^.]{0,45}invoice",
+            r"on[- ]time in[- ]full[^.]{0,70}(?:deduction|deduct)",
+            r"(?:위약벌|벌과금|위약금|과징)[^.]{0,40}(?:대금|송장)[^.]{0,25}(?:차감|공제)",
+            r"(?<!no )charge-?backs?",
             r"on[- ]time in[- ]full|\bOTIF\b",
             r"(penalt|liquidated damages)[^.]{0,80}deduct[^.]{0,40}invoice",
             r"(벌금|위약금|지체상금)[^.]{0,60}(대금|송장)[^.]{0,30}(공제|차감)" + NO_NEG_KO],
@@ -865,7 +942,10 @@ _clause(
 The Buyer may audit the Seller's facilities, books and records at any time
 without prior notice.""",
     text_ko="audit 과 at any time · without prior notice 가 함께 나오면 이 조항입니다.",
-    detect=[r"audit[^.]{0,80}(at any time|without (prior )?notice)",
+    detect=[r"(?:inspect|audit|access)[^.]{0,70}(?:books|accounts|premises|factor)[^.]{0,70}(?:without[^.]{0,25}(?:advance|prior)|at any time|on demand)",
+            r"(?:사전\s*)?예고\s*없이[^.]{0,40}(?:열람|감사|실사|출입)",
+            r"언제든지[^.]{0,40}(?:출입|실사|점검|열람)",
+            r"audit[^.]{0,80}(at any time|without (prior )?notice)",
             r"(right to )?(audit|inspect)[^.]{0,60}(books|records|accounts)"
             r"[^.]{0,60}(at any time|without (prior )?notice)",
             r"(감사|실사|현장\s*점검)[^.]{0,60}(언제든지|사전\s*통지\s*없이)" + NO_NEG_KO,
@@ -875,7 +955,6 @@ without prior notice.""",
             r"(감사|실사|현장\s*점검|점검|열람)" + NO_NEG_KO],
     fix="**연 1회·영업일·사전 서면통지**로 한정하고, 범위를 **이 계약 관련 자료만**으로 "
         "좁힙니다. 제3자 비밀정보는 제외하고, 감사인에게 비밀유지를 걸게 합니다.",
-    avoid=NEGATION,
 )
 
 _clause(
@@ -888,7 +967,11 @@ The Seller shall supply the Products exclusively to the Buyer in the Territory
 and shall not sell to any other party therein.""",
     text_ko="supply exclusively · shall not sell to any other 가 나오면 이 조항입니다. "
             "**최소 구매량(MOQ) 조항이 함께 있는지** 꼭 보세요.",
-    detect=[r"(supply|sell)[^.]{0,40}exclusively[^.]{0,40}(to the )?buyer",
+    detect=[r"deal(?:s|ing)? solely with[^.]{0,45}(?:buyer|purchaser)",
+            r"refrain from (?:supplying|selling)[^.]{0,70}(?:third part|competitor|any other)",
+            r"(?:매수인|바이어)\s*외에는[^.]{0,25}공급",
+            r"역내[^.]{0,25}제3자[^.]{0,25}판매",
+            r"(supply|sell)[^.]{0,40}exclusively[^.]{0,40}(to the )?buyer",
             r"shall not (sell|supply|distribute)[^.]{0,60}(any other|third part)"
             r"[^.]{0,40}(territory|region|country)",
             r"(독점|배타적)[^.]{0,20}(공급|판매)[^.]{0,30}(의무|한다|하여야)" + NO_NEG_KO],
@@ -917,7 +1000,11 @@ Bank and the issuance of the import licence.""",
     # 영문에도 부정 가드를 둡니다. (2026-10-02)
     # "Payment shall **not** be subject to any import licence" 를 짚었습니다.
     # 국문에는 NO_NEG_KO 가 있었는데 영문에는 없었습니다.
-    detect=[r"payment(?![^.]{0,20}\b(?:not|never)\b)[^.]{0,80}subject to[^.]{0,60}"
+    detect=[r"remittance[^.]{0,50}conditional upon",
+            r"(?:settlement|payment)[^.]{0,50}(?:follow|after)[^.]{0,50}(?:import permit|import licen|approval|clearance)",
+            r"(?:송금|결제|지급)[^.]{0,40}(?:외국환|외환)[^.]{0,25}(?:당국|허가|승인)",
+            r"수입승인[^.]{0,25}(?:난|받은|이후)",
+            r"payment(?![^.]{0,20}\b(?:not|never)\b)[^.]{0,80}subject to[^.]{0,60}"
             r"(central bank|foreign exchange|fx|import licen[cs]e|approval)",
             r"(central bank|foreign exchange|import licen[cs]e)[^.]{0,60}"
             r"(approval|permit)[^.]{0,60}(payment|remit)",
@@ -942,7 +1029,11 @@ Payment shall be made in the local currency at the exchange rate prevailing on
 the invoice date, and the Seller shall bear any exchange rate fluctuation.""",
     text_ko="local currency 와 exchange rate ... Seller shall bear 가 함께 나오면 "
             "이 조항입니다.",
-    detect=[r"(exchange rate|currency)[^.]{0,80}"
+    detect=[r"local currency[^.]{0,90}(?:currency risk|exchange risk|carries the)",
+            r"devaluation[^.]{0,70}(?:seller|supplier)\'?s? account",
+            r"환차손[^.]{0,25}(?:매도인|공급자)",
+            r"통화[^.]{0,25}(?:가치\s*)?하락[^.]{0,45}(?:공급자|매도인)[^.]{0,25}(?:부담|감수)",
+            r"(exchange rate|currency)[^.]{0,80}"
             r"(seller shall bear|borne by the seller|at the seller'?s risk)",
             r"seller shall bear[^.]{0,60}(exchange|currency|devaluation)",
             r"(환율|환차손|환\s*변동)[^.]{0,60}(매도인|공급자)[^.]{0,20}"
@@ -971,7 +1062,10 @@ customer compensation and public notice, whether voluntary or mandated.""",
     # "shall bear recall costs caused **solely** by the Seller's defect, **up to**
     # the invoice value" 는 우리가 권하는 좋은 꼴입니다. 그걸 독소로 짚으면
     # 고친 조항을 다시 지우게 됩니다.
-    detect=[r"recall(?![^.]{0,160}" + RECALL_CAPPED + r")[^.]{0,100}"
+    detect=[r"(?:seller|supplier)[^.]{0,40}(?:funds?|finances?|pays? for)[^.]{0,60}(?:recall|withdrawal)",
+            r"(?:product )?(?:withdrawal|recall)[^.]{0,90}(?:falls on|borne by|funded by|met by)[^.]{0,35}(?:seller|supplier)",
+            r"회수\s*조치[^.]{0,45}비용[^.]{0,35}(?:매도인|공급자)",
+            r"recall(?![^.]{0,160}" + RECALL_CAPPED + r")[^.]{0,100}"
             r"(all costs|costs and expenses|seller shall bear|"
             r"borne by the seller|at the seller'?s (cost|expense))",
             r"(seller shall bear|borne by the seller)"
@@ -1001,7 +1095,13 @@ and binding on the Seller.""",
     # 도 짚었습니다. 그런데 이 조항의 fix 가 권하는 해결책이 바로 "제3 검사기관
     # (SGS·BV)이 정하도록 하세요" 입니다. **우리가 권한 해결책을 우리가 독소라고
     # 한 것**입니다. 그 말을 들은 사람은 고친 조항을 다시 지웁니다.
-    detect=[r"buyer'?s?\s+(inspection|determination|decision|judg(e)?ment)"
+    detect=[r"(?:바이어|매수인)[^.]{0,25}(?:검수|검사)\s*결과[^.]{0,30}최종",
+            r"최종적이며[^.]{0,30}(?:매도인|공급자)[^.]{0,20}구속",
+            r"acceptance[^.]{0,45}rests[^.]{0,45}(?:buyer|purchaser)",
+            r"(?:buyer|purchaser)[^.]{0,25}alone[^.]{0,45}determin",
+            r"(?:합격|검수)[^.]{0,40}(?:매수인|바이어)[^.]{0,25}(?:판단|결과)",
+            r"이의를?\s*제기할\s*수\s*없",
+            r"buyer'?s?\s+(inspection|determination|decision|judg(e)?ment)"
             r"[^.]{0,80}(shall be )?(final|conclusive|binding)",
             r"(inspection|determination|decision)\s+(?:by|of)\s+the\s+buyer"
             r"[^.]{0,80}(shall be )?(final|conclusive|binding)",
@@ -1016,7 +1116,6 @@ and binding on the Seller.""",
     fix="합격 기준을 **별지에 숫자로** 박고, 다툼이 생기면 **제3 검사기관(SGS·BV 등)**이 "
         "정하도록 합니다. 검사는 **선적지에서** 하도록 하세요 — 도착지 검사는 반송 위험을 "
         "우리가 집니다.",
-    avoid=NEGATION,
 )
 
 _clause(
@@ -1029,7 +1128,12 @@ The Buyer may change the specifications, packaging or labelling at any time, and
 such change shall not affect the price or the delivery date.""",
     text_ko="change the specifications ... shall not affect the price 가 나오면 "
             "이 조항입니다.",
-    detect=[r"(change|modify|amend)[^.]{0,60}(specification|packaging|labell?ing|design)"
+    detect=[r"(?:사양|규격|디자인)\s*변경[^.]{0,30}단가[^.]{0,25}(?:종전|동일|그대로|변동\s*없)",
+            r"(?:revise|amend|change|modify)[^.]{0,50}(?:drawings?|artwork|design|specification)[^.]{0,90}price[^.]{0,40}(?:remains? unchanged|shall not)",
+            r"(?:design|specification)[^.]{0,35}(?:amendments?|changes?)[^.]{0,70}(?:not give rise|no)[^.]{0,35}price",
+            r"사양\s*변경[^.]{0,40}단가[^.]{0,25}(?:종전|동일|그대로)",
+            r"(?:디자인|규격|사양)\s*(?:수정|변경)[^.]{0,50}(?:가격|단가)\s*인상[^.]{0,25}(?:아니|않)",
+            r"(change|modify|amend)[^.]{0,60}(specification|packaging|labell?ing|design)"
             r"[^.]{0,120}(shall not affect|without any (change|adjustment) (in|to) the )"
             r"[^.]{0,30}(price|cost)",
             r"(specification|packaging|labell?ing)[^.]{0,60}"
@@ -1053,7 +1157,11 @@ All tooling, moulds and jigs required for the Products shall be provided by the
 Seller free of charge and shall become the property of the Buyer.""",
     text_ko="tooling/moulds 와 free of charge · at no cost 가 함께 나오면 이 조항입니다. "
             "**소유권이 누구에게 가는지** 함께 보세요.",
-    detect=[r"(tooling|moulds?|molds?|jigs?|dies)[^.]{0,100}"
+    detect=[r"(?:seller|supplier)[^.]{0,40}bears?[^.]{0,40}(?:entire|whole|full|all)[^.]{0,20}cost[^.]{0,50}(?:jigs?|dies|moulds?|molds?|tooling)",
+            r"(?:moulds?|molds?|tooling|jigs?|dies|fixtures?)[^.]{0,90}(?:at (?:its|the seller\'?s|their) own expense|seller bears|bears? the (?:entire|whole) cost)",
+            r"(?:금형|치공구|지그)[^.]{0,40}(?:제작비|비용)[^.]{0,40}(?:매도인|공급자)[^.]{0,25}(?:부담|전액)",
+            r"자비로[^.]{0,25}(?:제작|공급|제공)",
+            r"(tooling|moulds?|molds?|jigs?|dies)[^.]{0,100}"
             r"(free of charge|at no cost|without charge|no charge to the buyer)",
             r"(free of charge|at no cost)[^.]{0,80}(tooling|moulds?|molds?|jigs?)",
             r"(금형|치공구|사출\s*금형|지그)[^.]{0,60}(무상|무료)[^.]{0,30}"
@@ -1323,7 +1431,11 @@ directly to the Buyer by courier immediately after shipment.""",
             "이 조항입니다. 'telex release' 나 'surrendered B/L' 도 같은 뜻입니다.",
     # **대금을 받은 뒤 넘기는 것은 좋은 꼴**입니다. 빼야 합니다. (2026-10-02)
     #   "released to the Buyer only after full payment has been received"
-    detect=[r"original[^.]{0,40}(bill of lading|b/l|shipping documents?)"
+    detect=[r"원본\s*(?:운송|선적)?\s*서류[^.]{0,40}(?:바이어|매수인)[^.]{0,25}(?:직접|교부|송부|발송)",
+            r"forward[^.]{0,50}(?:full set of )?original[^.]{0,40}documents?",
+            r"original[^.]{0,45}transport documents?",
+            r"(?:선하증권|운송서류|선적서류)\s*원본[^.]{0,45}(?:발송|교부|송부|직접)",
+            r"original[^.]{0,40}(bill of lading|b/l|shipping documents?)"
             r"[^.]{0,80}(directly )?to the buyer"
             r"(?![^.]{0,60}(?:after|upon|against)[^.]{0,40}payment)",
             r"(telex release|surrender(ed)? b/?l|express release)"
@@ -1354,7 +1466,10 @@ shipment to be effected only upon the Buyer's written nomination of the vessel."
     text_ko="신용장 조건에 **바이어가 서명·지정해야 나오는 서류**가 있으면 소프트 "
             "조항입니다. signed by the buyer · specimen signature · buyer's "
             "nomination 이 보이면 의심하세요.",
-    detect=[r"(signed|issued|countersigned) by[^.]{0,40}(the )?buyer'?s?"
+    detect=[r"선적[^.]{0,30}(?:바이어|매수인)[^.]{0,25}서면[^.]{0,20}지정",
+            r"countersigned by[^.]{0,45}(?:buyer|purchaser)",
+            r"신용장[^.]{0,45}(?:매수인|바이어)[^.]{0,25}서명",
+            r"(signed|issued|countersigned) by[^.]{0,40}(the )?buyer'?s?"
             r"[^.]{0,40}representative",
             r"specimen signature[^.]{0,60}(issuing|advising) bank",
             r"(inspection|quality) certificate[^.]{0,60}"
@@ -1380,7 +1495,14 @@ Ten percent (10%) of the invoice value shall be retained by the Buyer as a
 performance guarantee for twelve (12) months after delivery.""",
     text_ko="retention · retained by the Buyer · performance guarantee 가 대금 "
             "조항에 붙어 있으면 이 조항입니다. **언제 돌려주는지**가 적혀 있는지 보세요.",
-    detect=[r"(retention|retained|withheld)[^.]{0,60}"
+    detect=[r"(?:five|ten|fifteen|twenty|thirty)\s+percent[^.]{0,70}(?:held back|holdback|retained|retention)",
+            r"대금[^.]{0,20}\d{1,2}\s*%[^.]{0,40}(?:보증|하자)[^.]{0,20}(?:경과|지난|후)",
+            r"\d{1,2}\s*%[^.]{0,40}(?:보증기간|하자\s*기간)[^.]{0,25}(?:경과|지난|후)",
+            r"\d{1,2}\s*(?:percent|%)[^.]{0,70}(?:held back|holdback|retained|retention)",
+            r"(?:performance )?holdback",
+            r"(?:하자보증|보증)\s*(?:금)?\s*명목[^.]{0,25}유보",
+            r"(?:보증기간|하자\s*기간)[^.]{0,25}(?:경과|지난)\s*후[^.]{0,25}지급",
+            r"(retention|retained|withheld)[^.]{0,60}"
             r"(\d{1,2}\s*(percent|%)|invoice value)[^.]{0,60}"
             r"(guarantee|warranty|security)",
             r"\d{1,2}\s*(percent|%)[^.]{0,40}(shall be )?retained by the buyer",
@@ -1408,7 +1530,10 @@ and shall bear all costs and charges thereof.""",
     #   "The Seller shall use the forwarder nominated by the Buyer and
     #    **shall bear all costs** thereof."
     # 맨 "shall bear ... costs" 도 봅니다. (2026-10-02)
-    detect=[r"(nominated|designated|appointed) by the buyer[^.]{0,100}"
+    detect=[r"(?:designated|nominated|appointed) by the (?:buyer|purchaser)[^.]{0,60}(?:pay|bear)[^.]{0,30}(?:the )?(?:premium|cost|fee|charge)",
+            r"(?:appointed|designated|nominated)[^.]{0,45}(?:forwarder|carrier|insurer|surveyor)[^.]{0,90}(?:seller|supplier)\'?s? expense",
+            r"(?:매수인|바이어)[^.]{0,25}지정[^.]{0,40}(?:선사|검사기관|포워더|보험사)[^.]{0,50}(?:매도인|공급자)",
+            r"(nominated|designated|appointed) by the buyer[^.]{0,100}"
             r"(seller shall bear|at the seller'?s (cost|expense)|borne by the seller"
             r"|shall bear[^.]{0,20}(all )?costs?)",
             r"(seller shall bear|at the seller'?s (cost|expense))[^.]{0,100}"
@@ -1440,7 +1565,10 @@ shall not disclose it to any third party.""",
     #    The Buyer shall likewise keep confidential ... from the Seller."
     # 다른 규칙이 쓰는 `[^.]` 는 첫 문장에서 끊겨 뒤 문장을 못 봅니다. 그래서
     # **쌍방인데 일방이라고** 짚었습니다. 이 가드만 `.`(re.S) 로 넘깁니다.
-    detect=[r"seller shall (keep|treat|hold)[^.]{0,40}confidential"
+    detect=[r"(?:seller|supplier)[^.]{0,50}(?:undertakes to )?treat[^.]{0,45}confidential(?!.{0,320}(?:each party|both parties|mutual|buyer shall.{0,40}confidential))",
+            r"(?:seller|supplier)[^.]{0,50}hold(?:s)? in confidence(?!.{0,320}(?:each party|both parties|mutual))",
+            r"(?:매도인|공급자)[^.]{0,50}(?:비밀로|기밀을)[^.]{0,25}(?:유지|지)(?!.{0,320}(?:양\s*당사자|쌍방|상호))",
+            r"seller shall (keep|treat|hold)[^.]{0,40}confidential"
             r"(?!.{0,320}(each party|both parties|mutual|reciprocal"
             r"|buyer shall.{0,40}confidential))",
             r"(매도인|공급자)[^.]{0,30}(비밀|기밀)[^.]{0,20}유지"
@@ -1461,7 +1589,12 @@ products to any other party worldwide during the term and for three (3) years
 thereafter.""",
     text_ko="similar or competing products · worldwide · thereafter 가 함께 나오면 "
             "이 조항입니다. **범위(지역·제품)와 기간**을 꼭 보세요.",
-    detect=[r"shall not (manufacture|sell|supply|produce)[^.]{0,80}"
+    detect=[r"전\s*세계[^.]{0,30}어디[^.]{0,40}(?:유사|경쟁)",
+            r"refrain from (?:producing|manufacturing)[^.]{0,70}(?:comparable|similar|competing)",
+            r"may not deal in[^.]{0,45}competing",
+            r"(?:유사|경쟁)\s*제품[^.]{0,50}(?:공급|제조|취급)[^.]{0,25}(?:아니|않|못)",
+            r"전\s*세계[^.]{0,50}(?:유사|경쟁)",
+            r"shall not (manufacture|sell|supply|produce)[^.]{0,80}"
             r"(similar|competing|identical)[^.]{0,60}products?",
             r"non[- ]competition[^.]{0,80}(worldwide|any (other )?(party|territory))",
             r"(경업\s*금지|경쟁\s*제품)[^.]{0,80}(제조|판매|공급)"
@@ -1484,14 +1617,18 @@ Seller's consent. The Seller shall not assign without the Buyer's prior written
 consent.""",
     text_ko="Buyer may assign ... without consent 와 Seller shall not assign 이 "
             "**함께** 나오면 이 조항입니다.",
-    detect=[r"buyer may assign[^.]{0,80}without[^.]{0,40}"
+    detect=[r"(?:바이어|매수인)[^.]{0,25}지위\s*이전[^.]{0,30}동의",
+            r"(?:buyer|purchaser) may (?:transfer|assign)[^.]{0,70}(?:freely|without)",
+            r"novation by the (?:buyer|purchaser)",
+            r"(?:매수인|바이어)[^.]{0,40}자유로이[^.]{0,25}양도",
+            r"(?:지위\s*이전|양도)[^.]{0,25}동의가?\s*필요\s*없",
+            r"buyer may assign[^.]{0,80}without[^.]{0,40}"
             r"(seller'?s|prior)[^.]{0,20}consent",
             r"buyer may assign[^.]{0,200}seller shall not assign",
             r"(매수인|바이어)[^.]{0,40}(양도|이전)[^.]{0,30}(할 수 있|자유)"
             r"[^.]{0,200}(매도인|공급자)[^.]{0,40}(양도|이전)[^.]{0,20}(할 수 없|못|금지)"],
     fix="**양쪽 모두 상대 동의를 받게** 바꿉니다. 바이어의 계열사 양도를 허용하더라도 "
         "**바이어가 연대책임을 진다**는 말을 넣으세요.",
-    avoid=NEGATION,
 )
 
 _clause(
@@ -1505,7 +1642,11 @@ All costs of certification, testing and factory audits required in the Buyer's
 country, including annual renewals, shall be borne by the Seller.""",
     text_ko="certification · testing · factory audit 과 borne by the Seller 가 "
             "함께 나오면 이 조항입니다. **인증 명의가 누구 앞인지**도 보세요.",
-    detect=[r"(certification|testing|test reports?|factory audit|inspection)"
+    detect=[r"(?:seller|supplier)[^.]{0,60}(?:pay|bear)[^.]{0,60}(?:conformity assessment|certification|type approval|homologation)",
+            r"(?:적합성\s*평가|형식승인|인증|시험)\s*(?:비용|수수료)[^.]{0,30}(?:매도인|공급자)[^.]{0,20}(?:낸|부담|지급)",
+            r"(?:homologation|type approval|conformity assessment)[^.]{0,90}(?:seller|supplier)",
+            r"(?:형식승인|공장심사|적합성\s*평가)[^.]{0,45}(?:비용|수수료)[^.]{0,40}(?:매도인|공급자)",
+            r"(certification|testing|test reports?|factory audit|inspection)"
             r"[^.]{0,100}(borne by the seller|at the seller'?s (cost|expense)|"
             r"seller shall bear)",
             r"(borne by the seller|seller shall bear)[^.]{0,100}"
@@ -1655,7 +1796,11 @@ _clause(
 Upon termination the Agent shall not be entitled to any indemnity or
 compensation whatsoever.""",
     text_ko="'어떤 보상도 없다'고 적어 두어도 EU 안에서는 그대로 통하지 않습니다.",
-    detect=[r"not be entitled to any[^.]{0,30}(indemnity|compensation)",
+    detect=[r"(?:영업권\s*보상|보상금|보상청구)[^.]{0,30}(?:청구하지|받지)[^.]{0,15}못",
+            r"no claim to goodwill indemnity",
+            r"waive[^.]{0,70}compensation[^.]{0,50}(?:86/653|directive)",
+            r"(?:영업권\s*보상|보상청구권)[^.]{0,40}(?:청구하지|포기)",
+            r"not be entitled to any[^.]{0,30}(indemnity|compensation)",
             r"no [^.]{0,20}(indemnity|compensation) (shall be|is) (due|payable)",
             r"waive[^.]{0,40}(goodwill|indemnity|compensation)",
             r"commercial agent",
@@ -1717,7 +1862,10 @@ _clause(
 All intellectual property rights in any designs, tooling, moulds, know-how or
 improvements arising from this Contract shall vest exclusively in the Buyer.""",
     text_ko="금형·도면·개선 기술이 어디에 귀속되는지 문장으로 갈라 두세요.",
-    detect=[r"(intellectual property|IP) rights[^.]{0,120}(vest|assign|belong)[^.]{0,30}Buyer",
+    detect=[r"title to[^.]{0,60}(?:moulds?|molds?|tooling)[^.]{0,80}(?:passes?|transfers?)[^.]{0,30}(?:to the )?(?:buyer|purchaser)",
+            r"(?:results? of development|development results?)[^.]{0,70}vest",
+            r"(?:개발\s*성과물|지적재산권)[^.]{0,50}(?:매수인|바이어)[^.]{0,25}(?:이전|귀속)",
+            r"(intellectual property|IP) rights[^.]{0,120}(vest|assign|belong)[^.]{0,30}Buyer",
             r"(tooling|moulds?|dies)[^.]{0,80}(vest|property of|owned by|belong)[^.]{0,30}Buyer",
             r"work made for hire",
             r"(지식재산권|지적재산권|금형|사출|치공구)[^.]{0,30}(갑|매수인|바이어)[^.]{0,10}(에게)?[^.]{0,6}(귀속|양도|이전)(?![^.]{0,40}(없|못하|아니하|아니한|금지))"],
@@ -1738,7 +1886,10 @@ _clause(
 The Buyer may set off or deduct from any amounts due any claim it may have
 against the Seller, whether liquidated or not.""",
     text_ko="상계·공제는 **확정된 금액**에 대해서만 가능하도록 좁혀야 합니다.",
-    detect=[r"Buyer (may|shall be entitled to|has the right to).{0,60}set[- ]?off",
+    detect=[r"apply any amount owing[^.]{0,70}reduction",
+            r"net off[^.]{0,50}(?:claims?|against)[^.]{0,40}(?:purchase )?price",
+            r"(?:매수인|바이어)[^.]{0,50}채권[^.]{0,25}(?:으로\s*)?대금[^.]{0,25}공제",
+            r"Buyer (may|shall be entitled to|has the right to).{0,60}set[- ]?off",
             r"Buyer.{0,40}(deduct|withhold).{0,40}(any|whatsoever)",
             r"set[- ]?off.{0,40}(any|whatsoever).{0,30}claim",
             r"(갑|매수인|바이어)[^.]{0,30}(상계|공제)(?![^.]{0,40}(없|못하|아니하|아니한|금지))"],
@@ -1769,7 +1920,11 @@ New York, and waive any objection to venue therein.""",
     #
     # **포기(waive)는 빼야 합니다.** "배심재판을 포기한다"는 우리에게
     # 유리한 문장입니다. 그것까지 독소로 짚으면 지우라고 하게 됩니다.
-    detect=[r"(courts?|jurisdiction) of .{0,40}(New York|California|Texas|Delaware|the United States)",
+    detect=[r"(?:캘리포니아|뉴욕|델라웨어|텍사스)\s*(?:주)?\s*법원",
+            r"federal courts? of (?:Delaware|New York|California|Texas)",
+            r"exemplary damages",
+            r"(?:캘리포니아|뉴욕|델라웨어|텍사스)[^.]{0,25}(?:주)?\s*법원",
+            r"(courts?|jurisdiction) of .{0,40}(New York|California|Texas|Delaware|the United States)",
             r"(submit|consent).{0,40}jurisdiction.{0,40}(United States|U\.S\.|New York)",
             r"exclusive jurisdiction.{0,40}(United States|U\.S\.|New York|California)",
             r"미국\s*법원[^.]{0,20}(관할|전속)(?![^.]{0,40}(없|못하|아니하|아니한))",
