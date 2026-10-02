@@ -37,14 +37,92 @@ CATEGORY_NOTE = {
 
 CLAUSES: list[dict] = []
 
+# 한국어 부정 가드. 찾은 말 **뒤** 40자 안에 부정말이 오면 그 조항이 아닙니다.
+#
+# "전량 반품을 요구할 수 **없다**" 는 우리를 보호하는 문장이고,
+# "금형은 매수인에게 귀속하지 **아니한다**" 도 그렇습니다. 이것까지 독소로
+# 짚으면 사용자가 멀쩡한 조항을 지웁니다. 오탐이 미탐보다 나쁩니다.
+NO_NEG_KO = r"(?![^.]{0,40}(없|못하|아니하|아니한|금지))"
+
+# 한국 법원·중재기관. 관할 조항 뒤에 이 말이 오면 "상대국 법원"이 아닙니다.
+# 서울중앙지방법원 전속관할은 우리에게 **유리한** 조항입니다.
+KOREA = r"(?:대한민국|한국|서울|부산|인천|대구|광주|수원|Korea|Seoul|Busan|KCAB)"
+
+# 권리를 **포기·배제**하는 문구까지 보는 가드.
+#
+# 배심재판·징벌적 손해배상은 "포기한다"가 우리에게 **유리**합니다. 그런데
+# 포기는 부정말이 아니라서 NO_NEG_KO 로는 안 걸러집니다. 실제로
+# "배심재판을 받을 권리를 포기한다"를 독소로 짚었습니다. (2026-10-02)
+#
+# NO_NEG_KO 에 포기를 넣지 않는 이유: 다른 조항에서는 포기가 반대로 쓰입니다.
+# "매도인은 항변권을 포기한다" 는 우리에게 불리합니다. 그래서 따로 둡니다.
+NO_WAIVE_KO = r"(?![^.]{0,40}(없|못하|아니하|아니한|금지|포기|배제|제외))"
+
+# **면책의 방향.** 보호받는 쪽이 Buyer 인 꼴만 봅니다.
+#
+# "The Buyer shall indemnify the Seller" 는 우리에게 **유리**합니다. 같은 낱말이
+# 쓰이므로 방향을 안 보면 유리한 조항을 지우라고 하게 됩니다. 실제로 GDPR·집단소송
+# 조항이 그랬습니다. (2026-10-02)
+# 리콜 비용에 **한정·상한**이 붙은 꼴. 이런 문장은 좋은 조항이라 빼야 합니다.
+RECALL_CAPPED = (r"(?:up to|limited to|shall not exceed|not to exceed|solely"
+                 r"|only to the extent|caused by the seller'?s"
+                 r"|한도|상한|초과하지)")
+
+INDEMNIFY_BUYER = (r"(?:indemnif\w*\s+(?:and\s+(?:defend|hold)\s+)?(?:the\s+)?buyer"
+                   r"|hold\s+(?:the\s+)?buyer\s+harmless"
+                   r"|seller\s+shall\s+(?:\w+\s+){0,3}?(?:indemnif|defend|hold harmless))")
+
 
 def _clause(key, title, category, why, risk, text_en, text_ko, detect,
-            applies=("always",), fix=""):
+            applies=("always",), fix="", countries=()):
+    """조항 한 줄.
+
+    countries
+      이 조항이 **특히 흔한 나라**. ISO 2자리(또는 EU·GULF 같은 묶음)입니다.
+      비어 있으면 어느 나라든 똑같이 봅니다.
+
+      **찾는 일에는 쓰지 않습니다.** 도착국을 모를 때도 찾아야 하고, 중국
+      중재 조항은 어디로 보내든 독소입니다. 보여 줄 때 앞세우는 데만 씁니다.
+      (2026-10-02)
+    """
+
     CLAUSES.append({
         "key": key, "title": title, "category": category, "why": why, "risk": risk,
         "text_en": text_en.strip(), "text_ko": text_ko.strip(),
         "detect": tuple(detect), "applies": tuple(applies), "fix": fix,
+        "countries": tuple(countries),
     })
+
+
+# 나라 묶음. 도착국 2자리를 주면 이 묶음까지 함께 봅니다.
+COUNTRY_GROUPS = {
+    "EU": ("AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR",
+           "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO",
+           "SE", "SI", "SK"),
+    "GULF": ("AE", "SA", "QA", "KW", "BH", "OM"),
+}
+
+
+def groups_for(country: str) -> set[str]:
+    """도착국 2자리 -> 그 나라와 그 나라가 든 묶음."""
+
+    code = (country or "").strip().upper()
+    if not code:
+        return set()
+    found = {code}
+    for name, members in COUNTRY_GROUPS.items():
+        if code in members:
+            found.add(name)
+    return found
+
+
+def for_country(country: str) -> list[dict]:
+    """그 나라에서 **특히 흔한** 조항. 도착국을 알 때 앞세워 보여 줍니다."""
+
+    tags = groups_for(country)
+    if not tags:
+        return []
+    return [row for row in CLAUSES if tags & set(row["countries"])]
 
 
 # ── 필수조항 ────────────────────────────────────────────────────────────────
@@ -281,7 +359,18 @@ _clause(
 The Seller shall indemnify the Buyer against any and all losses, damages and
 expenses of whatever nature, including loss of profit, without limitation.""",
     text_ko="without limitation · any and all · loss of profit 이 함께 나오면 이 조항입니다.",
-    detect=[r"without limitation", r"any and all (losses|damages)",
+    # **`without limitation` 을 맨 낱말로 보면 안 됩니다.** (2026-10-02)
+    #
+    # 영문 계약서에서 "including without limitation" 은 "~를 포함하되 이에
+    # 한정되지 않는"이라는 상투어이고, 책임 한도와 상관이 없습니다. 이 말은
+    # 실무 계약서 대부분에 들어가서, 전에는 **거의 매번** 이 조항이 떴습니다.
+    #   "The Goods shall include, without limitation, packaging and manuals."
+    # 책임·손해 이야기일 때만 봅니다.
+    detect=[r"(liability|liabilities|damages|indemnit|indemnif|responsib)"
+            r"[^.]{0,60}without limitation",
+            r"without limitation[^.]{0,60}"
+            r"(liability|liabilities|damages|indemnit|indemnif)",
+            r"any and all (losses|damages)",
             r"unlimited liability",
             r"무제한\s*(으로)?[^.]{0,6}(배상|책임)",
             r"(한도|상한|제한)[^.]{0,3}없이[^.]{0,30}배상",
@@ -312,8 +401,21 @@ _clause(
 The courts of <BUYER'S COUNTRY> shall have exclusive jurisdiction over any
 dispute arising out of this Contract.""",
     text_ko="exclusive jurisdiction 과 상대국 이름이 함께 나오면 이 조항입니다. 중재 조항과 **같이** 있으면 서로 모순됩니다.",
-    detect=[r"exclusive jurisdiction", r"courts? of .{0,40}shall have",
-            r"전속\s*적?[^.]{0,4}관할", r"관할\s*법원[^.]{0,30}(매수인|바이어)"],
+    # **법원이 어디인지 봅니다.** (2026-10-02)
+    #
+    # 전에는 `exclusive jurisdiction` 과 `전속적 관할` 만 보아, 서울중앙지방법원
+    # 전속관할도 독소로 짚었습니다. 한국 법원 전속관할은 우리에게 **유리한**
+    # 조항입니다. 그걸 지우라고 하면 안 됩니다.
+    #
+    # 뒤에 한국 지명이 오면 뺍니다. 영문에서 지명이 **앞**에 오는 꼴
+    # ("courts of Seoul shall have exclusive jurisdiction")은 파이썬 정규식이
+    # 길이가 변하는 뒤돌아보기를 못 하므로, `courts of` 쪽에서 가립니다 —
+    # 그래서 맨 뒤 `exclusive jurisdiction` 규칙은 **of/in 이 뒤따르는 꼴만**
+    # 봅니다. 지명이 앞에 오면 그 뒤에는 보통 "over any dispute"가 옵니다.
+    detect=[rf"exclusive jurisdiction\s+(?:of|in)\s+(?![^.]{{0,40}}{KOREA})",
+            rf"courts? of (?![^.]{{0,40}}{KOREA})[^.]{{0,40}}(?:shall have|exclusive)",
+            rf"전속\s*적?[^.]{{0,4}}관할(?![^.]{{0,40}}{KOREA})",
+            r"관할\s*법원[^.]{0,30}(매수인|바이어)"],
     fix="**중재(KCAB, 서울)** 로 바꾸거나, 최소한 **제3국 중재**로 바꿔 달라고 하세요.",
 )
 
@@ -339,8 +441,19 @@ _clause(
     text_en="""(지울 문구의 예)
 The Seller warrants the Goods against any defect without time limitation.""",
     text_ko="보증에 **기간**과 **범위**가 없으면 이 조항입니다.",
+    # 제목이 "**기간 제한 없는** 하자보증"인데 국문 규칙은 `무기한` 하나뿐이어서
+    # "기간의 제한 없이 하자를 보수하여야 한다"를 못 찾았습니다. 실무에서는
+    # "무기한"보다 "기간 제한 없이"·"기한 없이"·"영구히"를 더 많이 씁니다. (2026-10-02)
+    #
+    # 기간을 **정한** 문장("하자보증기간은 12개월로 한다")은 그대로 통과해야 하므로
+    # '없' 또는 '영구'가 함께 있을 때만 봅니다.
     detect=[r"warrant.{0,80}without (any )?(time )?limit",
-            r"perpetual warranty", r"무기한\s*(보증|하자)"],
+            r"perpetual warranty",
+            r"(warrant|defects?)[^.]{0,60}in perpetuity",
+            r"무기한\s*(보증|하자)",
+            r"(기간|기한)[^.]{0,8}(제한[^.]{0,4})?없[^.]{0,30}(보증|보수|수리|교체|하자)",
+            r"(보증|보수|하자)[^.]{0,30}(기간|기한)[^.]{0,8}(제한[^.]{0,4})?없",
+            r"영구[^.]{0,20}(보증|보수|하자)"],
     fix="**선적일로부터 12개월 또는 도착 후 6개월 중 먼저 오는 날**처럼 기한을 박으세요.",
 )
 
@@ -408,12 +521,430 @@ _clause(
 If any part of the shipment fails inspection, the Buyer may reject the entire
 shipment and the Seller shall bear all return freight, duties and storage.""",
     text_ko="reject the entire shipment 과 return freight 이 함께 나오면 이 조항입니다.",
+    # 간격을 6 -> 20자로 넓히고 **부정 가드**를 붙였습니다. (2026-10-02)
+    #
+    # 전에는 거꾸로 돌았습니다.
+    #   "전량 반품을 요구할 수 **없다**"        간격 1자 -> 잡힘  (오탐)
+    #   "물품 전량을 매도인에게 반품할 수 있으며"  간격 8자 -> 놓침  (미탐)
+    # 자연스러운 한국어는 "전량을 매도인에게 반품"처럼 사이에 말이 들어갑니다.
+    # 그리고 "전량 반품을 요구할 수 없다"는 **우리를 보호하는** 문장입니다.
     detect=[r"reject the entire", r"return freight",
-            r"전량[^.]{0,6}반품", r"전부[^.]{0,6}반품",
+            r"전량[^.]{0,20}반품" + NO_NEG_KO,
+            r"전부[^.]{0,20}반품" + NO_NEG_KO,
             r"반송\s*(운임|비용)[^.]{0,30}매도인"],
     fix="**불량분만 교체·감액**으로 바꾸고, 불합격 판정은 **선적지 검사기관**이 하도록 하세요.",
 )
 
+
+
+# ── 국가별 독소조항 ─────────────────────────────────────────────────────────
+#
+# 같은 문장도 나라에 따라 되돌릴 수 있는지가 다릅니다. 찾는 일은 나라와 무관하게
+# 하고, 보여 줄 때만 도착국에 흔한 것을 앞세웁니다. (2026-10-02)
+
+_clause(
+    "cn_tech_transfer", "기술자료·도면 제공 의무 (중국)", "toxic",
+    why="도면·BOM·공정서를 넘기면 같은 물건을 그쪽에서 만들 수 있습니다. "
+        "중국은 특허·상표가 **선출원주의**라, 받은 쪽이 먼저 출원하면 되돌리기 어렵습니다.",
+    risk="2년 뒤 같은 제품이 더 싸게 나오고, 우리가 침해 주장을 받는 쪽이 됩니다.",
+    text_en="""(지울 문구의 예)
+The Seller shall provide the Buyer with complete technical drawings, bills of
+materials and manufacturing process documentation for the Products.""",
+    text_ko="technical drawings · bill of materials · process documentation 을 "
+            "**넘기라**고 적혀 있으면 이 조항입니다.",
+    # 영어는 두 순서로 다 씁니다. 하나만 보면 절반을 놓칩니다. (2026-10-02)
+    #   "technical drawings shall be provided"      <- 자료가 먼저
+    #   "shall provide ... technical drawings"      <- 동사가 먼저
+    # **방향을 봅니다.** (2026-10-02)
+    #
+    # 바이어가 제 도면을 우리에게 주는 것("The Buyer shall provide the Seller
+    # with technical drawings")은 흔하고 위험이 없습니다. 전에는 그것도 짚었습니다.
+    # 주는 쪽이 매도인이거나 받는 쪽이 매수인인 꼴만 봅니다.
+    #
+    # 영어는 낱말 순서가 둘입니다 — 자료가 먼저("drawings shall be provided"),
+    # 동사가 먼저("shall provide ... drawings"). 둘 다 봅니다.
+    detect=[# 자료가 먼저 — 주는 쪽/받는 쪽을 뒤에서 확인
+            r"(technical|engineering) (drawings?|documentation|data|specifications?)"
+            r"[^.]{0,60}(?:shall )?be (?:provided|furnished|delivered|disclosed)"
+            r"[^.]{0,20}(?:by the seller|to the buyer)",
+            # 동사가 먼저 — 매도인이 주는 꼴
+            r"seller shall (?:\w+ ){0,3}?(?:provide|furnish|deliver|supply|disclose)"
+            r"[^.]{0,80}(technical|engineering) (drawings?|documentation|data)",
+            # 동사가 먼저 — 매수인이 받는 꼴
+            r"(?:provide|furnish|deliver|supply|disclose)\s+(?:the\s+)?buyer\s+with"
+            r"[^.]{0,80}(technical|engineering) (drawings?|documentation|data)",
+            # 부품표·공정서도 같은 방향으로
+            r"(?:bill of materials?|(?:manufacturing|production) process"
+            r"[^.]{0,30}(?:documentation|know-how))"
+            r"[^.]{0,60}(?:by the seller|to the buyer)",
+            r"seller shall (?:\w+ ){0,3}?(?:provide|furnish|deliver|disclose)"
+            r"[^.]{0,80}(?:bill of materials?|process documentation)",
+            r"(?:provide|furnish|deliver|disclose)\s+(?:the\s+)?buyer\s+with"
+            r"[^.]{0,80}(?:bill of materials?|process documentation)",
+            # 국문 — 주는 쪽이 매도인이거나 받는 쪽이 매수인
+            r"(도면|기술\s*자료|제조\s*공정\s*서|부품\s*표)[^.]{0,40}"
+            r"(매수인|바이어)[^.]{0,20}(제공|교부|인도|제출)" + NO_NEG_KO,
+            r"매도인[^.]{0,60}(도면|기술\s*자료|제조\s*공정\s*서|부품\s*표)"
+            r"[^.]{0,40}(제공|교부|인도|제출)" + NO_NEG_KO],
+    fix="도면은 **필요한 범위만** 주고, 비밀유지·역설계 금지·**용도 제한**을 함께 적습니다. "
+        "금형 소유권은 우리에게 둡니다(이익조항 ip).",
+    countries=("CN",),
+)
+
+_clause(
+    "cn_trademark_buyer", "상표를 바이어 명의로 등록 (중국)", "toxic",
+    why="우리 상표를 바이어 이름으로 등록하면 그 나라에서는 **바이어가 상표권자**입니다. "
+        "중국은 선출원주의라 나중에 되찾는 데 몇 년이 걸립니다.",
+    risk="거래를 끊으면 우리 상표로 우리 물건을 못 팝니다. 역수입도 막힙니다.",
+    text_en="""(지울 문구의 예)
+The Buyer shall register the Seller's trademarks in the Territory in the Buyer's
+own name and shall be the sole registrant thereof.""",
+    text_ko="register ... trademark ... in the Buyer's own name 이 나오면 이 조항입니다.",
+    detect=[r"register[^.]{0,60}(trademarks?|trade marks?|brand)[^.]{0,60}"
+            r"(in (its|the buyer'?s) own name|as (the )?(sole )?registrant)",
+            r"(trademarks?|brand)[^.]{0,40}shall be registered[^.]{0,40}buyer",
+            r"상표[^.]{0,40}(매수인|바이어|대리점)[^.]{0,20}명의[^.]{0,20}등록" + NO_NEG_KO],
+    fix="상표는 **우리 명의로 우리가 직접** 출원·등록하고, 바이어에게는 **사용권만** 줍니다. "
+        "거래 시작 전에 출원해 두는 것이 가장 안전합니다.",
+    countries=("CN",),
+)
+
+_clause(
+    "eu_gdpr_indemnity", "개인정보 과징금 전가 (EU · GDPR)", "toxic",
+    why="GDPR 과징금 상한은 **전세계 연매출 4% 또는 2천만 유로 중 큰 금액**입니다. "
+        "바이어가 제 잘못으로 맞은 과징금까지 우리가 물게 됩니다.",
+    risk="우리 매출과 무관한 규모의 금액이 청구됩니다. 보험으로도 안 덮입니다.",
+    text_en="""(지울 문구의 예)
+The Seller shall indemnify and hold the Buyer harmless against any fines or
+penalties imposed under the General Data Protection Regulation.""",
+    text_ko="GDPR · data protection 과 indemnify · fines 가 함께 나오면 이 조항입니다.",
+    # **방향을 봅니다.** (2026-10-02)
+    #
+    # "The Buyer shall indemnify the Seller against GDPR fines" 는 우리에게
+    # 유리합니다. 전에는 방향을 안 봐서 이것도 독소로 짚었습니다.
+    # 보호받는 쪽이 Buyer 인 꼴만 봅니다.
+    detect=[rf"(GDPR|General Data Protection Regulation)[^.]{{0,100}}{INDEMNIFY_BUYER}",
+            rf"{INDEMNIFY_BUYER}[^.]{{0,100}}(GDPR|General Data Protection)",
+            r"(GDPR|개인정보보호규정|일반\s*데이터\s*보호)[^.]{0,60}"
+            r"(과징금|과태료)[^.]{0,40}(매도인|공급자)[^.]{0,20}(부담|배상)" + NO_NEG_KO],
+    fix="우리가 **개인정보를 받지 않는다면** 이 조항은 뺍니다. 받는다면 책임을 "
+        "**우리가 처리한 범위로 한정**하고 금액 상한을 둡니다.",
+    countries=("EU",),
+)
+
+_clause(
+    "us_class_action_pl", "제조물책임·집단소송 무한 면책 (미국)", "toxic",
+    why="미국은 **집단소송**과 **징벌적 손해배상**이 있어 한 건이 회사 규모를 넘습니다. "
+        "그걸 상한 없이 우리가 떠안는 조항입니다.",
+    risk="송장 1만 달러짜리 거래에서 수백만 달러 소송의 방어비용까지 우리가 냅니다.",
+    text_en="""(지울 문구의 예)
+The Seller shall defend, indemnify and hold harmless the Buyer against all
+product liability claims, including class actions, without limitation.""",
+    text_ko="product liability · class action 과 indemnify · without limitation 이 "
+            "함께 나오면 이 조항입니다.",
+    # **방향을 봅니다.** 바이어가 우리를 면책하는 것은 유리한 조항입니다.
+    detect=[rf"class action[^.]{{0,100}}{INDEMNIFY_BUYER}",
+            rf"{INDEMNIFY_BUYER}[^.]{{0,100}}class action",
+            r"product liability[^.]{0,80}(without limitation|unlimited|all claims)",
+            r"(제조물\s*책임|집단\s*소송)[^.]{0,60}(매도인|공급자)[^.]{0,30}"
+            r"(면책|배상|방어|부담)" + NO_NEG_KO],
+    fix="면책 범위를 **우리 제조상 결함으로 한정**하고, 금액 상한과 "
+        "**보험 한도 내**라는 조건을 붙입니다. 방어비용은 따로 다룹니다.",
+    countries=("US",),
+)
+
+_clause(
+    "ru_sanctions_warranty", "제재 보증·면책 (러시아 등 제재 대상국)", "toxic",
+    why="제재 목록은 **수시로 바뀌고 우리가 통제할 수 없습니다.** 그런데 "
+        "'제재에 걸리지 않음을 보증한다'고 적으면 바뀌는 것까지 우리 책임이 됩니다.",
+    risk="거래 뒤 목록이 바뀌어 대금이 동결되면, 그 손해까지 우리가 뭅니다.",
+    text_en="""(지울 문구의 예)
+The Seller warrants that neither the Goods nor the transaction is subject to any
+sanctions, and shall indemnify the Buyer for all consequences thereof.""",
+    text_ko="sanctions 와 warrant · indemnify 가 함께 나오면 이 조항입니다.",
+    detect=[r"sanctions?[^.]{0,80}(warrant|indemnif|hold harmless)",
+            r"(warrant|represent)[^.]{0,60}not[^.]{0,40}subject to[^.]{0,40}sanctions?",
+            r"(제재|수출\s*통제)[^.]{0,60}(보증|담보|면책|배상)" + NO_NEG_KO],
+    fix="보증을 **계약 시점 기준**으로 한정하고, 뒤에 목록이 바뀌면 "
+        "**불가항력 또는 해지 사유**가 되도록 적습니다.",
+    countries=("RU", "BY", "IR", "KP", "SY", "CU"),
+)
+
+_clause(
+    "gulf_agent_lock", "등록 대리인 독점·해지 제한 (걸프)", "toxic",
+    why="걸프 국가들은 **상사대리인 등록제**가 있어, 등록된 대리인은 계약을 끊어도 "
+        "독점과 보상을 주장할 수 있습니다. 계약서에 독점·해지 제한까지 적으면 더 묶입니다.",
+    risk="대리인이 안 팔아도 다른 경로로 못 팝니다. 바꾸려면 합의금을 줘야 합니다.",
+    text_en="""(지울 문구의 예)
+The Agent shall have the exclusive right to import and distribute the Products
+in the Territory. This Agreement may not be terminated without the Agent's
+written consent.""",
+    text_ko="exclusive right to import/distribute 와 may not be terminated 가 "
+            "함께 나오면 이 조항입니다.",
+    # **문장을 넘어갑니다.** (2026-10-02)
+    #
+    # 실제 계약서는 독점을 한 문장, 해지 제한을 다음 문장에 적습니다.
+    # 다른 규칙이 쓰는 `[^.]` 는 문장에서 끊기므로 이 조항만 `.`(re.S) 로 넘깁니다.
+    # 독점만 있고 해지가 자유로우면 짚지 않습니다 — 그건 흔한 독점 조항입니다.
+    detect=[r"(sole|exclusive) (agent|distributor|right to (import|distribute))"
+            r".{0,240}(may not be terminated|shall not be terminated|"
+            r"without the (agent|distributor)'?s.{0,20}consent)",
+            r"(독점|배타적)[^.]{0,30}(대리인|대리점|수입|판매)[^.]{0,80}"
+            r"(해지[^.]{0,20}(할 수 없|불가|동의))"],
+    fix="독점을 **기간·실적 조건부**로 하고(최소 구매량 미달 시 자동 해제), "
+        "현지 **등록 전에** 조건을 확정합니다. 등록되면 바꾸기 어렵습니다.",
+    countries=("GULF",),
+)
+
+
+# ── 바이어 유형별 독소조항 ──────────────────────────────────────────────────
+#
+# 대형 유통·브랜드 공급계약에서 되풀이되는 것들입니다. 나라와 무관합니다.
+
+_clause(
+    "retro_price_deduction", "소급 단가 인하·판촉비 공제", "toxic",
+    why="이미 납품한 건까지 단가를 내리거나, 판촉비·진열비를 **대금에서 빼고** 넣습니다. "
+        "우리는 받을 금액을 미리 알 수 없습니다.",
+    risk="송장 100을 보내고 82가 들어옵니다. 다툴 근거가 계약서에 없습니다.",
+    text_en="""(지울 문구의 예)
+The Buyer may deduct any agreed rebate, markdown allowance or promotional
+funding from any payment due, including retroactively.""",
+    text_ko="rebate · markdown · allowance · promotional funding 과 deduct 가 "
+            "함께 나오면 이 조항입니다.",
+    detect=[r"(rebate|markdown|allowance|promotional (funding|support)|co-?op)"
+            r"[^.]{0,80}deduct",
+            r"deduct[^.]{0,80}(rebate|markdown|allowance|promotional)",
+            r"retroactive(ly)?[^.]{0,60}(price|discount|rebate)",
+            r"소급[^.]{0,30}(단가|가격|할인)[^.]{0,30}(인하|적용|조정)" + NO_NEG_KO,
+            r"(판촉|진열|행사)[^.]{0,20}(비용|분담금)[^.]{0,40}(공제|차감)" + NO_NEG_KO],
+    fix="공제는 **미리 합의한 항목·금액만**, 그리고 **송장별로** 서면 통지 뒤에 하도록 "
+        "바꿉니다. 소급 적용은 뺍니다.",
+)
+
+_clause(
+    "chargeback_penalty", "납기 벌금을 대금에서 공제 (챠지백·OTIF)", "toxic",
+    why="납기가 하루 늦거나 수량이 모자라면 주문액의 몇 %를 벌금으로 매기고, "
+        "그걸 **다른 건 대금에서 빼** 갑니다.",
+    risk="선사 스케줄이 밀려 생긴 지연까지 우리 벌금이 됩니다. 운임보다 벌금이 큽니다.",
+    text_en="""(지울 문구의 예)
+Late or short deliveries shall incur a chargeback of 5% of the order value,
+which the Buyer may deduct from any invoice then outstanding.""",
+    text_ko="chargeback · OTIF · on-time in-full 과 deduct 가 함께 나오면 이 조항입니다.",
+    # `(?<!no )` 로 앞쪽 부정을 막습니다. (2026-10-02)
+    #
+    # "No chargebacks shall be permitted" 는 **좋은 문장**인데 전에는 짚었습니다.
+    # 부정이 앞에 있어 뒤를 보는 가드로는 못 걸립니다. 파이썬 정규식은 길이가
+    # 변하는 뒤돌아보기를 못 하지만 "no " 는 길이가 고정이라 됩니다.
+    detect=[r"(?<!no )charge-?backs?",
+            r"on[- ]time in[- ]full|\bOTIF\b",
+            r"(penalt|liquidated damages)[^.]{0,80}deduct[^.]{0,40}invoice",
+            r"(벌금|위약금|지체상금)[^.]{0,60}(대금|송장)[^.]{0,30}(공제|차감)" + NO_NEG_KO],
+    fix="벌금에 **상한**을 두고, **우리 책임인 지연에만** 걸리게 합니다(선사 지연·불가항력 제외). "
+        "공제가 아니라 **별도 청구**로 바꿉니다.",
+)
+
+_clause(
+    "audit_rights", "예고 없는 무제한 감사·실사", "toxic",
+    why="언제든 예고 없이 우리 공장·장부·거래처를 들여다볼 수 있게 하는 조항입니다. "
+        "원가와 다른 거래처 정보가 함께 드러납니다.",
+    risk="원가가 드러나면 다음 협상에서 그만큼 깎입니다. 다른 바이어 정보가 새면 그쪽 계약 위반입니다.",
+    text_en="""(지울 문구의 예)
+The Buyer may audit the Seller's facilities, books and records at any time
+without prior notice.""",
+    text_ko="audit 과 at any time · without prior notice 가 함께 나오면 이 조항입니다.",
+    detect=[r"audit[^.]{0,80}(at any time|without (prior )?notice)",
+            r"(right to )?(audit|inspect)[^.]{0,60}(books|records|accounts)"
+            r"[^.]{0,60}(at any time|without (prior )?notice)",
+            r"(감사|실사|현장\s*점검)[^.]{0,60}(언제든지|사전\s*통지\s*없이)" + NO_NEG_KO,
+            # 한국어는 어찌말이 앞에 옵니다 — "언제든지 ... 점검할 수 있다".
+            # 뒤 순서만 보면 절반을 놓칩니다. (2026-10-02)
+            r"(언제든지|사전\s*통지\s*없이|예고\s*없이)[^.]{0,60}"
+            r"(감사|실사|현장\s*점검|점검|열람)" + NO_NEG_KO],
+    fix="**연 1회·영업일·사전 서면통지**로 한정하고, 범위를 **이 계약 관련 자료만**으로 "
+        "좁힙니다. 제3자 비밀정보는 제외하고, 감사인에게 비밀유지를 걸게 합니다.",
+)
+
+_clause(
+    "exclusive_no_moq", "독점 공급 의무 — 최소 구매량을 함께 보세요", "toxic",
+    why="우리는 그 시장에서 다른 데 못 팔는데, 바이어는 **얼마를 사야 하는 의무가 없는** "
+        "구조입니다. 한쪽만 묶입니다.",
+    risk="바이어가 한 해 동안 거의 안 사도 우리는 다른 거래처를 못 잡습니다. 시장을 잃습니다.",
+    text_en="""(지울 문구의 예)
+The Seller shall supply the Products exclusively to the Buyer in the Territory
+and shall not sell to any other party therein.""",
+    text_ko="supply exclusively · shall not sell to any other 가 나오면 이 조항입니다. "
+            "**최소 구매량(MOQ) 조항이 함께 있는지** 꼭 보세요.",
+    detect=[r"(supply|sell)[^.]{0,40}exclusively[^.]{0,40}(to the )?buyer",
+            r"shall not (sell|supply|distribute)[^.]{0,60}(any other|third part)"
+            r"[^.]{0,40}(territory|region|country)",
+            r"(독점|배타적)[^.]{0,20}(공급|판매)[^.]{0,30}(의무|한다|하여야)" + NO_NEG_KO],
+    fix="독점을 **연간 최소 구매량과 묶고**, 미달하면 독점이 자동으로 풀리게 합니다. "
+        "이익조항 min_order(최소 주문·취소 수수료)를 함께 넣으세요.",
+)
+
+
+# ── 돈을 못 받는 자리 · 원가가 새는 자리 ────────────────────────────────────
+#
+# 앞의 조항들이 '권리를 잃는' 쪽이라면, 이쪽은 **실어 놓고 돈을 못 받거나
+# 원가가 새는** 쪽입니다. 실무에서 더 자주 터집니다. (2026-10-02)
+
+_clause(
+    "payment_fx_approval", "외환 승인·수입허가 조건부 결제", "toxic",
+    why="대금 지급을 **상대국 중앙은행 승인이나 수입허가가 나오면** 하기로 한 조항입니다. "
+        "승인은 우리가 손쓸 수 없고, 언제 날지도 모릅니다.",
+    risk="물건은 이미 도착했는데 대금은 승인을 기다립니다. 외환 통제가 걸리면 몇 달, "
+         "심하면 영영 못 받습니다. 그 사이 물건은 상대 손에 있습니다.",
+    text_en="""(지울 문구의 예)
+Payment shall be made subject to and upon receipt of approval from the Central
+Bank and the issuance of the import licence.""",
+    text_ko="subject to ... approval · upon receipt of the import licence 가 "
+            "대금 조항에 붙어 있으면 이 조항입니다.",
+    # 영문에도 부정 가드를 둡니다. (2026-10-02)
+    # "Payment shall **not** be subject to any import licence" 를 짚었습니다.
+    # 국문에는 NO_NEG_KO 가 있었는데 영문에는 없었습니다.
+    detect=[r"payment(?![^.]{0,20}\b(?:not|never)\b)[^.]{0,80}subject to[^.]{0,60}"
+            r"(central bank|foreign exchange|fx|import licen[cs]e|approval)",
+            r"(central bank|foreign exchange|import licen[cs]e)[^.]{0,60}"
+            r"(approval|permit)[^.]{0,60}(payment|remit)",
+            r"remittance[^.]{0,60}subject to[^.]{0,40}approval",
+            r"(대금|지급|송금)[^.]{0,60}(외환|중앙은행|수입\s*허가|수입\s*승인)"
+            r"[^.]{0,30}(승인|허가)[^.]{0,20}(후|조건|받은)" + NO_NEG_KO,
+            r"(외환|중앙은행)[^.]{0,20}승인[^.]{0,40}(대금|지급|송금)" + NO_NEG_KO],
+    fix="대금은 **선적서류 기준**으로 받습니다 — 취소불능 L/C 또는 선적 전 일부 선금. "
+        "승인 지연은 **바이어 위험**으로 적고, 일정 기간이 지나면 지연이자와 해지권을 둡니다.",
+    countries=("IN", "BD", "PK", "EG", "NG", "AR", "ET", "UZ", "VN", "DZ"),
+)
+
+_clause(
+    "fx_risk_local", "현지 통화 결제 + 환율 위험 전가", "toxic",
+    why="대금을 상대국 통화로 받고, 환율이 움직인 손해까지 우리가 지는 조항입니다. "
+        "통화가 크게 흔들리는 나라에서는 받는 순간 값이 줄어 있습니다.",
+    risk="송장일과 입금일 사이에 통화가 20% 빠지면 그만큼 그냥 손해입니다. "
+         "마진이 10%면 팔수록 손해입니다.",
+    text_en="""(지울 문구의 예)
+Payment shall be made in the local currency at the exchange rate prevailing on
+the invoice date, and the Seller shall bear any exchange rate fluctuation.""",
+    text_ko="local currency 와 exchange rate ... Seller shall bear 가 함께 나오면 "
+            "이 조항입니다.",
+    detect=[r"(exchange rate|currency)[^.]{0,80}"
+            r"(seller shall bear|borne by the seller|at the seller'?s risk)",
+            r"seller shall bear[^.]{0,60}(exchange|currency|devaluation)",
+            r"(환율|환차손|환\s*변동)[^.]{0,60}(매도인|공급자)[^.]{0,20}"
+            r"(부담|책임|위험)" + NO_NEG_KO,
+            r"(매도인|공급자)[^.]{0,30}(환율|환차손|환\s*변동)[^.]{0,20}부담" + NO_NEG_KO],
+    fix="**미국 달러 등 기축통화로** 받고, 환율 기준일을 **입금일이 아니라 송장일**로 "
+        "박습니다. 현지 통화로 받아야 하면 **환율 변동 구간을 넘으면 단가를 다시 정한다**를 "
+        "함께 넣습니다(이익조항 price_adjust).",
+    countries=("TR", "AR", "EG", "NG", "BR", "ID", "VN", "IN", "ZA", "RU"),
+)
+
+_clause(
+    "recall_cost", "리콜·고객 보상 비용 전가", "toxic",
+    why="리콜은 물건 값이 아니라 **회수·폐기·고객 보상·광고**에 돈이 듭니다. "
+        "그걸 상한 없이 우리가 떠안는 조항입니다.",
+    risk="10만 달러짜리 납품 건에서 리콜 비용이 수백만 달러가 됩니다. "
+         "바이어가 자발적으로 하는 리콜까지 우리가 내게 됩니다.",
+    text_en="""(살펴볼 문구의 예)
+The Seller shall bear all costs of any recall, including retrieval, destruction,
+customer compensation and public notice, whether voluntary or mandated.""",
+    text_ko="recall 과 all costs · Seller shall bear 가 함께 나오면 이 조항입니다. "
+            "**voluntary(자발적)** 가 들어 있는지 꼭 보세요.",
+    # **한정·상한이 있으면 뺍니다.** (2026-10-02)
+    #
+    # "shall bear recall costs caused **solely** by the Seller's defect, **up to**
+    # the invoice value" 는 우리가 권하는 좋은 꼴입니다. 그걸 독소로 짚으면
+    # 고친 조항을 다시 지우게 됩니다.
+    detect=[r"recall(?![^.]{0,160}" + RECALL_CAPPED + r")[^.]{0,100}"
+            r"(all costs|costs and expenses|seller shall bear|"
+            r"borne by the seller|at the seller'?s (cost|expense))",
+            r"(seller shall bear|borne by the seller)"
+            r"(?![^.]{0,160}" + RECALL_CAPPED + r")[^.]{0,80}recall",
+            r"(리콜|회수\s*조치)[^.]{0,80}(매도인|공급자)[^.]{0,20}"
+            r"(부담|비용|책임)" + NO_NEG_KO,
+            r"(매도인|공급자)[^.]{0,40}(리콜|회수)[^.]{0,30}비용[^.]{0,20}부담" + NO_NEG_KO],
+    fix="**우리 결함이 원인인 리콜로 한정**하고 금액 상한과 **보험 한도 내**를 붙입니다. "
+        "자발적 리콜은 바이어가 단독으로 결정하지 못하게, **사전 협의**를 넣습니다.",
+    countries=("JP", "US", "EU", "AU", "CA", "GB"),
+)
+
+_clause(
+    "inspection_buyer_sole", "합격 판정을 바이어가 단독으로", "toxic",
+    why="검사 합격·불합격을 바이어가 **혼자, 최종적으로** 정하는 조항입니다. "
+        "기준이 계약서에 없으면 사실상 바이어 마음입니다.",
+    risk="시장이 나빠지면 '품질 미달'로 값을 깎거나 받지 않습니다. 다툴 근거가 없습니다.",
+    text_en="""(지울 문구의 예)
+The Buyer's inspection and determination of conformity shall be final, conclusive
+and binding on the Seller.""",
+    text_ko="inspection ... shall be final · sole discretion 이 검사 조항에 "
+            "붙어 있으면 이 조항입니다.",
+    # **판정하는 쪽이 매수인인 꼴만 봅니다.** (2026-10-02)
+    #
+    # 전에는 "the determination of **SGS** at the port of loading shall be final"
+    # 도 짚었습니다. 그런데 이 조항의 fix 가 권하는 해결책이 바로 "제3 검사기관
+    # (SGS·BV)이 정하도록 하세요" 입니다. **우리가 권한 해결책을 우리가 독소라고
+    # 한 것**입니다. 그 말을 들은 사람은 고친 조항을 다시 지웁니다.
+    detect=[r"buyer'?s?\s+(inspection|determination|decision|judg(e)?ment)"
+            r"[^.]{0,80}(shall be )?(final|conclusive|binding)",
+            r"(inspection|determination|decision)\s+(?:by|of)\s+the\s+buyer"
+            r"[^.]{0,80}(shall be )?(final|conclusive|binding)",
+            r"buyer'?s (sole|absolute) discretion[^.]{0,80}"
+            r"(inspect|conformity|accept|reject|quality)",
+            r"(inspect|conformity|accept|reject|quality)[^.]{0,80}"
+            r"buyer'?s (sole|absolute) discretion",
+            r"(검사|검수|합격|불합격)[^.]{0,60}(매수인|바이어)[^.]{0,30}"
+            r"(단독|최종|임의)[^.]{0,20}(판단|결정|정한)" + NO_NEG_KO,
+            r"(매수인|바이어)[^.]{0,30}(단독|최종)[^.]{0,20}(판단|결정)"
+            r"[^.]{0,40}(검사|합격|품질)" + NO_NEG_KO],
+    fix="합격 기준을 **별지에 숫자로** 박고, 다툼이 생기면 **제3 검사기관(SGS·BV 등)**이 "
+        "정하도록 합니다. 검사는 **선적지에서** 하도록 하세요 — 도착지 검사는 반송 위험을 "
+        "우리가 집니다.",
+)
+
+_clause(
+    "spec_change_no_price", "규격을 바꿀 수 있는데 단가는 그대로", "toxic",
+    why="바이어가 규격·포장·라벨을 일방적으로 바꿀 수 있는데 **단가와 납기는 그대로**인 "
+        "조항입니다. 바뀐 만큼 원가가 오르는데 받는 돈은 같습니다.",
+    risk="포장 규격이 바뀌어 금형을 다시 파고, 남은 자재는 버립니다. 그 비용을 우리가 냅니다.",
+    text_en="""(지울 문구의 예)
+The Buyer may change the specifications, packaging or labelling at any time, and
+such change shall not affect the price or the delivery date.""",
+    text_ko="change the specifications ... shall not affect the price 가 나오면 "
+            "이 조항입니다.",
+    detect=[r"(change|modify|amend)[^.]{0,60}(specification|packaging|labell?ing|design)"
+            r"[^.]{0,120}(shall not affect|without any (change|adjustment) (in|to) the )"
+            r"[^.]{0,30}(price|cost)",
+            r"(specification|packaging|labell?ing)[^.]{0,60}"
+            r"(change|modif)[^.]{0,80}no (price|cost) (change|adjustment|increase)",
+            r"(규격|포장|라벨|디자인)[^.]{0,40}(변경|수정)[^.]{0,80}"
+            r"(단가|가격|대금)[^.]{0,30}(변경|조정|인상)[^.]{0,10}(없|않|아니)",
+            r"(매수인|바이어)[^.]{0,40}(규격|포장|라벨)[^.]{0,20}(변경|수정)"
+            r"[^.]{0,60}(단가|가격)[^.]{0,20}(동일|그대로|불변)"],
+    fix="규격을 바꾸면 **단가와 납기를 다시 정한다**를 함께 적습니다. 남은 자재·금형 "
+        "폐기 비용은 **바이어 부담**으로 박습니다. 변경은 **서면 합의**로만 하게 하세요.",
+)
+
+_clause(
+    "tooling_free", "금형·치공구를 무상으로 요구", "toxic",
+    why="금형과 치공구를 우리 돈으로 만들어 **무상으로 제공**하라는 조항입니다. "
+        "선투자를 우리가 다 하고, 물량 보장은 없습니다.",
+    risk="금형에 수천만 원을 넣었는데 주문이 몇 백 개로 끝납니다. "
+         "금형을 바이어가 가져가면 다른 공장에서 같은 물건을 만듭니다.",
+    text_en="""(살펴볼 문구의 예)
+All tooling, moulds and jigs required for the Products shall be provided by the
+Seller free of charge and shall become the property of the Buyer.""",
+    text_ko="tooling/moulds 와 free of charge · at no cost 가 함께 나오면 이 조항입니다. "
+            "**소유권이 누구에게 가는지** 함께 보세요.",
+    detect=[r"(tooling|moulds?|molds?|jigs?|dies)[^.]{0,100}"
+            r"(free of charge|at no cost|without charge|no charge to the buyer)",
+            r"(free of charge|at no cost)[^.]{0,80}(tooling|moulds?|molds?|jigs?)",
+            r"(금형|치공구|사출\s*금형|지그)[^.]{0,60}(무상|무료)[^.]{0,30}"
+            r"(제공|공급|제작)" + NO_NEG_KO,
+            r"(무상|무료)[^.]{0,30}(금형|치공구|지그)[^.]{0,30}(제공|공급|제작)" + NO_NEG_KO],
+    fix="금형비는 **별도로 청구**하거나, 무상으로 하려면 **최소 물량을 보장**받고 "
+        "미달 시 금형비를 청구할 수 있게 합니다. **소유권은 우리에게** 두세요 "
+        "(이익조항 ip · 독소조항 ip_assignment 를 함께 보세요).",
+    countries=("CN", "VN", "IN", "ID"),
+)
 
 def by_key(key: str) -> dict | None:
     return next((row for row in CLAUSES if row["key"] == key), None)
@@ -520,6 +1051,7 @@ compensation whatsoever.""",
     applies=("always",),
     fix="보상이 발생한다는 전제로 **금액과 산정 방법을 미리 합의**하거나, 대리인이 아닌 "
         "매매(판매점) 구조로 갈 수 있는지 변호사와 검토하세요.",
+    countries=("EU",),
 )
 
 _clause(
@@ -560,6 +1092,7 @@ of [domestic institution], whose award shall be final.""",
     applies=("always",),
     fix="홍콩(HKIAC)·싱가포르(SIAC)·대한상사중재원(KCAB) 같은 **제3지 중재**를 제안해 보세요. "
         "중재지·기관·언어·중재인 수를 한 조항에 모두 적습니다.",
+    countries=("CN",),
 )
 
 
@@ -615,14 +1148,29 @@ New York, and waive any objection to venue therein.""",
             "('trial by jury'·'punitive damages' 라는 낱말 자체는 찾지 않습니다 — "
             "포기·면책 문장에도 똑같이 나와 편을 가릴 수 없습니다. 미국 관할이 "
             "보이면 이 위험을 함께 알립니다)",
+    # **제목이 약속한 배심재판·징벌적 손해배상을 실제로 봅니다.** (2026-10-02)
+    #
+    # 전에는 규칙 다섯 개에 jury · punitive · 배심 · 징벌적 이 하나도 없어,
+    # 미국 법원을 적지 않고 배심재판만 넣은 계약서는 통과했습니다.
+    #
+    # **포기(waive)는 빼야 합니다.** "배심재판을 포기한다"는 우리에게
+    # 유리한 문장입니다. 그것까지 독소로 짚으면 지우라고 하게 됩니다.
     detect=[r"(courts?|jurisdiction) of .{0,40}(New York|California|Texas|Delaware|the United States)",
             r"(submit|consent).{0,40}jurisdiction.{0,40}(United States|U\.S\.|New York)",
             r"exclusive jurisdiction.{0,40}(United States|U\.S\.|New York|California)",
             r"미국\s*법원[^.]{0,20}(관할|전속)(?![^.]{0,40}(없|못하|아니하|아니한))",
-            r"(뉴욕|캘리포니아|델라웨어)\s*(주)?\s*법원[^.]{0,20}관할"],
+            r"(뉴욕|캘리포니아|델라웨어)\s*(주)?\s*법원[^.]{0,20}관할",
+            # 배심재판 — 포기·배제는 뺍니다.
+            r"(?:consent|agree|submit)[^.]{0,40}trial by jury",
+            r"right[^.]{0,20}to[^.]{0,10}(?:a )?jury trial(?![^.]{0,40}waiv)",
+            r"배심\s*재판" + NO_WAIVE_KO,
+            # 징벌적 손해배상 — 배제 문구는 뺍니다.
+            r"punitive damages(?![^.]{0,60}(?:waiv|exclud|disclaim|shall not|no ))",
+            r"징벌적\s*손해\s*배상" + NO_WAIVE_KO],
     applies=("always",),
     fix="중재(뉴욕협약)로 바꾸는 것이 가장 낫습니다. 미국 법원을 피할 수 없다면 "
         "**배심재판 포기**와 **징벌적·간접손해 배제**를 반드시 넣으세요.",
+    countries=("US",),
 )
 
 
