@@ -1659,6 +1659,180 @@ country, including annual renewals, shall be borne by the Seller.""",
     avoid=NEGATION,
 )
 
+
+# ── 나라가 비어 있던 곳 ─────────────────────────────────────────────────────
+#
+# 수출 상위 상대국 32개 중 8개(HK·TW·SG·MX·MY·PH·TH·CL)에 조항이 하나도
+# 없었습니다. 그 빈 곳을 메웁니다. (2026-10-02)
+
+_clause(
+    "ddp_no_ior", "DDP 인데 현지 수입자가 될 수 없음", "toxic",
+    why="DDP 는 **매도인이 수입통관까지** 하는 조건입니다. 그런데 여러 나라에서 "
+        "현지에 법인이 없는 외국 매도인은 **수입자(importer of record)로 등록할 수 "
+        "없습니다.** 그러면 우리는 약속한 일을 할 수가 없습니다.",
+    risk="통관이 막혀 물건이 보세창고에 쌓이고, 보관료는 날마다 늘어납니다. "
+         "우리가 못 하는 일을 약속했으니 **우리가 계약 위반**이 됩니다. "
+         "현지 부가세 환급도 받을 수 없습니다.",
+    text_en="""(바꿀 문구의 예)
+Delivery shall be DDP the Buyer's warehouse, Incoterms 2020, with the Seller
+responsible for import clearance, duties and local taxes.""",
+    text_ko="DDP 와 import clearance/duties 가 매도인 책임으로 적혀 있으면 이 조항입니다. "
+            "**도착국에서 우리가 수입자가 될 수 있는지** 먼저 확인하세요.",
+    detect=[r"\bDDP\b[^.]{0,120}(?:import (?:clearance|customs|duties|formalities)"
+            r"|importer of record)",
+            r"(?:import (?:clearance|customs|duties)|importer of record)"
+            r"[^.]{0,120}\bDDP\b",
+            r"seller[^.]{0,60}(?:responsible for|shall (?:effect|arrange|bear))"
+            r"[^.]{0,60}import (?:clearance|customs|duties|formalities)",
+            r"\bDDP\b[^.]{0,80}(?:매도인|공급자)[^.]{0,40}(?:수입\s*통관|관세|수입세)",
+            # 한국어는 목적어가 **앞**에 오기도 합니다 — "수입통관과 관세는 매도인이
+            # 부담한다". 낱말 순서로 놓친 것이 **다섯 번째**입니다.
+r"\bDDP\b[^.]{0,80}(?:수입\s*통관|관세|수입세)[^.]{0,40}(?:매도인|공급자)",
+            r"(?:매도인|공급자)[^.]{0,50}(?:수입\s*통관|수입\s*신고)[^.]{0,30}"
+            r"(?:책임|부담|이행)" + NO_NEG_KO],
+    fix="**DAP 또는 CIP 로 바꿉니다** — 수입통관은 현지 수입자가 합니다. "
+        "꼭 DDP 로 해야 하면, 바이어를 **수입자로 세우고(DDP, VAT unpaid)** 관세만 "
+        "우리가 부담하는 식으로 나눕니다. 도착국에서 비거주자가 수입자가 될 수 "
+        "있는지 **계약 전에** 현지 관세사에게 확인하세요.",
+    countries=("BR", "MX", "RU", "CN", "IN", "AR", "ID", "TR", "VN", "TH", "PH", "CL"),
+    avoid=NEGATION,
+)
+
+_clause(
+    "reexport_control", "재수출·최종용도를 통제하지 않음", "toxic",
+    why="중계무역 거점으로 보낸 물건이 **제재 대상국으로 다시 나가면**, 수출신고를 한 "
+        "우리가 책임지는 쪽이 됩니다. 그런데 계약서에 재수출 제한과 최종용도 확인이 "
+        "없으면 막을 근거가 없습니다.",
+    risk="우리 이름으로 전략물자 수출 위반이 잡힙니다. 수출입 자격이 정지되면 "
+         "그 거래 하나가 아니라 **회사 전체의 수출이 멈춥니다.**",
+    text_en="""(넣어야 할 문구의 예 — 없으면 이 조항입니다)
+The Buyer shall not re-export the Goods to any sanctioned destination, shall
+disclose the end user and end use on request, and shall pass these obligations
+to any subsequent purchaser.""",
+    text_ko="중계무역 거점(홍콩·싱가포르·두바이 등)으로 보내는데 **재수출 제한·최종용도 "
+            "확인**이 없으면 이 조항입니다. 계약서에서 re-export 와 end use 를 찾아보세요.",
+    detect=[r"(?:buyer|purchaser)[^.]{0,80}(?:free to|may)[^.]{0,40}re[- ]?(?:export|sell)"
+            r"[^.]{0,60}(?:any|without)",
+            r"no restriction[^.]{0,60}(?:re[- ]?export|destination|end use)",
+            r"(?:매수인|바이어)[^.]{0,50}(?:재수출|전매)[^.]{0,40}"
+            r"(?:제한\s*없|자유)" + NO_NEG_KO,
+            r"(?:최종\s*용도|최종\s*수요자)[^.]{0,40}(?:확인|고지)[^.]{0,20}"
+            r"(?:하지\s*아니|없|면제)"],
+    fix="**재수출 금지 대상국**을 적고, **최종용도·최종수요자 확인서(End User "
+        "Certificate)** 를 받도록 넣습니다. 바이어가 다시 파는 상대에게도 같은 의무가 "
+        "넘어가게(pass-through) 적습니다. 전략물자관리원 사전판정도 함께 받아 두세요.",
+    countries=("HK", "SG", "TW", "AE", "MY", "TR", "KZ", "GE", "AM"),
+)
+
+_clause(
+    "eu_epr_cost", "확대생산자책임(EPR) 등록·분담금 전가 (EU)", "toxic",
+    why="EU 는 포장재·전기전자·배터리를 내놓는 사업자에게 **회원국마다** 등록과 "
+        "분담금을 물립니다. 그걸 공급자인 우리에게 떠넘기는 조항입니다. "
+        "비EU 사업자는 보통 직접 등록이 어려워 현지 대리인까지 세워야 합니다.",
+    risk="나라가 늘수록 비용이 곱절로 늡니다. 등록이 안 된 채로 팔리면 **판매 금지와 "
+         "과태료**가 나오는데, 정작 우리는 현지에서 등록할 자격이 없습니다.",
+    text_en="""(지울 문구의 예)
+All extended producer responsibility registrations, fees and reporting
+obligations in each Member State shall be undertaken and paid by the Seller.""",
+    text_ko="extended producer responsibility · EPR · packaging waste 와 "
+            "Seller 부담이 함께 나오면 이 조항입니다.",
+    detect=[r"extended producer responsibility[^.]{0,100}"
+            r"(?:seller|supplier|borne by|at the expense)",
+            r"\bEPR\b[^.]{0,80}(?:registration|fee|levy)[^.]{0,80}"
+            r"(?:seller|supplier|borne by)",
+            r"(?:packaging waste|WEEE|batter(?:y|ies))[^.]{0,60}(?:registration|lev(?:y|ies)|fees?|charges?)"
+            r"[^.]{0,80}(?:seller|supplier|borne by)",
+            r"(?:확대\s*생산자\s*책임|생산자\s*책임\s*재활용|EPR)[^.]{0,60}"
+            r"(?:분담금|비용|등록)[^.]{0,40}(?:매도인|공급자)" + NO_NEG_KO],
+    fix="EPR 은 **시장에 내놓는 사업자(바이어)** 의 의무입니다. 바이어가 등록하고 "
+        "분담금을 내도록 바꿉니다. 우리가 부담해야 하면 **나라와 금액 상한**을 적고, "
+        "단가에 미리 반영하세요.",
+    countries=("EU",),
+    avoid=NEGATION,
+)
+
+_clause(
+    "tariff_absorption", "관세 인상분을 공급자가 흡수", "toxic",
+    why="수입 관세가 오르면 그 차액을 우리가 떠안는 조항입니다. 관세는 **나라가 "
+        "정하는 것**이고 우리가 어찌할 수 없습니다.",
+    risk="무역분쟁으로 관세가 하루아침에 25% 붙으면 마진이 통째로 날아갑니다. "
+         "이미 받은 주문도 소급해 물어 주게 되는 경우가 있습니다.",
+    text_en="""(지울 문구의 예)
+Any increase in customs duties, tariffs or import charges shall be absorbed by
+the Seller, and the agreed price shall remain unchanged.""",
+    text_ko="increase in customs duties/tariffs 와 absorbed by the Seller 가 함께 "
+            "나오면 이 조항입니다.",
+    detect=[r"(?:increase|rise|change)[^.]{0,50}(?:customs dut|tariff|import charge)"
+            r"[^.]{0,100}(?:absorbed by|borne by|at the cost of)[^.]{0,30}"
+            r"(?:seller|supplier)",
+            r"(?:seller|supplier)[^.]{0,60}(?:absorb|bear)[^.]{0,60}"
+            r"(?:any )?(?:increase|additional)[^.]{0,40}(?:dut|tariff)",
+            r"(?:관세|수입세)[^.]{0,30}(?:인상|증가|추가)[^.]{0,60}"
+            r"(?:매도인|공급자)[^.]{0,25}(?:부담|흡수)" + NO_NEG_KO,
+            # 한국어는 수식어가 **앞**에 옵니다 — "**추가 관세**는 공급자가
+            # 부담한다". 낱말 순서로 놓친 것이 **여섯 번째**입니다.
+            r"(?:추가|인상|증가)\s*(?:관세|수입세)[^.]{0,40}(?:매도인|공급자)"
+            r"[^.]{0,25}(?:부담|흡수)" + NO_NEG_KO,
+            r"(?:매도인|공급자)[^.]{0,40}(?:관세\s*인상분|추가\s*관세)[^.]{0,25}부담"
+            + NO_NEG_KO],
+    fix="관세는 **인코텀즈가 정한 쪽**이 냅니다(FOB·CIF 면 바이어). 조항을 빼거나, "
+        "**관세가 일정 폭 이상 오르면 단가를 다시 정한다**로 바꿉니다. "
+        "이미 받은 주문에는 소급하지 않는다는 말도 함께 넣으세요.",
+    countries=("US", "CN", "EU", "IN", "BR", "MX", "TR"),
+    avoid=NEGATION,
+)
+
+_clause(
+    "psi_cost_delay", "선적 전 검사(PSI) 비용·지연 책임 전가", "toxic",
+    why="수입국이 요구하는 **선적 전 검사**의 비용과, 검사기관 일정 때문에 생긴 "
+        "지연까지 우리가 지는 조항입니다. 검사기관은 바이어나 그 나라가 고릅니다.",
+    risk="검사 예약이 2주 밀려 선적이 늦으면 **우리가 납기 지연 벌금**을 뭅니다. "
+         "검사비도 건당 수백 달러씩 듭니다.",
+    text_en="""(지울 문구의 예)
+Pre-shipment inspection by the agency appointed by the importing country shall
+be arranged and paid for by the Seller, who shall also bear any resulting delay.""",
+    text_ko="pre-shipment inspection · PSI 와 Seller 부담·지연 책임이 함께 나오면 "
+            "이 조항입니다.",
+    detect=[r"pre[- ]?shipment inspection[^.]{0,100}"
+            r"(?:paid for by|at the cost of|borne by|arranged by)[^.]{0,30}"
+            r"(?:seller|supplier)",
+            r"\bPSI\b[^.]{0,80}(?:seller|supplier)[^.]{0,40}(?:cost|expense|bear)",
+            r"(?:선적\s*전\s*검사|선적전검사)[^.]{0,60}(?:매도인|공급자)"
+            r"[^.]{0,30}(?:부담|비용)" + NO_NEG_KO,
+            r"(?:검사\s*지연|검사\s*일정)[^.]{0,50}(?:매도인|공급자)"
+            r"[^.]{0,25}(?:책임|부담)" + NO_NEG_KO],
+    fix="검사비는 **바이어 부담**으로 바꾸거나 단가에 반영합니다. 무엇보다 "
+        "**검사기관 일정으로 생긴 지연은 납기에서 뺀다**를 꼭 넣으세요 — "
+        "우리가 어찌할 수 없는 일로 벌금을 물면 안 됩니다.",
+    countries=("NG", "EG", "DZ", "BD", "KE", "ID", "PH", "CD", "UZ", "IR"),
+    avoid=NEGATION,
+)
+
+_clause(
+    "full_inspection", "전수검사 의무와 비용 전가", "toxic",
+    why="표본검사가 아니라 **하나하나 다 보는** 전수검사를 요구하고 그 비용을 우리가 "
+        "지는 조항입니다. 수량이 많으면 검사 인건비가 제품 원가를 넘습니다.",
+    risk="10만 개를 전수검사하면 그 비용만으로 거래 이익이 사라집니다. "
+         "불합격이 나오면 재검사까지 또 우리 몫입니다.",
+    text_en="""(살펴볼 문구의 예)
+The Seller shall carry out 100% inspection of every unit prior to shipment at
+its own cost, and shall re-inspect at its own cost if any defect is found.""",
+    text_ko="100% inspection · every unit · 전수검사 와 Seller 부담이 함께 나오면 "
+            "이 조항입니다. **표본검사(AQL)** 로 바꿀 수 있는지 보세요.",
+    detect=[r"100\s*%\s*inspection",
+            r"inspect(?:ion)?[^.]{0,40}(?:of )?(?:each|every) (?:unit|piece|item)",
+            # **누가 내는지 봐야 합니다.** "전수검사 비용은 매수인이 부담한다" 는
+            # 우리에게 유리합니다. (2026-10-02)
+r"(?:전수|전량)\s*검사[^.]{0,40}(?:매도인|공급자)[^.]{0,25}(?:부담|비용|실시)",
+            r"(?:매도인|공급자)[^.]{0,40}(?:전수|전량)\s*검사",
+            r"(?:매도인|공급자)[^.]{0,50}(?:전수|전량)[^.]{0,20}검사[^.]{0,30}"
+            r"(?:비용|부담)" + NO_NEG_KO],
+    fix="**표본검사(AQL 기준)** 로 바꾸고, 전수검사가 필요하면 **비용을 바이어가** "
+        "내거나 단가에 반영하도록 합니다. 재검사 횟수에도 상한을 두세요.",
+    countries=("JP", "TW", "DE"),
+    avoid=NEGATION,
+)
+
 def by_key(key: str) -> dict | None:
     return next((row for row in CLAUSES if row["key"] == key), None)
 
