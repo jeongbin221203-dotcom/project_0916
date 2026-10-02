@@ -57,6 +57,28 @@ MINIMUM_PURCHASE = (r"minimum\s+(?:annual\s+)?(?:purchase|quantity|order|volume)
                     r"\bMOQ\b", r"purchases? a minimum of",
                     r"최소\s*(?:구매|주문|발주)\s*(?:량|수량|물량)")
 
+# **상계를 하지 못한다**는 꼴. buyer_set_off 는 예문("whether liquidated or not")에
+# 부정말이 들어 있어 통짜 부정 가드를 못 씁니다. 그래서 상계 자체를 부정하는
+# 말만 봅니다. "The Buyer shall not set off any claim" 은 우리에게 유리합니다.
+SET_OFF_DENIED = (r"\b(?:shall|may|must|will|can)\s+not\s+(?:\w+\s+){0,2}?"
+                  r"(?:set[- ]?off|deduct|withhold)",
+                  r"\bcannot\s+(?:set[- ]?off|deduct|withhold)",
+                  r"\bno\s+set[- ]?off\b")
+
+# **자동 연장되지 않는다**는 꼴. evergreen 도 예문("해지 통보가 없으면")에 부정말이
+# 있어 통짜 가드를 못 씁니다. "shall not be automatically renewed" 는 유리합니다.
+RENEWAL_DENIED = (r"\b(?:shall|will|may)\s+not\s+(?:be\s+)?(?:automatically\s+)?"
+                  r"(?:renew|extend|roll)",
+                  r"\bno\s+automatic\s+(?:renewal|extension)")
+
+# 문장 안의 **한국 법원·중재기관**. 이것이 있으면 상대국 법원이 아닙니다.
+# 뒤에 오는 지명만 보던 탓에 "서울중앙지방법원**을** 전속관할로 한다" 를
+# 상대국 법원으로 짚었습니다. 낱말 순서로 놓친 것이 일곱 번째입니다.
+KOREAN_FORUM = (r"(?:서울|부산|인천|대구|광주|대전|수원|울산|창원|대한민국|한국)"
+                r"[^.]{0,12}(?:지방|중앙|고등)?\s*법원",
+                r"대한상사중재원", r"\bKCAB\b",
+                r"courts?\s+of\s+(?:the\s+Republic\s+of\s+)?(?:Korea|Seoul|Busan)")
+
 # 부정말. 찾은 자리가 든 문장에 이 말이 있으면 그 자리는 세지 않습니다.
 # 당사자가 **뒤바뀐** 꼴. 이런 문장은 우리에게 유리하므로 독소가 아닙니다.
 #
@@ -528,7 +550,7 @@ dispute arising out of this Contract.""",
             rf"전속\s*적?[^.]{{0,4}}관할(?![^.]{{0,40}}{KOREA})",
             r"관할\s*법원[^.]{0,30}(매수인|바이어)"],
     fix="**중재(KCAB, 서울)** 로 바꾸거나, 최소한 **제3국 중재**로 바꿔 달라고 하세요.",
-    avoid=NEGATION,
+    avoid=NEGATION + KOREAN_FORUM,
 )
 
 _clause(
@@ -630,6 +652,7 @@ unless either party gives written notice at least 180 days before expiry.""",
             r"(?:해지|종료)\s*(?:통보|통지)[^.]{0,25}없는\s*한",
             r"automatically renew", r"successive .{0,30}periods", r"자동\s*(연장|갱신)(?![^.]{0,25}(?:되지\s*아니|되지\s*않|하지\s*아니))"],
     fix="예고기간을 **30~60일**로 줄이거나, 자동 연장을 빼고 **합의 연장**으로 바꾸세요.",
+    avoid=RENEWAL_DENIED,
 )
 
 _clause(
@@ -2070,7 +2093,7 @@ against the Seller, whether liquidated or not.""",
     applies=("always",),
     fix="상계를 **양 당사자가 서면으로 인정했거나 확정판결·중재판정이 있는 금액**으로 "
         "한정하는 문장으로 바꿔 달라고 하세요.",
-    avoid=SELLER_SETS_OFF,
+    avoid=SELLER_SETS_OFF + SET_OFF_DENIED,
 )
 
 
