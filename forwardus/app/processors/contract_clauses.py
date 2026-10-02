@@ -44,6 +44,19 @@ CLAUSES: list[dict] = []
 # 짚으면 사용자가 멀쩡한 조항을 지웁니다. 오탐이 미탐보다 나쁩니다.
 NO_NEG_KO = r"(?![^.]{0,40}(없|못하|아니하|아니한|금지))"
 
+# 뜻풀이 문장. 의무를 정한 것이 아니라 **낱말의 뜻**을 적은 것입니다.
+#
+#   "Chargeback" means any deduction asserted by a customer of the Buyer.
+# 이걸 독소조항으로 짚으면, 정의 조항을 지우라고 하게 됩니다. 독소조항 전부에
+# 겁니다 — 뜻풀이가 의무인 경우는 없습니다. (2026-10-02)
+DEFINITION = (r"\bmeans\b", r"\bshall mean\b", r"\bis defined as\b",
+              r"(이|가)?\s*라\s*함은", r"(을|를)\s*말한다", r"(으)?로\s*정의한다")
+
+# 최소 구매량. 독점 공급이라도 이것이 함께 있으면 한쪽만 묶이지 않습니다.
+MINIMUM_PURCHASE = (r"minimum\s+(?:annual\s+)?(?:purchase|quantity|order|volume)",
+                    r"\bMOQ\b", r"purchases? a minimum of",
+                    r"최소\s*(?:구매|주문|발주)\s*(?:량|수량|물량)")
+
 # 부정말. 찾은 자리가 든 문장에 이 말이 있으면 그 자리는 세지 않습니다.
 # 당사자가 **뒤바뀐** 꼴. 이런 문장은 우리에게 유리하므로 독소가 아닙니다.
 #
@@ -202,7 +215,10 @@ acceptable to the Seller, at least <30> days before the shipment date, and it
 shall remain valid for at least <21> days after the latest shipment date.
 The Buyer shall bear all banking charges outside the Seller's country.""",
     text_ko="**언제 개설하는지**와 **은행 수수료를 누가 내는지**까지 적어야 다툼이 없습니다.",
-    detect=[r"\bpayment\b", r"letter of credit", r"\bL/?C\b", r"\bT/?T\b", r"결제\s*조건"],
+    detect=[r"대금\s*지급",
+            r"결제\s*조건",
+            r"전신환",
+            r"\bpayment\b", r"letter of credit", r"\bL/?C\b", r"\bT/?T\b", r"결제\s*조건"],
 )
 
 _clause(
@@ -215,7 +231,10 @@ Transhipment: <ALLOWED / NOT ALLOWED>.
 The date of the bill of lading (or air waybill) shall be conclusive evidence
 of the date of shipment.""",
     text_ko="**선적 기일 · 분할선적 · 환적** 세 가지를 L/C와 **같은 말로** 적습니다.",
-    detect=[r"\bshipment\b", r"partial shipment", r"trans?[hs]ipment", r"선적\s*조건"],
+    detect=[r"분할\s*선적",
+            r"환적",
+            r"선적\s*기일",
+            r"\bshipment\b", r"partial shipment", r"trans?[hs]ipment", r"선적\s*조건"],
 )
 
 _clause(
@@ -229,7 +248,12 @@ and quantity. Any claim shall be notified in writing within <15> days after
 arrival of the Goods at the destination, failing which the Goods shall be
 deemed accepted.""",
     text_ko="**선적지 검사를 최종으로** 하고, **도착 후 며칠 안에 통보하지 않으면 인수한 것으로 본다**를 넣습니다.",
-    detect=[r"\binspection\b", r"certificate of inspection", r"검사\s*(기관|조건|증명)"],
+    detect=[r"(?:quality|quantity)[^.]{0,60}(?:shall be )?inspect",
+            r"inspect(?:ed|ion)[^.]{0,60}(?:quality|quantity|before shipment|at the port)",
+            r"품질\s*검사",
+            r"검수",
+            r"검사[^.]{0,30}(?:실시|한다|받는다)",
+            r"\binspection\b", r"certificate of inspection", r"검사\s*(기관|조건|증명)"],
 )
 
 _clause(
@@ -242,7 +266,11 @@ Seller shall insure the Goods for 110% of the invoice value in the currency of
 this Contract, on <ICC(A) for CIP | ICC(C) for CIF> terms, with claims payable
 at the destination.""",
     text_ko="**110% · 계약 통화 · 담보 범위**를 적습니다. CIF는 ICC(C), CIP는 **ICC(A)** 가 기본입니다.",
-    detect=[r"\binsurance\b", r"\bICC\s*\(", r"보험\s*(조건|금액|부보)"],
+    detect=[r"marine cargo insurance",
+            r"적하\s*보험",
+            r"해상\s*보험",
+            r"부보",
+            r"\binsurance\b", r"\bICC\s*\(", r"보험\s*(조건|금액|부보)"],
     applies=("CIF", "CIP"),
 )
 
@@ -258,7 +286,9 @@ beyond its reasonable control. The affected party shall notify the other
 within <10> days. If such event continues for more than <60> days, either
 party may terminate this Contract without liability.""",
     text_ko="**사유 목록 · 통보 기한 · 장기화 시 해지**를 함께 적습니다. 수출규제를 목록에 꼭 넣으세요.",
-    detect=[r"force majeure", r"acts? of god", r"불가항력"],
+    detect=[r"beyond[^.]{0,30}(?:reasonable\s+)?control",
+            r"통제[^.]{0,20}(?:할 수 없|밖|범위)",
+            r"force majeure", r"acts? of god", r"불가항력"],
 )
 
 _clause(
@@ -270,7 +300,10 @@ This Contract shall be governed by and construed in accordance with the laws
 of the Republic of Korea. The United Nations Convention on Contracts for the
 International Sale of Goods (CISG) <shall apply | shall not apply>.""",
     text_ko="**한국법**을 우선 제안합니다. CISG 적용 여부도 **명시**해야 합니다(안 적으면 기본 적용).",
-    detect=[r"governing law", r"\bCISG\b", r"준거법"],
+    detect=[r"governed by[^.]{0,60}law",
+            r"construed[^.]{0,40}(?:under|in accordance with)[^.]{0,40}law",
+            r"(?:대한민국|한국)\s*법[^.]{0,30}(?:에 의|따른|따라|적용)",
+            r"governing law", r"\bCISG\b", r"준거법"],
 )
 
 _clause(
@@ -297,7 +330,9 @@ payment in full. Risk shall pass in accordance with the agreed Incoterms(R)
 2020 term. The Buyer shall store the Goods separately and identifiably until
 title passes.""",
     text_ko="**소유권은 대금 완납 시, 위험은 인코텀즈대로** — 둘을 갈라 적는 것이 핵심입니다.",
-    detect=[r"retention of title", r"title .{0,30}shall pass",
+    detect=[r"ownership[^.]{0,80}(?:remain|pass|retain)",
+            r"소유권[^.]{0,60}(?:유보|이전|귀속|남는)",
+            r"retention of title", r"title .{0,30}shall pass",
             r"reservation of ownership", r"소유권\s*유보"],
 )
 
@@ -312,7 +347,9 @@ Any amount not paid when due shall bear interest at <0.05>% per day from the
 due date until actual payment, without prejudice to any other remedy of the
 Seller. The Seller may suspend further shipments while any amount is overdue.""",
     text_ko="**일할 이자 + 연체 중 선적 중단권**을 함께 넣어야 실제로 압박이 됩니다.",
-    detect=[r"late payment", r"interest at", r"overdue", r"지연\s*이자", r"연체\s*이자"],
+    detect=[r"이자[^.]{0,30}(?:부담|가산|지급|붙)",
+            r"연\s*\d{1,2}(?:\.\d+)?\s*%[^.]{0,30}이자",
+            r"late payment", r"interest at", r"overdue", r"지연\s*이자", r"연체\s*이자"],
 )
 
 _clause(
@@ -326,7 +363,11 @@ principal raw material moves by more than <5>%, either party may request a
 price review. Failing agreement within <14> days, either party may cancel the
 affected order without liability.""",
     text_ko="**기준(환율·원자재) · 변동 폭 · 협의 기한 · 안 되면 취소**까지 적어야 작동합니다.",
-    detect=[r"price adjustment", r"price review", r"exchange rate .{0,40}(move|fluctuat)",
+    detect=[r"price[^.]{0,60}(?:may be |subject to |shall be )?adjust",
+            r"adjust[^.]{0,60}price",
+            r"(?:단가|가격)[^.]{0,50}(?:조정|재협의|재산정|변경)",
+            r"원자재[^.]{0,50}(?:변동|상승|등락)",
+            r"price adjustment", r"price review", r"exchange rate .{0,40}(move|fluctuat)",
             r"가격\s*조정"],
 )
 
@@ -340,8 +381,29 @@ shall not exceed the invoice value of the Goods giving rise to the claim. In
 no event shall the Seller be liable for indirect, incidental, special or
 consequential loss, or loss of profit, revenue or business.""",
     text_ko="**총액 상한(송장 금액) + 간접손해 배제** 두 문장이 한 쌍입니다.",
-    detect=[r"limitation of liability", r"aggregate liability", r"consequential",
-            r"책임\s*한도", r"손해배상\s*한도"],
+    # **흔한 문구 다섯을 놓치고 있었습니다.** (2026-10-02 공격해 보다 찾음)
+    #
+    # 이익조항의 미탐은 **이미 넣은 사람에게 "넣으세요"** 라고 하는 것입니다.
+    # 그 말을 들은 사람은 다음부터 이 화면을 믿지 않습니다.
+    #
+    # `consequential` 을 홀로 보던 것도 고쳤습니다. "liable for all direct,
+    # indirect and consequential damages **without limitation**" 은 무제한
+    # 배상 조항인데 "책임 한도가 있다"로 읽혔습니다. 정반대입니다.
+    detect=[r"limitation of liability",
+            r"(?:aggregate|total|maximum|overall)\s+liability",
+            r"liability[^.]{0,60}(?:shall )?not exceed",
+            r"(?:in no event|under no circumstances)[^.]{0,80}"
+            r"liability[^.]{0,40}exceed",
+            r"liability[^.]{0,40}(?:is|shall be)?\s*limited to",
+            # 간접·결과적 손해를 **빼는** 문맥일 때만 봅니다.
+            r"(?:not be liable|no liability|exclude[sd]?|disclaim)"
+            r"[^.]{0,80}(?:indirect|consequential)",
+            r"(?:indirect|consequential)[^.]{0,60}"
+            r"(?:excluded|disclaimed|shall not (?:be )?(?:apply|recoverable))",
+            r"책임\s*(?:의)?\s*한도" + NO_NEG_KO,
+            r"손해배상\s*(?:의)?\s*한도" + NO_NEG_KO,
+            r"(?:배상|책임)[^.]{0,40}(?:초과하지|넘지)\s*(?:아니|않)",
+            r"(?:배상|책임)[^.]{0,30}(?:으로|로)\s*한정" + NO_NEG_KO],
 )
 
 _clause(
@@ -354,7 +416,9 @@ approvals required under the laws of the Republic of Korea. If any such
 licence is refused or withdrawn, the Seller may cancel the affected order
 without liability, and the Buyer shall not claim any damages.""",
     text_ko="**허가를 못 받으면 면책**임을 적습니다. 전략물자·이중용도 품목이면 반드시 넣으세요.",
-    detect=[r"export licen[cs]e", r"export control", r"수출\s*허가"],
+    detect=[r"export (?:approval|permit|authoris|authoriz)",
+            r"수출\s*(?:승인|허가|신고)",
+            r"export licen[cs]e", r"export control", r"수출\s*허가"],
 )
 
 _clause(
@@ -366,7 +430,9 @@ All tooling, moulds, drawings and technical know-how developed or used by the
 Seller shall remain the sole property of the Seller, notwithstanding any
 contribution by the Buyer to their cost, unless otherwise agreed in writing.""",
     text_ko="**비용을 바이어가 냈더라도 우리 것**이라고 적어 두는 것이 핵심입니다.",
-    detect=[r"\btooling\b", r"\bmou?lds?\b", r"intellectual property", r"금형", r"도면"],
+    detect=[r"(?:drawings?|technical data|designs?)[^.]{0,80}(?:propert|belong|remain)[^.]{0,40}seller",
+            r"(?:금형|치공구|도면|지그)[^.]{0,50}(?:소유권|귀속)[^.]{0,30}(?:매도인|공급자)",
+            r"\btooling\b", r"\bmou?lds?\b", r"intellectual property", r"금형", r"도면"],
 )
 
 _clause(
@@ -379,7 +445,10 @@ confirmed by the Seller may not be cancelled or reduced after the Seller has
 commenced production; in such case the Buyer shall pay <30>% of the order
 value as a cancellation charge.""",
     text_ko="독점을 주면 **최소 물량**을 반드시 붙이세요. 취소 수수료는 생산 착수 시점 기준으로 적습니다.",
-    detect=[r"minimum (order|purchase)", r"\bMOQ\b", r"cancellation charge", r"최소\s*주문"],
+    detect=[r"cancellation (?:fee|charge|cost)",
+            r"취소\s*수수료",
+            r"최소\s*(?:주문|구매|발주)\s*(?:수량|물량|량)",
+            r"minimum (order|purchase)", r"\bMOQ\b", r"cancellation charge", r"최소\s*주문"],
 )
 
 # ── 독소조항 ────────────────────────────────────────────────────────────────
@@ -825,6 +894,7 @@ and shall not sell to any other party therein.""",
             r"(독점|배타적)[^.]{0,20}(공급|판매)[^.]{0,30}(의무|한다|하여야)" + NO_NEG_KO],
     fix="독점을 **연간 최소 구매량과 묶고**, 미달하면 독점이 자동으로 풀리게 합니다. "
         "이익조항 min_order(최소 주문·취소 수수료)를 함께 넣으세요.",
+    avoid=MINIMUM_PURCHASE,
 )
 
 
@@ -1037,7 +1107,9 @@ this Contract, and shall not disclose it to any third party without prior writte
 consent. This obligation shall survive for three (3) years after termination.""",
     text_ko="**양쪽 모두**에게 걸리게 하고(한쪽만이면 이익조항이 아니라 독소입니다), "
             "**목적 제한**(이 계약 이행에만 쓴다)과 **존속기간**을 적습니다.",
-    detect=[r"confidentiality\b", r"confidential information",
+    detect=[r"누설[^.]{0,20}(?:아니|않|못)",
+            r"기밀",
+            r"confidentiality\b", r"confidential information",
             r"keep confidential", r"non[- ]disclosure",
             # 조사가 끼어듭니다 — "비밀**을** 유지한다". \s 만으로는 안 걸립니다.
             r"비밀[^.]{0,6}유지", r"기밀[^.]{0,6}유지",
@@ -1107,7 +1179,9 @@ further shipments and production without liability, until all overdue amounts
 have been received.""",
     text_ko="**연체 일수**를 박고(예: 15일), 그동안의 **지연에 책임을 지지 않는다**는 "
             "말을 함께 넣습니다. 그래야 납기 지연 벌금을 안 뭅니다.",
-    detect=[r"suspend[^.]{0,80}(shipment|delivery|production)",
+    detect=[r"withhold[^.]{0,80}deliver",
+            r"(?:출하|선적|납품|공급)[^.]{0,30}(?:보류|중단|정지)",
+            r"suspend[^.]{0,80}(shipment|delivery|production)",
             r"(withhold|stop)[^.]{0,40}(further )?(shipment|delivery)"
             r"[^.]{0,60}(overdue|unpaid|payment)",
             r"(대금|지급)[^.]{0,30}(연체|지연)[^.]{0,60}(선적|출하|생산)"
@@ -1125,7 +1199,8 @@ The Buyer shall pay all amounts in full without any set-off, counterclaim,
 deduction or withholding of any kind.""",
     text_ko="**without any set-off, deduction or withholding** 를 대금 조항에 "
             "한 줄 넣습니다. 짧지만 힘이 셉니다.",
-    detect=[r"without any (set[- ]?off|deduction|withholding)",
+    detect=[r"free of[^.]{0,60}(?:counterclaim|withholding|set[- ]?off|deduction)",
+            r"without any (set[- ]?off|deduction|withholding)",
             r"no set[- ]?off[^.]{0,40}(deduction|counterclaim|withholding)",
             r"(상계|공제)[^.]{0,30}(없이|아니하고)[^.]{0,30}(전액|지급)",
             r"(매수인|바이어)[^.]{0,30}(상계|공제)[^.]{0,20}(할 수 없|하지 못|금지)"],
@@ -1144,7 +1219,8 @@ the port of destination, together with an inspection report issued by an
 internationally recognised surveyor. Claims notified later shall be deemed waived.""",
     text_ko="**도착 후 30일** 같은 기한을 박고, **제3 검사기관 보고서**를 함께 내게 "
             "합니다. 기한이 지나면 **포기한 것으로 본다**까지 적어야 닫힙니다.",
-    detect=[r"claims?[^.]{0,80}within[^.]{0,20}\(?\d{1,3}\)?[^.]{0,20}days",
+    detect=[r"(?:claim|notif)[^.]{0,80}within[^.]{0,30}(?:seven|ten|fourteen|fifteen|twenty|thirty|sixty|ninety)\s+days",
+            r"claims?[^.]{0,80}within[^.]{0,20}\(?\d{1,3}\)?[^.]{0,20}days",
             r"(claim|notification)[^.]{0,60}deemed waived",
             r"(클레임|이의|하자)[^.]{0,40}\d{1,3}\s*일[^.]{0,30}(이내|내에)"
             r"[^.]{0,30}(통지|서면)",
@@ -1164,7 +1240,13 @@ Seller by 15 November 2026. If the L/C is not established by that date, the
 Seller may cancel this Contract and claim the costs already incurred.""",
     text_ko="**개설 기한 날짜**를 박고, 미개설이면 **해지권과 기발생 비용 청구**까지 "
             "적습니다. 날짜가 없으면 아무 효력이 없습니다.",
-    detect=[r"(open|establish)[^.]{0,60}letter of credit[^.]{0,80}"
+    detect=[r"(?:open|establish)[^.]{0,80}(?:l/?c|letter of credit)",
+            r"(?:l/?c|letter of credit)[^.]{0,80}(?:by|before|no later than|not later than)",
+            r"(?:신용장|L/?C)[^.]{0,60}(?:까지|전까지)[^.]{0,30}개설",
+            # 한국어는 기한이 **앞**에 오기도 합니다 — "선적 30일 전까지
+            # 신용장을 개설". 낱말 순서로 놓친 것이 **네 번째**입니다.
+            r"(?:까지|전까지|이내)[^.]{0,40}(?:신용장|L/?C)[^.]{0,30}개설",
+            r"(open|establish)[^.]{0,60}letter of credit[^.]{0,80}"
             r"(by|no later than|within)",
             r"(l/c|letter of credit)[^.]{0,60}(not (be )?(opened|established))"
             r"[^.]{0,60}(cancel|terminate)",
@@ -1188,7 +1270,8 @@ not infringe any third party rights, and shall indemnify and hold the Seller
 harmless against any claim arising therefrom, including legal costs.""",
     text_ko="바이어가 준 **도면·상표**에 한정해서 **바이어가 보증하고 면책**하게 "
             "합니다. OEM·ODM 거래라면 꼭 넣으세요.",
-    detect=[r"buyer warrants[^.]{0,80}(design|drawing|trademark|specification)"
+    detect=[r"indemnif\w*[^.]{0,40}(?:the )?seller[^.]{0,100}(?:buyer'?s?\s+)?(?:design|specification|drawing|trademark)",
+            r"buyer warrants[^.]{0,80}(design|drawing|trademark|specification)"
             r"[^.]{0,60}(not infringe|no infringement)",
             r"(design|drawing|trademark)[^.]{0,40}(supplied|provided) by the buyer"
             r"[^.]{0,100}(indemnif|hold the seller harmless)",
@@ -1451,6 +1534,44 @@ def applies_to(row: dict, incoterms: str = "") -> bool:
     return (incoterms or "").upper() in row["applies"]
 
 
+# 목차. 계약서 앞에 조항 **제목만** 줄줄이 적힌 덩어리입니다.
+#
+#     1. DESCRIPTION OF GOODS
+#     2. PRICE AND INCOTERMS
+#     3. PAYMENT TERMS
+#
+# 걷어내지 않으면 **내용이 하나도 없는데 필수조항을 다 갖췄다**고 하게 됩니다.
+# 실제로 14개 중 13개를 '있다'고 했습니다. 사용자는 그 조항 없이 계약합니다.
+# (2026-10-02 공격해 보다 찾았습니다)
+#
+# 제목만 있는 줄이 **넷 넘게 이어질 때만** 걷어냅니다. 진짜 조항은 제목 뒤에
+# 본문이 따라오므로 제목 줄이 연달아 나오지 않습니다.
+_HEADING_LINE = re.compile(
+    r"^\s*(?:\d{1,2}|[IVXivx]{1,5})\s*[.)]?\s+[A-Z가-힣][^.]{0,70}$")
+# 본문에 있는 말. 이것이 있으면 제목이 아니라 조항 내용입니다.
+_OBLIGATION = re.compile(r"\b(shall|will|must|may)\b|하여야|한다\b|됩니다|한다\.", re.I)
+TOC_RUN = 4
+
+
+def _drop_table_of_contents(text: str) -> str:
+    """목차 덩어리를 걷어냅니다. 제목만 있는 줄이 TOC_RUN 개 넘게 이어질 때만."""
+
+    lines = text.split("\n")
+    heading = [bool(_HEADING_LINE.match(line)) and not _OBLIGATION.search(line)
+               for line in lines]
+    drop = [False] * len(lines)
+    start = None
+    for index, is_heading in enumerate(heading + [False]):
+        if is_heading and start is None:
+            start = index
+        elif not is_heading and start is not None:
+            if index - start > TOC_RUN:
+                for pos in range(start, index):
+                    drop[pos] = True
+            start = None
+    return "\n".join(line for line, skip in zip(lines, drop) if not skip)
+
+
 # 쪽 번호·머리글·바닥글. 계약서는 여러 쪽이라 **문장 한가운데** 이런 줄이 끼어듭니다.
 #   "…at a price lower than"  /  "- 16 -"  /  "that offered to the Buyer…"
 # 그러면 "price lower than that offered" 를 찾는 규칙이 끊깁니다. 흔들어 보니
@@ -1515,6 +1636,8 @@ registered as a commercial agency.""",
     text_ko="대리점 등록 여부와 해지·보상 조건을 반드시 확인하세요. 등록되면 되돌리기 어렵습니다.",
     detect=[r"commercial agenc(y|ies)",
             r"(sole|exclusive) (agent|distributor|representative)",
+            # "exclusive agent" 말고 "exclusive **right to sell**" 로 적는 꼴.
+            r"(?:sole|exclusive) right to (?:sell|distribute|import|market)",
             r"agency (registration|registry)",
             r"(총판|독점\s*(대리점|판매권|대리인))",
             r"대리점\s*등록"],
@@ -1679,7 +1802,8 @@ def find_in(text: str) -> set[str]:
     # PDF에서 읽은 계약서는 줄이 꺾여 있어 "than"과 "that" 사이에 줄바꿈이
     # 들어갑니다. 그러면 한 칸(space)을 찾는 규칙이 안 맞아, **실제 계약서에서만
     # 못 잡습니다.** 시험에서는 한 줄로 넣어 잘 잡혔습니다. (2026-09-26)
-    body = _drop_page_furniture(str(text or ""))
+    body = _drop_table_of_contents(str(text or ""))
+    body = _drop_page_furniture(body)
     # **줄 끝에서 하이픈으로 갈린 낱말을 도로 붙입니다.**
     #
     # PDF 는 제 폭대로 줄을 꺾으면서 긴 낱말을 "interrup-\ntion" 처럼 자릅니다.
@@ -1695,7 +1819,11 @@ def find_in(text: str) -> set[str]:
         return set()
     found = set()
     for row in CLAUSES:
-        avoid = row.get("avoid") or ()
+        # 뜻풀이 문장은 **독소조항 전부**에서 거릅니다. 낱말의 뜻을 적은 것이지
+        # 의무를 정한 것이 아닙니다. (2026-10-02)
+        avoid = (row.get("avoid") or ())
+        if row["category"] == "toxic":
+            avoid = avoid + DEFINITION
         for pattern in row["detect"]:
             if not avoid:
                 if re.search(pattern, body, re.I | re.S):
