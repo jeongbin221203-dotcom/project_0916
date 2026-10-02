@@ -11,10 +11,11 @@ from app.extensions import db
 from app.routes import (collector_response, error_response, json_body,
                         load_shipment, once_only, remember_once)
 from app.routes.auth import current_user, login_required
-from app.services import (ServiceError, customs_filing_service, document_draft_service,
-                          document_extract_service, document_service, document_source_service,
-                          document_start_service, draft_document_service, requirement_service,
-                          shipment_service, translate_service)
+from app.services import (ServiceError, contract_clause_service, customs_filing_service,
+                          document_draft_service, document_extract_service, document_service,
+                          document_source_service, document_start_service,
+                          draft_document_service, requirement_service, shipment_service,
+                          translate_service)
 from app.validators import ValidationError
 
 document_bp = Blueprint("document", __name__, url_prefix="/documents")
@@ -537,6 +538,8 @@ def view(shipment_id: str, doc_type: str):
         # 확정(final)한 뒤에도 [수정하기]로 편집 모드에 들어옵니다.
         # 저장하면 확정이 풀리고 다시 검증을 거칩니다. (document_service.update_document)
         edit=request.args.get("edit") == "1",
+        # 계약서 조항 칸이 도착국에 흔한 독소조항을 앞세우는 데 씁니다.
+        contract_country=contract_clause_service.country_of(shipment),
     )
 
 

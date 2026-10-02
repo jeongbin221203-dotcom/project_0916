@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request, Response
 
+from app.processors import contract_clauses
 from app.routes import error_response, json_body
 from app.services import ServiceError, contract_clause_service
 from app.validators import ValidationError
@@ -27,9 +28,14 @@ def clauses():
     """이 건에 걸리는 조항 점검표. 인코텀즈를 주면 그에 맞춰 추립니다."""
 
     incoterms = (request.args.get("incoterms") or "").upper()
+    # 도착국을 주면 그 나라에 흔한 조항을 앞세웁니다. 없어도 그대로 돕니다.
+    country = (request.args.get("country") or "").upper()
     return jsonify({"success": True, "data": {
         "incoterms": incoterms,
-        "groups": contract_clause_service.checklist(incoterms),
+        "country": country,
+        "groups": contract_clause_service.checklist(incoterms, country=country),
+        "country_watch": [row["key"] for row in
+                          contract_clauses.for_country(country)] if country else [],
         "note": contract_clause_service.DISCLAIMER,
     }})
 
@@ -44,6 +50,10 @@ def review():
     incoterms = (request.form.get("incoterms") or
                  (request.json or {}).get("incoterms") if request.is_json else
                  request.form.get("incoterms") or "")
+    # 도착국. 주면 그 나라에 흔한 독소조항을 앞세우고, 아직 안 보이는 것도
+    # watch_country 로 미리 알려 줍니다. 없어도 판정은 그대로 돕니다. (2026-10-02)
+    country = (request.form.get("country") or
+               ((request.json or {}).get("country") if request.is_json else "") or "")
     upload = request.files.get("file")
     try:
         if upload is not None and (upload.filename or "").strip():
@@ -64,7 +74,8 @@ def review():
         else:
             text = (request.form.get("text") or
                     ((request.json or {}).get("text") if request.is_json else "") or "")
-        result = contract_clause_service.review(text, str(incoterms or ""))
+        result = contract_clause_service.review(text, str(incoterms or ""),
+                                                str(country or ""))
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     result["summary"] = contract_clause_service.as_text(result)

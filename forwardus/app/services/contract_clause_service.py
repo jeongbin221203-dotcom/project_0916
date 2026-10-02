@@ -23,13 +23,22 @@ DISCLAIMER = ("법률 자문이 아닙니다. 여기 문안은 출발점이고, 
               "변호사 검토를 받으세요.")
 
 
-def checklist(incoterms: str = "", present: set[str] | None = None) -> dict:
+def checklist(incoterms: str = "", present: set[str] | None = None,
+              country: str = "") -> dict:
     """이 건에 걸리는 조항 점검표.
 
     present를 주면(올린 계약서에서 보인 조항) 줄마다 있음/없음을 함께 답니다.
+
+    country(도착국 2자리)를 주면 그 나라에 **특히 흔한** 조항에 for_country 를
+    달고, 독소 묶음에서 앞으로 올립니다. 계약서를 올리기 전에도 "중국으로
+    보내시는군요 — 이 셋을 특히 보세요"를 말할 수 있습니다. (2026-10-02)
+
+    **찾는 일에는 나라를 쓰지 않습니다.** 도착국을 몰라도 다 찾아야 하고,
+    중국 중재 조항은 어디로 보내든 독소입니다.
     """
 
     present = present or set()
+    tags = contract_clauses.groups_for(country)
     out: dict[str, list[dict]] = {"must": [], "gain": [], "toxic": []}
     for row in contract_clauses.CLAUSES:
         if not contract_clauses.applies_to(row, incoterms):
@@ -38,11 +47,17 @@ def checklist(incoterms: str = "", present: set[str] | None = None) -> dict:
             "key": row["key"], "title": row["title"], "why": row["why"],
             "risk": row["risk"], "text_ko": row["text_ko"], "fix": row["fix"],
             "present": row["key"] in present,
+            "countries": list(row["countries"]),
+            "for_country": bool(tags & set(row["countries"])),
         })
+    if tags:
+        # 그 나라 것을 앞으로. 그 안에서는 원래 순서를 지킵니다(sort 는 안정적입니다).
+        for category in out:
+            out[category].sort(key=lambda item: not item["for_country"])
     return out
 
 
-def review(text: str, incoterms: str = "") -> dict:
+def review(text: str, incoterms: str = "", country: str = "") -> dict:
     """올린 계약서 판정.
 
     missing  빠진 필수조항 — 넣어야 합니다
@@ -56,13 +71,18 @@ def review(text: str, incoterms: str = "") -> dict:
         raise ServiceError("읽을 글이 없습니다. 계약서 파일이나 글을 넣어 주세요.",
                            "VALIDATION_ERROR")
     found = contract_clauses.find_in(body[:MAX_TEXT])
-    rows = checklist(incoterms, found)
+    rows = checklist(incoterms, found, country)
+    # 도착국에 흔한데 **아직 안 보이는** 독소조항. 올린 계약서에 없더라도
+    # 협상 중에 들어올 수 있어 미리 알려 줍니다. (2026-10-02)
+    watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]]
     return {
         "missing": [row for row in rows["must"] if not row["present"]],
         "toxic": [row for row in rows["toxic"] if row["present"]],
         "gain": [row for row in rows["gain"] if not row["present"]],
         "ok_must": [row for row in rows["must"] if row["present"]],
         "present": sorted(found),
+        "country": (country or "").upper(),
+        "watch_country": watch,
         "checked": len(body),
         "note": DISCLAIMER,
     }
@@ -86,6 +106,36 @@ def read_file(filename: str, data: bytes) -> str:
     # 스캔본이면 우리 컴퓨터의 OCR로 읽습니다. 없으면 빈 글자입니다.
     return extract.ocr_text(text, images)
 
+
+
+def country_of(shipment) -> str:
+    """이 건의 도착국 ISO 2자리. 못 알아내면 빈 글자입니다.
+
+    도착국을 알면 그 나라에 흔한 독소조항을 앞세울 수 있습니다. 계약서를 올리기
+    전에도 경고가 되므로, 운송 계획에 적힌 값을 그대로 씁니다. (2026-10-02)
+
+    document_service 가 FTA 협정을 찾을 때 쓰는 방식과 같습니다.
+      1) destination_country ("NL" 또는 "NL · 네덜란드")
+      2) 비어 있으면 destination_code 앞 두 글자 (UN/LOCODE)
+
+    **못 알아내면 비웁니다.** 억지로 맞추면 엉뚱한 나라의 조항을 앞세웁니다.
+    공항 부호(IATA · ICN·LAX)는 나라를 담지 않으므로 이 길로는 못 알아냅니다.
+    """
+
+    # **isascii() 를 함께 봅니다.** 파이썬 isalpha() 는 한글도 True 라서,
+    # "네덜란드" 에서 "네덜" 을 국가코드로 내놓았습니다. (2026-10-02 실제로 그랬습니다)
+    # 나라 칸에 한글만 적힌 건은 도착지 부호 쪽으로 넘깁니다.
+    def _iso2(value: str) -> str:
+        head = value[:2]
+        return head if len(head) == 2 and head.isascii() and head.isalpha() else ""
+
+    text = str(getattr(shipment, "destination_country", "") or "").strip().upper()
+    found = _iso2(text)
+    if found:
+        return found
+    code = str(getattr(shipment, "destination_code", "") or "").strip().upper()
+    # UN/LOCODE 는 다섯 글자(NLRTM)입니다. 세 글자는 공항 부호(ICN)라 나라가 없습니다.
+    return _iso2(code) if len(code) == 5 else ""
 
 def clause_text(keys) -> str:
     """고른 조항의 문안을 한 벌로. 계약서에 그대로 붙여 쓸 수 있게 냅니다."""

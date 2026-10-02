@@ -55,6 +55,8 @@
   function mount(host, options) {
     const config = options || {};
     const incoterms = config.incoterms || "";
+    // 도착국(ISO 2자리). 있으면 그 나라에 흔한 독소조항이 앞으로 옵니다.
+    const country = config.country || "";
     host.innerHTML = `
       <div class="cc_panel" data-cc-panel>
         <div class="cc_intro">
@@ -109,7 +111,8 @@
     async function load() {
       status.textContent = "조항을 불러오는 중입니다…";
       const answer = await window.Forwardus.getJson(
-        `${config.clausesUrl}?incoterms=${encodeURIComponent(incoterms)}`);
+        `${config.clausesUrl}?incoterms=${encodeURIComponent(incoterms)}`
+        + (country ? `&country=${encodeURIComponent(country)}` : ""));
       status.textContent = "";
       if (!answer.success) { status.textContent = answer.message || "불러오지 못했습니다."; return; }
       note.textContent = `※ ${answer.data.note}`;
@@ -120,6 +123,7 @@
       event.preventDefault();
       const data = new FormData(form);
       data.set("incoterms", incoterms);
+      if (country) data.set("country", country);
       const file = data.get("file");
       const text = String(data.get("text") || "").trim();
       if ((!file || !file.name) && !text) {
