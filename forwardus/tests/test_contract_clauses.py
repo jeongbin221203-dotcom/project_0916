@@ -34,6 +34,10 @@ SOUND = """SALES CONTRACT
 8. GOVERNING LAW: laws of the Republic of Korea. CISG shall not apply.
 9. ARBITRATION in Seoul under the rules of KCAB INTERNATIONAL.
 10. RETENTION OF TITLE: title shall pass upon payment in full.
+11. PACKING AND MARKING: export standard seaworthy packing; shipping marks as per Annex 2.
+12. QUANTITY: a tolerance of 5% more or less in quantity shall be acceptable.
+13. CONFIDENTIALITY: each party shall keep confidential all information disclosed by the other.
+14. AMENDMENT: no amendment shall be effective unless made in writing and signed by both parties.
 """
 
 
@@ -107,7 +111,9 @@ def test_모든_조항에_문안과_설명이_있다():
 def test_화면_창구가_돈다(client):
     listed = client.get("/contract/clauses?incoterms=CIF").get_json()
     assert listed["success"]
-    assert len(listed["data"]["groups"]["must"]) == 10
+    # 필수조항 수. 2026-10-02 에 10 -> 14 로 늘렸습니다(포장·화인 · 비밀유지 ·
+    # 수량 과부족 · 서면 변경). 숫자를 박아 두어야 누가 조용히 지우면 울립니다.
+    assert len(listed["data"]["groups"]["must"]) == 14
 
     judged = client.post("/contract/review", data={"text": DANGEROUS, "incoterms": "FOB"})
     data = judged.get_json()["data"]
