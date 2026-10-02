@@ -327,6 +327,51 @@ CASES = {
         "제16조 관할은 캘리포니아주 법원으로 한다.",
         "제16조 징벌적 손해배상을 청구할 수 있다.",
     ],
+    "ddp_no_ior": [
+        "Delivery shall be DDP the Buyer's warehouse with the Seller responsible "
+        "for import clearance, duties and local taxes.",
+        "The Supplier shall act as importer of record and clear the Goods through "
+        "customs at destination under DDP terms.",
+        "제2조 DDP 조건으로 하며 수입통관과 관세는 매도인이 부담한다.",
+        "제2조 매도인은 도착국의 수입 통관을 책임진다.",
+    ],
+    "reexport_control": [
+        "The Buyer is free to re-export the Goods to any destination without "
+        "restriction.",
+        "There shall be no restriction on the end use or onward destination of "
+        "the Goods.",
+        "제23조 매수인은 재수출에 제한 없이 전매할 수 있다.",
+        "제23조 최종 용도 확인은 하지 아니한다.",
+    ],
+    "eu_epr_cost": [
+        "All extended producer responsibility registrations, fees and reporting "
+        "obligations in each Member State shall be paid by the Seller.",
+        "Packaging waste and WEEE levies shall be borne by the Supplier.",
+        "제24조 확대생산자책임 분담금은 매도인이 부담한다.",
+        "제24조 EPR 등록 비용은 공급자가 낸다.",
+    ],
+    "tariff_absorption": [
+        "Any increase in customs duties or tariffs shall be absorbed by the Seller "
+        "and the price shall remain unchanged.",
+        "The Supplier shall bear any additional duty imposed after the date of "
+        "this Agreement.",
+        "제25조 관세 인상분은 매도인이 부담한다.",
+        "제25조 추가 관세는 공급자가 부담한다.",
+    ],
+    "psi_cost_delay": [
+        "Pre-shipment inspection by the appointed agency shall be paid for by the "
+        "Seller.",
+        "PSI shall be at the Supplier's cost and expense.",
+        "제26조 선적 전 검사 비용은 매도인이 부담한다.",
+        "제26조 검사 일정으로 인한 지연은 공급자의 책임으로 한다.",
+    ],
+    "full_inspection": [
+        "The Seller shall carry out 100% inspection of every unit prior to "
+        "shipment at its own cost.",
+        "The Supplier shall inspect each piece before despatch and bear the cost.",
+        "제27조 매도인은 전수검사를 실시하고 그 비용을 부담한다.",
+        "제27조 공급자가 전량 검사를 하며 비용을 진다.",
+    ],
 }
 
 CASE_LIST = [(key, body) for key, bodies in CASES.items() for body in bodies]

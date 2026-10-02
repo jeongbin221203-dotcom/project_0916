@@ -84,6 +84,31 @@ SAFE = [
     ("쌍방 비밀유지 — 한 문장 안",
      "Article 18 The Seller shall keep confidential information from the Buyer, "
      "and each party shall protect the other's data."),
+    # ── 2026-10-02 에 더한 나라별 여섯 조항의 '좋은 꼴' ─────────────────
+    ("DAP 로 바꾼 꼴 — 수입통관은 바이어가",
+     "Article 2 Delivery shall be DAP the Buyer's warehouse; import clearance "
+     "and duties are for the Buyer's account."),
+    ("수입통관은 바이어가 (국문)",
+     "제2조 수입통관과 관세는 매수인이 부담한다."),
+    ("재수출을 제한함",
+     "Article 23 The Buyer shall not re-export the Goods to any sanctioned "
+     "destination and shall provide an end user certificate."),
+    ("최종용도를 확인함",
+     "제23조 매수인은 최종 수요자와 최종 용도를 서면으로 고지한다."),
+    ("EPR 은 바이어가",
+     "Article 24 All extended producer responsibility registrations and fees "
+     "shall be undertaken and paid by the Buyer."),
+    ("관세는 바이어가",
+     "Article 25 Any increase in customs duties shall be borne by the Buyer."),
+    ("관세 인상 시 단가 재협의",
+     "제25조 관세가 5% 이상 인상되면 단가를 다시 정한다."),
+    ("검사비는 바이어가",
+     "Article 26 Pre-shipment inspection shall be arranged and paid for by the "
+     "Buyer."),
+    ("표본검사(AQL)로",
+     "Article 27 Inspection shall be by sampling in accordance with AQL 2.5."),
+    ("전수검사 비용은 바이어가",
+     "제27조 전수검사가 필요한 경우 그 비용은 매수인이 부담한다."),
 ]
 
 CATCH = [
