@@ -151,6 +151,9 @@ ALSO = {
     # 금형을 무상으로 주면서 **소유권까지** 넘기면 그건 권리 양도이기도 합니다.
     # tooling_free 의 fix 가 "ip_assignment 를 함께 보세요"라고 적어 둔 그대로입니다.
     "tooling_free": {"ip_assignment"},
+    # 뉴욕주 법원 전속관할은 **상대국 법원**이면서 동시에 **미국 법원**입니다.
+    # 미국 법원이면 배심재판과 징벌적 손해배상에 노출되므로 둘 다 짚는 것이 맞습니다.
+    "foreign_forum": {"us_jury_punitive"},
 }
 
 
