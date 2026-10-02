@@ -83,6 +83,9 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
         "present": sorted(found),
         "country": (country or "").upper(),
         "watch_country": watch,
+        # Party A/B 계약서에서 누구를 우리(매도인)로 읽었는지. 틀렸으면
+        # 사용자가 바로 알아야 합니다 — 방향이 뒤집히면 판정도 뒤집힙니다.
+        "our_side": contract_clauses.our_side(body[:MAX_TEXT]),
         "checked": len(body),
         "note": DISCLAIMER,
     }
@@ -163,6 +166,11 @@ def as_text(result: dict) -> str:
     """판정을 사람이 읽는 글로. 무역 상담 답변에 그대로 씁니다."""
 
     lines = ["## 계약서 조항 점검", ""]
+    side = result.get("our_side")
+    if side:
+        lines += [f"우리 쪽(매도인·수출자)을 **{side['label']} — {side['name']}**, "
+                  f"상대(매수인)를 **{side['other_label']} — {side['other_name']}** 로 "
+                  "읽었습니다. 반대라면 판정도 반대가 됩니다.", ""]
     if result["toxic"]:
         lines += [f"### 🔴 지우거나 고쳐야 할 조항 {len(result['toxic'])}개", ""]
         for row in result["toxic"]:

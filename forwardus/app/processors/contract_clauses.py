@@ -2195,6 +2195,7 @@ def find_in(text: str) -> set[str]:
     body = re.sub(r"\s+", " ", body)
     if not body.strip():
         return set()
+    body = _as_seller(body)
     found = set()
     for row in CLAUSES:
         # 뜻풀이 문장은 **독소조항 전부**에서 거릅니다. 낱말의 뜻을 적은 것이지
@@ -2217,6 +2218,83 @@ def find_in(text: str) -> set[str]:
     return found
 
 
+# ── 우리 쪽 정하기 ──────────────────────────────────────────────────────────
+#
+# **우리는 수출자, 곧 매도인입니다.** (2026-10-02 사용자 확인)
+#
+# 규칙은 방향을 Seller·Buyer 로 봅니다 — "the Seller shall indemnify the Buyer"
+# 는 독소, 거꾸로는 유리. 그런데 가공무역·위탁 계약서는 "Party A / Party B" 로만
+# 부릅니다. 그러면 방향을 못 봐서, 우리에게 유리한 조항도 똑같이 짚습니다.
+#
+# 앞머리의 당사자 정의에서 **한국에 있는 쪽이 하나뿐일 때만** 그쪽을 매도인으로
+# 바꿔 읽습니다. 둘 다 한국이거나 둘 다 아니면 건드리지 않습니다 — 틀리게
+# 정하느니 정하지 않는 편이 낫습니다.
+#
+# 국문의 갑·을은 다루지 않습니다. "을" 은 조사와 글자가 같아 바꾸면 문장이
+# 망가집니다.
+
+_PARTY_DEF = re.compile(
+    r"(?P<name>[A-Z][^;:\n]{1,120}?),?\s*\(?\s*hereinafter\s+(?:referred\s+to\s+as\s+|called\s+)?"
+    r"(?:the\s+)?[\"“']?(?P<label>Party\s+[A-Z]|(?:First|Second)\s+Party)\b[\"”']?")
+_KOREA_HQ = re.compile(r"\b(?:Republic\s+of\s+Korea|South\s+Korea|Korea|Seoul|Busan|Incheon)\b"
+                       r"|대한민국|한국|서울|부산|인천")
+# 주소 뒤에서 본문이 시작하는 자리 — "Korea. Whereas it …". "U.S.A., and" 나
+# "Co., Ltd." 의 마침표에서는 끊지 않습니다.
+_SENTENCE_START = re.compile(r"\.\s+(?=[A-Z][a-z]+\s+[a-z])")
+
+
+def _clean_name(raw: str) -> str:
+    """"San Francisco, U.S.A., and Haneul Weaving Co., Ltd." → 회사 이름만."""
+
+    name = re.split(r"\b(?:between|and)\s+", raw)[-1]
+    # "Hana Co., Ltd. of Busan, Korea" — 주소가 이름 뒤에 붙는 꼴
+    name = re.split(r",?\s+(?:of|a company|having|with its)\s+(?=[A-Z]|its|principal)", name)[0]
+    return name.strip(" ,")
+
+
+def our_side(text: str) -> dict | None:
+    """당사자 정의에서 우리(한국 수출자) 쪽을 찾습니다. 못 정하면 None.
+
+    주소는 정의 **뒤**("hereinafter … Party B, having its head office at Seoul")
+    에도, **앞**("ABC Co., Ltd. of Seoul, Korea (hereinafter Party B)")에도
+    옵니다. 뒤쪽을 먼저 보고, 한 곳으로 안 갈리면 앞쪽을 봅니다.
+    """
+
+    body = re.sub(r"\s+", " ", str(text or ""))[:6000]
+    defs = list(_PARTY_DEF.finditer(body))
+    labels = {re.sub(r"\s+", " ", d.group("label")) for d in defs}
+    if len(defs) != 2 or len(labels) != 2:
+        return None
+    names = [_clean_name(d.group("name")) for d in defs]
+    name_at = [d.end("name") - len(d.group("name").rstrip(" ,")) +
+               d.group("name").rstrip(" ,").rfind(n) for d, n in zip(defs, names)]
+
+    after_end = name_at[1]
+    stop = _SENTENCE_START.search(body, defs[1].end())
+    after = [(defs[0].end(), after_end),
+             (defs[1].end(), min(stop.start() if stop else len(body), defs[1].end() + 250))]
+    before = [(name_at[0], defs[0].start("label")), (name_at[1], defs[1].start("label"))]
+    korean = []
+    for spans in (after, before):
+        korean = [i for i, (a, b) in enumerate(spans) if a < b and _KOREA_HQ.search(body[a:b])]
+        if len(korean) == 1:
+            break
+    if len(korean) != 1:
+        return None
+    i = korean[0]
+    return {"label": re.sub(r"\s+", " ", defs[i].group("label")), "name": names[i],
+            "other_label": re.sub(r"\s+", " ", defs[1 - i].group("label")),
+            "other_name": names[1 - i]}
+
+
+def _as_seller(body: str) -> str:
+    side = our_side(body)
+    if not side:
+        return body
+    for label, role in ((side["label"], "the Seller"), (side["other_label"], "the Buyer")):
+        words = r"\s+".join(map(re.escape, label.split()))
+        body = re.sub(rf"\b(?:the\s+)?{words}\b", role, body)
+    return body
 
 
 def _vetoed(body: str, pos: int, avoid) -> bool:
