@@ -209,7 +209,12 @@ this Contract. Any deviation shall require the Seller's prior written consent.
     # 별지 제목만 있는 것은 물품 명세 조항이 아닙니다. (2026-09-26)
     detect=[r"description of goods", r"\bcommodity\b",
             r"specifications?\b.{0,20}(set (out|forth)|of the goods|shall (be|form))",
-            r"물품\s*의?\s*명세", r"품명[^.]{0,30}(규격|수량|HS)"],
+            r"물품\s*의?\s*명세", r"품명[^.]{0,30}(규격|수량|HS)",
+            # 오퍼 시트는 조항이 아니라 **표**로 적습니다. 머리글만 있는 것은
+            # 빼려고, 머리글 뒤에 금액(1,234.00)이 실제로 오는 꼴만 봅니다.
+            # OCR 이 "Unit" 을 "보메" 로 읽어도 걸리게 사이를 넓게 둡니다. (2026-10-02)
+            r"\bdescription\b.{0,40}\bquantity\b.{0,40}\bprice\b.{0,250}\d[\d,]*\.\d{2}\b",
+            r"\bgoods\s*(?:&|and)\s*packing\s+details\b", r"\bitem\s+name\s*:"],
 )
 
 _clause(
@@ -502,7 +507,15 @@ expenses of whatever nature, including loss of profit, without limitation.""",
             r"unlimited liability",
             r"무제한\s*(으로)?[^.]{0,6}(배상|책임)",
             r"(한도|상한|제한)[^.]{0,3}없이[^.]{0,30}배상",
-            r"배상[^.]{0,15}(한도|상한)[^.]{0,6}없"],
+            r"배상[^.]{0,15}(한도|상한)[^.]{0,6}없",
+            # "for all losses … **without monetary limit**" — 실물 보세가공 계약서
+            # 제9조. limitation 이 아니라 limit 이고, any and all 이 아니라 all
+            # 이라 놓쳤습니다. 배상 이야기 뒤에 올 때만 봅니다. (2026-10-02)
+            r"(?:liabilit|damages|indemnif|indemnit|losses|compensat)[^.]{0,300}"
+            r"without\s+(?:any\s+)?(?:monetary|financial|maximum|upper)\s+"
+            r"(?:limit|limitation|cap|ceiling)\b",
+            r"\bno\s+(?:monetary|financial|maximum|upper)\s+limit\b[^.]{0,60}"
+            r"(?:liabilit|damages|indemnif|indemnit|losses)"],
     fix="책임 한도(Limitation of Liability) 조항을 넣어 **송장 금액 상한**과 **간접손해 배제**로 바꿔 달라고 하세요.",
     avoid=INDEMNIFY_SELLER,
 )
@@ -1222,7 +1235,14 @@ Annex 2. Packing shall comply with ISPM 15 where wooden material is used.""",
             r"(export )?(standard )?seaworthy packing",
             r"\bISPM[\s-]?15\b",
             r"포장\s*(및|·)?\s*화인", r"수출\s*표준\s*포장",
-            r"화인[^.]{0,30}(별지|부속서|표시)"],
+            r"화인[^.]{0,30}(별지|부속서|표시)",
+            # 오퍼 시트의 꼴 — "PACKING SPECIFICATIONS" 표, "EXPORT STANDARD
+            # PACKED", "Packing: … 50 PCS per export carton". packing list(서류
+            # 이름)는 포장 조건이 아니므로 걸리지 않게 둡니다. (2026-10-02)
+            r"\bpacking\s+specifications?\b",
+            r"\bexport\s+standard\s+pack(?:ed|ing)\b",
+            r"\bpacking\b\s*:?[^.]{0,80}\b\d+\s*(?:pcs|pieces|units|sets)\s*"
+            r"(?:/|per)\s*(?:export\s+)?cartons?\b"],
     fix="",
 )
 
@@ -1285,7 +1305,13 @@ three (3) business days after dispatch by courier or upon confirmed email receip
             r"(amendment|modification)[^.]{0,40}in writing[^.]{0,40}signed",
             r"notices? shall be (given|made|sent)[^.]{0,40}(in writing|to the address)",
             r"(계약|본\s*계약)[^.]{0,20}변경[^.]{0,40}서면[^.]{0,30}(합의|서명)",
-            r"통지[^.]{0,40}(서면|주소)[^.]{0,30}(한다|하여야|발송)"],
+            r"통지[^.]{0,40}(서면|주소)[^.]{0,30}(한다|하여야|발송)",
+            # "Changes require mutual written agreement." — 실물 오퍼의 꼴.
+            # "revised **dates** require …" 는 날짜만의 이야기라 세지 않습니다. (2026-10-02)
+            r"\b(?:changes?|amendments?|modifications?|variations?)\b"
+            r"(?:\s+to\s+(?:this|the)\s+(?:contract|offer|agreement|order))?\s+"
+            r"(?:shall\s+|will\s+)?(?:requires?|be\s+subject\s+to)\s+(?:the\s+)?"
+            r"(?:mutual\s+)?(?:prior\s+)?written\s+(?:agreement|consent)"],
     fix="",
 )
 
