@@ -18,6 +18,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app import create_app
@@ -139,3 +141,31 @@ def test_스위치는_한_곳이다():
     """되살리는 사람이 한 줄만 보면 되도록, 이름이 config 에 있어야 합니다."""
 
     assert hasattr(TestConfig, "CONTRACT_CLAUSES_ON")
+
+
+def test_내보내는_기본값은_켜짐이다():
+    """**코드에 적힌 기본값**이 켜짐이어야 합니다. (2026-10-02)
+
+    왜 따로 보나
+      이 파일의 다른 시험은 OffConfig 로 끄고, 켜진 모습은 TestConfig 로 봅니다.
+      둘 다 값을 손으로 못 박기 때문에, 정작 사람에게 나가는 기본값을 아무도
+      보지 않았습니다. 기본값을 0 으로 되돌려 봤더니 이 파일의 시험 22개가
+      **전부 그대로 통과**했습니다. 기능이 조용히 사라져도 모릅니다.
+      누가 되돌리거나 병합이 09-27 상태로 끌어가면 여기서 울립니다.
+
+    왜 Config.CONTRACT_CLAUSES_ON 을 보지 않나
+      config.py 는 뜰 때 .env 를 읽습니다. 그래서 그 값은 **이 컴퓨터의 .env** 를
+      따릅니다. 끄고 싶은 사람은 안내대로 .env 에 CONTRACT_CLAUSES_ON=0 을 넣는데,
+      그걸 실패로 적으면 **잘못한 것이 없는 사람에게 빨간불**이 뜹니다.
+      오탐이 미탐보다 나쁩니다. 그래서 .env 가 건드리지 못하는 자리 — 코드에 적힌
+      기본값 — 만 봅니다.
+    """
+
+    import config
+
+    source = Path(config.__file__).read_text(encoding="utf-8")
+    assert 'os.getenv("CONTRACT_CLAUSES_ON", "1")' in source, (
+        "config.py 의 기본값이 켜짐이 아닙니다. "
+        'os.getenv("CONTRACT_CLAUSES_ON", "1") 이어야 합니다. '
+        "끄는 것은 코드가 아니라 .env 로 합니다."
+    )
