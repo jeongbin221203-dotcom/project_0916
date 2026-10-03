@@ -389,6 +389,67 @@ CASES = {
         "제31조 매수인이 공급한 원자재는 대금 정산 전에는 매수인의 동의 없이 가공할 수 없다.",
         "제31조 위탁가공 원사는 매수인의 승낙 없이 가공하지 못한다.",
     ],
+    # ── 실제 분쟁에서 나온 독소조항 (2026-10-03, tests/test_contract_disputes.py) ──
+    "battle_of_forms": [
+        "In the event of any conflict, the Purchaser's standard terms and conditions of "
+        "purchase shall govern.",
+        "Buyer's PO terms take precedence over any Seller quotation or acknowledgement.",
+        "All deliveries are accepted solely on the terms stated herein; our purchase "
+        "conditions apply exclusively.",
+        "제32조 본 거래에는 매수인의 구매약관이 우선하여 적용된다.",
+    ],
+    "foreign_language_prevails": [
+        "This Agreement is executed in English and Vietnamese; the Vietnamese version "
+        "shall govern in case of inconsistency.",
+        "Should the texts differ, the Russian text shall be authoritative.",
+        "In case of conflict, precedence shall be given to the Arabic version.",
+        "제33조 국문과 중문이 다를 때에는 중문을 우선한다.",
+    ],
+    "acceptance_signature_payment": [
+        "The balance of 70% shall be paid within 30 days after the final acceptance "
+        "certificate is signed by the Buyer.",
+        "Payment of the remaining amount is subject to the installation report approved "
+        "by the end user.",
+        "The Commissioning Certificate signed by the Purchaser is required before any "
+        "payment becomes payable.",
+        "제34조 잔금은 매수인이 시운전 완료 확인서에 서명한 날부터 30일 이내에 지급한다.",
+    ],
+    "on_demand_bond": [
+        "Supplier shall provide an advance payment guarantee payable upon the Buyer's "
+        "first written demand.",
+        "A 10% performance bond, callable on first demand, shall be issued by a "
+        "first-class bank.",
+        "The bank shall pay on demand without any proof of default.",
+        "제35조 매도인은 매수인의 서면 청구만으로 조건 없이 지급되는 이행보증서를 제출한다.",
+    ],
+    "time_essence_cancel": [
+        "Time is of the essence with respect to all delivery dates under this Agreement.",
+        "Delivery dates are of the essence; should the Supplier be late, the Purchaser "
+        "is entitled to terminate the purchase forthwith.",
+        "If the Seller fails to ship by the agreed date, the Buyer may immediately "
+        "cancel the order.",
+        "제36조 선적이 3일 이상 지연되면 매수인은 즉시 계약을 해제할 수 있다.",
+    ],
+    "cover_purchase": [
+        "Should the Supplier fail to deliver, the Purchaser may procure replacement "
+        "goods elsewhere at the Supplier's expense.",
+        "Buyer may buy equivalent goods from other sources and Seller shall reimburse "
+        "the price difference.",
+        "All cover purchases made by the Buyer shall be charged to the Seller.",
+        "제37조 매도인이 납기를 어기면 매수인은 제3자로부터 구매하고 그 차액을 매도인이 부담한다.",
+    ],
+    "one_way_force_majeure": [
+        "Force majeure may be invoked by the Buyer only.",
+        "The force majeure provisions apply solely to the Purchaser.",
+        "No force majeure event shall relieve the Seller of its delivery obligations.",
+        "제38조 불가항력 조항은 매수인에게만 적용된다.",
+    ],
+    "unilateral_amendment": [
+        "Purchaser reserves the right to modify these terms from time to time by notice.",
+        "The Buyer may change the unit prices at any time upon written notice.",
+        "Buyer shall be entitled to revise the contract terms unilaterally.",
+        "제39조 매수인은 통지만으로 본 계약의 조건을 변경할 수 있다.",
+    ],
 }
 
 CASE_LIST = [(key, body) for key, bodies in CASES.items() for body in bodies]

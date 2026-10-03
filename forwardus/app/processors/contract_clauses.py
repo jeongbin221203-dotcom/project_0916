@@ -140,7 +140,7 @@ INDEMNIFY_BUYER = (r"(?:indemnif\w*\s+(?:and\s+(?:defend|hold)\s+)?(?:the\s+)?bu
 
 def _clause(key, title, category, why, risk, text_en, text_ko, detect,
             applies=("always",), fix="", countries=(), avoid=(), weak=(),
-            require=None, context=(), neg_ok=False):
+            require=None, context=(), neg_ok=False, strict=()):
     """조항 한 줄.
 
     countries
@@ -170,6 +170,11 @@ def _clause(key, title, category, why, risk, text_en, text_ko, detect,
              있는 조항(위탁 원자재)을 보통 매매계약에서 찾지 않게 합니다.
     neg_ok   부정이 **뜻의 일부**인 조항(비밀유지·상계 금지·분할선적 금지)은
              앞뒤의 부정말로 약하다고 보지 않습니다.
+    strict   **avoid 를 거치지 않는** 규칙. 부정이 독소의 뜻 그 자체인 문장
+             — "shall not make any payment … unless the officials approve",
+             "최종매수인이 지급하지 않는 경우 … 지급되지 않는다" — 은 avoid 의
+             부정 가드가 통째로 걸러 버립니다. 이런 규칙은 극성을 **규칙 안에서**
+             직접 봅니다. 뜻풀이(DEFINITION)만은 여기서도 거릅니다. (2026-10-03)
     """
 
     CLAUSES.append({
@@ -178,7 +183,7 @@ def _clause(key, title, category, why, risk, text_en, text_ko, detect,
         "detect": tuple(detect), "applies": tuple(applies), "fix": fix,
         "countries": tuple(countries), "avoid": tuple(avoid),
         "weak": tuple(weak), "require": require, "context": tuple(context),
-        "neg_ok": bool(neg_ok),
+        "neg_ok": bool(neg_ok), "strict": tuple(strict),
     })
 
 
@@ -417,7 +422,13 @@ title passes.""",
     detect=[r"ownership[^.]{0,80}(?:remain|pass|retain)",
             r"소유권[^.]{0,60}(?:유보|이전|귀속|남는)",
             r"retention of title", r"title .{0,30}shall pass",
-            r"reservation of ownership", r"소유권\s*유보"],
+            r"reservation of ownership", r"소유권\s*유보",
+            # 판례에 나온 꼴 — ownership 이 아니라 property·owner 로 씁니다.
+            # (Coutinho v. Tracomex 2015 BCSC 787 · Usinor v. Leeco 2002, 2026-10-03)
+            r"remain\w*\s+the\s+(?:sole\s+|exclusive\s+)?(?:property|owner)\s+of\s+"
+            r"(?:the\s+)?(?:seller|goods)[^.]{0,80}(?:until|up\s+to|unless)[^.]{0,40}pa(?:id|yment)",
+            r"\btitle\b[^.]{0,30}(?:remain|retain|vest)\w*[^.]{0,30}seller[^.]{0,60}"
+            r"until[^.]{0,40}pa(?:id|yment)"],
 )
 
 # ── 이익조항 ────────────────────────────────────────────────────────────────
@@ -554,6 +565,28 @@ value as a cancellation charge.""",
 
 # ── 독소조항 ────────────────────────────────────────────────────────────────
 
+# 간접손해·영업손실. unlimited_damages 에서 씁니다. (2026-10-03)
+_INDIRECT_EN = (r"(?:\b(?:indirect|consequential|special|incidental)\b[^.]{0,40}?"
+                r"\b(?:damages?|loss(?:es)?)\b"
+                r"|\bloss(?:es)?\s+of\s+(?:profits?|business|production|revenue|goodwill)\b"
+                r"|\blost\s+profits?\b)")
+CONSEQUENTIAL_EN = (r"\b(?:seller|supplier|vendor)\s+(?:shall|will|must|agrees?\s+to|undertakes?\s+to)"
+                    r"\s+(?:also\s+|further\s+|fully\s+)?(?:be\s+)?"
+                    r"(?:liable|responsible|indemnify|compensate|reimburse)\b"
+                    # 동사와 손해 사이 — 빼거나 한정하는 말이 끼면 아닙니다.
+                    r"(?:(?!\b(?:not|no|nor|but|except|other\s+than|exclud\w*|limited)\b)[^.]){0,150}?"
+                    + _INDIRECT_EN +
+                    # 문장 끝까지 — 한도가 붙으면 무제한이 아닙니다.
+                    r"(?![^.]*\b(?:limited\s+to|not\s+(?:to\s+)?exceed\w*|up\s+to|cap(?:ped)?|maximum)\b)")
+# 국문은 주제 조사(은·는)만 봅니다. "매수인은 매도인**이** 입은 간접손해를" 은
+# 바이어가 무는 문장입니다. 손해 낱말 뒤 40자에 부정·제외·한도가 오면 아닙니다.
+CONSEQUENTIAL_KO = (r"(?:매도인|공급자|수출자|판매자)(?:은|는)[^.]{0,60}?"
+                    r"(?:간접\s*손해|특별\s*손해|결과\s*적?\s*손해|파생\s*손해|일실\s*이익"
+                    r"|영업\s*손실|기대\s*이익|이익\s*상실)"
+                    # "배**상한**다" 의 상한은 한도가 아닙니다 — 낱말 가운데를 조심합니다.
+                    r"(?![^.]{0,40}(?:없|아니|않|제외|배제|면제|한도|(?<![배보])상한|초과하지))"
+                    r"[^.]{0,40}(?:배상|보상|책임을\s*진|부담)")
+
 _clause(
     "unlimited_damages", "무제한 손해배상", "toxic",
     why="상한이 없는 배상 약속은 거래 규모와 무관하게 회사를 무너뜨릴 수 있습니다.",
@@ -589,7 +622,20 @@ expenses of whatever nature, including loss of profit, without limitation.""",
             r"without\s+(?:any\s+)?(?:monetary|financial|maximum|upper)\s+"
             r"(?:limit|limitation|cap|ceiling)\b",
             r"\bno\s+(?:monetary|financial|maximum|upper)\s+limit\b[^.]{0,60}"
-            r"(?:liabilit|damages|indemnif|indemnit|losses)"],
+            r"(?:liabilit|damages|indemnif|indemnit|losses)",
+            # **간접손해·영업손실을 우리가 떠안는 꼴.** (2026-10-03)
+            #   "The Seller shall be liable for all indirect, consequential and
+            #    special damages, including loss of profit"
+            # 상한 없는 배상에서 가장 흔한 꼴인데 위 말들이 안 들어 있어 놓쳤습니다.
+            # 그런데 간접손해라는 말은 **빼는** 조항("Neither party shall be liable
+            # for … consequential damages")에 훨씬 자주 나옵니다. 그래서
+            #   - 주어가 Seller 이고 바로 뒤에 배상 동사가 와야 하고
+            #     ("In no event shall the Seller be liable" 은 이 꼴이 아닙니다)
+            #   - 동사와 손해 사이에 not·excluding·other than·but 이 없어야 하고
+            #   - 문장에 한도(limited to · not exceed · up to)가 없어야 합니다.
+            # 걸리면 안 되는 문장은 tests/test_contract_consequential.py 에 있습니다.
+            CONSEQUENTIAL_EN,
+            CONSEQUENTIAL_KO],
     fix="책임 한도(Limitation of Liability) 조항을 넣어 **송장 금액 상한**과 **간접손해 배제**로 바꿔 달라고 하세요.",
     avoid=INDEMNIFY_SELLER,
 )
@@ -659,8 +705,19 @@ end customer.""",
             r"from its (end )?customer",
             r"재판매[^.]{0,30}(대금|수령|지급)",
             r"최종\s*(고객|수요자|구매자)[^.]{0,30}(대금|수령|지급)"],
+    # **부정이 뜻 그 자체인 꼴.** 신용장 특수조건으로 들어옵니다. (대법원
+    # 2000.5.30. 98다47443 — 이 조건을 유효한 지급거절 조건으로 봤습니다.)
+    #   "최종매수인이 … 75일 내에 … 대금을 지급하지 않는 경우 인수된 어음과
+    #    서류들은 만기일에 지급되지 않는다"
+    strict=[r"최종\s*(?:매수인|고객|수요자|구매자|바이어)[^.]{0,80}(?:지급|결제)하지\s*않는\s*"
+            r"(?:경우|때)[^.]{0,80}(?:지급|결제|인수|매입)(?:되|하)지\s*(?:않|아니)",
+            r"(?:shall|will)\s+not\s+be\s+(?:paid|honou?red)[^.]{0,80}\bunless\b[^.]{0,60}"
+            r"(?:end|final|ultimate)\s+(?:customer|buyer|purchaser)\w*[^.]{0,30}(?:pa(?:y|id)|remit)"],
     fix="**선적일 또는 B/L일 기준**으로 기한을 바꾸고, 안 되면 L/C나 수출보험으로 막으세요.",
-    avoid=NEGATION,
+    # "최종 고객이 지급하지 **않더라도** 매수인은 지급한다" 는 우리를 지키는
+    # 문장입니다. '않더라도' 는 NEGATION 의 꼴(않는·않으)에 안 걸려서 짚었습니다.
+    avoid=NEGATION + (r"(?:않|없)더라도", r"관계\s*없이", r"무관하게", r"불구하고",
+                      r"\bregardless\b", r"\birrespective\b"),
 )
 
 _clause(
@@ -793,6 +850,17 @@ shipment and the Seller shall bear all return freight, duties and storage.""",
             r"전량[^.]{0,20}반품" + NO_NEG_KO,
             r"전부[^.]{0,20}반품" + NO_NEG_KO,
             r"반송\s*(운임|비용)[^.]{0,30}매도인"],
+    # **'만족하지 않으면' 무조건 반품.** 조건절의 not 때문에 avoid 에 걸러져서
+    # 극성을 규칙 안에서 봅니다 — 반품 바로 앞의 not 은 반품 금지입니다.
+    # (절강성 고급인민법원 (2011) 浙商外终字 第16号, 2026-10-03)
+    #   "if the buyer is not satisfied … can be returned unconditionally"
+    strict=[r"(?<!not be )(?<!not )(?<!never be )(?:return(?:ed)?|sent\s+back)\s+"
+            r"(?:\w+\s+){0,3}?unconditionally",
+            r"\bunconditional(?:ly)?\s+returns?\b",
+            r"(?:not\s+satisfied|dissatisfied|unsatisfied)[^.]{0,100}(?<!not be )(?<!not )"
+            r"(?:return(?:ed)?|sent\s+back)\b(?![^.]{0,20}\bonly\s+(?:after|if)\b)",
+            r"(?:만족하지\s*(?:않|못)|불만족)[^.]{0,60}반품"
+            r"(?![^.]{0,20}(?:할\s*수\s*없|하지\s*못|불가|금지))"],
     fix="**불량분만 교체·감액**으로 바꾸고, 불합격 판정은 **선적지 검사기관**이 하도록 하세요.",
     avoid=NEGATION,
 )
@@ -1225,7 +1293,16 @@ and binding on the Seller.""",
             r"(검사|검수|합격|불합격)[^.]{0,60}(매수인|바이어)[^.]{0,30}"
             r"(단독|최종|임의)[^.]{0,20}(판단|결정|정한)" + NO_NEG_KO,
             r"(매수인|바이어)[^.]{0,30}(단독|최종)[^.]{0,20}(판단|결정)"
-            r"[^.]{0,40}(검사|합격|품질)" + NO_NEG_KO],
+            r"[^.]{0,40}(검사|합격|품질)" + NO_NEG_KO,
+            # **도착지·수입국 검사기관을 최종으로** 정한 꼴. 매도인이 진 판례입니다.
+            # (CIETAC 심천 1999.4.7 — 광동 수출입상품검험국 증명서 "final and
+            # binding") 선적지 검사가 최종인 꼴은 우리에게 유리하므로 도착지 말이
+            # **최종보다 앞에** 와야 합니다. (2026-10-03)
+            r"(?:at\s+(?:the\s+)?(?:port\s+of\s+)?(?:destination|discharge|unloading)"
+            r"|import\w*\s+(?:and\s+export\s+)?commodit\w*\s+inspection|\bCIQ\b"
+            r"|buyer'?s?\s+country)"
+            r"[^.]{0,160}(?<!not )(?:(?:shall\s+be|is|are)\s+(?:deemed\s+)?(?:final|conclusive)\b"
+            r"|final\s+and\s+(?:binding|conclusive))"],
     fix="합격 기준을 **별지에 숫자로** 박고, 다툼이 생기면 **제3 검사기관(SGS·BV 등)**이 "
         "정하도록 합니다. 검사는 **선적지에서** 하도록 하세요 — 도착지 검사는 반송 위험을 "
         "우리가 집니다.",
@@ -1471,7 +1548,16 @@ internationally recognised surveyor. Claims notified later shall be deemed waive
             r"(claim|notification)[^.]{0,60}deemed waived",
             r"(클레임|이의|하자)[^.]{0,40}\d{1,3}\s*일[^.]{0,30}(이내|내에)"
             r"[^.]{0,30}(통지|서면)",
-            r"(기한|기간)[^.]{0,20}(지나|경과)[^.]{0,30}(포기|소멸)[^.]{0,20}(간주|본다)"],
+            r"(기한|기간)[^.]{0,20}(지나|경과)[^.]{0,30}(포기|소멸)[^.]{0,20}(간주|본다)",
+            # 법원이 유효하다고 본 문구 셋 (2026-10-03) — complaint · notice of
+            # defects 로 쓰고 숫자로 적습니다. 선적 통지("notify … of the shipment
+            # within 7 days")와 섞이지 않게 **하자·클레임 말**에 묶습니다.
+            #   Tokyo District Court 2020.12.8 · OLG Saarbrücken 1993 · Arnhem 2009
+            # 실제 계약서에서 "불만은 90 일 안에 종결", "하자는 30 일 안에 수리" 가
+            # 걸려서, 클레임을 **내는** 동사가 있어야 합니다.
+            r"(?:complain\w*|claims?|notice\s+of\s+(?:defects?|non-?conformit\w*)|defects?|rejections?)"
+            r"[^.]{0,120}\b(?:made|raised|notif\w*|reported|submitted|given|lodged|filed|asserted|occur)\b"
+            r"[^.]{0,60}within\s+\(?\d{1,3}\)?\s*(?:working\s+|business\s+|calendar\s+)?days"],
     fix="",
 )
 
@@ -1631,7 +1717,32 @@ shipment to be effected only upon the Buyer's written nomination of the vessel."
             r"(shipment|vessel)[^.]{0,60}buyer'?s? (written )?"
             r"(nomination|approval|instruction)",
             r"(신용장|L/?C)[^.]{0,60}(매수인|바이어)[^.]{0,30}(서명|지정|승인)"
-            r"[^.]{0,30}(서류|증명서)"],
+            r"[^.]{0,30}(서류|증명서)",
+            # ── 판례에 인용된 소프트 조항 (2026-10-03) ──
+            # 개설의뢰인(applicant)·수입자(importer) 도 바이어입니다.
+            r"(?:countersigned|signed|issued|stamped)\s+by[^.]{0,45}"
+            r"(?:applicant|importer|opener)\b",
+            # "Inspection Cert. Issued by MR. LIU YUE HONG of …" (대법원 2000다63691)
+            # — 줄임표 마침표 때문에 [^.] 로는 못 건넙니다.
+            r"\b(?:inspection|quality|acceptance|analysis)\s+cert(?:ificate)?\.?\s+"
+            r"(?:issued|signed|stamped)\s+by\s+(?:mr|mrs|ms|miss|dr)\b",
+            # 특정 개인 서명 (Gian Singh v. Banque de l'Indochine, PC 1974)
+            r"certificate[^.]{0,30}signed\s+by[^.]{0,60}(?:holder\s+of|passport)",
+            # 개설은행 전문으로 운송사를 지정 (Hamilton Bank v. Kookmin Bank, 2d Cir. 2001)
+            r"(?:telex|swift|message|advice)\s+from\s+(?:the\s+)?issuing\s+bank[^.]{0,120}"
+            r"(?:nominat|approv|authori[sz])\w*",
+            r"\bnominat\w*\s+(?:the\s+)?(?:transporting|shipping|carrying)\s+(?:company|vessel|line)",
+            # 개설의뢰인의 지급동의서·승인서 (대법원 2017다235036)
+            r"(?:개설의뢰인|매수인|바이어|수입자)[^.]{0,20}(?:지급|결제)\s*(?:동의서|승인서|승낙서)",
+            r"payment[^.]{0,40}(?:subject\s+to|upon|against|only\s+after|conditional\s+(?:up)?on)"
+            r"[^.]{0,30}(?:applicant|buyer|importer)'?s?\s+(?:consent|approval|acceptance|authori[sz]ation)",
+            r"(?:applicant|buyer|importer)'?s?\s+(?:payment\s+)?(?:consent|approval|authori[sz]ation)"
+            r"\s+(?:to|for)\s+(?:the\s+)?payment"],
+    # **"지급하지 않는다 … 승인하지 않으면"** — 부정이 조건의 뜻입니다. avoid 의
+    # 부정 가드에 통째로 걸러지므로 규칙 안에서 봅니다.
+    # (Hilaturas Miel v. Republic of Iraq, S.D.N.Y. 2008)
+    strict=[r"(?:shall|will|may)\s+not\s+(?:make\s+any\s+|effect\s+any\s+)?(?:pay|payment|honou?r)"
+            r"[^.]{0,80}\bunless\b[^.]{0,100}(?:approv|consent|authori[sz]|confirm)\w*"],
     fix="신용장 조건은 **우리가 혼자 만들 수 있는 서류**로만 채웁니다. "
         "검사증명서가 필요하면 **제3 검사기관(SGS·BV)** 발행으로 바꾸고, "
         "선박 지정이 필요하면 **개설 전에** 확정해 둡니다.",
@@ -2358,6 +2469,252 @@ writing, in accordance with applicable customs requirements.""",
 )
 
 
+
+# ── 실제 분쟁에서 나온 독소조항 (2026-10-03) ─────────────────────────────────
+#
+# 판결문·중재판정에 **인용된 문구**를 모아(CISG 판례 52 · 결제·신용장 35 · 국내
+# 41 · 해외 26건) 기존 조항과 맞춰 보니, 어디에도 안 들어가는 유형이 여럿
+# 나왔습니다. 그중 **여러 사건에서 매도인이 진** 것만 넣습니다. 사건과 문구는
+# tests/test_contract_disputes.py 에 있습니다.
+
+# 다른 나라 말. 영문·국문이 우선하는 꼴은 우리에게 문제가 없습니다.
+_FOREIGN_LANG = (r"(?:chinese|japanese|vietnamese|russian|arabic|spanish|portuguese|french"
+                 r"|german|italian|indonesian|thai|turkish|hindi|polish|dutch|persian|farsi"
+                 r"|malay|mongolian|uzbek|kazakh)")
+
+_clause(
+    "battle_of_forms", "바이어 발주서·구매약관이 우선", "toxic",
+    why="계약서를 잘 써 두어도 바이어 발주서(PO)나 구매약관이 우선한다고 적혀 있으면, "
+        "우리가 넣은 책임 한도·중재·클레임 기한이 **통째로 밀려납니다**.",
+    risk="판례에서 가장 자주 다툰 자리입니다. 바이어 약관의 지연 공제로 대금이 깎이고"
+         "(OGH 2017), 우리 PI 의 중재 조항이 PO 와 충돌해 관할을 다투느라 5년이 걸렸습니다"
+         "(KCAB·서울중앙지법 2020~2024).",
+    text_en="""(지울 문구의 예)
+The terms and conditions of the Buyer's purchase order shall prevail over any
+terms of the Seller's quotation, proforma invoice or order acknowledgement.""",
+    text_ko="Buyer's purchase order · our purchase terms 와 prevail · exclusively 가 함께 "
+            "나오면 이 조항입니다.",
+    detect=[r"(?:buyer|purchaser)'?s?\s+(?:purchase\s+orders?|P\.?O\.?s?|general\s+(?:terms|conditions)"
+            r"(?:\s+of\s+purchase)?|purchase\s+(?:terms|conditions)|standard\s+terms"
+            r"|terms\s+and\s+conditions(?:\s+of\s+purchase)?)[^.]{0,80}"
+            r"(?:prevail|govern|control|take\s+precedence|apply\s+exclusively)",
+            r"\bexclusive\w*\s+(?:validity\s+of\s+)?our\s+(?:general\s+)?purchas\w*\s+(?:terms|conditions)",
+            r"\bour\s+(?:general\s+)?purchas\w*\s+(?:terms|conditions)\b[^.]{0,60}"
+            r"(?:exclusive|prevail|apply|govern)",
+            r"(?:received|accepted)\s+solely\s+(?:under|on)\s+the\s+(?:conditions|terms)\s+(?:herein|stated)",
+            r"(?:매수인|바이어)[^.]{0,10}(?:발주서|주문서|구매\s*(?:약관|조건)|일반\s*거래\s*조건)"
+            r"[^.]{0,40}(?:우선(?:하여)?\s*적용|우선한다|우선함|에\s*따른다)" + NO_NEG_KO],
+    fix="'**본 계약이 바이어 발주서·약관보다 우선하며, 발주서의 다른 조건은 효력이 없다**'로 "
+        "바꿉니다. 우리 약관은 **원문을 첨부**해야 효력이 있습니다(BGH 2001 — 참조만 하고 "
+        "첨부하지 않은 면책 조항은 무효). PO 를 받으면 다른 조건을 **서면으로 거절**하세요.",
+    avoid=NEGATION + (r"subject\s+to\s+(?:this|the)\s+(?:contract|agreement)",
+                      r"\b(?:this|the)\s+(?:contract|agreement)\s+(?:shall\s+)?prevail",
+                      r"prevail\w*\s+over\s+(?:the\s+|any\s+)?(?:terms\s+(?:of|in)\s+(?:the\s+|any\s+)?)?"
+                      r"(?:buyer|purchaser)",
+                      r"seller'?s?\s+(?:general\s+)?(?:terms|conditions)[^.]{0,40}prevail",
+                      r"본\s*계약[^.]{0,10}우선"),
+)
+
+_clause(
+    "foreign_language_prevails", "상대 언어로 쓴 본이 우선", "toxic",
+    why="영문과 중문(또는 다른 언어)으로 함께 쓰고 **상대 언어본이 우선**하면, 우리가 "
+        "읽지 못하는 글이 계약이 됩니다. 두 본에 서로 다른 중재 조항이 들어가 있어도 모릅니다.",
+    risk="영문본은 '영문 우선', 중문본은 '중문 우선 · CIETAC 중재'로 적힌 계약에서 법원은 "
+         "중재 합의가 **없다**고 봤습니다(NY Dept. of Health v. Rusi Technology, 2022). "
+         "상대가 읽지 못한 언어의 약관은 거꾸로 우리 클레임 기한을 무력하게 했습니다"
+         "(MCC-Marble, 11th Cir. 1998).",
+    text_en="""(지울 문구의 예)
+This Contract is made in Chinese and English. In case of any discrepancy,
+the Chinese text shall prevail.""",
+    text_ko="Chinese · Vietnamese · Russian … version(text) 과 prevail 이 함께 나오면 이 조항입니다.",
+    detect=[_FOREIGN_LANG + r"\s+(?:version|text|language|original)\b"
+            r"(?:(?!english|korean|reference)[^.]){0,40}"
+            r"(?:(?:shall|will|is\s+to|to)\s+(?:prevail|govern|control|take\s+precedence"
+            r"|be\s+(?:the\s+)?(?:authoritative|binding|controlling))|\b(?:prevails|governs|controls)\b)",
+            r"precedence\s+(?:shall\s+be\s+)?given\s+to\s+(?:the\s+)?" + _FOREIGN_LANG,
+            r"(?:중국어|중문|일본어|일문|베트남어|러시아어|아랍어|스페인어|포르투갈어|프랑스어|독일어"
+            r"|인도네시아어|태국어|터키어)\s*(?:본|판|계약서|원문)?[^.]{0,25}"
+            r"(?:우선|기준으로\s*한다|효력을\s*가진다)" + NO_NEG_KO],
+    fix="**영문 한 본만 정본**으로 하고, 번역본은 '참고용(for reference only)'이라고 적습니다. "
+        "여러 언어로 쓸 때는 **모든 본에 같은 우선 언어 조항**을 넣으세요.",
+    avoid=NEGATION,
+)
+
+_clause(
+    "acceptance_signature_payment", "바이어 서명이 있어야 대금 지급이 시작됨", "toxic",
+    why="검수·시운전 확인서에 **바이어가 서명해야** 지급 기한이 시작되면, 바이어는 서명을 "
+        "미루는 것만으로 대금을 미룰 수 있습니다.",
+    risk="러시아 바이어가 시운전 확인서 서명을 거부하며 '아직 지급기가 아니다'라고 버텨, "
+         "한국 매도인은 **대법원까지 가서야** 116만 달러를 받았습니다(대법원 2025.3.27. "
+         "2021다242185).",
+    text_en="""(지울 문구의 예)
+The first instalment shall become due on the date on which the commissioning
+confirmation document is signed by the Buyer.""",
+    text_ko="payment(instalment) 과 acceptance · commissioning certificate … signed 가 함께 "
+            "나오고 **'서명하지 않으면 인수로 본다'가 없으면** 이 조항입니다.",
+    detect=[r"(?:payment|instal+ments?|balance|price|amount)[^.]{0,80}(?:upon|after|against|following"
+            r"|on\s+the\s+date\s+on\s+which|from\s+the\s+date\s+(?:on\s+which|of)|subject\s+to)[^.]{0,40}"
+            r"(?:acceptance|commissioning|completion|installation|final\s+inspection|performance)\s+"
+            r"(?:test\s+)?(?:certificate|confirmation|protocol|document|report)",
+            r"(?:acceptance|commissioning|completion|installation)\s+(?:test\s+)?"
+            r"(?:certificate|confirmation|protocol|document|report)[^.]{0,40}(?:signed|issued|approved)\s+by\s+"
+            r"the\s+(?:buyer|purchaser|end\s+user|customer)[^.]{0,80}(?:payment|paid|payable)",
+            r"(?:검수|인수|시운전|설치|성능\s*시험)\s*(?:완료)?\s*(?:확인서|증명서|보고서)[^.]{0,40}"
+            r"(?:서명|발급|날인)[^.]{0,60}(?:지급|결제|기산)",
+            r"(?:지급|결제)[^.]{0,40}(?:검수|인수|시운전)\s*(?:완료)?\s*(?:확인서|증명서)[^.]{0,20}(?:서명|발급)"],
+    fix="'**시운전 완료 후 N일 안에 서면 이의가 없으면 인수한 것으로 본다(deemed acceptance)**'를 "
+        "함께 넣고, 늦어도 **선적 후 N일**에는 지급기가 오도록 상한을 둡니다.",
+    avoid=NEGATION + (r"\bdeemed\b", r"간주", r"(?:fail|refus)\w*\s+to\s+sign",
+                      r"\bin\s+any\s+event\b", r"늦어도"),
+)
+
+_clause(
+    "on_demand_bond", "청구만 하면 지급되는 이행·선수금 보증", "toxic",
+    why="'**청구하면 증빙 없이 조건 없이 지급**'하는 보증은 바이어가 우리 잘못을 증명하지 "
+        "않고도 돈을 찾아갈 수 있습니다. 은행은 우리에게 그대로 구상합니다.",
+    risk="바이어가 신용장을 열지도 않고 이행보증을 청구했는데 은행은 지급해야 했습니다"
+         "(Edward Owen v. Barclays, 1978). 이란 바이어의 청구를 권리남용이라고 다퉜지만 "
+         "대법원은 '객관적으로 명백'하지 않다며 받아들이지 않았습니다(대법원 2014.8.26. "
+         "2013다53700).",
+    text_en="""(지울 문구의 예)
+The Seller shall furnish a performance guarantee payable on first written demand,
+without proof or conditions.""",
+    text_ko="performance(advance payment) bond · guarantee 와 on (first) demand · without proof 가 "
+            "함께 나오면 이 조항입니다. '수익자가 판단하여 서면으로 청구하면 조건 없이'도 같습니다.",
+    detect=[r"(?:performance|advance\s+payment|down\s*payment|refund|warranty|retention)\s+"
+            r"(?:bond|guarantee|security|standby)[^.]{0,120}"
+            r"(?:on\s+(?:first\s+)?(?:written\s+)?demand|first\s+(?:written\s+)?demand)",
+            r"(?:payable|pay)\s+(?:up)?on\s+(?:first\s+)?(?:written\s+)?demand\s+without\s+"
+            r"(?:any\s+)?(?:proof|conditions?|objection|reference)"],
+    # **'조건 없이'** 의 '없' 은 NEGATION 에 걸립니다. 부정이 뜻의 일부라 규칙
+    # 안에서 봅니다 — 끝에 지급을 부정하는 말이 오면 아닙니다.
+    strict=[r"보증[^.]{0,80}(?:판단하여|청구만으로|서면\s*청구|청구하면|요구\s*즉시)[^.]{0,60}"
+            r"(?:조건\s*없이|무조건|즉시|이의\s*없이)(?![^.]{0,30}(?:아니한다|않는다|하지\s*않))",
+            r"(?:이행|선수금\s*환급|계약\s*이행|하자\s*보수)\s*보증[^.]{0,60}"
+            r"(?:조건\s*없이|무조건|청구\s*즉시|청구만으로)(?![^.]{0,30}(?:아니한다|않는다|하지\s*않))",
+            r"(?:청구만으로|청구\s*즉시|요구\s*즉시)[^.]{0,30}(?:조건\s*없이|무조건)?[^.]{0,20}"
+            r"지급(?:되는|하는)\s*(?:이행|선수금\s*환급|계약\s*이행|하자\s*보수)?\s*보증"],
+    fix="보증은 **계약에 맞는 L/C 를 받은 뒤** 효력이 생기게 하고, 청구에는 **중재판정이나 "
+        "제3자(검사기관) 확인**을 붙입니다. 금액은 **선적분만큼 줄고**, 만료일을 박으세요. "
+        "제재로 이행할 수 없는 경우는 청구 사유에서 뺍니다.",
+    avoid=NEGATION + (r"(?:buyer|purchaser)\s+shall\s+(?:procure|provide|furnish|open|issue|arrange|cause)",
+                      r"in\s+favou?r\s+of\s+the\s+seller",
+                      r"against\s+(?:a\s+)?(?:final\s+)?(?:arbitral\s+award|court\s+judg)"),
+)
+
+_clause(
+    "time_essence_cancel", "조금만 늦어도 바로 해제", "toxic",
+    why="'time is of the essence'나 '7일 늦으면 취소'는 **유예기간 없이** 계약을 끝낼 "
+        "근거가 됩니다. 이미 만든 물건이 그대로 남습니다.",
+    risk="선적 7일 지연 해제권이 있는 계약에서 한국 무역상이 선수금에 연 20% 이자를 얹어 "
+         "돌려줬습니다(서울고법 2014.10.17. 2012나29719). 바이어가 납기를 중요하다고 알린 "
+         "것만으로도 지연이 곧 해제 사유가 됐습니다(ICC Award 8128).",
+    text_en="""(지울 문구의 예)
+Time of delivery is of the essence. If shipment is delayed by more than seven (7)
+days, the Buyer may cancel the order without liability.""",
+    text_ko="time is of the essence, 또는 '지연되면 바이어가 취소·해제할 수 있다'가 "
+            "**추가 기간 없이** 나오면 이 조항입니다.",
+    # **납기에 묶인 것만** 봅니다. 미국 계약서 1,310 건에서 "Time is of the essence
+    # of this Agreement" 가 88 건 나왔는데, 납기와 무관한 상투어입니다. (2026-10-03)
+    detect=[r"\btime\s+of\s+(?:delivery|shipment)\s+(?:is|shall\s+be)\s+of\s+the\s+essence",
+            r"\btime\s+(?:is|shall\s+be)\s+of\s+the\s+essence[^.]{0,120}"
+            r"(?:deliver|shipment|ship\b|delivery\s+dates?|lead\s+time)",
+            r"\b(?:delivery|shipment)\s+dates?\s+(?:is|are|shall\s+be)\s+(?:of\s+the\s+)?essen",
+            r"(?:delay\w*|late|fails?\s+to\s+(?:ship|deliver))[^.]{0,100}(?:buyer|purchaser)\s+"
+            r"(?:may|shall\s+be\s+entitled\s+to|has\s+the\s+right\s+to|is\s+entitled\s+to)\s+"
+            r"(?:immediately\s+)?(?:cancel|terminate|rescind|avoid)\b[^.]{0,40}"
+            r"(?:order|contract|agreement|purchase)",
+            r"(?:선적|인도|납기)[^.]{0,30}(?:지연|늦)[^.]{0,60}(?:매수인|바이어)[^.]{0,20}"
+            r"(?:즉시\s*)?(?:계약|주문)?[^.]{0,10}(?:해제|해지|취소)할\s*수\s*있"],
+    fix="해제 전에 **서면 최고 + 추가 기간(예: 15~30일)**을 주게 하고, 해제는 **늦은 선적분에만** "
+        "미치게 합니다. 원공급사 지연·불가항력은 지연에서 빼세요.",
+    avoid=NEGATION + (r"additional\s+period", r"grace\s+period", r"(?:after|following)\s+(?:a\s+)?written\s+notice",
+                      r"\bnachfrist\b", r"force\s+majeure", r"유예\s*기간", r"최고", r"불가항력",
+                      r"(?:for|of|as\s+to|in)\s+(?:the\s+)?payment", r"payment\s+(?:date|obligations?)",
+                      # 30 일 넘게 기다린 뒤의 해제는 유예가 있는 것입니다 (Bitmain 공급계약)
+                      r"(?:after|within)\s+(?:\w+\s+)?\(?(?:[3-9]\d|[1-9]\d{2})\)?\s+"
+                      r"(?:calendar\s+|working\s+|business\s+)?days",
+                      r"(?:more\s+than|exceed\w*|over|beyond|longer\s+than)\s+\(?(?:[3-9]\d|[1-9]\d{2})\)?\s+"
+                      r"(?:calendar\s+|working\s+)?days"),
+)
+
+_clause(
+    "cover_purchase", "대체 구매 차액을 우리가 무한정 부담", "toxic",
+    why="늦거나 안 맞으면 바이어가 **다른 데서 사고 차액을 우리에게 청구**합니다. 값이 "
+        "오른 시장에서는 계약금액보다 큰 돈이 됩니다.",
+    risk="분할선적 한 회분이 빠지자 바이어가 나머지를 해제하고 대체 구매 차액에 항공 운임까지 "
+         "받아 갔습니다(서울고법 2009.7.23. 2008나14857). 원자재가 상승을 이유로 한 면책은 "
+         "인정되지 않았고 대체 구매 손해를 물었습니다(CRCICA 2023).",
+    text_en="""(지울 문구의 예)
+If the Seller fails to deliver on time, the Buyer may purchase substitute goods
+from a third party and the Seller shall bear all excess costs.""",
+    text_ko="substitute(replacement) goods 와 Seller's cost · Seller shall bear 가 함께 나오고 "
+            "**상한이 없으면** 이 조항입니다.",
+    detect=[r"(?:purchase|procure|buy|obtain|source)\s+(?:substitute|replacement|equivalent|alternative|similar)\s+"
+            r"goods[^.]{0,150}(?:(?:seller|supplier|vendor)'?s?\s+(?:cost|expense|account|risk)"
+            r"|(?:seller|supplier)\s+shall\s+(?:bear|pay|reimburse|compensate|be\s+liable))",
+            r"\bcover\s+(?:purchases?|costs?)\b[^.]{0,80}(?:seller|supplier)",
+            r"(?:대체\s*(?:구매|조달|품)|제3자로부터\s*(?:구매|조달)|다른\s*(?:곳|공급자)(?:에서|로부터)\s*"
+            r"(?:구매|조달))[^.]{0,80}(?:차액|추가\s*비용|비용)[^.]{0,30}(?:매도인|공급자)[^.]{0,10}"
+            r"(?:부담|배상|지급)" + NO_NEG_KO],
+    fix="대체 구매 차액에 **상한(예: 늦은 물품 대금의 10%)**을 두고, 대체 구매 전에 **서면 통지와 "
+        "추가 기간**을 주게 합니다. 분할선적이면 해제가 **그 회분에만** 미치게 하세요.",
+    avoid=NEGATION + (r"not\s+(?:to\s+)?exceed", r"limited\s+to", r"\bup\s+to\b", r"한도", r"상한"),
+)
+
+_clause(
+    "one_way_force_majeure", "불가항력이 바이어에게만 적용", "toxic",
+    why="불가항력이 **바이어만 면책**하면, 같은 전쟁·봉쇄·감염병에서 우리는 그대로 물립니다.",
+    risk="매도인의 불가항력 주장은 판례에서 거의 받아들여지지 않습니다 — 공급사 생산 중단·"
+         "통관 문제(서울중앙지법 2014.11.7. 2013가합68479), 수입국 규제(Macromex v. Globex, "
+         "2008). 반대로 **매도인에게만** 적용되는 불가항력은 한국 수출자를 지켰습니다"
+         "(Standard Retail v. G.S. Global, 봄베이 고등법원 2020).",
+    text_en="""(지울 문구의 예)
+Force majeure shall excuse only the Buyer's performance. The Seller shall not be
+relieved of its obligations by any force majeure event.""",
+    text_ko="force majeure 와 only the Buyer, 또는 'Seller shall not be relieved'가 함께 나오면 "
+            "이 조항입니다.",
+    detect=[r"force\s+majeure[^.]{0,80}\b(?:only|solely|exclusively)\s+(?:to\s+|by\s+|for\s+)?(?:the\s+)?"
+            r"(?:buyer|purchaser)",
+            r"force\s+majeure[^.]{0,60}(?:apply|available|invoked?)\w*\s+(?:only\s+)?(?:to|by)\s+"
+            r"(?:the\s+)?(?:buyer|purchaser)\s+only",
+            r"불가항력[^.]{0,60}(?:매수인|바이어)(?:에게만|만|에\s*한하여)[^.]{0,30}(?:적용|면책|원용)"],
+    # "Seller shall **not** be relieved" — 부정이 뜻 그 자체입니다. 통지 요건
+    # ("… unless notified within 7 days")은 흔한 정상 조항이라 뺍니다.
+    strict=[r"(?:seller|supplier)\s+shall\s+not\s+be\s+(?:relieved|excused|released|discharged)[^.]{0,80}"
+            r"force\s+majeure(?![^.]*\bunless\b)",
+            r"force\s+majeure\s+(?:events?\s+|circumstances?\s+)?shall\s+not\s+"
+            r"(?:relieve|excuse|release|discharge)\s+the\s+(?:seller|supplier)(?![^.]*\bunless\b)",
+            r"\bno\s+force\s+majeure\s+(?:event\s+)?shall\s+(?:relieve|excuse|release|discharge)\s+the\s+"
+            r"(?:seller|supplier)(?![^.]*\bunless\b)",
+            r"(?:매도인|공급자)(?:은|는)[^.]{0,40}불가항력[^.]{0,40}"
+            r"(?:면책되지\s*(?:않|아니)|책임을\s*면하지\s*못)"],
+    fix="불가항력은 **양쪽 모두**에 적용하고, 사유에 **수출허가 거부·제재·원공급사 불이행·"
+        "수입국 규제 변경·항만 폐쇄**를 적어 둡니다. 판례는 적혀 있지 않은 사유를 거의 "
+        "인정하지 않습니다.",
+    avoid=NEGATION,
+)
+
+_clause(
+    "unilateral_amendment", "바이어가 혼자 조건을 바꿈", "toxic",
+    why="바이어가 **통지만으로** 약관·단가·조건을 바꿀 수 있으면, 계약서에 적은 것이 "
+        "언제든 달라질 수 있습니다.",
+    risk="바이어가 L/C 조건변경으로 단가를 30달러에서 25달러로 깎았는데, 수익자가 거절 "
+         "의사를 바로 밝히지 않아 분쟁이 됐습니다(대한상의 무역클레임 상담사례).",
+    text_en="""(지울 문구의 예)
+The Buyer may amend these terms and conditions at any time by written notice to
+the Seller, and such amendments shall bind the Seller.""",
+    text_ko="Buyer may amend(modify·change) these terms(prices) 가 나오면 이 조항입니다.",
+    detect=[r"(?:buyer|purchaser)\s+(?:may|reserves\s+the\s+right\s+to|shall\s+be\s+entitled\s+to|has\s+the\s+right\s+to)\s+"
+            r"(?:unilaterally\s+|at\s+any\s+time\s+)?(?:amend|modify|change|revise|update|vary|alter)\s+"
+            r"(?:these|this|the|any)\s+(?:terms|conditions|agreement|contract|purchase\s+terms|prices?|unit\s+prices?)",
+            r"(?:매수인|바이어)(?:은|는|이|가)?[^.]{0,20}(?:일방적으로|임의로|언제든지|통지만으로)[^.]{0,30}"
+            r"(?:계약|조건|약관|단가|가격)[^.]{0,20}(?:변경|수정)할\s*수\s*있"],
+    fix="'계약 변경은 **양 당사자가 서명한 서면**으로만 효력이 있다'로 바꿉니다. 신용장 "
+        "조건변경으로 단가·수량이 바뀌면 **받는 즉시 서면으로 거절**하세요(UCP600 제10조).",
+    avoid=NEGATION + (r"by\s+mutual", r"both\s+parties", r"signed\s+by\s+both", r"쌍방", r"서면\s*합의"),
+)
+
 # **이 독소가 있으면 이 보호 조항은 무력합니다.** (2026-10-02)
 #
 # 실물 보세가공 계약서 제6조는 "직접손해만 배상"으로 한도를 걸었는데, 앞머리에
@@ -2431,11 +2788,13 @@ def analyze(text: str) -> dict:
         if row["category"] == "toxic":
             avoid = avoid + DEFINITION
         best = None
-        for pattern in row["detect"]:
+        rules = [(p, avoid) for p in row["detect"]]
+        rules += [(p, DEFINITION) for p in row["strict"]]
+        for pattern, veto in rules:
             # **자리마다** 봅니다. 첫 자리가 부정문·미정이어도 다른 자리에 진짜가
             # 있을 수 있습니다.
             for hit in re.finditer(pattern, body, re.I | re.S):
-                if avoid and _vetoed(body, hit.start(), avoid):
+                if veto and _vetoed(body, hit.start(), veto):
                     continue
                 reason = "" if row["category"] == "toxic" else _weakness(row, body, hit)
                 if reason is None:
