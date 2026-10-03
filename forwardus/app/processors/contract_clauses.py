@@ -2633,7 +2633,13 @@ def our_side(text: str) -> dict | None:
 
 
 def _as_seller(body: str) -> str:
-    side = our_side(body)
+    return as_seller_with(our_side(body), body)
+
+
+def as_seller_with(side: dict | None, body: str) -> str:
+    """정해 둔 우리 쪽(side)으로 글을 바꿔 읽습니다. 조항 하나만 바꿀 때 씁니다
+    — 조항 하나에는 당사자 정의가 없어 our_side 를 다시 못 구합니다. (2026-10-03)"""
+
     if not side:
         return body
     for label, role in ((side["label"], "the Seller"), (side["other_label"], "the Buyer")):

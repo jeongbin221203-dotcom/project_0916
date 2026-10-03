@@ -240,7 +240,10 @@ def as_text(result: dict) -> str:
     if result.get("check"):
         lines += [f"### ⚪ 규칙이 판정하지 못한 조항 {len(result['check'])}개 (직접 확인)", ""]
         for item in result["check"]:
-            lines.append(f"- **{item['title']}** 조항으로 보입니다 — “{item['sentence']}”")
+            lines.append(f"- **{item['title']}** 조항으로 보입니다 — {item.get('label', '확인 필요')}")
+            if item.get("why"):
+                lines.append(f"  - 수출자 입장: {item['why']}")
+            lines.append(f"  - 문장: “{item['sentence']}”")
         lines.append("")
     if result["gain"]:
         lines += [f"### 🔵 챙기면 이로운 조항 {len(result['gain'])}개", ""]

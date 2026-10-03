@@ -225,5 +225,74 @@ def test_목차에_속지_않는다():
     assert not _candidates(doc)
 
 
+# ── 수출자 입장 (2026-10-03) ───────────────────────────────────────────────
+# '직접 확인' 조항에 우리(매도인) 입장을 붙입니다. 가장 나쁜 실수는 **불리한
+# 조항을 유리하다고** 하는 것이라, 그런 꼴(U)을 따로 모아 지킵니다.
+
+STANCE = [
+    # F 유리 · U 불리 · M 쌍방 · ? 확인 필요
+    ("Article 20 Neither party may assign this Contract without consent.", "assignment", "M"),
+    ("3. EXCLUSIVITY: The Seller shall supply the Products exclusively to the Buyer.", "exclusivity", "U"),
+    ("The Buyer shall indemnify the Seller against all class actions.", "indemnity", "F"),
+    ("The Seller shall indemnify the Buyer against all third-party claims.", "indemnity", "U"),
+    ("Article 16 The courts of Seoul shall have exclusive jurisdiction.", "jurisdiction", "F"),
+    ("제18조 (관할) 서울중앙지방법원을 관할법원으로 한다.", "jurisdiction", "F"),
+    ("The courts of New York shall have exclusive jurisdiction.", "jurisdiction", "U"),
+    ("Each Party irrevocably waives any right to trial by jury.", "jury_waiver", "F"),
+    ("Punitive damages are expressly excluded under this Agreement.", "liability_cap", "F"),
+    ("Neither Party shall be liable for consequential damages.", "liability_cap", "F"),
+    ("The Buyer shall be entitled to punitive damages.", "liability_cap", "U"),
+    ("The Seller shall not be liable for any indirect loss.", "liability_cap", "F"),
+    ("The Seller's liability shall not exceed the invoice value.", "liability_cap", "F"),
+    ("The Buyer may terminate this Contract at any time upon notice.", "termination", "U"),
+    ("The Seller may terminate this Contract if payment is overdue.", "termination", "F"),
+    ("The Buyer may not set off any claim against the price.", "set_off", "F"),
+    ("All payments shall be made in US Dollars.", "payment", "?"),
+    ("매수인은 매도인의 동의 없이 계약을 해지할 수 있다.", "termination", "U"),
+    ("매도인은 대금이 연체되면 계약을 해지할 수 있다.", "termination", "F"),
+    ("매도인은 간접손해에 대하여 책임을 지지 아니한다.", "liability_cap", "F"),
+    ("매수인은 제3자의 청구로부터 매도인을 면책한다.", "indemnity", "F"),       # '면책한다' = 지켜 줄 의무
+    ("어느 당사자도 상대방의 중대한 위반이 있는 경우에만 해지할 수 있다.", "termination", "M"),
+]
+# 불리한데 유리로 읽히기 쉬운 꼴 — F 가 나오면 안 됩니다
+NEVER_FAVORABLE = [
+    ("Goods made in Korea shall be governed by the laws of New York.", "governing_law"),
+    ("The Korean exporter submits to the courts of Singapore.", "jurisdiction"),
+    ("Arbitration shall be seated in Hong Kong; the language shall be Korean.", "disputes"),
+    ("The Seller may not terminate this Contract for any reason.", "termination"),
+    ("The Seller shall be entitled to no compensation upon termination.", "termination"),
+    ("The Seller may only claim within 7 days, failing which all claims are waived.", "warranty"),
+    ("The Seller may be deemed to have waived its right to claim after 7 days.", "warranty"),
+    ("The Buyer shall have the right to reject the goods at its sole discretion.", "inspection"),
+    ("The Buyer shall not be required to pay until resale.", "payment"),
+    ("매도인은 계약을 해지할 수 없다.", "termination"),
+    ("매도인은 어떠한 경우에도 가격을 인상하지 못한다.", "price"),
+]
+CODE = {"favorable": "F", "unfavorable": "U", "mutual": "M", "unclear": "?"}
+
+
+@pytest.mark.parametrize("text,topic,want", STANCE, ids=[t[:24] for t, _, _ in STANCE])
+def test_수출자_입장을_판정한다(text, topic, want):
+    assert CODE[ct.stance(text, topic)["stance"]] == want
+
+
+@pytest.mark.parametrize("text,topic", NEVER_FAVORABLE, ids=[t[:24] for t, _ in NEVER_FAVORABLE])
+def test_불리한_조항을_유리하다고_하지_않는다(text, topic):
+    assert ct.stance(text, topic)["stance"] != "favorable"
+
+
+def test_PartyAB_계약서는_우리_쪽으로_바꿔_읽고_판정한다():
+    """Party A 가 우리(Party B) 장부를 본다 — 상대 권리라 불리합니다."""
+
+    doc = ("CONTRACT between the following parties concerned: Acme Inc., hereinafter referred to "
+           "as Party A, having its head office at Tokyo, Japan, and Hana Co., Ltd., hereinafter "
+           "referred to as Party B, having its head office at Seoul, Korea. Whereas the parties "
+           "agree as follows.\nArticle 17 Upon reasonable notice Party A may examine and copy the "
+           "books and records of Party B relating to the Products.\n")
+    audit = [c for c in _candidates(doc) if c["topic"] == "audit"]
+    assert audit and audit[0]["stance"] == "unfavorable"
+    assert "Party A may examine" in audit[0]["sentence"]     # 보여 주는 문장은 원문 그대로
+
+
 def test_모델_파일이_json_으로_읽힌다():
     json.loads(ct.MODEL_PATH.read_text(encoding="utf-8"))

@@ -257,6 +257,121 @@ def chunks(text: str) -> list[str]:
     return [c for c in out if len(c) >= 40]
 
 
+# ── 수출자 입장 판정 ───────────────────────────────────────────────────────
+#
+# **우리는 수출자, 곧 매도인입니다.** (2026-10-03)
+#
+# '직접 확인'으로 띄우는 조항은 주제만 알려 줘서, "서울중앙지방법원 관할"처럼
+# 우리에게 **유리한** 조항도 똑같이 확인하라고 했습니다. 문장에서 **누가 의무를
+# 지고 누가 권리를 갖는지**를 보고 수출자 입장을 덧붙입니다.
+#
+# 원칙: 틀리게 '유리'라고 하면 사용자가 위험한 조항을 넘깁니다. 그래서 근거가
+# 없으면 '확인 필요'로 둡니다 — '유리'는 문장이 분명히 말할 때만.
+
+_SELLER = r"(?:the\s+)?(?:seller|supplier|manufacturer|exporter|vendor)s?"
+_BUYER = r"(?:the\s+)?(?:buyer|purchaser|customer|importer|distributor)s?"
+_MUTUAL_EN = re.compile(r"\b(?:neither\s+party|each\s+party|either\s+party|both\s+parties|the\s+parties"
+                        r"|each\s+of\s+the\s+parties|neither\s+of\s+the\s+parties|mutual(?:ly)?)\b", re.I)
+_MUTUAL_KO = re.compile(r"어느\s*당사자|각\s*당사자|양\s*당사자|쌍방|당사자\s*모두|상호")
+_SELLER_KO = r"(?:매도인|공급자|수출자|판매자|제조자)"
+_BUYER_KO = r"(?:매수인|바이어|구매자|수입자|구입자)"
+# 우리 책임을 덜거나 없애는 말 — 주어가 우리면 유리, 상대면 불리
+_RELIEF_EN = (r"not\s+be\s+(?:liable|responsible)|have\s+no\s+(?:liability|obligation|responsibility)"
+              r"|be\s+excused|not\s+be\s+(?:required|obliged)")
+# "면책한다"는 넣지 않습니다 — "매수인은 매도인을 면책한다"는 매수인이 매도인을
+# **지켜 주는 의무**입니다. 주어의 책임이 줄어드는 것은 "면책된다"입니다. (2026-10-03)
+_RELIEF_KO = r"책임을?\s*지지\s*아니|책임이\s*없|면책된다|의무가\s*없"
+_RIGHT_EN = r"(?:may|can|shall\s+(?:be\s+entitled|have\s+the\s+right)|is\s+entitled|has\s+the\s+right)"
+_DUTY_EN = r"(?:shall|must|will|agrees?\s+to|undertakes?)"
+_SUBJECT_EN = re.compile(rf"\b(?P<who>{_SELLER}|{_BUYER})\b(?:'s)?\s+(?:\w+\s+){{0,2}}?"
+                         rf"(?P<modal>{_RIGHT_EN}|{_DUTY_EN})\b(?P<rest>[^.;]{{0,80}})", re.I)
+_SUBJECT_KO = re.compile(rf"(?P<who>{_SELLER_KO}|{_BUYER_KO})(?:은|는|이|가)(?P<rest>[^.]{{0,80}})")
+
+_LABEL = {"favorable": "🟢 우리에게 유리", "unfavorable": "🔴 우리에게 불리할 수 있음",
+          "mutual": "⚪ 양쪽에 같게 걸림", "unclear": "확인 필요"}
+
+
+def _verdict(stance: str, why: str) -> dict:
+    return {"stance": stance, "label": _LABEL[stance], "why": why}
+
+
+def stance(text: str, topic: str = "") -> dict:
+    """수출자(매도인) 입장에서 이 조항이 어떤가. Party A/B 는 미리 바꿔 읽어 넘깁니다."""
+
+    from app.processors.contract_clauses import KOREA
+
+    s = re.sub(r"\s+", " ", str(text or ""))
+    low = s.lower()
+    # 1) 주제가 방향을 정하는 것
+    if topic in ("jurisdiction", "disputes", "governing_law"):
+        courts = re.search(r"courts?\s+of|법원|중재|arbitration|laws?\s+of|법령|준거", s, re.I)
+        # 한국 지명이 법원·법률·중재 **바로 옆**에 있어야 합니다. 문장 어디에 Korea 가
+        # 있기만 해도 유리로 보면 "Goods made in Korea … laws of New York" 를 유리라고
+        # 합니다 — 불리를 유리로 보는, 가장 나쁜 실수입니다. (2026-10-03)
+        home = re.search(rf"(?:courts?\s+(?:of|in|sitting\s+in)|laws?\s+of|arbitration\s+(?:in|at)"
+                         rf"|seat(?:ed)?\s+(?:of\s+arbitration\s+)?(?:shall\s+be\s+)?(?:in|at)?)"
+                         rf"\s+(?:the\s+)?(?:republic\s+of\s+)?{KOREA}|\bKCAB\b|대한상사중재원"
+                         rf"|{KOREA}[^.]{{0,12}}(?:법원|중재|법령|법률|법에)", s, re.I)
+        if courts and home:
+            return _verdict("favorable", "한국 법원·중재·법률입니다 — 우리 쪽에서 다툽니다.")
+        if courts:
+            return _verdict("unfavorable", "한국이 아닌 곳의 법원·법률로 보입니다 — 멀리서, 남의 법으로 다툽니다.")
+    if topic == "jury_waiver" and re.search(r"waive|포기", low):
+        return _verdict("favorable", "배심재판을 포기합니다 — 미국 배심의 큰 배상 판결을 피합니다.")
+    # 2) 쌍방
+    if _MUTUAL_EN.search(s) or _MUTUAL_KO.search(s):
+        if topic in ("liability_cap", "indemnity") and re.search(
+                r"not\s+be\s+liable|neither\s+party\s+shall\s+be\s+liable|exclud|shall\s+not\s+exceed"
+                r"|limited\s+to|책임을?\s*지지\s*아니|한도", low):
+            return _verdict("favorable", "양쪽 모두의 책임을 줄입니다 — 보통 배상 청구를 받는 쪽은 "
+                                         "매도인이라 우리에게 더 이롭습니다.")
+        return _verdict("mutual", "양쪽에 똑같이 걸리는 조항입니다.")
+    # 3) 주어 + 의무·권리
+    m = _SUBJECT_EN.search(s)
+    if m:
+        ours = re.fullmatch(_SELLER, m.group("who"), re.I) is not None
+        rest = m.group("rest")
+        right = re.fullmatch(_RIGHT_EN, m.group("modal"), re.I) is not None
+        relief = re.search(_RELIEF_EN, m.group("modal") + rest, re.I) is not None
+        # "The Seller's **liability** shall not exceed …" — 'shall' 만 보면 우리 의무로
+        # 읽힙니다. 책임 한도는 우리 책임을 **덜어 줍니다**.
+        if re.search(r"liabilit", m.group(0), re.I) and re.search(
+                r"not\s+exceed|(?:be\s+)?limited\s+to|be\s+capped", rest, re.I):
+            relief = True
+        # "may **not**", "shall be entitled to **no** …" — 권리가 아니라 금지입니다.
+        # 'may' 만 보고 우리 권리(유리)라 하면 불리를 유리로 보는 실수입니다.
+        # "may **only** claim within 7 days, failing which all claims are waived" — 권리를
+        # 주는 것이 아니라 **묶는** 것입니다. 공격에서 유리로 판정했습니다. (2026-10-03)
+        if right and re.match(r"\s*(?:not\b|to\s+no\b|no\b|only\b)", rest, re.I):
+            right = False
+        who = "우리(매도인)" if ours else "상대(바이어)"
+        # 우리가 권리를 **포기·상실**하는 말이 붙으면 불리합니다.
+        if ours and re.search(r"waive|forfeit|deemed\s+(?:to\s+have\s+)?accepted|포기|상실", rest, re.I):
+            return _verdict("unfavorable", "우리(매도인)의 권리를 포기·제한합니다.")
+        if relief:
+            return _verdict("favorable" if ours else "unfavorable", f"{who}의 책임을 덜어 줍니다.")
+        if right:
+            return _verdict("favorable" if ours else "unfavorable", f"{who}에게 권리를 줍니다.")
+        return _verdict("unfavorable" if ours else "favorable", f"{who}에게 의무·제한을 지웁니다.")
+    m = _SUBJECT_KO.search(s)
+    if m:
+        ours = re.fullmatch(_SELLER_KO, m.group("who")) is not None
+        rest = m.group("rest")
+        who = "우리(매도인)" if ours else "상대(바이어)"
+        if re.search(_RELIEF_KO, rest):
+            return _verdict("favorable" if ours else "unfavorable", f"{who}의 책임을 덜어 줍니다.")
+        if re.search(r"할\s*수\s*있", rest):
+            return _verdict("favorable" if ours else "unfavorable", f"{who}에게 권리를 줍니다.")
+        # "해지할 수 없다", "하지 못한다" — 금지는 의무·제한입니다.
+        if re.search(r"하여야|해야|한다|진다|부담|할\s*수\s*없|하지\s*못", rest):
+            return _verdict("unfavorable" if ours else "favorable", f"{who}에게 의무·제한을 지웁니다.")
+    # 4) 주어 없이 책임을 빼는 꼴 — "Punitive damages are expressly excluded"
+    if topic in ("liability_cap", "indemnity") and re.search(
+            r"(?:are|is|shall\s+be)\s+(?:expressly\s+)?excluded|shall\s+not\s+exceed|배제", low):
+        return _verdict("favorable", "배상 범위를 줄입니다 — 보통 청구를 받는 쪽은 매도인입니다.")
+    return _verdict("unclear", "누가 의무를 지는지 문장에서 가리지 못했습니다. 직접 확인하세요.")
+
+
 def candidates(text: str, judged: dict, categories: dict) -> list[dict]:
     """규칙이 그 **주제를 하나도 판정하지 못한** 조항만 냅니다.
 
@@ -267,11 +382,15 @@ def candidates(text: str, judged: dict, categories: dict) -> list[dict]:
     갑니다 — 규칙이 이미 말한 것을 분류기가 되풀이하면 소음입니다.
     """
 
-    from app.processors.contract_clauses import _drop_page_furniture, _drop_table_of_contents
+    from app.processors.contract_clauses import (
+        _drop_page_furniture, _drop_table_of_contents, as_seller_with, our_side)
 
     # 목차를 먼저 지웁니다. 그대로 두면 "제12조(준거법) …… 5" 가 줄마다 후보가
     # 됩니다. 판정(contract_clauses.find_in)도 같은 것을 지우고 봅니다.
     body = _drop_page_furniture(_drop_table_of_contents(str(text or "")))
+    # Party A/B 계약서 — 우리 쪽은 문서 머리에서 한 번 정하고, 조항마다 그것으로
+    # 바꿔 읽어 입장을 봅니다. 보여 주는 문장은 원문 그대로입니다.
+    side = our_side(body)
     best: dict[str, dict] = {}
     # 조항 수 상한 — 아주 긴 문서(부록·약관 묶음)에서 응답이 늘어지지 않게.
     for chunk in chunks(body)[:MAX_CHUNKS]:
@@ -288,7 +407,8 @@ def candidates(text: str, judged: dict, categories: dict) -> list[dict]:
             continue
         kind = "must" if any(categories.get(k) == "must" for k in keys) else "check"
         item = {**found, "kind": kind,
-                "sentence": chunk if len(chunk) <= 300 else chunk[:297] + "…"}
+                "sentence": chunk if len(chunk) <= 300 else chunk[:297] + "…",
+                **stance(as_seller_with(side, chunk), found["topic"])}
         if found["topic"] not in best or item["score"] > best[found["topic"]]["score"]:
             best[found["topic"]] = item
     ranked = sorted(best.values(), key=lambda x: x["score"] - x["threshold"], reverse=True)

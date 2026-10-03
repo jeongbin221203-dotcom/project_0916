@@ -57,6 +57,8 @@
         <ul class="cc_list">${items.map((item) => `
           <li class="cc_row">
             <span class="cc_tag cc_check">확인</span> <b>${esc(item.title)}</b> 조항으로 보입니다
+            ${item.label ? `<span class="cc_stance cc_${esc(item.stance || "unclear")}">${esc(item.label)}</span>` : ""}
+            ${item.why ? `<p class="cc_why">수출자 입장 — ${esc(item.why)}</p>` : ""}
             <blockquote class="cc_evidence">“${esc(item.sentence)}”</blockquote>
           </li>`).join("")}</ul>
       </section>`;

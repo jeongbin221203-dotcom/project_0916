@@ -47,6 +47,12 @@
 /* 주제 분류기가 고른 것 — 판정이 아니라 '직접 보세요'라 회색으로 둡니다. (2026-10-03) */
 .cc_check { background: #e2e8f0; color: #334155; }
 .cc_maybe { border-left-color: #94a3b8; }
+/* 수출자 입장 — 유리(초록)·불리(빨강)·쌍방(회색)·확인 필요(노랑) (2026-10-03) */
+.cc_stance { margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; }
+.cc_favorable { background: #dcfce7; color: #166534; }
+.cc_unfavorable { background: #fee2e2; color: #b91c1c; }
+.cc_mutual { background: #f1f5f9; color: #475569; }
+.cc_unclear { background: #fef3c7; color: #92400e; }
 .cc_side { margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--surface);
   font-size: 12.5px; line-height: 1.7; }
 @media (max-width: 620px) {
