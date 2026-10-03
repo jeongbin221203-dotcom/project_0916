@@ -2585,7 +2585,9 @@ terms of the Seller's quotation, proforma invoice or order acknowledgement.""",
                       r"prevail\w*\s+over\s+(?:the\s+|any\s+)?(?:terms\s+(?:of|in)\s+(?:the\s+|any\s+)?)?"
                       r"(?:buyer|purchaser)",
                       r"seller'?s?\s+(?:general\s+)?(?:terms|conditions)[^.]{0,40}prevail",
-                      r"본\s*계약[^.]{0,10}우선"),
+                      # "본 계약은 매수인의 발주서**보다** 우선" — 우리 계약이 이깁니다.
+                      r"본\s*계약[^.]{0,30}우선",
+                      r"(?:발주서|주문서|구매\s*(?:약관|조건)|일반\s*거래\s*조건)[^.]{0,5}보다\s*우선"),
 )
 
 _clause(
@@ -2641,7 +2643,8 @@ confirmation document is signed by the Buyer.""",
                       r"\bin\s+any\s+event\b", r"늦어도",
                       # 우리가 서명하는 확인서는 우리 손에 있습니다.
                       r"(?:signed|issued|approved)\s+by\s+the\s+(?:seller|supplier)",
-                      r"(?:매도인|공급자)(?:이|가)\s*(?:서명|발급)"),
+                      # "매도인이 설치 완료 확인서를 발급한 날" — 목적어가 사이에 옵니다.
+                      r"(?:매도인|공급자)(?:이|가)[^.]{0,30}(?:서명|발급)"),
 )
 
 _clause(
