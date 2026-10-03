@@ -320,8 +320,9 @@ def test_도착국을_주면_그_나라_조항을_앞세운다(client):
     assert all(row["for_country"] for row in toxic[:3]), \
         [row["key"] for row in toxic[:3]]
     # 나머지는 그대로 있습니다 — 걸러 내는 것이 아니라 순서만 바꿉니다.
+    # 가공계약에서만 보는 조항(context)은 계약서를 올리기 전에는 내지 않습니다. (2026-10-02)
     assert len(toxic) == len([r for r in contract_clauses.CLAUSES
-                              if r["category"] == "toxic"])
+                              if r["category"] == "toxic" and not r["context"]])
 
 
 def test_도착국이_없어도_그대로_돈다(client):

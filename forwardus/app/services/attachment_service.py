@@ -128,7 +128,7 @@ def _contract_answer(filename: str, data: bytes, message: str) -> dict | None:
         "intent": {"make": False, "kinds": []},
         "route": "consult",
         "answer": contract_clause_service.as_text(result),
-        "contract": {key: result[key] for key in ("missing", "toxic", "gain", "present")},
+        "contract": {key: result[key] for key in ("missing", "toxic", "weak", "gain", "present")},
         "question": message or filename,
     }
 

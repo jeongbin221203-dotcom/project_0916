@@ -210,6 +210,14 @@ CASES = {
         "제28조 해지 시 잔여 재고는 매수인이 인수한다.",
         "제28조 해지 시 금형 미상각분을 정산한다.",
     ],
+    # 가공계약에서만 봅니다 — 문장 안에 상대가 원자재를 대는 말이 함께 있어야 합니다.
+    "material_yield": [
+        "29. A processing loss of up to 3% of the materials supplied by the Buyer "
+        "shall be allowed.",
+        "Wastage allowance: 2% of the yarn supplied by the Buyer.",
+        "제29조 매수인이 공급한 원사의 손모율은 3%로 한다.",
+        "제29조 위탁가공 후 남은 잔량은 매수인에게 반송한다.",
+    ],
 }
 
 CASE_LIST = [(key, body) for key, bodies in CASES.items() for body in bodies]

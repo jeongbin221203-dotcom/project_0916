@@ -362,7 +362,7 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
         return {"success": True, "source": "contract", "data": {
             "answer": contract_clause_service.as_text(judged),
             "route": "contract",
-            "contract": {key: judged[key] for key in ("missing", "toxic", "gain", "present")},
+            "contract": {key: judged[key] for key in ("missing", "toxic", "weak", "gain", "present")},
             "links": [{"label": "📜 조항 문안 받기 · 계약서 다시 올리기",
                        "url": "/documents"}],
         }}

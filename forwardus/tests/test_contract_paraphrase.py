@@ -372,6 +372,23 @@ CASES = {
         "제27조 매도인은 전수검사를 실시하고 그 비용을 부담한다.",
         "제27조 공급자가 전량 검사를 하며 비용을 진다.",
     ],
+    # 실물 보세가공 계약서 제9조·제15조에서 (2026-10-02)
+    "own_negligence_indemnity": [
+        "The Seller shall indemnify the Buyer for all claims, including those caused "
+        "in whole or in part by the Buyer's own negligence.",
+        "The Seller shall indemnify the Buyer against any loss, regardless of fault.",
+        "제30조 매도인은 매수인의 과실 여부를 불문하고 모든 손해를 배상한다.",
+        "제30조 매수인의 지시로 인한 손해를 포함하여 매도인이 모두 배상한다.",
+        "제30조 매수인의 과실과 관계없이 매도인이 손해를 배상한다.",
+    ],
+    "consigned_material_lock": [
+        "Yarn supplied by the Buyer remains its property until paid; until then the "
+        "Seller shall not process it without the Buyer's written consent.",
+        "Materials consigned by the Buyer: the Seller may not mix or process the "
+        "materials without the Buyer's prior consent.",
+        "제31조 매수인이 공급한 원자재는 대금 정산 전에는 매수인의 동의 없이 가공할 수 없다.",
+        "제31조 위탁가공 원사는 매수인의 승낙 없이 가공하지 못한다.",
+    ],
 }
 
 CASE_LIST = [(key, body) for key, bodies in CASES.items() for body in bodies]

@@ -14,8 +14,9 @@
 (function () {
   "use strict";
 
-  const MARK = { must: "필수", gain: "이익", toxic: "독소" };
-  const TONE = { must: "cc_must", gain: "cc_gain", toxic: "cc_toxic" };
+  // weak — 적혀 있으나 미정·부정·불리·무력인 필수·이익조항 (2026-10-02)
+  const MARK = { must: "필수", gain: "이익", toxic: "독소", weak: "보완" };
+  const TONE = { must: "cc_must", gain: "cc_gain", toxic: "cc_toxic", weak: "cc_weak" };
 
   function esc(text) {
     return window.Forwardus ? window.Forwardus.escapeHtml(text) : String(text == null ? "" : text);
@@ -35,7 +36,10 @@
           <span class="cc_tag ${TONE[group]}">${MARK[group]}</span>
           <b>${esc(item.title)}</b>
           ${item.present ? `<span class="cc_found">${group === "toxic" ? "들어 있음" : "있음"}</span>` : ""}
+          ${item.status === "weak" ? `<span class="cc_weak_tag">적혀 있으나 부족</span>` : ""}
         </label>
+        ${item.status === "weak" && item.reason ? `<p class="cc_reason">${rich(item.reason)}</p>` : ""}
+        ${item.evidence ? `<blockquote class="cc_evidence">근거 — “${esc(item.evidence)}”</blockquote>` : ""}
         <p class="cc_why">${rich(item.why)}</p>
         <p class="cc_risk">${rich(item.risk)}</p>
         ${item.text_ko ? `<p class="cc_how">${rich(item.text_ko)}</p>` : ""}
@@ -100,8 +104,12 @@
 
     function draw(groups, found) {
       body.innerHTML =
-        groupBlock(found ? "🔴 지우거나 고쳐야 할 조항" : "🔴 조심할 조항 (독소)",
+        (groups.side ? `<p class="cc_side">우리 쪽(매도인·수출자)을 <b>${esc(groups.side.label)} — ${esc(groups.side.name)}</b>,
+            상대(매수인)를 <b>${esc(groups.side.other_label)} — ${esc(groups.side.other_name)}</b> 로 읽었습니다.
+            반대라면 판정도 반대가 됩니다.</p>` : "")
+        + groupBlock(found ? "🔴 지우거나 고쳐야 할 조항" : "🔴 조심할 조항 (독소)",
                    groups.toxic, "toxic")
+        + groupBlock("🟡 적혀 있으나 제 구실을 못 하는 조항", groups.weak, "weak")
         + groupBlock(found ? "🟠 빠진 필수조항" : "🟠 있어야 할 조항 (필수)",
                      groups.must, "must")
         + groupBlock("🔵 챙기면 이로운 조항 (이익)", groups.gain, "gain");
@@ -143,8 +151,10 @@
       const result = answer.data;
       status.textContent =
         `${result.checked.toLocaleString()}자를 읽었습니다. `
-        + `독소 ${result.toxic.length}개 · 빠진 필수 ${result.missing.length}개.`;
-      draw({ toxic: result.toxic, must: result.missing, gain: result.gain }, true);
+        + `독소 ${result.toxic.length}개 · 보완 ${(result.weak || []).length}개 · `
+        + `빠진 필수 ${result.missing.length}개.`;
+      draw({ toxic: result.toxic, weak: result.weak || [], must: result.missing,
+             gain: result.gain, side: result.our_side }, true);
     });
 
     exportBtn.addEventListener("click", async () => {

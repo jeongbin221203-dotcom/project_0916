@@ -63,7 +63,10 @@ MINIMUM_PURCHASE = (r"minimum\s+(?:annual\s+)?(?:purchase|quantity|order|volume)
 SET_OFF_DENIED = (r"\b(?:shall|may|must|will|can)\s+not\s+(?:\w+\s+){0,2}?"
                   r"(?:set[- ]?off|deduct|withhold)",
                   r"\bcannot\s+(?:set[- ]?off|deduct|withhold)",
-                  r"\bno\s+set[- ]?off\b")
+                  r"\bno\s+set[- ]?off\b",
+                  # 국문 — "매수인은 어떠한 공제도 **하지 못한다**". 이익조항(상계
+                  # 금지)과 짝으로 판정하면서 드러났습니다. (2026-10-02)
+                  r"(?:상계|공제)[^.]{0,10}(?:할\s*수\s*없|하지\s*못|금지|불가)")
 
 # **자동 연장되지 않는다**는 꼴. evergreen 도 예문("해지 통보가 없으면")에 부정말이
 # 있어 통짜 가드를 못 씁니다. "shall not be automatically renewed" 는 유리합니다.
@@ -136,7 +139,8 @@ INDEMNIFY_BUYER = (r"(?:indemnif\w*\s+(?:and\s+(?:defend|hold)\s+)?(?:the\s+)?bu
 
 
 def _clause(key, title, category, why, risk, text_en, text_ko, detect,
-            applies=("always",), fix="", countries=(), avoid=()):
+            applies=("always",), fix="", countries=(), avoid=(), weak=(),
+            require=None, context=(), neg_ok=False):
     """조항 한 줄.
 
     countries
@@ -152,6 +156,20 @@ def _clause(key, title, category, why, risk, text_en, text_ko, detect,
       영어는 부정이 앞에 와서("shall not send") 규칙 안에 가드를 못 끼웁니다.
       그래서 찾은 뒤에 거릅니다. 부정이 **뜻의 일부**인 조항(최혜대우·경업금지)
       에는 붙이지 않습니다 — 붙이면 영영 못 찾습니다. (2026-10-02)
+
+    아래 넷은 **필수·이익조항**에만 씁니다. 낱말이 보여도 그 조항이 제 구실을
+    하는지는 따로 봐야 합니다. "Incoterms to be agreed later" 는 가격조건이
+    **없는** 것이고, "no price adjustment" 는 가격조정이 **안 되는** 것입니다.
+    전에는 둘 다 '있다'고 해서, 사용자를 안심시켰습니다. (2026-10-02)
+
+    weak     ((문장 규칙, 까닭), …) — 찾은 자리의 문장이 이 꼴이면 '적혀 있으나
+             불리'로 봅니다. 예: 금형이 바이어에게 귀속.
+    require  ((규칙, …), 까닭) — 찾은 자리 둘레에 이 중 하나가 없으면 '적혀
+             있으나 빈 조항'입니다. 예: 선적 조항인데 시기가 없음.
+    context  문서 어디에든 이 중 하나가 있어야 이 조항을 봅니다. 가공계약에만
+             있는 조항(위탁 원자재)을 보통 매매계약에서 찾지 않게 합니다.
+    neg_ok   부정이 **뜻의 일부**인 조항(비밀유지·상계 금지·분할선적 금지)은
+             앞뒤의 부정말로 약하다고 보지 않습니다.
     """
 
     CLAUSES.append({
@@ -159,6 +177,8 @@ def _clause(key, title, category, why, risk, text_en, text_ko, detect,
         "text_en": text_en.strip(), "text_ko": text_ko.strip(),
         "detect": tuple(detect), "applies": tuple(applies), "fix": fix,
         "countries": tuple(countries), "avoid": tuple(avoid),
+        "weak": tuple(weak), "require": require, "context": tuple(context),
+        "neg_ok": bool(neg_ok),
     })
 
 
@@ -261,7 +281,21 @@ of the date of shipment.""",
     detect=[r"분할\s*선적",
             r"환적",
             r"선적\s*기일",
-            r"\bshipment\b", r"partial shipment", r"trans?[hs]ipment", r"선적\s*조건"],
+            r"\bshipment\b", r"partial shipment", r"trans?[hs]ipment", r"선적\s*조건",
+            # "선적은 2027년 3월 15일까지 한다" — 국문 본문 꼴을 못 봤습니다.
+            # 시기는 아래 require 가 따로 봅니다. (2026-10-02)
+            r"선적(?:은|을|일|\s*시기|\s*기한)"],
+    # "PAYMENT : BY T/T BEFORE **SHIPMENT**" 의 낱말 하나로 '선적 조건이 있다'고
+    # 했습니다. 실물 오퍼 시트에는 선적 기일이 어디에도 없었습니다. (2026-10-02)
+    # 금액·수량의 숫자("by T/T 30% deposit")는 시기가 아닙니다. 날짜·일수 꼴만.
+    require=((r"\d+\s*(?:\(\d+\)\s*)?(?:calendar\s+|business\s+|working\s+)?days",
+              r"\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b",
+              r"\b(?:sixty|thirty|ninety|forty[- ]five|fifteen|ten|seven)\s+(?:\(\d+\)\s*)?(?:calendar\s+|business\s+|working\s+)?days",
+              r"\b(?:19|20)\d{2}\b", r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?",
+              r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}\b",
+              r"partial|trans[hs]ipment|분할|환적", r"선적\s*기일", r"\d+\s*일", r"까지|이내"),
+             "선적 시기(기일·기간)가 없습니다. '선적'이라는 낱말만 있습니다."),
+    neg_ok=True,
 )
 
 _clause(
@@ -281,6 +315,19 @@ deemed accepted.""",
             r"검수",
             r"검사[^.]{0,30}(?:실시|한다|받는다)",
             r"\binspection\b", r"certificate of inspection", r"검사\s*(기관|조건|증명)"],
+    # "within ten business days **after inspection**" — 언제 검사하는지가 없으면
+    # 상대가 몇 달 뒤에 검사하고 클레임을 겁니다. (2026-10-02 실물 보세가공 계약서)
+    require=((r"before shipment|prior to (?:shipment|loading|dispatch)|pre-?shipment",
+              r"at the (?:port|place|factory|warehouse|premises)|port of (?:loading|shipment|discharge)",
+              r"(?:upon|after|on) (?:arrival|receipt|delivery)|at (?:the )?destination",
+              r"\bby\s+(?:an?\s+|the\s+)?(?:independent|third|surveyor|inspector|SGS|BV|Intertek|Bureau)",
+              r"surveyor|certificate|\bSGS\b|Intertek|Bureau Veritas",
+              # "claim … within 10 days after inspection" 의 10일은 **통지** 기한이지
+              # 검사 시기가 아닙니다. 검사에 붙은 기한만 셉니다.
+              r"inspect\w*[^.]{0,30}within\s+\d",
+              r"final and binding|conclusive|quality|quantity",
+              r"선적\s*전|선적지|도착|검사\s*기관|공인|검사증|이내[^.]{0,15}검사|품질|수량"),
+             "검사를 언제·어디서·누가 하는지가 없습니다. 상대가 아무 때나 검사하고 클레임을 걸 수 있습니다."),
 )
 
 _clause(
@@ -316,6 +363,12 @@ party may terminate this Contract without liability.""",
     detect=[r"beyond[^.]{0,30}(?:reasonable\s+)?control",
             r"통제[^.]{0,20}(?:할 수 없|밖|범위)",
             r"force majeure", r"acts? of god", r"불가항력"],
+    weak=((r"\bseller\b[^.]{0,30}not\s+(?:be\s+)?(?:excused|relieved|exempt(?:ed)?)"
+           r"|not\s+(?:be\s+)?(?:excused|relieved|exempt(?:ed)?)[^.]{0,30}\bseller\b"
+           r"|force majeure[^.]{0,60}(?:shall|does|will)\s+not\s+(?:apply|excuse|relieve)[^.]{0,30}seller",
+           "불가항력 면책이 **우리(매도인)에게는** 적용되지 않게 적혀 있습니다."),
+          (r"(?:매도인|공급자)[^.]{0,30}불가항력[^.]{0,30}(?:면책되지|적용하지|적용되지)",
+           "불가항력 면책이 **우리(매도인)에게는** 적용되지 않게 적혀 있습니다.")),
 )
 
 _clause(
@@ -377,6 +430,9 @@ Seller. The Seller may suspend further shipments while any amount is overdue."""
     detect=[r"이자[^.]{0,30}(?:부담|가산|지급|붙)",
             r"연\s*\d{1,2}(?:\.\d+)?\s*%[^.]{0,30}이자",
             r"late payment", r"interest at", r"overdue", r"지연\s*이자", r"연체\s*이자"],
+    weak=((r"\bno\s+(?:late\s+|default\s+|penalty\s+)?interest\b|interest\s+shall\s+not|without\s+interest"
+           r"|이자[^.]{0,10}(?:없|아니|않)",
+           "연체 이자가 **없다**고 적혀 있습니다."),),
 )
 
 _clause(
@@ -396,6 +452,10 @@ affected order without liability.""",
             r"원자재[^.]{0,50}(?:변동|상승|등락)",
             r"price adjustment", r"price review", r"exchange rate .{0,40}(move|fluctuat)",
             r"가격\s*조정"],
+    weak=((r"(?:shall|will|may)\s+not\s+be\s+(?:adjusted|changed|revised|increased)"
+           r"|not\s+subject\s+to\s+(?:any\s+)?(?:adjustment|revision|change)"
+           r"|조정(?:하지|되지)\s*(?:아니|않)|변경\s*불가",
+           "가격을 **조정할 수 없다**고 적혀 있습니다."),),
 )
 
 _clause(
@@ -430,7 +490,12 @@ consequential loss, or loss of profit, revenue or business.""",
             r"책임\s*(?:의)?\s*한도" + NO_NEG_KO,
             r"손해배상\s*(?:의)?\s*한도" + NO_NEG_KO,
             r"(?:배상|책임)[^.]{0,40}(?:초과하지|넘지)\s*(?:아니|않)",
-            r"(?:배상|책임)[^.]{0,30}(?:으로|로)\s*한정" + NO_NEG_KO],
+            r"(?:배상|책임)[^.]{0,30}(?:으로|로)\s*한정" + NO_NEG_KO,
+            # "compensate … for **direct loss** proved" — 간접손해를 빼는 한정.
+            # 실물 보세가공 계약서 제6조. (2026-10-02)
+            r"(?:compensate|liable|indemnif\w*)[^.]{0,80}\bdirect\s+(?:loss|losses|damages?)\b"],
+    weak=((r"\bunlimited\b|without\s+(?:any\s+)?(?:monetary\s+|financial\s+)?limit",
+           "책임 한도가 **없다**고 적혀 있습니다."),),
 )
 
 _clause(
@@ -446,6 +511,7 @@ without liability, and the Buyer shall not claim any damages.""",
     detect=[r"export (?:approval|permit|authoris|authoriz)",
             r"수출\s*(?:승인|허가|신고)",
             r"export licen[cs]e", r"export control", r"수출\s*허가"],
+    neg_ok=True,
 )
 
 _clause(
@@ -460,6 +526,10 @@ contribution by the Buyer to their cost, unless otherwise agreed in writing.""",
     detect=[r"(?:drawings?|technical data|designs?)[^.]{0,80}(?:propert|belong|remain)[^.]{0,40}seller",
             r"(?:금형|치공구|도면|지그)[^.]{0,50}(?:소유권|귀속)[^.]{0,30}(?:매도인|공급자)",
             r"\btooling\b", r"\bmou?lds?\b", r"intellectual property", r"금형", r"도면"],
+    weak=((r"(?:vest|belong|remain|transfer|pass)\w*[^.]{0,30}(?:in|to|with)\s+(?:the\s+)?buyer"
+           r"|property of the buyer|buyer\s+shall\s+own"
+           r"|(?:매수인|바이어)(?:에게|의)\s*(?:귀속|소유|있)",
+           "금형·도면이 **상대(바이어) 소유**로 적혀 있습니다."),),
 )
 
 _clause(
@@ -561,7 +631,10 @@ dispute arising out of this Contract.""",
     detect=[rf"exclusive jurisdiction\s+(?:of|in)\s+(?![^.]{{0,40}}{KOREA})",
             rf"courts? of (?![^.]{{0,40}}{KOREA})[^.]{{0,40}}(?:shall have|exclusive)",
             rf"전속\s*적?[^.]{{0,4}}관할(?![^.]{{0,40}}{KOREA})",
-            r"관할\s*법원[^.]{0,30}(매수인|바이어)"],
+            r"관할\s*법원[^.]{0,30}(매수인|바이어)",
+            # "disputes **go to** the courts of New York" — shall have 가 없는 꼴 (2026-10-02)
+            rf"(?:disputes?|claims?)[^.]{{0,40}}(?:go|be\s+(?:referred|submitted|brought|heard))\s+"
+            rf"(?:to|in|before)\s+the\s+courts?\s+of\s+(?![^.]{{0,40}}{KOREA})"],
     fix="**중재(KCAB, 서울)** 로 바꾸거나, 최소한 **제3국 중재**로 바꿔 달라고 하세요.",
     avoid=NEGATION + KOREAN_FORUM,
 )
@@ -1266,6 +1339,7 @@ consent. This obligation shall survive for three (3) years after termination."""
             r"비밀[^.]{0,6}유지", r"기밀[^.]{0,6}유지",
             r"비밀[^.]{0,20}(정보|자료)[^.]{0,30}(공개|누설)[^.]{0,20}(아니|않|금지)"],
     fix="",
+    neg_ok=True,
 )
 
 _clause(
@@ -1342,8 +1416,19 @@ have been received.""",
             r"(withhold|stop)[^.]{0,40}(further )?(shipment|delivery)"
             r"[^.]{0,60}(overdue|unpaid|payment)",
             r"(대금|지급)[^.]{0,30}(연체|지연)[^.]{0,60}(선적|출하|생산)"
-            r"[^.]{0,20}(중단|보류|정지)"],
+            r"[^.]{0,20}(중단|보류|정지)",
+            # 실물 꼴 (2026-10-02) — 이미 있는데 '넣으세요'라고 했습니다.
+            #   "shipment shall not be required until the corresponding credit is operative"
+            #   "Shipment by April 19, subject to receipt of deposit and balance"
+            #   "Production begins upon receipt of full payment"
+            r"(?:shipment|delivery)\s+shall\s+not\s+be\s+required\s+until[^.]{0,80}(?:credit|payment|paid)",
+            r"\bnot\s+(?:be\s+)?(?:obliged|obligated|required)\s+to\s+(?:ship|deliver|make\s+shipment)"
+            r"[^.]{0,80}until",
+            r"(?:shipment|production|dispatch|delivery)[^.]{0,60}(?:subject to|upon|after|provided)\s+"
+            r"(?:the\s+)?(?:receipt of|full)\s+(?:the\s+)?(?:full\s+)?(?:payment|deposit)",
+            r"(?:대금|선수금|계약금)[^.]{0,20}(?:입금|수령)[^.]{0,10}(?:후|뒤)[^.]{0,20}(?:선적|생산|출하)"],
     fix="",
+    neg_ok=True,
 )
 
 _clause(
@@ -1362,6 +1447,7 @@ deduction or withholding of any kind.""",
             r"(상계|공제)[^.]{0,30}(없이|아니하고)[^.]{0,30}(전액|지급)",
             r"(매수인|바이어)[^.]{0,30}(상계|공제)[^.]{0,20}(할 수 없|하지 못|금지)"],
     fix="",
+    neg_ok=True,
 )
 
 _clause(
@@ -1413,6 +1499,19 @@ Seller may cancel this Contract and claim the costs already incurred.""",
             r"(신용장|L/?C)[^.]{0,40}(까지|이내|기한)[^.]{0,20}개설",
             r"(신용장|L/?C)[^.]{0,40}(미개설|개설되지)[^.]{0,40}(해지|취소)"],
     fix="",
+    # **바이어가 여는** 신용장의 **기한**이어야 이익조항입니다. (2026-10-02)
+    # 실물 보세가공 계약서에서 **우리가** 원사 대금 신용장을 여는 문장을 보고
+    # '있다'고 했습니다. 정작 상대 신용장에는 기한이 없었습니다.
+    avoid=(r"\bseller\s+shall\s+(?:open|establish|issue)",
+           r"(?:매도인|공급자)(?:은|는|이|가)[^.]{0,30}(?:신용장|L/?C)[^.]{0,20}개설"),
+    # 금액(USD 45,000)은 기한이 아닙니다. 날짜·일수 꼴만. 실물 제3조가 그랬습니다.
+    require=((r"\d+\s*(?:\(\d+\)\s*)?(?:calendar\s+|business\s+|working\s+|banking\s+)?days",
+              r"\b(?:19|20)\d{2}\b", r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?",
+              r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}\b", r"\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b",
+              r"\d+\s*(?:일|월)",
+              r"\b(?:one|two|three|five|seven|ten|fifteen|twenty|thirty|forty[- ]five|sixty)\s+(?:\(\d+\)\s*)?(?:calendar\s+|business\s+|banking\s+)?days",
+              r"까지|이내|기한", r"cancel|terminat|해지|취소"),
+             "신용장을 연다고만 적혀 있고 **언제까지** 열어야 하는지가 없습니다."),
 )
 
 _clause(
@@ -2166,12 +2265,128 @@ New York, and waive any objection to venue therein.""",
     avoid=NEGATION,
 )
 
+# ── 실물 보세가공 계약서에서 (2026-10-02) ─────────────────────────────────
+#
+# 우리는 수출자(매도인)입니다. 가공무역에서는 상대가 원자재를 보내고, 우리가
+# 가공해 되팝니다. 보통 매매계약에는 없는 위험이 둘 있습니다.
+
+# 가공계약인가 — 상대(바이어)가 우리에게 원자재를 대는가. (_as_seller 뒤의 글)
+PROCESSING = (r"\bbuyer\s+shall\s+(?:supply|provide|furnish|deliver|consign)\s+(?:to\s+the\s+seller\s+)?"
+              r"[^.]{0,80}(?:yarn|materials?|components?|parts|fabrics?|resin|raw)",
+              r"(?:materials?|yarn|components?|parts)\s+(?:supplied|provided|furnished|consigned)\s+by\s+the\s+buyer",
+              r"\b(?:bonded|consignment|toll)\s+processing\b|\bprocessing\s+trade\b",
+              r"(?:매수인|바이어|위탁자)[^.]{0,30}(?:원자재|원사|자재|부품)[^.]{0,20}(?:공급|제공)",
+              r"(?:매수인|바이어|위탁자)[^.]{0,20}(?:공급|제공)한\s*(?:원자재|원사|자재|부품)",
+              r"(?:위탁|보세)\s*가공")
+
+_clause(
+    "own_negligence_indemnity", "상대 과실까지 우리가 배상", "toxic",
+    why="상대의 지시나 과실로 생긴 손해까지 우리가 물어 주는 조항입니다. 우리가 "
+        "막을 방법이 없는 손해를 떠안습니다.",
+    risk="상대가 보낸 원자재가 불량이거나 상대가 잘못 지시해서 생긴 손해도 우리가 "
+         "전부 배상합니다. 보험으로도 잘 안 막힙니다.",
+    text_en="""(지울 문구의 예)
+The Seller shall indemnify the Buyer for all losses, including losses caused in
+whole or in part by the Buyer's own instructions or negligence.""",
+    text_ko="caused … by the Buyer's own negligence · regardless of fault · "
+            "매수인의 과실을 불문하고 가 배상 문장에 붙어 있으면 이 조항입니다.",
+    detect=[r"indemnif\w*[^.]{0,250}(?:caused|arising|resulting)\s+(?:in\s+whole\s+or\s+in\s+part\s+)?"
+            r"(?:by|from)\s+(?:the\s+)?buyer'?s?\s+(?:own\s+)?(?:\w+\s+(?:or|and)\s+)?(?:gross\s+)?"
+            r"(?:negligen|fault|instruction)",
+            r"indemnif\w*[^.]{0,250}(?:even if|whether or not|regardless of whether)[^.]{0,60}"
+            r"(?:caused by|due to|attributable to)[^.]{0,20}(?:the\s+)?buyer",
+            r"indemnif\w*[^.]{0,200}regardless of (?:the\s+buyer'?s?\s+)?(?:fault|negligence)",
+            r"(?:매수인|바이어)\s*(?:의)?\s*(?:고의|과실|귀책|지시)[^.]{0,40}(?:포함|불문|관계없이)"
+            r"[^.]{0,40}(?:배상|면책|책임)",
+            r"(?:과실|귀책)\s*(?:여부|유무)[^.]{0,6}(?:를|와)?\s*(?:불문|관계없이)[^.]{0,40}"
+            r"(?:매도인|공급자)(?:은|는|이|가)?[^.]{0,30}(?:배상|책임)"],
+    fix="**각자 자기 과실 범위에서만** 책임지게(\"to the extent caused by its own "
+        "negligence\") 바꾸고, 상대 원자재·지시로 생긴 손해는 상대 부담으로 적어 달라고 하세요.",
+    # 통짜 NEGATION 은 못 씁니다 — "과실과 관계**없**이" 의 '없'이 부정말로 읽혀
+    # 이 조항을 스스로 못 찾습니다. 배상 자체를 부정하는 말만 봅니다.
+    avoid=INDEMNIFY_SELLER + (
+        r"\b(?:shall|will|need)\s+not\s+(?:be\s+(?:required|obliged)\s+to\s+)?indemnif",
+        r"배상(?:하지|할\s*책임이)\s*(?:아니|않|없)"),
+)
+
+_clause(
+    "consigned_material_lock", "상대 원자재를 동의 없이 가공 못 함", "toxic",
+    why="상대가 보낸 원자재의 대금이 정산되기 전에는 상대 동의 없이 가공할 수 "
+        "없게 묶는 조항입니다. 대금이 늦어지면 생산이 멈추는데, 납기는 그대로입니다.",
+    risk="신용장 서류 하자로 원자재 대금 지급이 늦어지면 공장이 섭니다. 그래도 "
+         "완제품 선적 기한을 넘기면 우리가 위반입니다.",
+    text_en="""(지울 문구의 예)
+Until the price is received, the buyer shall not resell, pledge, mix or process
+the goods without the seller's written consent.""",
+    text_ko="가공계약에서 원자재 소유권 유보와 '동의 없이 가공 금지'가 함께 있으면 "
+            "이 조항입니다. 보통 매매계약에서는 우리에게 **유리**하므로 짚지 않습니다.",
+    detect=[r"(?:shall|may|must)\s+not\s+(?:[a-z]+,?\s+(?:or\s+|and\s+)?){0,5}process\s+"
+            r"(?:them|it|the\s+(?:goods|materials?|yarn|fabrics?|components?|parts))"
+            r"[^.]{0,60}without[^.]{0,40}consent",
+            r"(?:원자재|원사|자재|부품)[^.]{0,60}(?:동의|승낙)\s*없이[^.]{0,20}"
+            r"가공(?:할 수 없|하지 못|금지)"],
+    fix="**신용장 개설(또는 대금 지급 절차 개시)로 가공에 동의한 것**으로 보게 하고, "
+        "원자재 대금이 늦어지면 **완제품 납기도 그만큼** 늦추게 해 달라고 하세요.",
+    context=PROCESSING,
+)
+
+_clause(
+    "material_yield", "가공 손모율·잔량 처리 (Yield & Surplus)", "gain",
+    why="원자재 10,000kg 으로 완제품 9,000m 를 만들라는 계약에서, 불량·손실을 "
+        "얼마까지 인정하는지와 남은 원자재를 어떻게 하는지가 없으면 모자란 만큼 "
+        "우리가 물어냅니다.",
+    risk="원자재 품질 탓에 수율이 떨어져도 계약 수량을 못 맞춘 책임은 우리에게 "
+         "갑니다. 보세 원자재 잔량은 세관 정산 대상입니다.",
+    text_en="""(넣을 문구의 예)
+A processing loss of up to <3>% of the materials supplied by the Buyer shall be
+allowed. Any shortfall caused by defective materials shall be borne by the Buyer.
+Surplus materials shall be returned to the Buyer or disposed of as agreed in
+writing, in accordance with applicable customs requirements.""",
+    text_ko="**손모 허용률(%)**, **원자재 불량에 따른 부족은 상대 부담**, **잔량 반송·처분 "
+            "방법**을 함께 적습니다.",
+    detect=[r"(?:processing\s+)?(?:wastage|loss|yield|scrap)\s+(?:rate|allowance|ratio)",
+            r"processing\s+loss", r"(?:surplus|remaining|leftover|excess)\s+(?:yarn|materials?)",
+            r"(?:손모|로스)\s*율?", r"잔량|잔여\s*(?:원자재|원사|자재)"],
+    fix="",
+    context=PROCESSING,
+)
+
+
+# **이 독소가 있으면 이 보호 조항은 무력합니다.** (2026-10-02)
+#
+# 실물 보세가공 계약서 제6조는 "직접손해만 배상"으로 한도를 걸었는데, 앞머리에
+# "Subject to Article 9" 가 붙어 있고 제9조가 한도 없는 배상입니다. 제6조만
+# 보고 '책임 한도 있음'이라고 하면 사용자는 안심합니다.
+DEFEATED_BY = {
+    "liability_cap": (("unlimited_damages", "own_negligence_indemnity"),
+                      "한도가 적혀 있지만, 한도 없는 배상 조항이 함께 있어 밀릴 수 있습니다."),
+    "ip": (("ip_assignment", "tooling_free"),
+           "금형·도면 조항이 있지만, 상대에게 넘기는 조항이 함께 있습니다."),
+    "confidential": (("one_way_nda",), "비밀유지가 있지만 **우리에게만** 걸려 있습니다."),
+    "no_set_off": (("buyer_set_off",), "상계 금지가 있지만, 상대의 상계를 허용하는 조항이 함께 있습니다."),
+    "claim_period": (("open_warranty",), "클레임 기한이 있지만, 기한 없는 보증 조항이 함께 있습니다."),
+    "arbitration": (("foreign_forum",), "중재 조항이 있지만, 상대국 법원 전속관할과 함께 있어 서로 모순됩니다."),
+}
+
 
 def find_in(text: str) -> set[str]:
-    """올린 계약서에서 **보이는** 조항의 key.
+    """올린 계약서에서 **제 구실을 하는** 조항의 key.
 
-    보인다/안 보인다만 말합니다. 보인다고 해서 그 조항이 우리에게 유리하게
-    쓰여 있다는 뜻은 아닙니다.
+    독소조항은 보이면 들어갑니다. 필수·이익조항은 '적혀 있으나 미정·불리'
+    (analyze 의 weak)인 것을 뺍니다 — 그건 있는 것이 아닙니다. (2026-10-02)
+    """
+
+    return {key for key, row in analyze(text)["clauses"].items()
+            if row["status"] == "present"}
+
+
+def analyze(text: str) -> dict:
+    """조항마다 판정과 근거.
+
+    clauses  {key: {"status": "present"|"weak", "evidence": 근거 문장,
+                    "reason": weak 의 까닭}}  — 안 보인 조항은 없습니다.
+    context  문서가 맞춘 context 조항의 key (가공계약 조항 등)
+    side     Party A/B 계약서에서 우리로 읽은 쪽 (our_side)
     """
 
     # **줄바꿈을 지웁니다.**
@@ -2196,26 +2411,95 @@ def find_in(text: str) -> set[str]:
     if not body.strip():
         return set()
     body = _as_seller(body)
-    found = set()
+    context = {row["key"] for row in CLAUSES
+               if row["context"] and any(re.search(p, body, re.I) for p in row["context"])}
+    out: dict[str, dict] = {}
     for row in CLAUSES:
+        if row["context"] and row["key"] not in context:
+            continue
         # 뜻풀이 문장은 **독소조항 전부**에서 거릅니다. 낱말의 뜻을 적은 것이지
         # 의무를 정한 것이 아닙니다. (2026-10-02)
         avoid = (row.get("avoid") or ())
         if row["category"] == "toxic":
             avoid = avoid + DEFINITION
+        best = None
         for pattern in row["detect"]:
-            if not avoid:
-                if re.search(pattern, body, re.I | re.S):
-                    found.add(row["key"])
+            # **자리마다** 봅니다. 첫 자리가 부정문·미정이어도 다른 자리에 진짜가
+            # 있을 수 있습니다.
+            for hit in re.finditer(pattern, body, re.I | re.S):
+                if avoid and _vetoed(body, hit.start(), avoid):
+                    continue
+                reason = "" if row["category"] == "toxic" else _weakness(row, body, hit)
+                judged = {"status": "weak" if reason else "present",
+                          "evidence": _evidence(body, hit), "reason": reason}
+                if not reason:
+                    best = judged
                     break
-                continue
-            # avoid 가 있으면 **자리마다** 그 문장을 보고 거릅니다.
-            # 첫 자리가 부정문이어도 다른 자리에 진짜가 있을 수 있습니다.
-            if any(not _vetoed(body, hit.start(), avoid)
-                   for hit in re.finditer(pattern, body, re.I | re.S)):
-                found.add(row["key"])
+                best = best or judged
+            if best and best["status"] == "present":
                 break
-    return found
+        if best:
+            out[row["key"]] = best
+    # 짝 독소가 함께 있으면, 보호 조항은 **있어도 무력**합니다.
+    #   제6조 "직접손해만 배상" + 제9조 "한도 없이 배상" — 제6조가 제9조에 밀립니다.
+    for key, (toxics, reason) in DEFEATED_BY.items():
+        mine = out.get(key)
+        hits = [t for t in toxics if t in out]
+        if mine and mine["status"] == "present" and hits:
+            names = ", ".join(by_key(t)["title"] for t in hits)
+            mine.update(status="weak", reason=f"{reason} (함께 있는 독소: {names})")
+    return {"clauses": out, "context": context, "side": our_side(body)}
+
+
+# 찾은 자리 **바로 뒤**의 미정 문구. "Incoterms to be agreed later",
+# "Payment terms: TBA". 낱말 셋까지 건너뜁니다 — "Payment **terms** to be advised".
+_UNDECIDED_AFTER = re.compile(
+    r"^\W{0,3}(?:[\w/]+\W{1,3}){0,3}?"
+    r"(?:to\s+be\s+(?:agreed|advised|confirmed|determined|decided|discussed|negotiated|fixed)"
+    r"|TB[ADC]\b|추후\s*(?:협의|결정|통지|확정)|미정|협의\s*(?:예정|후\s*결정))", re.I)
+# 찾은 자리 **바로 앞**의 부정어. "There shall be **no** price adjustment".
+# 바로 앞만 봅니다 — "shall not be liable for delay … force majeure" 는 정상 조항입니다.
+_NEG_BEFORE = re.compile(r"\b(?:no|not|without|nor|never)\s+(?:any\s+|the\s+|a\s+|such\s+)?$", re.I)
+# 한국어는 부정이 **뒤**에 옵니다. "가격 조정은 **없다**". 조건("없으면")·
+# "서면 합의 없이는" 은 부정이 아니라서 좁게 씁니다.
+_NEG_AFTER_KO = re.compile(
+    r"^\s*(?:은|는|이|가|을|를|도)?\s*(?:없(?:다|음|으며|고|이\s)|두지\s*아니|하지\s*아니|하지\s*않)")
+
+
+def _scope(body: str, start: int, end: int, reach: int = 150) -> str:
+    """찾은 자리가 든 문장. 표처럼 마침표가 없는 글은 앞뒤 reach 자로 자릅니다."""
+
+    left = max(body.rfind(".", 0, start) + 1, start - reach)
+    right = body.find(".", end)
+    right = min(len(body) if right < 0 else right, end + reach)
+    return body[left:right]
+
+
+def _evidence(body: str, hit) -> str:
+    text = _scope(body, hit.start(), hit.end(), reach=110).strip(" ,;:")
+    return text if len(text) <= 260 else text[:257] + "…"
+
+
+def _weakness(row: dict, body: str, hit) -> str:
+    """필수·이익조항의 찾은 자리가 **제 구실을 못 하면** 그 까닭. 하면 ""."""
+
+    after = body[hit.end():hit.end() + 60]
+    if _UNDECIDED_AFTER.search(after):
+        return "적혀 있으나 '추후 결정'입니다. 정해진 내용이 없습니다."
+    if not row["neg_ok"]:
+        if _NEG_BEFORE.search(body[max(0, hit.start() - 25):hit.start()]):
+            return "부정문입니다 — 이 조항이 '없다'고 적혀 있습니다."
+        if _NEG_AFTER_KO.search(body[hit.end():hit.end() + 16]):
+            return "부정문입니다 — 이 조항이 '없다'고 적혀 있습니다."
+    scope = _scope(body, hit.start(), hit.end())
+    for pattern, reason in row["weak"]:
+        if re.search(pattern, scope, re.I):
+            return reason
+    if row["require"]:
+        patterns, reason = row["require"]
+        if not any(re.search(p, scope, re.I) for p in patterns):
+            return reason
+    return ""
 
 
 # ── 우리 쪽 정하기 ──────────────────────────────────────────────────────────

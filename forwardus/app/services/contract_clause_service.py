@@ -24,7 +24,7 @@ DISCLAIMER = ("법률 자문이 아닙니다. 여기 문안은 출발점이고, 
 
 
 def checklist(incoterms: str = "", present: set[str] | None = None,
-              country: str = "") -> dict:
+              country: str = "", analysis: dict | None = None) -> dict:
     """이 건에 걸리는 조항 점검표.
 
     present를 주면(올린 계약서에서 보인 조항) 줄마다 있음/없음을 함께 답니다.
@@ -38,15 +38,25 @@ def checklist(incoterms: str = "", present: set[str] | None = None,
     """
 
     present = present or set()
+    # analysis(analyze 결과)를 주면 줄마다 판정(status)·근거 문장·까닭을 답니다.
+    # 가공계약에만 있는 조항(context)은 그 문서가 가공계약일 때만 냅니다. (2026-10-02)
+    judged = (analysis or {}).get("clauses", {})
+    contexts = (analysis or {}).get("context", set())
     tags = contract_clauses.groups_for(country)
     out: dict[str, list[dict]] = {"must": [], "gain": [], "toxic": []}
     for row in contract_clauses.CLAUSES:
         if not contract_clauses.applies_to(row, incoterms):
             continue
+        if row["context"] and row["key"] not in contexts:
+            continue
+        seen = judged.get(row["key"]) or {}
         out[row["category"]].append({
             "key": row["key"], "title": row["title"], "why": row["why"],
             "risk": row["risk"], "text_ko": row["text_ko"], "fix": row["fix"],
             "present": row["key"] in present,
+            "status": seen.get("status") or ("present" if row["key"] in present else "absent"),
+            "evidence": seen.get("evidence", ""),
+            "reason": seen.get("reason", ""),
             "countries": list(row["countries"]),
             "for_country": bool(tags & set(row["countries"])),
         })
@@ -70,15 +80,20 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
     if not body.strip():
         raise ServiceError("읽을 글이 없습니다. 계약서 파일이나 글을 넣어 주세요.",
                            "VALIDATION_ERROR")
-    found = contract_clauses.find_in(body[:MAX_TEXT])
-    rows = checklist(incoterms, found, country)
+    analysis = contract_clauses.analyze(body[:MAX_TEXT])
+    found = {key for key, row in analysis["clauses"].items() if row["status"] == "present"}
+    rows = checklist(incoterms, found, country, analysis)
     # 도착국에 흔한데 **아직 안 보이는** 독소조항. 올린 계약서에 없더라도
     # 협상 중에 들어올 수 있어 미리 알려 줍니다. (2026-10-02)
     watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]]
     return {
-        "missing": [row for row in rows["must"] if not row["present"]],
+        "missing": [row for row in rows["must"] if row["status"] == "absent"],
         "toxic": [row for row in rows["toxic"] if row["present"]],
-        "gain": [row for row in rows["gain"] if not row["present"]],
+        # **적혀 있으나 제 구실을 못 하는** 필수·이익조항 — 미정·부정·불리·무력.
+        # '있다'고 하면 안심시키고, '없다'고 하면 이미 쓴 사람에게 넣으라고
+        # 합니다. 둘 다 아니라서 따로 냅니다. (2026-10-02)
+        "weak": [row for row in rows["must"] + rows["gain"] if row["status"] == "weak"],
+        "gain": [row for row in rows["gain"] if row["status"] == "absent"],
         "ok_must": [row for row in rows["must"] if row["present"]],
         "present": sorted(found),
         "country": (country or "").upper(),
@@ -175,8 +190,17 @@ def as_text(result: dict) -> str:
         lines += [f"### 🔴 지우거나 고쳐야 할 조항 {len(result['toxic'])}개", ""]
         for row in result["toxic"]:
             lines.append(f"- **{row['title']}** — {row['risk']}")
+            if row.get("evidence"):
+                lines.append(f"  - 근거: “{row['evidence']}”")
             if row["fix"]:
                 lines.append(f"  - 고치는 법: {row['fix']}")
+        lines.append("")
+    if result.get("weak"):
+        lines += [f"### 🟡 적혀 있으나 제 구실을 못 하는 조항 {len(result['weak'])}개", ""]
+        for row in result["weak"]:
+            lines.append(f"- **{row['title']}** — {row['reason']}")
+            if row.get("evidence"):
+                lines.append(f"  - 근거: “{row['evidence']}”")
         lines.append("")
     if result["missing"]:
         lines += [f"### 🟠 빠진 필수조항 {len(result['missing'])}개", ""]
@@ -188,7 +212,7 @@ def as_text(result: dict) -> str:
         for row in result["gain"]:
             lines.append(f"- **{row['title']}** — {row['risk']}")
         lines.append("")
-    if not (result["toxic"] or result["missing"]):
+    if not (result["toxic"] or result["missing"] or result.get("weak")):
         lines += ["필수조항은 다 보이고, 독소조항은 보이지 않습니다. "
                   "다만 **글자를 찾은 결과**일 뿐이라 내용까지 맞다는 뜻은 아닙니다.", ""]
     lines += [f"※ {result['note']}"]
