@@ -100,6 +100,14 @@ def shake(text: str) -> str:
 
 
 keys = [row["key"] for row in C.CLAUSES]
+# 미탐으로 세지 않는 것 (2026-10-03, 왜 무해한지)
+#   reexport_control  예문이 **넣어야 할** 보호 문구입니다 — 그게 없을 때가 독소라
+#                     예문을 넣으면 안 걸리는 것이 맞습니다.
+#   context 조항      가공계약에만 보는 조항(consigned_material_lock 등)은 이 시험의
+#                     보통 매매계약에서 안 걸리는 것이 맞습니다.
+#   DEFEATED_BY       보호 조항과 그것을 무력하게 하는 독소가 같이 뽑히면 보호 조항은
+#                     '무력'으로 내려갑니다(아래 루프에서 거릅니다).
+NOT_SELF = {"reexport_control"}
 bad, checked = [], 0
 miss = {}
 false_hit = {}
@@ -124,6 +132,18 @@ for turn in range(ROUNDS):
         continue
 
     for key in want - got:
+        if key in NOT_SELF or C.by_key(key)["context"]:
+            continue
+        # 짝 독소가 같이 들어가면 보호 조항은 '무력'(weak)으로 내려가는 것이 맞습니다.
+        # 넣은 독소뿐 아니라 **실제로 걸린** 독소로 봅니다 — 제조물책임 예문의
+        # "Seller shall indemnify … without limitation" 은 무제한 손해배상이기도 합니다.
+        defeated = C.DEFEATED_BY.get(key)
+        if defeated and set(defeated[0]) & (want | got):
+            continue
+        # 쌍방 비밀유지(필수조항 confidential 의 예문 "Each party shall keep …")가 같이
+        # 뽑히면 일방 비밀유지가 아닙니다 — one_way_nda 규칙이 일부러 거릅니다.
+        if key == "one_way_nda" and "confidential" in want:
+            continue
         miss[key] = miss.get(key, 0) + 1
     # 조항 본문끼리 말이 겹쳐 다른 조항이 함께 걸리는 것은 오탐이 아닙니다.
     # 우리 조항을 **하나도 안 넣은** 회차에서 걸린 것만 셉니다.
