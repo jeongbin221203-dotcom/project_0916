@@ -254,9 +254,20 @@
         if (!lines.length) return "";
         // 한 덩어리가 전부 목록이면 목록으로, 아니면 문단으로 그립니다.
         if (lines.every((line) => /^\s*(?:[-*•]|\d+\.)\s+/.test(line))) {
-          const items = lines.map((line) =>
-            `<li>${inline(line.replace(/^\s*(?:[-*•]|\d+\.)\s+/, ""))}</li>`).join("");
-          return /^\s*\d+\./.test(lines[0]) ? `<ol>${items}</ol>` : `<ul>${items}</ul>`;
+          // 들여쓴 줄(두 칸 이상)은 앞 항목의 **설명**입니다 — "근거", "고치는 법".
+          // 전에는 본 항목과 같은 글머리표로 펴져서, 어느 조항의 근거인지 안 보였습니다.
+          // 앞 항목 안에 "- 근거: …" 한 줄로 둡니다. (2026-10-03)
+          const items = [];
+          lines.forEach((line) => {
+            const text = inline(line.replace(/^\s*(?:[-*•]|\d+\.)\s+/, ""));
+            if (/^\s{2,}[-*•]\s+/.test(line) && items.length) {
+              items[items.length - 1] += `<span class="li_sub">- ${text}</span>`;
+            } else {
+              items.push(text);
+            }
+          });
+          const html = items.map((item) => `<li>${item}</li>`).join("");
+          return /^\s*\d+\./.test(lines[0]) ? `<ol>${html}</ol>` : `<ul>${html}</ul>`;
         }
         if (lines.length === 1 && /^#{1,4}\s+/.test(lines[0])) {
           return `<h4>${inline(lines[0].replace(/^#{1,4}\s+/, ""))}</h4>`;

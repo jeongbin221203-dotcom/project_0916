@@ -607,3 +607,8 @@ body.hs_modal_open { overflow: hidden; }
   background: #dbeafe; color: var(--blue_dark); font-size: 10.5px; font-weight: 800;
   text-align: center; line-height: 16px; }
 .hs_sibs_list li small { color: var(--muted); font-size: 11.5px; }
+
+/* 목록 항목 안의 설명 줄 — "- 근거: …", "- 고치는 법: …". 본 항목과 구별되게
+   글머리표 대신 "-" 로 시작하고, 한 단 낮춰 흐리게 둡니다. (2026-10-03) */
+.li_sub { display: block; margin-top: 4px; padding-left: 4px; color: var(--muted);
+  font-size: 0.93em; line-height: 1.65; }
