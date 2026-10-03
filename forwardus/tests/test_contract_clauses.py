@@ -73,6 +73,24 @@ def test_빈_글은_판정하지_않는다():
         service.review("   ", "FOB")
 
 
+@pytest.mark.parametrize("text", ["Page 1 of 2", "- 1 -", "Page 1 of 3\n- 2 -\n"])
+def test_쪽_번호만_읽힌_파일은_판정하지_않는다(text):
+    """쪽 머리글을 지우고 나면 본문이 없습니다. 전에는 500 이 났습니다(2026-10-03).
+
+    '필수조항이 전부 빠졌다'고 답하면 안 됩니다 — 못 읽은 것이지 없는 것이 아닙니다.
+    """
+
+    with pytest.raises(ServiceError) as caught:
+        service.review(text, "FOB")
+    assert caught.value.error_code == "UNREADABLE"
+
+
+def test_본문이_없어도_찾기는_빈_결과를_낸다():
+    assert contract_clauses.find_in("") == set()
+    assert contract_clauses.find_in("Page 1 of 2") == set()
+    assert contract_clauses.analyze("- 1 -")["clauses"] == {}
+
+
 def test_독소조항은_문안으로_내보내도_빼라고_말한다():
     body = service.clause_text(["termination_at_will"])
     assert "넣는 것이 아니라 빼는 것" in body
@@ -374,3 +392,32 @@ def test_영문_문안은_문장_가운데서_줄이_끊기지_않는다():
     assert lines[0] == "3. PAYMENT"
     assert "first-class bank acceptable to the Seller, at least" in lines[1]
     assert "Seller by a first-class" in service.clause_plain(["payment"])
+
+
+# ── 소유권이 대금 전에 넘어가는 꼴 (2026-10-03) ─────────────────────────────────
+# "title shall pass" 만 보고 '소유권 유보 있음'이라고 했습니다. 인도·선적 때
+# 넘어가면 유보가 **아닙니다** — 바이어가 부도나면 물건은 그쪽 파산재단으로 갑니다.
+TITLE_ON_DELIVERY = [
+    "Title and risk shall pass to the Buyer upon delivery.",
+    "Ownership of the Goods shall pass to the Buyer upon shipment.",
+    "Title to the Goods shall pass to the Buyer when the Goods are loaded on board.",
+    "소유권은 선적 시 매수인에게 이전한다.",
+]
+TITLE_ON_PAYMENT = [
+    "Title shall pass to the Buyer only upon receipt of full payment.",
+    "소유권은 대금 완납 시 매수인에게 이전한다.",
+    "Title to the Goods shall pass to the Buyer upon delivery, provided that the price has "
+    "been paid in full.",
+]
+
+
+@pytest.mark.parametrize("line", TITLE_ON_DELIVERY)
+def test_인도_때_넘어가는_소유권은_유보가_아니다(line):
+    row = contract_clauses.analyze("SALES CONTRACT\n" + line)["clauses"]["title"]
+    assert row["status"] == "weak", line
+    assert "대금" in row["reason"]
+
+
+@pytest.mark.parametrize("line", TITLE_ON_PAYMENT)
+def test_대금_완납_때_넘어가는_소유권은_유보다(line):
+    assert "title" in contract_clauses.find_in("SALES CONTRACT\n" + line)

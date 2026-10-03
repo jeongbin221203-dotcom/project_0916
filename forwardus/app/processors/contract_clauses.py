@@ -429,6 +429,18 @@ title passes.""",
             r"(?:the\s+)?(?:seller|goods)[^.]{0,80}(?:until|up\s+to|unless)[^.]{0,40}pa(?:id|yment)",
             r"\btitle\b[^.]{0,30}(?:remain|retain|vest)\w*[^.]{0,30}seller[^.]{0,60}"
             r"until[^.]{0,40}pa(?:id|yment)"],
+    # **인도·선적 때 넘어가면 유보가 아닙니다.** "title shall pass" 만 보고 '있다'고
+    # 해서, 소유권이 대금 전에 넘어가는 계약서를 안심시켰습니다. 대금 말이 같은
+    # 문장에 있으면(“provided that the price has been paid”) 유보입니다. (2026-10-03)
+    weak=((r"^(?![^.]*(?:pa(?:id|yment)|price\s+has\s+been))[^.]*(?:pass|transfer|vest)\w*"
+           r"[^.]{0,40}buyer[^.]{0,40}(?:upon|on|at|when|once)\s+(?:the\s+)?"
+           r"(?:goods\s+(?:are|have\s+been)\s+)?(?:deliver|ship|load|arriv|hand|tender|discharg)",
+           "소유권이 **대금과 상관없이** 인도·선적 때 넘어갑니다. 대금 전에 바이어가 부도나면 "
+           "물건을 되찾을 근거가 없습니다."),
+          (r"^(?![^.]*(?:대금|완납|지급|결제))[^.]*소유권[^.]{0,30}(?:선적|인도|도착|적재|하역)\s*"
+           r"(?:시|와\s*동시에|하는\s*때|한\s*때)[^.]{0,30}(?:매수인|바이어)[^.]{0,10}(?:이전|귀속|넘어)",
+           "소유권이 **대금과 상관없이** 인도·선적 때 넘어갑니다. 대금 전에 바이어가 부도나면 "
+           "물건을 되찾을 근거가 없습니다.")),
 )
 
 # ── 이익조항 ────────────────────────────────────────────────────────────────
@@ -570,7 +582,9 @@ _INDIRECT_EN = (r"(?:\b(?:indirect|consequential|special|incidental)\b[^.]{0,40}
                 r"\b(?:damages?|loss(?:es)?)\b"
                 r"|\bloss(?:es)?\s+of\s+(?:profits?|business|production|revenue|goodwill)\b"
                 r"|\blost\s+profits?\b)")
-CONSEQUENTIAL_EN = (r"\b(?:seller|supplier|vendor)\s+(?:shall|will|must|agrees?\s+to|undertakes?\s+to)"
+# "NEITHER PURCHASER **NOR SELLER** SHALL BE LIABLE … CONSEQUENTIAL" 은 빼는 조항입니다.
+CONSEQUENTIAL_EN = (r"(?<!nor )(?<!neither )"
+                    r"\b(?:seller|supplier|vendor)\s+(?:shall|will|must|agrees?\s+to|undertakes?\s+to)"
                     r"\s+(?:also\s+|further\s+|fully\s+)?(?:be\s+)?"
                     r"(?:liable|responsible|indemnify|compensate|reimburse)\b"
                     # 동사와 손해 사이 — 빼거나 한정하는 말이 끼면 아닙니다.
@@ -603,14 +617,33 @@ expenses of whatever nature, including loss of profit, without limitation.""",
     #   "The Goods shall include, without limitation, packaging and manuals."
     # 책임·손해 이야기일 때만 봅니다.
     detect=[r"liabilit(?:y|ies)[^.]{0,40}(?:shall be |is )?unlimited",
-            r"no[^.]{0,25}(?:financial\s+)?(?:ceiling|cap)\b",
+            # **낱말 경계와 배상 이야기에 묶습니다.** 경계가 없어 "notice"·"nor"·
+            # "Sicap"·"Expense Cap" 에서 걸렸고, 가격 인상의 "no escalation cap" 도
+            # 걸렸습니다(실제 계약서 2 차 검증, 2026-10-03).
+            r"(?:liabilit|damages|indemnif|indemnit|compensat|loss)[^.]{0,80}"
+            r"\bno\s+(?:\w+\s+){0,2}?(?:financial\s+|monetary\s+)?(?:ceiling|cap)\b",
+            r"\bno\s+(?:financial\s+|monetary\s+)?(?:ceiling|cap)\b[^.]{0,60}"
+            r"(?:liabilit|damages|indemnif|compensat)",
             r"(?:배상|책임)[^.]{0,30}(?:상한|한도)[^.]{0,20}(?:두지|정하지)[^.]{0,10}(?:아니|않)",
             r"제한\s*없이[^.]{0,20}배상",
-            r"(liability|liabilities|damages|indemnit|indemnif|responsib)"
-            r"[^.]{0,60}without limitation",
-            r"without limitation[^.]{0,60}"
-            r"(liability|liabilities|damages|indemnit|indemnif)",
-            r"any and all (losses|damages)",
+            # **우리가 무는 문장일 때만.** (2026-10-03)
+            # 전에는 "any and all losses" 와 책임 낱말 옆의 "without limitation" 을
+            # 방향 없이 봐서, 실제 계약서 1,310 건 중 539 건이 걸렸는데 우리(매도인)가
+            # 무는 문장은 5 건이었습니다 — 간접손해를 **빼는** 조항("Neither party
+            # shall be liable … including, without limitation, lost profits"), 세금
+            # 조항, 바이어가 무는 조항이 걸렸고, 그러면 책임 한도 조항까지 '무력'으로
+            # 바뀌었습니다. 이제는 Seller 가 배상 동사의 주어이고, "including, without
+            # limitation" 상투어가 아니고, 문장에 상한이 없을 때만 봅니다.
+            # "will **not** be responsible and disclaims" · "**nor** Seller shall be liable"
+            # 은 면책을 거부하거나 빼는 문장입니다 — 건너뛰는 낱말에 부정을 넣지 않습니다.
+            r"(?<!nor )(?<!neither )"
+            r"\b(?:seller|supplier|vendor|manufacturer|exporter)\s+(?:shall|will|must|hereby\s+agrees?\s+to"
+            r"|agrees?\s+to|undertakes?\s+to)\s+(?:(?!not\b|never\b)\w+,?\s+){0,5}?(?:indemnif\w*|defend|hold\s+harmless"
+            r"|be\s+(?:fully\s+)?(?:liable|responsible)|compensate|reimburse)\b[^.]{0,160}?"
+            r"(?:any\s+and\s+all\s+(?:losses|damages|liabilit\w+|claims|costs)"
+            r"|(?<!including )(?<!including, )(?<!includes )(?<!include )without\s+(?:any\s+)?limitation)"
+            r"(?![^.]*\b(?:not\s+(?:to\s+)?exceed\w*|limited\s+to|in\s+no\s+event|aggregate\s+liability"
+            r"|cap(?:ped)?)\b)",
             r"unlimited liability",
             r"무제한\s*(으로)?[^.]{0,6}(배상|책임)",
             r"(한도|상한|제한)[^.]{0,3}없이[^.]{0,30}배상",
@@ -637,7 +670,8 @@ expenses of whatever nature, including loss of profit, without limitation.""",
             CONSEQUENTIAL_EN,
             CONSEQUENTIAL_KO],
     fix="책임 한도(Limitation of Liability) 조항을 넣어 **송장 금액 상한**과 **간접손해 배제**로 바꿔 달라고 하세요.",
-    avoid=INDEMNIFY_SELLER,
+    # 서로 배상하는 상호 조항("hold one another harmless")은 우리만 무는 것이 아닙니다.
+    avoid=INDEMNIFY_SELLER + (r"\bone\s+another\b", r"\beach\s+other\b"),
 )
 
 _clause(
@@ -2866,7 +2900,10 @@ def analyze(text: str) -> dict:
     body = re.sub(r"(?<=[A-Za-z])-\s*\n\s*(?=[a-z])", "", body)
     body = re.sub(r"\s+", " ", body)
     if not body.strip():
-        return set()
+        # **쪽 번호·머리글만 있던 글.** 전에는 set() 을 돌려줘 find_in·review 가
+        # 500 을 냈습니다("Page 1 of 2" 만 읽힌 스캔본). 같은 모양으로 비워서
+        # 내고, empty 로 '못 읽었다'를 알립니다. (2026-10-03)
+        return {"clauses": {}, "context": set(), "side": None, "empty": True}
     # 바꿔 읽기 **전에** 정합니다. 바꾼 뒤에는 Party 표지가 없어 못 찾습니다.
     side = our_side(body)
     body = _as_seller(body)

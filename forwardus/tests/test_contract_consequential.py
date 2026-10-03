@@ -92,3 +92,67 @@ def test_책임_한도_조항은_그대로_있다고_본다():
     doc = ("SALES CONTRACT\nNeither party shall be liable for any indirect or consequential "
            "damages. The Seller's total liability shall not exceed the invoice value.")
     assert contract_clauses.analyze(doc)["clauses"].get("liability_cap", {}).get("status") == "present"
+
+
+# ── 실제 계약서 1,310 건에서 539 건이 걸리던 것 (2026-10-03) ─────────────────────
+# 우리가(매도인이) 무는 문장은 5 건뿐이었습니다. 나머지는 "including, without
+# limitation" 상투어, 간접손해를 **빼는** 조항, 세금 조항, 바이어가 무는 조항이었고,
+# 이게 걸리면 같은 계약서의 책임 한도 조항까지 '무력'으로 바뀌었습니다.
+CORPUS_SAFE = [
+    "IN NO EVENT SHALL EITHER PARTY OR ITS SUBSIDIARIES BE LIABLE TO THE OTHER PARTY FOR ANY "
+    "DAMAGES, INCLUDING WITHOUT LIMITATION SPECIAL, CONSEQUENTIAL, INDIRECT, INCIDENTAL OR "
+    "PUNITIVE DAMAGES OR LOST PROFITS.",
+    "NEITHER PARTY SHALL BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR CONSEQUENTIAL "
+    "DAMAGES OF ANY KIND, INCLUDING, WITHOUT LIMITATION, LOST GOODWILL OR LOST PROFITS.",
+    "Each party will be solely responsible for any and all taxes imposed thereon, including, "
+    "without limitation, all income taxes and sales taxes.",
+    "The Buyer hereby agrees to indemnify and hold harmless the Seller against any and all "
+    "losses, claims, damages, liabilities and expenses.",
+    '"Liabilities" includes without limitation all costs, expenses, losses, damages and claims.',
+    "The Seller shall indemnify the Buyer against any and all third party claims to the extent "
+    "arising from the Seller's negligence, provided that the Seller's aggregate liability shall "
+    "not exceed the contract price.",
+    "The Seller's liability shall include, without limitation, the cost of repair or "
+    "replacement of defective Goods.",
+    "The Goods shall include, without limitation, packaging, manuals and spare parts.",
+    # 2 차 검증(보강 뒤 86 건)에서 남은 오탐
+    "The Seller will not be responsible and hereby disclaims any and all liabilities resulting "
+    "from the use by the Buyer of the training aids.",
+    "Neither the Indemnification Basket nor the Indemnification Cap shall apply with respect "
+    "to Purchaser Losses.",
+    "NEITHER PURCHASER NOR SELLER SHALL BE LIABLE TO THE OTHER FOR SPECIAL, INDIRECT, "
+    "INCIDENTAL OR CONSEQUENTIAL DAMAGES.",
+    "The Supplier shall give 90 days' notice if the Total Actual Liability reaches the Cap.",
+    "Price escalation shall apply to such Aircraft with no escalation cap or limit.",
+    "Distributor may return Product once per quarter, provided such returns do not exceed the "
+    "Balancing Cap.",
+    "The Buyer and the Supplier agree to fully release, indemnify, defend and hold one another "
+    "harmless from and against any and all claims.",
+]
+
+
+@pytest.mark.parametrize("line", CORPUS_SAFE, ids=[s[:30] for s in CORPUS_SAFE])
+def test_실제_계약서의_상투어와_배제_조항은_짚지_않는다(line):
+    assert "unlimited_damages" not in contract_clauses.find_in("SUPPLY AGREEMENT\n" + line)
+
+
+CORPUS_TOXIC = [
+    # 실제 공급계약서(SEC EDGAR)에서 우리 쪽이 무는 문장
+    "Seller shall indemnify, defend and hold harmless Purchaser (and its Affiliates) from and "
+    "against any and all damages, liabilities, claims, costs, charges, judgments and expenses.",
+    "The Supplier agrees to indemnify the Buyer against any and all losses arising out of this "
+    "Agreement.",
+    "The Seller shall be liable to the Buyer without limitation for all losses arising from "
+    "defective Goods.",
+]
+
+
+@pytest.mark.parametrize("line", CORPUS_TOXIC, ids=[s[:30] for s in CORPUS_TOXIC])
+def test_우리가_모든_손해를_무는_문장은_짚는다(line):
+    assert "unlimited_damages" in contract_clauses.find_in("SUPPLY AGREEMENT\n" + line)
+
+
+def test_상투어가_있어도_책임_한도_조항은_무력해지지_않는다():
+    doc = ("SALES CONTRACT\nThe Goods shall include, without limitation, packaging and manuals. "
+           "The Seller's total liability shall not exceed the invoice value.")
+    assert contract_clauses.analyze(doc)["clauses"]["liability_cap"]["status"] == "present"

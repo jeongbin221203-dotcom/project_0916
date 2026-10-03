@@ -91,3 +91,15 @@ def test_묶음을_나눠도_고른_조항은_모두_나온다(build):
         if isinstance(out, bytes) else out
     for key in PICKED:
         assert contract_clauses.by_key(key)["title"] in text, key
+
+
+def test_상담_답변도_묶음_소제목으로_나뉜다():
+    doc = ("SALES CONTRACT\nThe Buyer may set off any amounts it claims against the price. "
+           "The courts of Shanghai shall have exclusive jurisdiction.")
+    result = service.review(doc, "FOB")
+    result["summary"] = ""
+    text = service.as_text(result)
+    labels = dict(contract_clauses.TOXIC_GROUPS)
+    pay = f"**{labels['payment']}**"
+    dispute = f"**{labels['dispute']}**"
+    assert text.index(pay) < text.index("상계") < text.index(dispute)

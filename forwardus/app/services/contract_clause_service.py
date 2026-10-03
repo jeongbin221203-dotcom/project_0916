@@ -103,7 +103,12 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
         raise ServiceError("읽을 글이 없습니다. 계약서 파일이나 글을 넣어 주세요.",
                            "VALIDATION_ERROR")
     analysis = contract_clauses.analyze(body[:MAX_TEXT])
-    found = {key for key, row in analysis["clauses"].items() if row["status"] == "present"}
+    if analysis.get("empty"):
+        # 못 읽은 것을 '필수조항이 전부 빠졌다'고 하면 안 됩니다.
+        raise ServiceError("쪽 번호·머리글만 읽혔고 계약서 본문을 찾지 못했습니다. 스캔본이면 "
+                           "글자가 있는 PDF로 다시 저장하거나, 본문을 붙여 넣어 주세요.",
+                           "UNREADABLE")
+    found ={key for key, row in analysis["clauses"].items() if row["status"] == "present"}
     rows = checklist(incoterms, found, country, analysis)
     # 도착국에 흔한데 **아직 안 보이는** 독소조항. 올린 계약서에 없더라도
     # 협상 중에 들어올 수 있어 미리 알려 줍니다. (2026-10-02)
@@ -399,7 +404,12 @@ def as_text(result: dict) -> str:
                   "읽었습니다. 반대라면 판정도 반대가 됩니다.", ""]
     if result["toxic"]:
         lines += [f"### 🔴 지우거나 고쳐야 할 조항 {len(result['toxic'])}개", ""]
+        last = None
         for row in result["toxic"]:
+            # 화면·내려받기와 같은 묶음 소제목 (① 대금 … ⑧ 제재). (2026-10-03)
+            if row.get("group_label") and row["group_label"] != last:
+                lines += ([""] if last else []) + [f"**{row['group_label']}**"]
+                last = row["group_label"]
             lines.append(f"- **{row['title']}** — {row['risk']}")
             if row.get("evidence"):
                 lines.append(f"  - 근거: “{row['evidence']}”")
