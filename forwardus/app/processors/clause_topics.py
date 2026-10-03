@@ -110,6 +110,127 @@ def classify(text: str) -> dict | None:
             "score": round(margin, 2), "threshold": threshold}
 
 
+# ── 조항 제목으로 알아보기 ─────────────────────────────────────────────────
+#
+# **국문과 재현율을 위해서입니다.** (2026-10-03)
+#
+# 분류기는 영문 자료로 배워 국문을 못 보고, 오탐을 막으려 문턱을 높여 영문도
+# 절반쯤만 띄웁니다. 그런데 계약서는 거의 언제나 조항에 **제목**을 답니다 —
+# "제12조(준거법)", "Article 12 Governing Law.", "12. FORCE MAJEURE:". 제목이
+# 주제를 말해 주면 학습 자료가 없어도 정확합니다. 분류기가 못 보는 국문과
+# 확신이 모자란 영문을 이것으로 메웁니다.
+#
+# 제목 **전체**가 사전의 꼴과 맞아야 합니다(fullmatch). "Article 12 The Buyer
+# shall …" 의 "The Buyer shall" 은 어떤 주제와도 맞지 않아 지나갑니다.
+#
+# (주제, 이름, 우리 조항, 국문 제목, 영문 제목)
+HEADINGS = [
+    ("governing_law", "준거법", ("governing_law", "cisg_silent"),
+     r"준거\s*법(?:률)?|적용\s*법(?:률)?|준거법\s*및\s*관할", r"governing\s+laws?|applicable\s+laws?|choice\s+of\s+law"
+     r"|governing\s+law\s+and\s+jurisdiction"),
+    ("jurisdiction", "관할 법원", ("foreign_forum",),
+     r"(?:재판\s*)?관할(?:\s*법원)?|합의\s*관할", r"jurisdictions?|venue|forum|submission\s+to\s+jurisdiction"),
+    ("disputes", "분쟁 해결·중재", ("arbitration", "foreign_forum", "china_domestic_arb"),
+     r"중재|분쟁(?:의)?\s*해결|분쟁\s*처리|분쟁", r"arbitration|dispute\s+resolution|settlement\s+of\s+disputes|disputes"),
+    ("confidential", "비밀유지", ("confidential", "one_way_nda"),
+     r"(?:비밀|기밀)\s*(?:유지|준수|보호)?(?:\s*의무)?", r"confidentiality|non[- ]?disclosure|confidential\s+information"),
+    ("amendment", "계약 변경·통지", ("amendment",),
+     # '변경' 하나로 보면 "규격 변경"(사양 변경 — 다른 이야기)까지 계약 변경이 됩니다.
+     r"계약(?:의)?\s*(?:변경|수정)|^(?:변경|수정)$|통지", r"amendments?|modifications?|variations?|notices?"),
+    ("indemnity", "손해배상·면책", ("unlimited_damages", "own_negligence_indemnity", "eu_gdpr_indemnity",
+                                   "us_class_action_pl"),
+     r"손해\s*배상(?:\s*책임)?|배상(?:\s*책임)?|면책", r"indemnit(?:y|ies|ification)|damages|compensation"),
+    ("liability_cap", "책임 한도", ("liability_cap", "unlimited_damages"),
+     r"책임(?:의)?\s*(?:제한|한도)|손해\s*배상(?:의)?\s*(?:범위|한도|제한)", r"limitations?\s+(?:of|on)\s+liability"),
+    ("liquidated", "지체상금·위약금", ("uncapped_ld",),
+     r"지체\s*상금|지연\s*배상(?:금)?|위약(?:금|벌)", r"liquidated\s+damages|penalt(?:y|ies)|delay\s+damages"),
+    ("termination", "해지", ("termination_at_will", "exit_buyback"),
+     r"(?:계약(?:의)?\s*)?(?:해지|해제|종료)(?:\s*및\s*(?:해제|해지))?", r"termination|cancell?ation"),
+    ("renewal", "계약 기간·갱신", ("evergreen",),
+     r"계약\s*기간|유효\s*기간|존속\s*기간|갱신|자동\s*연장", r"term(?:\s+of\s+(?:the\s+)?(?:agreement|contract))?"
+     r"|duration|renewal|term\s+and\s+renewal"),
+    ("warranty", "품질 보증", ("claim_period", "open_warranty"),
+     r"(?:품질\s*)?보증|하자\s*(?:담보|보수)?|품질", r"warrant(?:y|ies)|quality\s+guarantee|defects?|quality"),
+    ("assignment", "양도", ("assignment_one_way",),
+     r"양도|계약상\s*지위(?:의)?\s*(?:이전|승계)", r"assignments?|transfer\s+of\s+rights"),
+    ("ip", "지식재산·금형", ("ip", "ip_assignment", "buyer_design_ip", "cn_tech_transfer", "tooling_free",
+                            "cn_trademark_buyer"),
+     r"(?:지식|지적|산업)\s*재산권?|금형|도면|상표(?:권)?", r"intellectual\s+property(?:\s+rights)?|tooling|moulds?|molds?"
+     r"|trademarks?"),
+    ("audit", "감사·장부", ("audit_rights",), r"감사|장부(?:\s*열람)?|실사", r"audits?|books\s+and\s+records|records"),
+    ("mfn", "최혜 가격", ("mfn_price",), r"최혜(?:\s*(?:대우|가격|조건))?", r"most\s+favou?red\s+(?:nation|customer)"
+     r"(?:\s+(?:pricing|treatment))?"),
+    ("non_compete", "경업 금지", ("non_compete_wide",), r"경업\s*금지|경쟁\s*(?:제한|금지)",
+     r"non[- ]?compet(?:e|ition)|restrictive\s+covenants?"),
+    ("exclusivity", "독점·대리점", ("exclusive_no_moq", "agency_protection", "gulf_agent_lock", "agency_law_eu"),
+     r"독점(?:\s*(?:판매)?권)?|총판|대리점", r"exclusivity|exclusive\s+(?:rights|distribution|distributor)"),
+    ("min_order", "최소 주문", ("min_order",), r"최소\s*(?:주문|구매|발주)(?:\s*(?:수)?량)?",
+     r"minimum\s+(?:order|purchase)(?:\s+(?:quantity|commitment|requirements?))?"),
+    ("price", "가격", ("price_adjust", "retro_price_deduction"), r"가격(?:의)?(?:\s*조정)?|단가", r"prices?|pricing"
+     r"|price\s+adjustments?"),
+    ("sanctions", "제재·수출 규제", ("ru_sanctions_warranty", "export_licence", "reexport_control"),
+     r"수출\s*(?:통제|규제|허가|승인)|제재", r"export\s+(?:control|controls|compliance|licen[cs]es?)|sanctions"),
+    ("taxes", "세금·관세", ("tariff_absorption", "ddp_no_ior"), r"세금|조세|관세|제세\s*공과금?",
+     r"taxes|duties|customs\s+duties|taxes\s+and\s+duties"),
+    ("payment", "결제", ("payment", "lc_deadline", "docs_before_payment", "payment_retention", "payment_on_resale",
+                        "suspend_delivery"),
+     r"대금(?:의)?(?:\s*지급)?|결제(?:\s*조건)?|지급(?:\s*조건)?", r"payments?|terms\s+of\s+payment|payment\s+terms"),
+    ("insurance", "보험", ("insurance",), r"(?:적하\s*)?보험|부보", r"insurance"),
+    ("force_majeure", "불가항력", ("force_majeure",), r"불가항력", r"force\s+majeure|excusable\s+delays?"),
+    ("title", "소유권·위험 이전", ("title",), r"소유권(?:\s*(?:및|과)\s*위험(?:\s*부담)?)?|위험\s*(?:부담|이전)"
+     r"|소유권(?:의)?\s*(?:이전|유보)", r"title(?:\s+and\s+risk(?:\s+of\s+loss)?)?|risk\s+of\s+loss"
+     r"|passing\s+of\s+(?:property|title)|retention\s+of\s+title"),
+    ("inspection", "검사·인수", ("inspection", "inspection_buyer_sole", "full_inspection"),
+     r"검사|검수|검품|인수\s*검사", r"inspections?|acceptance|testing|inspection\s+and\s+acceptance"),
+    ("delivery", "인도·선적", ("shipment", "incoterms"), r"인도(?:\s*조건)?|선적(?:\s*조건)?|납품|납기|운송",
+     r"deliver(?:y|ies)|shipments?|shipping|delivery\s+terms"),
+    ("packing", "포장·화인", ("packing",), r"포장(?:\s*및\s*화인)?|화인", r"packing|packaging|marking|shipping\s+marks?"
+     r"|packing\s+and\s+marking"),
+    ("late_interest", "연체 이자", ("late_interest",), r"(?:지연|연체)\s*이자",
+     r"late\s+payments?|interest\s+on\s+late\s+payments?"),
+    ("set_off", "상계", ("no_set_off", "buyer_set_off"), r"상계(?:\s*금지)?", r"set[- ]?off|no\s+set[- ]?off"),
+    ("goods", "물품 명세", ("goods",), r"물품|제품|품목|목적물|계약\s*물품",
+     r"goods|products|description\s+of\s+goods|commodity"),
+    ("quantity", "수량", ("quantity_tol",), r"수량(?:\s*과부족)?", r"quantity|quantities"),
+]
+_KO_HEAD = re.compile(r"^제\s*\d+\s*조\s*[(\[【<〔]?\s*(?P<h>[가-힣·\s]{1,20}?)\s*[)\]】>〕]")
+_EN_HEAD = re.compile(r"^(?:(?:article|section|clause)\s+)?\d{1,2}(?:\.\d{1,2})?\.?\s*[-–:]?\s*\(?"
+                      r"(?P<h>[A-Za-z][A-Za-z ,&/\-]{2,45}?)\)?\s*(?:[.:]\s|\s[-–]\s|$)", re.I)
+
+
+# 국문 제목은 '들어 있으면' 보므로, 구체적인 것부터 맞춰 봅니다.
+_KO_FIRST = ("set_off", "late_interest", "mfn", "min_order", "liability_cap", "liquidated", "title",
+             "inspection", "packing", "force_majeure", "insurance", "governing_law", "jurisdiction",
+             "disputes", "confidential", "non_compete", "exclusivity", "sanctions", "taxes", "ip", "audit",
+             "assignment", "termination", "renewal", "indemnity", "payment", "delivery", "price",
+             "warranty", "amendment", "quantity", "goods")
+_KO_ORDER = sorted(HEADINGS, key=lambda row: _KO_FIRST.index(row[0]))
+
+
+def heading_topic(chunk: str) -> dict | None:
+    """조항 머리의 제목이 사전의 꼴과 **통째로** 맞으면 그 주제."""
+
+    head = chunk.strip()
+    m = _KO_HEAD.match(head)
+    lang = "ko"
+    if not m:
+        m, lang = _EN_HEAD.match(head), "en"
+    if not m:
+        return None
+    title = re.sub(r"\s+", " ", m.group("h")).strip(" ,-")
+    # 국문 제목은 짧고 꾸밈말이 붙습니다 — "권리의 양도", "손해배상의 제한",
+    # "선적 전 검사". 그래서 **들어 있으면** 봅니다. 대신 구체적인 주제부터
+    # 맞춰 봅니다(_KO_ORDER) — "손해배상의 제한" 은 '배상'이 아니라 '책임 한도'.
+    # 영문 제목은 통째로 맞아야 합니다. (2026-10-03)
+    rows = _KO_ORDER if lang == "ko" else HEADINGS
+    for topic, name, keys, ko, en in rows:
+        hit = re.search(ko, title) if lang == "ko" else re.fullmatch(en, title, re.I)
+        if hit:
+            return {"topic": topic, "title": f"{name} (조항 제목 “{title}”)", "keys": list(keys),
+                    "score": 99.0, "threshold": 0.0, "via": "heading"}
+    return None
+
+
 # 조항 단위로 자릅니다. 학습 데이터가 조항(문단) 단위라 문장 하나보다 낫습니다.
 _ARTICLE = re.compile(r"(?=(?:\bArticle\s+\d+|\bSection\s+\d+|\bClause\s+\d+|제\s*\d+\s*조"
                       r"|(?<![\d.])\d{1,2}\.\s+[A-Z]))")
@@ -146,16 +267,20 @@ def candidates(text: str, judged: dict, categories: dict) -> list[dict]:
     갑니다 — 규칙이 이미 말한 것을 분류기가 되풀이하면 소음입니다.
     """
 
-    if not model():
-        return []
+    from app.processors.contract_clauses import _drop_page_furniture, _drop_table_of_contents
+
+    # 목차를 먼저 지웁니다. 그대로 두면 "제12조(준거법) …… 5" 가 줄마다 후보가
+    # 됩니다. 판정(contract_clauses.find_in)도 같은 것을 지우고 봅니다.
+    body = _drop_page_furniture(_drop_table_of_contents(str(text or "")))
     best: dict[str, dict] = {}
     # 조항 수 상한 — 아주 긴 문서(부록·약관 묶음)에서 응답이 늘어지지 않게.
-    for chunk in chunks(text)[:MAX_CHUNKS]:
-        # **국문 조항은 보지 않습니다.** 학습 자료가 거의 영문이라 국문을 엉뚱한
-        # 주제로 붙였습니다. 국문은 규칙(contract_clauses)만으로 판정합니다.
-        if len(_HANGUL_CHAR.findall(chunk)) > len(_LATIN_CHAR.findall(chunk)):
-            continue
-        found = classify(chunk)
+    for chunk in chunks(body)[:MAX_CHUNKS]:
+        # 1) 조항 제목 — 국문도 봅니다. 제목이 주제를 말하면 그것이 가장 확실합니다.
+        found = heading_topic(chunk)
+        # 2) 분류기 — **국문 조항은 보지 않습니다.** 학습 자료가 거의 영문이라
+        #    국문을 엉뚱한 주제로 붙였습니다.
+        if not found and model() and len(_HANGUL_CHAR.findall(chunk)) <= len(_LATIN_CHAR.findall(chunk)):
+            found = classify(chunk)
         if not found:
             continue
         keys = found["keys"]

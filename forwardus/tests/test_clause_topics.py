@@ -168,5 +168,62 @@ def test_모델이_없으면_조용히_빈_답(monkeypatch, tmp_path):
         ct.model.cache_clear()
 
 
+# ── 조항 제목 (2026-10-03) ──────────────────────────────────────────────────
+# 분류기는 국문을 못 보고 영문도 절반쯤만 띄웁니다. 계약서는 거의 언제나 조항에
+# 제목을 답니다 — 국문도. 제목이 주제를 말하면 학습 자료 없이도 정확합니다.
+
+HEADS = [
+    ("제14조(권리의 양도) 어느 당사자도 …", "assignment"),
+    ("제20조(계약상 지위의 이전) …", "assignment"),
+    ("제11조(손해배상의 제한) …", "liability_cap"),      # '배상'이 아니라 '책임 한도'
+    ("제6조(선적 전 검사) …", "inspection"),              # '선적'이 아니라 '검사'
+    ("제8조(계약의 해지 및 손해배상) …", "termination"),
+    ("제2조(물품의 인도) …", "delivery"),
+    ("제16조(상계) …", "set_off"),
+    ("제22조 [최혜 대우] …", "mfn"),
+    ("Article 7 Force Majeure. Neither party …", "force_majeure"),
+    ("12. GOVERNING LAW: This Contract …", "governing_law"),
+    ("Section 9 - Most Favored Customer - Supplier …", "mfn"),
+    ("Article 14 Set-off. The Buyer …", "set_off"),
+]
+NOT_HEADS = [
+    "제1조(목적) 본 계약은 …",
+    "제21조(기타) …",
+    "제4조(규격 변경) 매수인이 규격을 변경하는 경우 단가와 납기를 다시 정한다.",   # 계약 변경이 아님
+    "Article 12 The Buyer shall pay the price within 30 days.",                     # 제목이 아님
+    "Article 3 This Contract shall not be automatically renewed.",
+]
+
+
+@pytest.mark.parametrize("head,topic", HEADS, ids=[h[:14] for h, _ in HEADS])
+def test_조항_제목으로_주제를_안다(head, topic):
+    found = ct.heading_topic(head)
+    assert found and found["topic"] == topic
+
+
+@pytest.mark.parametrize("head", NOT_HEADS, ids=[h[:14] for h in NOT_HEADS])
+def test_주제가_아닌_제목은_넘어간다(head):
+    found = ct.heading_topic(head)
+    assert not found or found["topic"] != "amendment"
+    if "목적" in head or "기타" in head or "Article" in head:
+        assert found is None
+
+
+def test_국문_계약서에서_규칙이_놓친_조항을_제목으로_띄운다():
+    doc = ("물품매매계약서\n제1조(목적) 본 계약은 물품 공급 조건을 정한다.\n"
+           "제14조(권리의 양도) 어느 당사자도 상대방의 사전 서면 승낙 없이 이 계약상 지위를 "
+           "넘기지 못한다.\n")
+    assert "assignment" in {c["topic"] for c in _candidates(doc)}
+
+
+def test_목차에_속지_않는다():
+    """목차를 그대로 두면 "제12조(비밀유지) …… 5" 가 줄마다 후보가 됩니다."""
+
+    doc = ("SALES CONTRACT\n목차\n제7조(불가항력) ........ 3\n제9조(준거법) ........ 4\n"
+           "제12조(비밀유지) ........ 5\n제14조(권리의 양도) ........ 6\n제15조(보험) ........ 6\n"
+           "제16조(상계) ........ 7\n제1조(목적) 본 계약은 물품 공급 조건을 정한다.\n")
+    assert not _candidates(doc)
+
+
 def test_모델_파일이_json_으로_읽힌다():
     json.loads(ct.MODEL_PATH.read_text(encoding="utf-8"))

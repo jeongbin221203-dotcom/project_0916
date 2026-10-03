@@ -247,5 +247,46 @@ def test_근거는_계약서에_적힌_그대로다():
     assert "the Seller" not in row["evidence"]
 
 
+def test_긴_근거는_누가와_결정적인_끝을_함께_보여_준다():
+    """브라우저로 보니 근거가 "… by Party A's own negligence" 직전에서 잘렸습니다.
+    누가 누구에게(앞)와 결정적인 끝(뒤)이 둘 다 보여야 합니다. (2026-10-03)"""
+
+    row = contract_clauses.analyze(BONDED)["clauses"]["own_negligence_indemnity"]
+    assert "Party B shall indemnify Party A" in row["evidence"]
+    assert "own instructions or negligence" in row["evidence"]
+    assert len(row["evidence"]) <= 300
+
+
+def test_근거는_낱말_가운데서_끊기지_않는다():
+    """"s 11 and 13", "proc" 처럼 잘렸습니다. 원문에서 조각의 자리를 찾아, 앞뒤
+    글자가 낱말 경계인지 봅니다."""
+
+    norm = " ".join(BONDED.split())
+    for key, row in contract_clauses.analyze(BONDED)["clauses"].items():
+        for piece in row["evidence"].lstrip("…").split(" … "):
+            at = norm.find(piece)
+            assert at >= 0, (key, piece[:40])
+            before = norm[at - 1] if at > 0 else " "
+            after = norm[at + len(piece)] if at + len(piece) < len(norm) else " "
+            assert not (before.isalnum() and piece[0].isalnum()), f"{key}: 앞이 잘림 {piece[:25]!r}"
+            assert not (after.isalnum() and piece[-1].isalnum()), f"{key}: 뒤가 잘림 {piece[-25:]!r}"
+
+
+def test_화면_문구에_내부_이름이_없다():
+    """"독소조항 buyer_set_off 의 반대편입니다" 가 화면에 나왔습니다. (2026-10-03)"""
+
+    import re
+
+    keys = {row["key"] for row in contract_clauses.CLAUSES}
+    rows = contract_clause_service.checklist("CIF")
+    for group in rows.values():
+        for row in group:
+            for field in ("why", "risk", "text_ko", "fix"):
+                leaked = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", row[field])) & keys
+                assert not leaked, (row["key"], field, leaked)
+    text = contract_clause_service.clause_text([row["key"] for row in contract_clauses.CLAUSES])
+    assert not set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", text)) & keys
+
+
 def test_analyze_가_우리_쪽을_돌려준다():
     assert contract_clauses.analyze(BONDED)["side"]["label"] == "Party B"

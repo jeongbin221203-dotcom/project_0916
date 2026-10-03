@@ -2485,6 +2485,20 @@ def _scope(body: str, start: int, end: int, reach: int = 150) -> str:
     return body[left:right]
 
 
+def _words(body: str, start: int, end: int) -> str:
+    """[start:end] 를 **낱말 경계**에 맞춰 자릅니다 — "s 11 and 13", "proc" 처럼
+    낱말 가운데서 끊기지 않게. 문장 처음·끝이면 그대로 둡니다."""
+
+    start, end = max(0, start), min(len(body), end)
+    if 0 < start < len(body) and body[start - 1].isalnum() and body[start].isalnum():
+        nxt = body.find(" ", start, end)
+        start = nxt + 1 if nxt != -1 else start
+    if 0 < end < len(body) and body[end - 1].isalnum() and body[end].isalnum():
+        prev = body.rfind(" ", start, end)
+        end = prev if prev > start else end
+    return body[start:end].strip(" ,;:")
+
+
 def _evidence(body: str, hit, side: dict | None = None) -> str:
     """찾은 자리의 문장. **계약서에 적힌 그대로** 보여 줍니다.
 
@@ -2494,7 +2508,22 @@ def _evidence(body: str, hit, side: dict | None = None) -> str:
     _as_seller 가 넣은 꼴(소문자 the + 대문자 Seller/Buyer)만 되돌립니다. (2026-10-03)
     """
 
-    text = _scope(body, hit.start(), hit.end(), reach=110).strip(" ,;:")
+    # **찾은 자리를 중심으로** 자릅니다. 문장 앞에서 260자만 보여 주니, 긴 배상
+    # 문장에서 정작 "Party A's own instructions or negligence" 직전에서 잘렸습니다
+    # (2026-10-03 브라우저 확인). 찾은 자리의 끝이 꼭 들어가게 합니다.
+    left = max(body.rfind(".", 0, hit.start()) + 1, hit.start() - 110)
+    stop = body.find(".", hit.end())
+    right = min(len(body) if stop < 0 else stop, hit.end() + 110)
+    if right - left <= 260:
+        text = _words(body, left, right)
+    elif hit.end() - hit.start() > 150:
+        # 찾은 범위 자체가 길면 **앞과 끝을 함께** — 누가 누구에게("Party B shall
+        # indemnify Party A")와 결정적인 끝("… own negligence, without monetary limit").
+        head = _words(body, max(left, hit.start() - 30), hit.start() + 110)
+        tail = _words(body, hit.end() - 90, min(right, hit.end() + 30))
+        text = f"{head} … {tail}"
+    else:
+        text = "…" + _words(body, max(left, hit.end() - 190), right)[:257]
     if side:
         text = re.sub(r"\bthe Seller\b", side["label"], text)
         text = re.sub(r"\bthe Buyer\b", side["other_label"], text)

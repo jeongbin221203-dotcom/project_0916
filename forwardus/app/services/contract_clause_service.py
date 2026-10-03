@@ -15,12 +15,29 @@
 
 from __future__ import annotations
 
+import re
+
 from app.processors import clause_topics, contract_clauses
 from app.services import ServiceError
 
 MAX_TEXT = 400_000
 DISCLAIMER = ("법률 자문이 아닙니다. 여기 문안은 출발점이고, 최종 계약서는 "
               "변호사 검토를 받으세요.")
+
+
+def _readable(text: str) -> str:
+    """조항 설명 속 **내부 이름**(buyer_set_off 등)을 화면 이름으로.
+
+    조항 설명이 서로를 가리킬 때 key 를 그대로 적어 두어, 화면에 "독소조항
+    buyer_set_off 의 반대편입니다"가 나왔습니다. 8곳이었습니다. 하나씩 고치면
+    새 문구에서 또 생기므로, 내보내는 길목에서 바꿉니다. (2026-10-03)
+    """
+
+    def name(m: re.Match) -> str:
+        row = contract_clauses.by_key(m.group(0))
+        return f"‘{row['title']}’" if row else m.group(0)
+
+    return re.sub(r"\b[a-z]+(?:_[a-z]+)+\b", name, str(text or ""))
 
 
 def checklist(incoterms: str = "", present: set[str] | None = None,
@@ -51,8 +68,9 @@ def checklist(incoterms: str = "", present: set[str] | None = None,
             continue
         seen = judged.get(row["key"]) or {}
         out[row["category"]].append({
-            "key": row["key"], "title": row["title"], "why": row["why"],
-            "risk": row["risk"], "text_ko": row["text_ko"], "fix": row["fix"],
+            "key": row["key"], "title": row["title"], "why": _readable(row["why"]),
+            "risk": _readable(row["risk"]), "text_ko": _readable(row["text_ko"]),
+            "fix": _readable(row["fix"]),
             "present": row["key"] in present,
             "status": seen.get("status") or ("present" if row["key"] in present else "absent"),
             "evidence": seen.get("evidence", ""),
@@ -177,13 +195,13 @@ def clause_text(keys) -> str:
     for row in picked:
         mark = contract_clauses.CATEGORIES[row["category"]]
         lines += [f"## [{mark}] {row['title']}", "",
-                  f"왜 필요한가: {row['why']}",
-                  f"빠지면/있으면: {row['risk']}", ""]
+                  f"왜 필요한가: {_readable(row['why'])}",
+                  f"빠지면/있으면: {_readable(row['risk'])}", ""]
         if row["category"] == "toxic":
             lines += ["이 조항은 **넣는 것이 아니라 빼는 것**입니다.", ""]
             if row["fix"]:
-                lines += [f"고치는 법: {row['fix']}", ""]
-        lines += ["```", row["text_en"], "```", "", row["text_ko"], "", "---", ""]
+                lines += [f"고치는 법: {_readable(row['fix'])}", ""]
+        lines += ["```", row["text_en"], "```", "", _readable(row["text_ko"]), "", "---", ""]
     return "\n".join(lines).rstrip() + "\n"
 
 
