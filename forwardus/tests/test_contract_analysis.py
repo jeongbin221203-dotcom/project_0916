@@ -148,11 +148,18 @@ def test_실물_보세가공_독소_셋(key):
     assert _bonded()["clauses"][key]["status"] == "present"
 
 
-@pytest.mark.parametrize("key", ["inspection", "liability_cap", "lc_deadline"])
+@pytest.mark.parametrize("key", ["liability_cap", "lc_deadline"])
 def test_실물_보세가공_적혀_있으나_부족(key):
-    """검사 시기 없음 · 제6조 한도가 제9조에 밀림 · 상대 신용장 기한 없음."""
+    """제6조 한도가 제9조에 밀림 · 상대 신용장 기한 없음."""
 
     assert _bonded()["clauses"][key]["status"] == "weak"
+
+
+def test_실물_보세가공_검사는_없음이다():
+    """제2조 "within ten business days **after inspection**" 은 검사를 언급만 한 것.
+    검사 조항이 '적혀 있으나 부족'이 아니라 **없습니다**. (2026-10-03)"""
+
+    assert "inspection" not in _bonded()["clauses"]
 
 
 def test_실물_보세가공_선적_보류권은_있다():
@@ -173,7 +180,8 @@ def test_가공계약_조항은_가공계약에서만_본다():
 def test_판정_결과에_보완_묶음과_근거가_나온다():
     result = contract_clause_service.review(BONDED, "CIF", "US")
     weak = {row["key"] for row in result["weak"]}
-    assert {"inspection", "liability_cap", "lc_deadline"} <= weak
+    assert {"liability_cap", "lc_deadline"} <= weak
+    assert "inspection" in {row["key"] for row in result["missing"]}
     assert not weak & {row["key"] for row in result["missing"]}
     assert all(row["evidence"] for row in result["toxic"])
     text = contract_clause_service.as_text(result)
@@ -184,9 +192,60 @@ def test_판정_결과에_보완_묶음과_근거가_나온다():
     assert "material_yield" not in {row["key"] for row in plain["gain"]}
 
 
-def test_오퍼_시트_선적은_시기가_없어_부족이다():
+def test_오퍼_시트_선적은_없음이다():
+    """결제 문구 "BEFORE SHIPMENT" 는 선적 조항이 아닙니다 — 빠진 필수조항입니다."""
+
     sheet = ("Offer Sheet\nItem Name : Nylon 95% / spandex 5% fabric\n"
              "PACKING: EXPORT STANDARD PACKED\nPAYMENT : BY T/T BEFORE SHIPMENT\n"
              "DELIVERY : SHANG HAI, PORT CY\n")
-    row = contract_clauses.analyze(sheet)["clauses"]["shipment"]
-    assert row["status"] == "weak" and "시기" in row["reason"]
+    assert "shipment" not in contract_clauses.analyze(sheet)["clauses"]
+
+
+# ── 2026-10-03 다시 확인에서 나온 것 ─────────────────────────────────────────
+
+# 미정 문구가 **옆 문장**에 있는 꼴. 그 미정은 다른 이야기입니다.
+NEXT_SENTENCE_UNDECIDED = [
+    ("payment", "Payment: T/T. Packing to be advised."),
+    ("incoterms", "FOB Busan. Port TBA."),
+    ("governing_law", "Governing law: Korea. Notify party TBD."),
+]
+
+# 낱말을 **언급만** 한 문장 — 그 조항이 '부족'한 것이 아니라 없습니다.
+MENTION_ONLY = [
+    ("shipment", "WARRANTY: twelve (12) months from the date of shipment."),
+    ("shipment", "The Seller shall send the original B/L to the Buyer after shipment."),
+    ("inspection", "Expenses of factory inspection are for the Supplier's account."),
+    ("lc_deadline", "The L/C shall require an inspection certificate issued by SGS."),
+]
+
+
+@pytest.mark.parametrize("key,line", NEXT_SENTENCE_UNDECIDED,
+                         ids=[k for k, _ in NEXT_SENTENCE_UNDECIDED])
+def test_옆_문장의_미정은_이_조항과_상관없다(key, line):
+    assert _status(key, line) == "present"
+
+
+@pytest.mark.parametrize("key,line", MENTION_ONLY, ids=[f"{k}:{s[:20]}" for k, s in MENTION_ONLY])
+def test_언급만_한_문장은_부족이_아니라_없음이다(key, line):
+    assert _status(key, line) == "absent"
+
+
+@pytest.mark.parametrize("line", [
+    "Inspection shall be by sampling in accordance with AQL 2.5.",
+    "제27조 매도인은 전수검사를 실시한다.",
+])
+def test_검사_방식을_정한_문장은_검사_조항이다(line):
+    assert _status("inspection", line) == "present"
+
+
+def test_근거는_계약서에_적힌_그대로다():
+    """Party A/B 계약서를 Seller·Buyer 로 바꿔 읽어도, 근거는 원문 표기로 냅니다.
+    사용자가 계약서에서 그 문장을 찾을 수 있어야 합니다. (2026-10-03)"""
+
+    row = contract_clauses.analyze(BONDED)["clauses"]["unlimited_damages"]
+    assert "Party B shall indemnify Party A" in row["evidence"]
+    assert "the Seller" not in row["evidence"]
+
+
+def test_analyze_가_우리_쪽을_돌려준다():
+    assert contract_clauses.analyze(BONDED)["side"]["label"] == "Party B"

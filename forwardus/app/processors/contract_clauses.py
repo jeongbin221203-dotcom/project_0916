@@ -294,7 +294,7 @@ of the date of shipment.""",
               r"\b(?:19|20)\d{2}\b", r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?",
               r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}\b",
               r"partial|trans[hs]ipment|분할|환적", r"선적\s*기일", r"\d+\s*일", r"까지|이내"),
-             "선적 시기(기일·기간)가 없습니다. '선적'이라는 낱말만 있습니다."),
+             "선적 시기(기일·기간)가 없습니다. '선적'이라는 낱말만 있습니다.", "absent"),
     neg_ok=True,
 )
 
@@ -326,8 +326,12 @@ deemed accepted.""",
               # 검사 시기가 아닙니다. 검사에 붙은 기한만 셉니다.
               r"inspect\w*[^.]{0,30}within\s+\d",
               r"final and binding|conclusive|quality|quantity",
+              # 방식·기준을 정한 문장도 검사 조항입니다 — "by sampling in accordance
+              # with AQL 2.5", "전수검사를 실시한다". (2026-10-03 회귀 감사)
+              r"\bAQL\b|sampling|\b100\s*%|standard|\bISO\b|전수|샘플링|발췌|기준",
               r"선적\s*전|선적지|도착|검사\s*기관|공인|검사증|이내[^.]{0,15}검사|품질|수량"),
-             "검사를 언제·어디서·누가 하는지가 없습니다. 상대가 아무 때나 검사하고 클레임을 걸 수 있습니다."),
+             "검사를 언제·어디서·누가 하는지가 없습니다. 상대가 아무 때나 검사하고 클레임을 걸 수 있습니다.",
+             "absent"),
 )
 
 _clause(
@@ -1484,7 +1488,9 @@ Seller may cancel this Contract and claim the costs already incurred.""",
     text_ko="**개설 기한 날짜**를 박고, 미개설이면 **해지권과 기발생 비용 청구**까지 "
             "적습니다. 날짜가 없으면 아무 효력이 없습니다.",
     detect=[r"(?:open|establish)[^.]{0,80}(?:l/?c|letter of credit)",
-            r"(?:l/?c|letter of credit)[^.]{0,80}(?:by|before|no later than|not later than)",
+            # "certificate **issued by** SGS" 의 by 는 기한이 아닙니다. (2026-10-03)
+            r"(?:l/?c|letter of credit)[^.]{0,80}(?<!issued )(?<!advised )(?<!confirmed )"
+            r"(?<!negotiated )(?<!payable )(?:\bby\b|before|no later than|not later than)",
             r"(?:신용장|L/?C)[^.]{0,60}(?:까지|전까지)[^.]{0,30}개설",
             # 한국어는 기한이 **앞**에 오기도 합니다 — "선적 30일 전까지
             # 신용장을 개설". 낱말 순서로 놓친 것이 **네 번째**입니다.
@@ -2410,6 +2416,8 @@ def analyze(text: str) -> dict:
     body = re.sub(r"\s+", " ", body)
     if not body.strip():
         return set()
+    # 바꿔 읽기 **전에** 정합니다. 바꾼 뒤에는 Party 표지가 없어 못 찾습니다.
+    side = our_side(body)
     body = _as_seller(body)
     context = {row["key"] for row in CLAUSES
                if row["context"] and any(re.search(p, body, re.I) for p in row["context"])}
@@ -2430,8 +2438,10 @@ def analyze(text: str) -> dict:
                 if avoid and _vetoed(body, hit.start(), avoid):
                     continue
                 reason = "" if row["category"] == "toxic" else _weakness(row, body, hit)
+                if reason is None:
+                    continue
                 judged = {"status": "weak" if reason else "present",
-                          "evidence": _evidence(body, hit), "reason": reason}
+                          "evidence": _evidence(body, hit, side), "reason": reason}
                 if not reason:
                     best = judged
                     break
@@ -2448,7 +2458,7 @@ def analyze(text: str) -> dict:
         if mine and mine["status"] == "present" and hits:
             names = ", ".join(by_key(t)["title"] for t in hits)
             mine.update(status="weak", reason=f"{reason} (함께 있는 독소: {names})")
-    return {"clauses": out, "context": context, "side": our_side(body)}
+    return {"clauses": out, "context": context, "side": side}
 
 
 # 찾은 자리 **바로 뒤**의 미정 문구. "Incoterms to be agreed later",
@@ -2475,15 +2485,32 @@ def _scope(body: str, start: int, end: int, reach: int = 150) -> str:
     return body[left:right]
 
 
-def _evidence(body: str, hit) -> str:
+def _evidence(body: str, hit, side: dict | None = None) -> str:
+    """찾은 자리의 문장. **계약서에 적힌 그대로** 보여 줍니다.
+
+    Party A/B 계약서는 Seller·Buyer 로 바꿔 읽은 글에서 찾으므로, 근거도 바뀐
+    글로 나왔습니다("the Seller shall indemnify the Buyer"). 원문 인용이라면서
+    원문에 없는 말을 보여 주면 사용자가 계약서에서 그 문장을 못 찾습니다.
+    _as_seller 가 넣은 꼴(소문자 the + 대문자 Seller/Buyer)만 되돌립니다. (2026-10-03)
+    """
+
     text = _scope(body, hit.start(), hit.end(), reach=110).strip(" ,;:")
+    if side:
+        text = re.sub(r"\bthe Seller\b", side["label"], text)
+        text = re.sub(r"\bthe Buyer\b", side["other_label"], text)
     return text if len(text) <= 260 else text[:257] + "…"
 
 
-def _weakness(row: dict, body: str, hit) -> str:
-    """필수·이익조항의 찾은 자리가 **제 구실을 못 하면** 그 까닭. 하면 ""."""
+def _weakness(row: dict, body: str, hit) -> str | None:
+    """필수·이익조항의 찾은 자리가 **제 구실을 못 하면** 그 까닭. 하면 "".
+    이 조항이 아예 아니면 None (require 의 "absent")."""
 
     after = body[hit.end():hit.end() + 60]
+    # **같은 문장 안에서만** 봅니다. "Payment: T/T. Packing to be advised." 의
+    # 미정은 포장 이야기인데, 결제조건을 '추후 결정'으로 봤습니다. (2026-10-03)
+    end = re.search(r"[.;](?:\s|$)", after)
+    if end:
+        after = after[:end.start()]
     if _UNDECIDED_AFTER.search(after):
         return "적혀 있으나 '추후 결정'입니다. 정해진 내용이 없습니다."
     if not row["neg_ok"]:
@@ -2496,9 +2523,14 @@ def _weakness(row: dict, body: str, hit) -> str:
         if re.search(pattern, scope, re.I):
             return reason
     if row["require"]:
-        patterns, reason = row["require"]
+        # 셋째 칸이 "absent" 면, 필수 요소가 없는 자리는 이 조항이 **아닙니다**
+        # (None). "WARRANTY: 12 months from the date of shipment" 는 선적 조항이
+        # 적혀 있으나 부족한 것이 아니라, 선적을 **언급**만 한 것입니다.
+        # '부족'으로 내면 보증 조항을 선적 조항이라며 근거로 보여 줍니다. (2026-10-03)
+        patterns, reason = row["require"][:2]
+        absent = row["require"][2:] == ("absent",)
         if not any(re.search(p, scope, re.I) for p in patterns):
-            return reason
+            return None if absent else reason
     return ""
 
 

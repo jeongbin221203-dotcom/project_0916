@@ -428,6 +428,24 @@ def test_겹친_백슬래시가_없다():
     assert not bad, f"겹친 백슬래시: {bad[:5]}"
 
 
+def test_소스에_제어_문자가_없다():
+    r"""패치하다 `\b` 가 **백스페이스 문자**(0x08)로 바뀌어 들어갔습니다.
+
+    화면에서는 안 보이고, 정규식은 백스페이스를 찾아 **절대 안 맞습니다.**
+    `\bAQL\b` 가 그렇게 조용히 죽었습니다. (2026-10-03)
+    """
+
+    from pathlib import Path
+
+    source = Path(contract_clauses.__file__).read_text(encoding="utf-8")
+    bad = [i for i, line in enumerate(source.splitlines(), 1)
+           if any(ord(ch) < 32 and ch not in "\t\r" for ch in line)]
+    assert not bad, f"제어 문자가 든 줄: {bad[:10]}"
+    pats = [(row["key"], pat) for row in contract_clauses.CLAUSES
+            for pat in row["detect"] if any(ord(ch) < 32 for ch in pat)]
+    assert not pats, pats[:5]
+
+
 def test_모든_규칙이_컴파일된다():
     import re
 
