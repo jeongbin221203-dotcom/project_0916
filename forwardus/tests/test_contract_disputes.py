@@ -117,6 +117,12 @@ SAFE = [
     ("time_essence_cancel", "If the Supplier fails to deliver the Products after thirty (30) days "
                             "after the prescribed deadline, the Purchaser shall be entitled to "
                             "cancel the Order of such batch of Products."),
+    ("time_essence_cancel", "If Buyer establishes a revised delivery date and Seller fails to "
+                            "deliver by that revised date, Buyer may cancel the Order."),
+    ("time_essence_cancel", "If such delay continues for more than two (2) months following the "
+                            "initial forty-five (45)-day period, Purchaser may cancel the Purchase Order."),
+    ("time_essence_cancel", "If an excused delay lasts more than sixty (60) days, Buyer may "
+                            "immediately terminate the Agreement."),
     ("claim_period", "Party A has received over 50 justified complaints within 30 days about the "
                      "same subject."),
     ("claim_period", "The Supplier shall use commercially reasonable efforts to ensure that all "

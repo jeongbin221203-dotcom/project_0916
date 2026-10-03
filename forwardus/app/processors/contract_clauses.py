@@ -657,6 +657,13 @@ notice, without liability.""",
             r"언제든지[^.]{0,40}해지", r"이유\s*없이[^.]{0,30}해지",
             r"임의\s*로[^.]{0,20}해지"],
     fix="해지에 **사유와 예고기간**을 붙이고, 생산 착수 뒤에는 **취소 수수료**를 물도록 바꿉니다.",
+    # **방향이 뒤집힌 꼴은 우리에게 유리합니다.** 예문의 Seller ↔ Buyer 를 맞바꿔도
+    # 걸려서, 아래 꼴은 거릅니다. (tests/test_contract_direction.py, 2026-10-03)
+    avoid=(r"^(?![^.]*\b(?:buyer|purchaser|either\s+party|each\s+party|both\s+parties)\b[^.]{0,60}"
+           r"\b(?:may|right|entitled)\b)[^.]*\b(?:seller|supplier)\s+(?:may|shall\s+have\s+the\s+right\s+to"
+           r"|is\s+entitled\s+to)\s+(?:\w+\s+){0,3}?(?:terminate|cancel)",
+           r"^(?![^.]*(?:매수인|바이어)[^.]{0,30}(?:해지|해제)할\s*수)[^.]*(?:매도인|공급자)(?:은|는)"
+           r"[^.]{0,40}(?:해지|해제)할\s*수\s*있"),
 )
 
 _clause(
@@ -762,6 +769,13 @@ day of delay.""",
             r"(?:지연|납기)[^.]{0,20}배상금[^.]{0,40}한도[^.]{0,25}(?:아니|없)",
             r"liquidated damages", r"penalt(y|ies) .{0,30}per day", r"지연\s*배상금"],
     fix="“**총 계약금액의 5%를 넘지 않는다**”는 상한 문장을 반드시 붙이세요.",
+    # **방향이 뒤집힌 꼴은 우리에게 유리합니다.** 예문의 Seller ↔ Buyer 를 맞바꿔도
+    # 걸려서, 아래 꼴은 거릅니다. (tests/test_contract_direction.py, 2026-10-03)
+    avoid=(r"\b(?:buyer|purchaser)\s+shall\s+pay\s+(?:to\s+the\s+seller\s+)?(?:liquidated\s+damages"
+           r"|a\s+penalty|late\s+(?:payment\s+)?(?:fees?|charges?|interest))",
+           r"delay\s+in\s+(?:the\s+)?payment", r"overdue\s+(?:amount|sum|payment)",
+           r"(?:매수인|바이어)(?:은|는|이|가)[^.]{0,30}(?:지체상금|위약금|지연\s*손해금)",
+           r"(?:대금|지급)\s*지연"),
 )
 
 _clause(
@@ -1026,6 +1040,11 @@ sanctions, and shall indemnify the Buyer for all consequences thereof.""",
     fix="보증을 **계약 시점 기준**으로 한정하고, 뒤에 목록이 바뀌면 "
         "**불가항력 또는 해지 사유**가 되도록 적습니다.",
     countries=("RU", "BY", "IR", "KP", "SY", "CU"),
+    # **방향이 뒤집힌 꼴은 우리에게 유리합니다.** 예문의 Seller ↔ Buyer 를 맞바꿔도
+    # 걸려서, 아래 꼴은 거릅니다. (tests/test_contract_direction.py, 2026-10-03)
+    avoid=INDEMNIFY_SELLER + (
+           r"\b(?:buyer|purchaser)\s+(?:hereby\s+)?(?:warrants|represents|undertakes|certifies|confirms)",
+           r"(?:매수인|바이어)(?:은|는)[^.]{0,20}(?:보증|확약|진술)"),
 )
 
 _clause(
@@ -1136,6 +1155,11 @@ without prior notice.""",
             r"(감사|실사|현장\s*점검|점검|열람)" + NO_NEG_KO],
     fix="**연 1회·영업일·사전 서면통지**로 한정하고, 범위를 **이 계약 관련 자료만**으로 "
         "좁힙니다. 제3자 비밀정보는 제외하고, 감사인에게 비밀유지를 걸게 합니다.",
+    # **방향이 뒤집힌 꼴은 우리에게 유리합니다.** 예문의 Seller ↔ Buyer 를 맞바꿔도
+    # 걸려서, 아래 꼴은 거릅니다. (tests/test_contract_direction.py, 2026-10-03)
+    avoid=(r"\b(?:seller|supplier)\s+(?:may|shall\s+have\s+the\s+right\s+to|is\s+entitled\s+to)\s+"
+           r"(?:\w+\s+){0,2}?(?:audit|inspect|examine)",
+           r"(?:buyer|purchaser|distributor)'?s?\s+(?:sales\s+)?(?:books|records|accounts)"),
 )
 
 _clause(
@@ -1334,6 +1358,12 @@ such change shall not affect the price or the delivery date.""",
             r"[^.]{0,60}(단가|가격)[^.]{0,20}(동일|그대로|불변)"],
     fix="규격을 바꾸면 **단가와 납기를 다시 정한다**를 함께 적습니다. 남은 자재·금형 "
         "폐기 비용은 **바이어 부담**으로 박습니다. 변경은 **서면 합의**로만 하게 하세요.",
+    # **방향이 뒤집힌 꼴은 우리에게 유리합니다.** 예문의 Seller ↔ Buyer 를 맞바꿔도
+    # 걸려서, 아래 꼴은 거릅니다. (tests/test_contract_direction.py, 2026-10-03)
+    avoid=(r"^(?![^.]*\b(?:buyer|purchaser)\s+may\b)[^.]*\b(?:seller|supplier)\s+may\s+"
+           r"(?:\w+\s+){0,2}?(?:change|modify|alter|amend)",
+           r"^(?![^.]*(?:매수인|바이어)[^.]{0,20}변경할\s*수)[^.]*(?:매도인|공급자)(?:은|는)[^.]{0,40}"
+           r"변경할\s*수\s*있"),
 )
 
 _clause(
@@ -1868,6 +1898,11 @@ thereafter.""",
             r"(판매|공급)[^.]{0,20}(아니|않|못|금지)"],
     fix="**지역·제품군·기간을 좁힙니다** — 그 바이어의 판매 지역, 그 바이어 모델에 "
         "한정, 계약 기간 중에만. 그리고 **최소 구매량과 묶어** 미달하면 풀리게 하세요.",
+    # **방향이 뒤집힌 꼴은 우리에게 유리합니다.** 예문의 Seller ↔ Buyer 를 맞바꿔도
+    # 걸려서, 아래 꼴은 거릅니다. (tests/test_contract_direction.py, 2026-10-03)
+    avoid=(r"\b(?:buyer|purchaser|distributor)\s+shall\s+not\s+(?:\w+,?\s+){0,4}?"
+           r"(?:manufacture|sell|supply|distribute|purchase|deal|market)",
+           r"(?:매수인|바이어|대리점)(?:은|는)[^.]{0,60}(?:판매|제조|취급)하여서는\s*아니"),
 )
 
 _clause(
@@ -2001,7 +2036,9 @@ All extended producer responsibility registrations, fees and reporting
 obligations in each Member State shall be undertaken and paid by the Seller.""",
     text_ko="extended producer responsibility · EPR · packaging waste 와 "
             "Seller 부담이 함께 나오면 이 조항입니다.",
-    detect=[r"extended producer responsibility[^.]{0,100}"
+    # 이 조항의 예문("registrations, fees and reporting obligations in each Member
+    # State … paid by the Seller")이 100자를 넘어 못 찾았습니다. (2026-10-03)
+    detect=[r"extended producer responsibility[^.]{0,180}"
             r"(?:seller|supplier|borne by|at the expense)",
             r"\bEPR\b[^.]{0,80}(?:registration|fee|levy)[^.]{0,80}"
             r"(?:seller|supplier|borne by)",
@@ -2013,7 +2050,9 @@ obligations in each Member State shall be undertaken and paid by the Seller.""",
         "분담금을 내도록 바꿉니다. 우리가 부담해야 하면 **나라와 금액 상한**을 적고, "
         "단가에 미리 반영하세요.",
     countries=("EU",),
-    avoid=NEGATION,
+    # 바이어(수입자)가 내는 꼴은 우리에게 유리합니다 — "borne by" 만으로 걸렸습니다.
+    avoid=NEGATION + (r"(?:borne|paid|undertaken)\s+by\s+the\s+(?:buyer|purchaser|importer)",
+                      r"(?:매수인|바이어|수입자)[^.]{0,10}(?:이|가)\s*부담"),
 )
 
 _clause(
@@ -2565,7 +2604,10 @@ confirmation document is signed by the Buyer.""",
     fix="'**시운전 완료 후 N일 안에 서면 이의가 없으면 인수한 것으로 본다(deemed acceptance)**'를 "
         "함께 넣고, 늦어도 **선적 후 N일**에는 지급기가 오도록 상한을 둡니다.",
     avoid=NEGATION + (r"\bdeemed\b", r"간주", r"(?:fail|refus)\w*\s+to\s+sign",
-                      r"\bin\s+any\s+event\b", r"늦어도"),
+                      r"\bin\s+any\s+event\b", r"늦어도",
+                      # 우리가 서명하는 확인서는 우리 손에 있습니다.
+                      r"(?:signed|issued|approved)\s+by\s+the\s+(?:seller|supplier)",
+                      r"(?:매도인|공급자)(?:이|가)\s*(?:서명|발급)"),
 )
 
 _clause(
@@ -2634,8 +2676,11 @@ days, the Buyer may cancel the order without liability.""",
                       # 30 일 넘게 기다린 뒤의 해제는 유예가 있는 것입니다 (Bitmain 공급계약)
                       r"(?:after|within)\s+(?:\w+\s+)?\(?(?:[3-9]\d|[1-9]\d{2})\)?\s+"
                       r"(?:calendar\s+|working\s+|business\s+)?days",
-                      r"(?:more\s+than|exceed\w*|over|beyond|longer\s+than)\s+\(?(?:[3-9]\d|[1-9]\d{2})\)?\s+"
-                      r"(?:calendar\s+|working\s+)?days"),
+                      # "more than sixty (60) days" — 낱말 숫자 뒤에 괄호 숫자가 옵니다.
+                      r"(?:more\s+than|exceed\w*|over|beyond|longer\s+than)\s+(?:\w+\s+)?"
+                      r"\(?(?:[3-9]\d|[1-9]\d{2})\)?\s+(?:calendar\s+|working\s+)?days",
+                      # 달 단위 유예, 바이어가 새 납기를 준 뒤의 해제 (실제 공급계약)
+                      r"\(?\d+\)?\s+months?\b", r"\brevised\s+(?:delivery\s+)?date"),
 )
 
 _clause(
