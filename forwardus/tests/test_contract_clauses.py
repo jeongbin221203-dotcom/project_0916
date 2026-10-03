@@ -290,3 +290,86 @@ def test_별지_제목만_있는_줄은_물품_명세가_아니다():
     """'Annex 1: Specification (attached)' 한 줄에도 물품 명세가 있다고 했습니다."""
 
     assert "goods" not in contract_clauses.find_in("Annex 1: Specification (attached)")
+
+
+# ── 일반 사용자용 내려받기 — Word · 텍스트 (2026-10-03) ─────────────────────────
+# .md 는 Windows 에서 더블클릭해도 열 프로그램이 없습니다. 받은 파일을 **도로
+# 열어서** 실무자가 보는 모습 그대로 확인합니다.
+
+def _opened(data: bytes):
+    import io
+
+    import docx
+
+    return docx.Document(io.BytesIO(data))
+
+
+def test_Word_문안은_열리고_영문은_상자에_든다():
+    document = _opened(service.clause_docx(["arbitration", "termination_at_will"]))
+    text = "\n".join(p.text for p in document.paragraphs)
+    assert "법률 자문이 아닙니다" in text
+    assert "넣는 것이 아니라 빼는 것" in text
+    assert "**" not in text
+    boxes = [table.cell(0, 0).text for table in document.tables]
+    assert len(boxes) == 2
+    assert "KCAB" in boxes[0] and "terminate" in boxes[1]
+
+
+def test_Word_에서_독소조항_제목은_빨갛다():
+    document = _opened(service.clause_docx(["termination_at_will", "arbitration"]))
+    heads = {p.text: p.runs[0].font.color.rgb for p in document.paragraphs
+             if p.text.startswith("[")}
+    toxic = next(color for head, color in heads.items() if head.startswith("[독소]"))
+    must = next(color for head, color in heads.items() if head.startswith("[필수]"))
+    assert str(toxic) == "C0392B" and str(must) != "C0392B"
+
+
+def test_Word_는_굵게_표시를_진짜_굵은_글자로_바꾼다():
+    document = _opened(service.clause_docx(["arbitration"]))
+    bold = {run.text for p in document.paragraphs for run in p.runs if run.bold}
+    assert any("중재지" in text for text in bold)
+
+
+def test_모든_조항을_Word_로_낼_수_있다():
+    keys = [row["key"] for row in contract_clauses.CLAUSES]
+    assert len(_opened(service.clause_docx(keys)).tables) == len(keys)
+
+
+def test_텍스트_문안은_기호_없이_메모장에서_읽힌다():
+    body = service.clause_plain(["arbitration", "termination_at_will"])
+    assert body.startswith("﻿") and "\r\n" in body
+    assert "**" not in body and "```" not in body and "## " not in body
+    assert "법률 자문이 아닙니다" in body and "넣는 것이 아니라 빼는 것" in body
+    assert "KCAB" in body
+
+
+def test_Word_텍스트도_고른_조항이_없으면_내보내지_않는다():
+    for build in (service.clause_docx, service.clause_plain):
+        with pytest.raises(ServiceError):
+            build([])
+
+
+@pytest.mark.parametrize("kind,mime", [
+    ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("txt", "text/plain"),
+])
+def test_창구가_Word_텍스트로_내려준다(client, kind, mime):
+    answer = client.post("/contract/export", json={"keys": ["arbitration"], "format": kind})
+    assert answer.status_code == 200
+    assert answer.mimetype == mime
+    assert f"contract-clauses.{kind}" in answer.headers["Content-Disposition"]
+
+
+def test_모르는_형식은_거절한다(client):
+    answer = client.post("/contract/export", json={"keys": ["arbitration"], "format": "exe"})
+    assert answer.status_code == 400
+
+
+def test_영문_문안은_문장_가운데서_줄이_끊기지_않는다():
+    """소스에 80자로 꺾어 둔 줄을 그대로 붙이면 계약서에서 문장이 끊깁니다."""
+
+    box = _opened(service.clause_docx(["payment"])).tables[0].cell(0, 0)
+    lines = [p.text for p in box.paragraphs]
+    assert lines[0] == "3. PAYMENT"
+    assert "first-class bank acceptable to the Seller, at least" in lines[1]
+    assert "Seller by a first-class" in service.clause_plain(["payment"])

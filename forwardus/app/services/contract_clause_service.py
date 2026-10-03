@@ -186,10 +186,7 @@ def country_of(shipment) -> str:
 def clause_text(keys) -> str:
     """고른 조항의 문안을 한 벌로. 계약서에 그대로 붙여 쓸 수 있게 냅니다."""
 
-    picked = [contract_clauses.by_key(key) for key in keys or []]
-    picked = [row for row in picked if row]
-    if not picked:
-        raise ServiceError("내보낼 조항을 골라 주세요.", "VALIDATION_ERROR")
+    picked = _picked(keys)
     lines = ["# 계약서 조항 문안", "",
              f"※ {DISCLAIMER}", ""]
     for row in picked:
@@ -203,6 +200,162 @@ def clause_text(keys) -> str:
                 lines += [f"고치는 법: {_readable(row['fix'])}", ""]
         lines += ["```", row["text_en"], "```", "", _readable(row["text_ko"]), "", "---", ""]
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _picked(keys) -> list[dict]:
+    picked = [contract_clauses.by_key(key) for key in keys or []]
+    picked = [row for row in picked if row]
+    if not picked:
+        raise ServiceError("내보낼 조항을 골라 주세요.", "VALIDATION_ERROR")
+    return picked
+
+
+# ── 일반 사용자용 내려받기 (2026-10-03) ────────────────────────────────────────
+#
+# .md 는 Windows 에서 더블클릭해도 열 프로그램이 없고, 메모장으로 열면 ** · ```
+# 가 그대로 보입니다. 받는 사람은 계약서를 쓰는 실무자라 Word·한글에서 열거나,
+# 어디서든 열리는 평문이 맞습니다. 조항 설명에 쓰인 표시는 **굵게** 하나뿐입니다.
+
+def _plain(text: str) -> str:
+    return _readable(text).replace("**", "")
+
+
+# 머리 — 「(넣을 문구의 예)」, 「3. PAYMENT」, 번호 없는 「LATE PAYMENT」.
+_EN_HEAD = re.compile(r"^\(.*\)$|^(?:\d+(?:\.\d+)*\.?\s+)?[A-Z][A-Z0-9 &/,'()-]*[A-Z)]$")
+
+
+def _reflow(text_en: str) -> list[str]:
+    """영문 문안을 문단으로. 소스에 80자로 꺾어 둔 줄을 도로 잇습니다.
+
+    꺾인 그대로 계약서에 붙이면 문장 가운데서 줄이 끊깁니다. 머리(「(넣을 문구의
+    예)」·「3. PAYMENT」)와 들여 쓴 줄·「- 」 목록은 제 줄로 둡니다.
+    """
+
+    out: list[str] = []
+    joinable = False
+    for raw in text_en.strip().splitlines():
+        line = raw.strip()
+        if not line:
+            joinable = False
+            continue
+        alone = _EN_HEAD.match(line) or raw[:1].isspace() or line.startswith("- ")
+        if joinable and not alone:
+            out[-1] += " " + line
+        else:
+            out.append(line)
+        joinable = not _EN_HEAD.match(line)
+    return out
+
+
+def clause_plain(keys) -> str:
+    """고른 조항의 문안을 평문(.txt)으로. 기호 없이, 메모장에서 그대로 읽힙니다."""
+
+    rule = "=" * 60
+    lines = ["계약서 조항 문안", rule, "", f"※ {DISCLAIMER}", ""]
+    for row in _picked(keys):
+        mark = contract_clauses.CATEGORIES[row["category"]]
+        lines += [rule, f"[{mark}] {row['title']}", rule, "",
+                  f"왜 필요한가: {_plain(row['why'])}",
+                  f"빠지면/있으면: {_plain(row['risk'])}", ""]
+        if row["category"] == "toxic":
+            lines += ["★ 이 조항은 넣는 것이 아니라 빼는 것입니다.", ""]
+            if row["fix"]:
+                lines += [f"고치는 법: {_plain(row['fix'])}", ""]
+        lines += ["[영문 문안]", "", *_reflow(row["text_en"]), "",
+                  _plain(row["text_ko"]), "", ""]
+    # 메모장·옛 편집기가 한글을 깨뜨리지 않게 BOM 과 CRLF 로 냅니다.
+    return "﻿" + "\r\n".join(lines).rstrip() + "\r\n"
+
+
+_RED = "C0392B"
+_INK = {"must": "1F4E79", "gain": "1E7B45", "toxic": _RED}
+
+
+def _runs(paragraph, text: str, *, color: str | None = None, size: float | None = None) -> None:
+    """**굵게** 표시를 진짜 굵은 글자로 바꿔 넣습니다."""
+
+    from docx.shared import Pt, RGBColor
+
+    for i, part in enumerate(_readable(text).split("**")):
+        if not part:
+            continue
+        run = paragraph.add_run(part)
+        run.bold = bool(i % 2) or None
+        if color:
+            run.font.color.rgb = RGBColor.from_string(color)
+        if size:
+            run.font.size = Pt(size)
+
+
+def _boxed(document, text: str) -> None:
+    """영문 문안을 테두리 친 상자(1칸 표)에 넣습니다. 복사해 붙이기 좋게."""
+
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+
+    cell = document.add_table(rows=1, cols=1, style="Table Grid").cell(0, 0)
+    shade = OxmlElement("w:shd")
+    shade.set(qn("w:val"), "clear")
+    shade.set(qn("w:fill"), "F4F6F8")
+    cell._tc.get_or_add_tcPr().append(shade)
+    cell.paragraphs[0].text = ""
+    for i, line in enumerate(_reflow(text)):
+        paragraph = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
+        run = paragraph.add_run(line)
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(10.5)
+    document.add_paragraph()
+
+
+def clause_docx(keys) -> bytes:
+    """고른 조항의 문안을 Word(.docx)로. 한글(HWP)에서도 열립니다."""
+
+    import io
+
+    from docx import Document
+    from docx.oxml.ns import qn
+    from docx.shared import Cm, Pt
+
+    picked = _picked(keys)
+    document = Document()
+    for section in document.sections:
+        section.page_width, section.page_height = Cm(21), Cm(29.7)
+        section.left_margin = section.right_margin = Cm(2.2)
+        section.top_margin = section.bottom_margin = Cm(2)
+    # 한글 글꼴을 따로 정하지 않으면 Word 가 아무 글꼴로 대신합니다.
+    normal = document.styles["Normal"]
+    normal.font.name = "Malgun Gothic"
+    normal.font.size = Pt(10.5)
+    normal.element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), "맑은 고딕")
+
+    title = document.add_paragraph()
+    _runs(title, "**계약서 조항 문안**", size=18)
+    note = document.add_paragraph()
+    _runs(note, f"※ {DISCLAIMER}", color="666666", size=9.5)
+
+    for row in picked:
+        category = row["category"]
+        mark = contract_clauses.CATEGORIES[category]
+        head = document.add_paragraph()
+        head.paragraph_format.space_before = Pt(14)
+        head.paragraph_format.keep_with_next = True
+        _runs(head, f"**[{mark}] {row['title']}**", color=_INK[category], size=13)
+        if category == "toxic":
+            warn = document.add_paragraph()
+            _runs(warn, "■ 이 조항은 **넣는 것이 아니라 빼는 것**입니다.", color=_RED)
+        for label, field in (("왜 필요한가", "why"), ("빠지면/있으면", "risk")):
+            line = document.add_paragraph()
+            _runs(line, f"**{label}:** {row[field]}")
+        if category == "toxic" and row["fix"]:
+            line = document.add_paragraph()
+            _runs(line, f"**고치는 법:** {row['fix']}")
+        _boxed(document, row["text_en"])
+        _runs(document.add_paragraph(), row["text_ko"])
+
+    out = io.BytesIO()
+    document.save(out)
+    return out.getvalue()
 
 
 def as_text(result: dict) -> str:

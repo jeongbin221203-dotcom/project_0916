@@ -96,7 +96,8 @@
           </details>
           <div class="cc_actions">
             <button class="button primary" type="submit">읽고 판정하기</button>
-            <button class="button ghost" type="button" data-cc-export disabled>고른 조항 문안 받기</button>
+            <button class="button ghost" type="button" data-cc-export="docx" disabled>Word로 받기</button>
+            <button class="button ghost" type="button" data-cc-export="txt" disabled>텍스트로 받기</button>
           </div>
           <p class="cc_status" data-cc-status role="status"></p>
         </form>
@@ -107,12 +108,17 @@
     const note = host.querySelector("[data-cc-note]");
     const status = host.querySelector("[data-cc-status]");
     const form = host.querySelector("[data-cc-form]");
-    const exportBtn = host.querySelector("[data-cc-export]");
+    // .md 는 Windows 에서 열 프로그램이 없어 Word·평문 둘로 냅니다. (2026-10-03)
+    const exportBtns = Array.from(host.querySelectorAll("[data-cc-export]"));
+    const EXPORT_LABEL = { docx: "Word로 받기", txt: "텍스트로 받기" };
 
     function refreshExport() {
       const picked = host.querySelectorAll("[data-cc-pick]:checked").length;
-      exportBtn.disabled = picked === 0;
-      exportBtn.textContent = picked ? `고른 조항 ${picked}개 문안 받기` : "고른 조항 문안 받기";
+      exportBtns.forEach((btn) => {
+        const label = EXPORT_LABEL[btn.dataset.ccExport];
+        btn.disabled = picked === 0;
+        btn.textContent = picked ? `고른 조항 ${picked}개 ${label}` : label;
+      });
     }
 
     host.addEventListener("change", (event) => {
@@ -175,25 +181,29 @@
              gain: result.gain, side: result.our_side, check: result.check || [] }, true);
     });
 
-    exportBtn.addEventListener("click", async () => {
+    async function download(format) {
       const keys = Array.from(host.querySelectorAll("[data-cc-pick]:checked"))
         .map((input) => input.value);
       if (!keys.length) return;
       const response = await fetch(config.exportUrl, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys }),
+        body: JSON.stringify({ keys, format }),
       });
       if (!response.ok) { status.textContent = "문안을 만들지 못했습니다."; return; }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "contract-clauses.md";
+      link.download = `계약서-조항-문안.${format}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
       status.textContent = `조항 ${keys.length}개 문안을 내려받았습니다.`;
+    }
+
+    exportBtns.forEach((btn) => {
+      btn.addEventListener("click", () => download(btn.dataset.ccExport));
     });
 
     load();

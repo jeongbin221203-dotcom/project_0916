@@ -84,13 +84,31 @@ def review():
 
 @contract_bp.post("/export")
 def export():
-    """고른 조항의 문안을 텍스트 파일로 내려받습니다."""
+    """고른 조항의 문안을 내려받습니다.
+
+    format  docx  Word·한글에서 엽니다 (화면의 기본)
+            txt   어디서든 열리는 평문
+            md    예전 그대로 — format 을 안 주던 호출이 깨지지 않게 둡니다
+    """
 
     payload = json_body()
     keys = payload.get("keys")
+    keys = keys if isinstance(keys, list) else []
+    kind = str(payload.get("format") or "md").lower()
+    if kind not in EXPORT_FORMATS:
+        return error_response(ValidationError("format 은 docx · txt · md 중 하나입니다.", "format"))
+    build, mimetype = EXPORT_FORMATS[kind]
     try:
-        body = contract_clause_service.clause_text(keys if isinstance(keys, list) else [])
+        body = build(keys)
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
-    return Response(body, mimetype="text/markdown; charset=utf-8", headers={
-        "Content-Disposition": 'attachment; filename="contract-clauses.md"'})
+    return Response(body, mimetype=mimetype, headers={
+        "Content-Disposition": f'attachment; filename="contract-clauses.{kind}"'})
+
+
+EXPORT_FORMATS = {
+    "docx": (contract_clause_service.clause_docx,
+             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    "txt": (contract_clause_service.clause_plain, "text/plain; charset=utf-8"),
+    "md": (contract_clause_service.clause_text, "text/markdown; charset=utf-8"),
+}
