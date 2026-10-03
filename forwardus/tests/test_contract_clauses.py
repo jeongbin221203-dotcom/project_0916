@@ -312,7 +312,8 @@ def test_Word_문안은_열리고_영문은_상자에_든다():
     assert "**" not in text
     boxes = [table.cell(0, 0).text for table in document.tables]
     assert len(boxes) == 2
-    assert "KCAB" in boxes[0] and "terminate" in boxes[1]
+    # 독소(묶음 순서) · 필수 · 이익 순으로 냅니다 — 고른 순서가 아니라.
+    assert "terminate" in boxes[0] and "KCAB" in boxes[1]
 
 
 def test_Word_에서_독소조항_제목은_빨갛다():

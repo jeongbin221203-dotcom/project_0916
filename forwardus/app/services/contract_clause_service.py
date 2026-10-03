@@ -67,6 +67,7 @@ def checklist(incoterms: str = "", present: set[str] | None = None,
         if row["context"] and row["key"] not in contexts:
             continue
         seen = judged.get(row["key"]) or {}
+        _, group_id, group_label = contract_clauses.toxic_group(row["key"])
         out[row["category"]].append({
             "key": row["key"], "title": row["title"], "why": _readable(row["why"]),
             "risk": _readable(row["risk"]), "text_ko": _readable(row["text_ko"]),
@@ -77,11 +78,14 @@ def checklist(incoterms: str = "", present: set[str] | None = None,
             "reason": seen.get("reason", ""),
             "countries": list(row["countries"]),
             "for_country": bool(tags & set(row["countries"])),
+            "group": group_id, "group_label": group_label,
         })
     if tags:
         # 그 나라 것을 앞으로. 그 안에서는 원래 순서를 지킵니다(sort 는 안정적입니다).
         for category in out:
             out[category].sort(key=lambda item: not item["for_country"])
+    # 독소조항은 묶음 순서로 — 묶음 안에서는 위의 순서(도착국 먼저)를 지킵니다.
+    out["toxic"].sort(key=lambda item: contract_clauses.toxic_group(item["key"])[0])
     return out
 
 
@@ -186,10 +190,11 @@ def country_of(shipment) -> str:
 def clause_text(keys) -> str:
     """고른 조항의 문안을 한 벌로. 계약서에 그대로 붙여 쓸 수 있게 냅니다."""
 
-    picked = _picked(keys)
     lines = ["# 계약서 조항 문안", "",
              f"※ {DISCLAIMER}", ""]
-    for row in picked:
+    for head, row in _picked(keys):
+        if head:
+            lines += [f"# 🔴 {head}", ""]
         mark = contract_clauses.CATEGORIES[row["category"]]
         lines += [f"## [{mark}] {row['title']}", "",
                   f"왜 필요한가: {_readable(row['why'])}",
@@ -202,12 +207,28 @@ def clause_text(keys) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _picked(keys) -> list[dict]:
+_CATEGORY_ORDER = {"toxic": 0, "must": 1, "gain": 2}
+
+
+def _picked(keys) -> list[tuple[str, dict]]:
+    """고른 조항을 화면 순서로 — 독소(묶음 순서) · 필수 · 이익.
+
+    (소제목, 조항) 짝을 냅니다. 소제목은 독소 묶음이 **바뀌는 자리에만** 있고,
+    나머지는 빈 문자열입니다. (2026-10-03)
+    """
+
     picked = [contract_clauses.by_key(key) for key in keys or []]
     picked = [row for row in picked if row]
     if not picked:
         raise ServiceError("내보낼 조항을 골라 주세요.", "VALIDATION_ERROR")
-    return picked
+    picked.sort(key=lambda row: (_CATEGORY_ORDER.get(row["category"], 9),
+                                 contract_clauses.toxic_group(row["key"])[0]))
+    out, last = [], ""
+    for row in picked:
+        label = contract_clauses.toxic_group(row["key"])[2]
+        out.append((label if label and label != last else "", row))
+        last = label
+    return out
 
 
 # ── 일반 사용자용 내려받기 (2026-10-03) ────────────────────────────────────────
@@ -252,7 +273,9 @@ def clause_plain(keys) -> str:
 
     rule = "=" * 60
     lines = ["계약서 조항 문안", rule, "", f"※ {DISCLAIMER}", ""]
-    for row in _picked(keys):
+    for head, row in _picked(keys):
+        if head:
+            lines += ["", f"■ {head}", ""]
         mark = contract_clauses.CATEGORIES[row["category"]]
         lines += [rule, f"[{mark}] {row['title']}", rule, "",
                   f"왜 필요한가: {_plain(row['why'])}",
@@ -319,6 +342,7 @@ def clause_docx(keys) -> bytes:
 
     picked = _picked(keys)
     document = Document()
+
     for section in document.sections:
         section.page_width, section.page_height = Cm(21), Cm(29.7)
         section.left_margin = section.right_margin = Cm(2.2)
@@ -334,7 +358,13 @@ def clause_docx(keys) -> bytes:
     note = document.add_paragraph()
     _runs(note, f"※ {DISCLAIMER}", color="666666", size=9.5)
 
-    for row in picked:
+    for group, row in picked:
+        if group:
+            # 독소 묶음 소제목 — 「① 대금을 못 받거나 늦게 받음」
+            band = document.add_paragraph()
+            band.paragraph_format.space_before = Pt(20)
+            band.paragraph_format.keep_with_next = True
+            _runs(band, f"**{group}**", color=_RED, size=15)
         category = row["category"]
         mark = contract_clauses.CATEGORIES[category]
         head = document.add_paragraph()

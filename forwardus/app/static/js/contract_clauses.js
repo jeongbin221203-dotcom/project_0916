@@ -69,8 +69,23 @@
     return `
       <section class="cc_group">
         <h4>${esc(title)} <span class="cc_count">${items.length}</span></h4>
-        <ul class="cc_list">${items.map((item) => row(item, group)).join("")}</ul>
+        ${group === "toxic" ? toxicLists(items) : `<ul class="cc_list">${items.map((item) => row(item, group)).join("")}</ul>`}
       </section>`;
+  }
+
+  // 독소조항은 위험 종류 8묶음(① 대금 … ⑧ 제재)으로 나눕니다. 서버가 묶음 순서로
+  // 보내므로 바뀌는 자리마다 소제목만 끼웁니다. (2026-10-03)
+  function toxicLists(items) {
+    const parts = [];
+    items.forEach((item) => {
+      const label = item.group_label || "";
+      const last = parts[parts.length - 1];
+      if (!last || last.label !== label) parts.push({ label, items: [] });
+      parts[parts.length - 1].items.push(item);
+    });
+    return parts.map((part) => `
+        ${part.label ? `<h5 class="cc_sub">${esc(part.label)} <span class="cc_count">${part.items.length}</span></h5>` : ""}
+        <ul class="cc_list">${part.items.map((item) => row(item, "toxic")).join("")}</ul>`).join("");
   }
 
   function mount(host, options) {

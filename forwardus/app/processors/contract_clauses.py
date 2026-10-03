@@ -2760,6 +2760,55 @@ the Seller, and such amendments shall bind the Seller.""",
     avoid=NEGATION + (r"by\s+mutual", r"both\s+parties", r"signed\s+by\s+both", r"쌍방", r"서면\s*합의"),
 )
 
+# ── 독소조항 묶음 (2026-10-03) ──────────────────────────────────────────────
+#
+# 55개가 한 줄로 늘어서면 읽히지 않습니다. 수출자가 먼저 묻는 것 — **돈을 못
+# 받는가, 얼마나 물리는가** — 순서로 묶어 화면과 내려받는 문안에 씁니다.
+# 새 독소조항을 넣으면 여기에도 붙이세요(tests/test_contract_toxic_groups.py).
+TOXIC_GROUPS = [
+    ("payment", "① 대금을 못 받거나 늦게 받음"),
+    ("liability", "② 상한 없는 배상"),
+    ("quality", "③ 품질·검사"),
+    ("termination", "④ 계약을 끊거나 바꿈"),
+    ("cost", "⑤ 무역조건·비용 전가"),
+    ("ip", "⑥ 기술·지재권·영업 제한"),
+    ("dispute", "⑦ 분쟁 해결·언어"),
+    ("sanctions", "⑧ 제재·대리점·가공"),
+]
+TOXIC_GROUP = {
+    **dict.fromkeys(("payment_on_resale", "payment_fx_approval", "fx_risk_local",
+                     "docs_before_payment", "lc_soft_clause", "payment_retention",
+                     "acceptance_signature_payment", "buyer_set_off", "retro_price_deduction",
+                     "chargeback_penalty", "on_demand_bond"), "payment"),
+    **dict.fromkeys(("unlimited_damages", "uncapped_ld", "own_negligence_indemnity",
+                     "us_class_action_pl", "recall_cost", "eu_gdpr_indemnity",
+                     "cover_purchase", "open_warranty"), "liability"),
+    **dict.fromkeys(("inspection_buyer_sole", "full_return", "full_inspection",
+                     "cert_test_cost", "psi_cost_delay"), "quality"),
+    **dict.fromkeys(("termination_at_will", "time_essence_cancel", "unilateral_amendment",
+                     "spec_change_no_price", "evergreen", "assignment_one_way",
+                     "battle_of_forms"), "termination"),
+    **dict.fromkeys(("term_conflict", "buyer_nominated_cost", "ddp_no_ior",
+                     "tariff_absorption", "eu_epr_cost"), "cost"),
+    **dict.fromkeys(("cn_tech_transfer", "cn_trademark_buyer", "ip_assignment", "tooling_free",
+                     "one_way_nda", "non_compete_wide", "mfn_price", "exclusive_no_moq",
+                     "audit_rights"), "ip"),
+    **dict.fromkeys(("foreign_forum", "china_domestic_arb", "us_jury_punitive",
+                     "foreign_language_prevails", "one_way_force_majeure"), "dispute"),
+    **dict.fromkeys(("ru_sanctions_warranty", "reexport_control", "gulf_agent_lock",
+                     "agency_law_eu", "consigned_material_lock"), "sanctions"),
+}
+_GROUP_ORDER = {group_id: i for i, (group_id, _) in enumerate(TOXIC_GROUPS)}
+_GROUP_LABEL = dict(TOXIC_GROUPS)
+
+
+def toxic_group(key: str) -> tuple[int, str, str]:
+    """(순서, id, 소제목). 독소조항이 아니면 묶음 없이 맨 뒤입니다."""
+
+    group_id = TOXIC_GROUP.get(key, "")
+    return _GROUP_ORDER.get(group_id, len(TOXIC_GROUPS)), group_id, _GROUP_LABEL.get(group_id, "")
+
+
 # **이 독소가 있으면 이 보호 조항은 무력합니다.** (2026-10-02)
 #
 # 실물 보세가공 계약서 제6조는 "직접손해만 배상"으로 한도를 걸었는데, 앞머리에
