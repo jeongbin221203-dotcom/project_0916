@@ -40,11 +40,26 @@
         </label>
         ${item.status === "weak" && item.reason ? `<p class="cc_reason">${rich(item.reason)}</p>` : ""}
         ${item.evidence ? `<blockquote class="cc_evidence">근거 — “${esc(item.evidence)}”</blockquote>` : ""}
+        ${item.maybe ? `<blockquote class="cc_evidence cc_maybe">규칙은 못 찾았지만 이 문장일 수 있습니다 — “${esc(item.maybe)}”</blockquote>` : ""}
         <p class="cc_why">${rich(item.why)}</p>
         <p class="cc_risk">${rich(item.risk)}</p>
         ${item.text_ko ? `<p class="cc_how">${rich(item.text_ko)}</p>` : ""}
         ${item.fix ? `<p class="cc_fix">고치는 법 — ${rich(item.fix)}</p>` : ""}
       </li>`;
+  }
+
+  /* 규칙이 주제째 놓친 조항 — 주제 분류기가 고른 것. 판정이 아니라 "직접 보세요"입니다. */
+  function checkBlock(items) {
+    if (!items || !items.length) return "";
+    return `
+      <section class="cc_group">
+        <h4>⚪ 규칙이 판정하지 못한 조항 (직접 확인) <span class="cc_count">${items.length}</span></h4>
+        <ul class="cc_list">${items.map((item) => `
+          <li class="cc_row">
+            <span class="cc_tag cc_check">확인</span> <b>${esc(item.title)}</b> 조항으로 보입니다
+            <blockquote class="cc_evidence">“${esc(item.sentence)}”</blockquote>
+          </li>`).join("")}</ul>
+      </section>`;
   }
 
   function groupBlock(title, items, group) {
@@ -112,7 +127,8 @@
         + groupBlock("🟡 적혀 있으나 제 구실을 못 하는 조항", groups.weak, "weak")
         + groupBlock(found ? "🟠 빠진 필수조항" : "🟠 있어야 할 조항 (필수)",
                      groups.must, "must")
-        + groupBlock("🔵 챙기면 이로운 조항 (이익)", groups.gain, "gain");
+        + groupBlock("🔵 챙기면 이로운 조항 (이익)", groups.gain, "gain")
+        + checkBlock(groups.check);
       refreshExport();
     }
 
@@ -154,7 +170,7 @@
         + `독소 ${result.toxic.length}개 · 보완 ${(result.weak || []).length}개 · `
         + `빠진 필수 ${result.missing.length}개.`;
       draw({ toxic: result.toxic, weak: result.weak || [], must: result.missing,
-             gain: result.gain, side: result.our_side }, true);
+             gain: result.gain, side: result.our_side, check: result.check || [] }, true);
     });
 
     exportBtn.addEventListener("click", async () => {

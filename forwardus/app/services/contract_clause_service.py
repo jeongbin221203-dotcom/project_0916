@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from app.processors import contract_clauses
+from app.processors import clause_topics, contract_clauses
 from app.services import ServiceError
 
 MAX_TEXT = 400_000
@@ -86,8 +86,18 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
     # 도착국에 흔한데 **아직 안 보이는** 독소조항. 올린 계약서에 없더라도
     # 협상 중에 들어올 수 있어 미리 알려 줍니다. (2026-10-02)
     watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]]
+    # 규칙이 **주제째 놓친** 조항 — 주제 분류기가 고릅니다. 판정은 바꾸지 않고
+    # 빠진 필수조항에 "이 문장일 수 있습니다"를 덧붙이거나, '확인 필요'로 냅니다.
+    # (2026-10-03, app/processors/clause_topics.py)
+    category = {row["key"]: row["category"] for row in contract_clauses.CLAUSES}
+    maybe = clause_topics.candidates(body[:MAX_TEXT], analysis["clauses"], category)
+    missing = [row for row in rows["must"] if row["status"] == "absent"]
+    for row in missing:
+        hint = next((c for c in maybe if c["kind"] == "must" and row["key"] in c["keys"]), None)
+        row["maybe"] = hint["sentence"] if hint else ""
     return {
-        "missing": [row for row in rows["must"] if row["status"] == "absent"],
+        "missing": missing,
+        "check": [c for c in maybe if c["kind"] == "check"],
         "toxic": [row for row in rows["toxic"] if row["present"]],
         # **적혀 있으나 제 구실을 못 하는** 필수·이익조항 — 미정·부정·불리·무력.
         # '있다'고 하면 안심시키고, '없다'고 하면 이미 쓴 사람에게 넣으라고
@@ -206,6 +216,13 @@ def as_text(result: dict) -> str:
         lines += [f"### 🟠 빠진 필수조항 {len(result['missing'])}개", ""]
         for row in result["missing"]:
             lines.append(f"- **{row['title']}** — {row['why']}")
+            if row.get("maybe"):
+                lines.append(f"  - 규칙은 못 찾았지만 이 문장일 수 있습니다: “{row['maybe']}”")
+        lines.append("")
+    if result.get("check"):
+        lines += [f"### ⚪ 규칙이 판정하지 못한 조항 {len(result['check'])}개 (직접 확인)", ""]
+        for item in result["check"]:
+            lines.append(f"- **{item['title']}** 조항으로 보입니다 — “{item['sentence']}”")
         lines.append("")
     if result["gain"]:
         lines += [f"### 🔵 챙기면 이로운 조항 {len(result['gain'])}개", ""]

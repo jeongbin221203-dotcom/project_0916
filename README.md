@@ -783,6 +783,31 @@ imputed
 
 Mock 데이터를 실시간 데이터처럼 표시하지 않습니다.
 
+## 16.1 계약 조항 주제 분류기의 학습 자료
+
+계약서 조항 점검에서 **규칙이 놓친 조항**을 "직접 확인"으로 띄우는 분류기
+(`forwardus/app/processors/clause_topics.py`)는 아래 공개 자료로 만들었습니다.
+저장소에는 낱말 가중치(`forwardus/data/processed/clause_topics.json`)만 들어
+있고, 원문은 들어 있지 않습니다.
+
+| 자료 | 내용 | 라이선스 |
+|---|---|---|
+| [CUAD v1](https://zenodo.org/records/4595826) (The Atticus Project) | 실제 계약서 510건, 조항 41종 라벨 | CC BY 4.0 |
+| [LEDGAR](https://huggingface.co/datasets/coastalcph/lex_glue) (LexGLUE 판) | SEC 공시 계약 조항 약 8만 개, 100종 | CC BY 4.0 |
+| [SEC EDGAR](https://www.sec.gov/os/accessing-edgar-data) 공급·구매 계약서 | 조항 제목으로 단 라벨(검사·인도·소유권·포장 등) | 미국 정부 공개 자료 |
+
+다시 만들기:
+
+```bash
+pip install -r forwardus/data/requirements-build.txt
+python forwardus/data/collect_edgar_contracts.py     # EDGAR 원문 (data/raw, git 제외)
+python forwardus/data/build_clause_topics.py         # CUAD·LEDGAR 는 data/raw/contracts 에 둡니다
+```
+
+분류기는 **주제만** 말하고 판정(독소·유리)은 바꾸지 않습니다. 확신 문턱은
+학습에 안 쓴 자료에서 정밀도 90% 이상으로 맞췄습니다. 국문 조항은 학습 자료가
+부족해 분류하지 않고 규칙으로만 판정합니다.
+
 ---
 
 # 17. 기술 스택

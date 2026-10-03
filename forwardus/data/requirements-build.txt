@@ -5,3 +5,7 @@
 httpx>=0.27,<1
 searoute>=1.6        # 해상 항로망(marnet)과 항만 좌표
 networkx>=3.0        # 최단 항로 계산
+#   python data/build_clause_topics.py  (계약 조항 주제 분류기)
+pandas>=2.0          # LEDGAR parquet 읽기
+pyarrow>=14          # parquet
+numpy>=1.26          # 로지스틱 회귀 학습 (서버는 쓰지 않습니다)
