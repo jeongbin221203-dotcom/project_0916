@@ -119,8 +119,13 @@ def test_비밀유지가_쌍방이면_일방이_아니다(doc):
     assert "one_way_nda" not in contract_clauses.find_in("SALES CONTRACT\n" + doc)
 
 
-def test_양쪽_모두_해지할_수_있어도_우리에게는_위험하다():
-    """'Either party' 는 바이어도 할 수 있다는 뜻입니다 — 생산한 뒤 끊기는 위험은 그대로."""
+def test_양쪽_모두_해지할_수_있으면_바이어의_일방적_해지권이_아니다():
+    """2026-10-04 전문가 점검 2회차로 바꿨습니다.
+
+    전에는 'Either party' 도 바이어가 끊을 수 있으니 위험하다고 짚었습니다. 그런데 이 조항의
+    이름은 '바이어의 **일방적** 해지권'이고, 예고기간을 둔 쌍방 편의해지는 실무에서 균형
+    잡힌 꼴로 봅니다(전문가 판단). 일방적인 꼴만 짚습니다.
+    """
 
     line = "Either party may terminate this Contract at any time for convenience upon notice."
-    assert "termination_at_will" in contract_clauses.find_in("SALES CONTRACT\n" + line)
+    assert "termination_at_will" not in contract_clauses.find_in("SALES CONTRACT\n" + line)

@@ -318,7 +318,11 @@ of the date of shipment.""",
               r"\b(?:sixty|thirty|ninety|forty[- ]five|fifteen|ten|seven)\s+(?:\(\d+\)\s*)?(?:calendar\s+|business\s+|working\s+)?days",
               r"\b(?:19|20)\d{2}\b", r"\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?",
               r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}\b",
-              r"partial|trans[hs]ipment|분할|환적", r"선적\s*기일", r"\d+\s*일", r"까지|이내"),
+              r"partial|trans[hs]ipment|분할|환적", r"선적\s*기일", r"\d+\s*일", r"까지|이내",
+              # 기계·설비는 달 단위로 적습니다 — "within seven (7) months" (2회차)
+              # "within" 에 붙어야 — "WARRANTY: 12 months from the date of shipment" 은 보증 얘기입니다.
+              r"\bwithin\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\s*(?:\(\d+\)\s*)?"
+              r"(?:months?|weeks?)\b"),
              "선적 시기(기일·기간)가 없습니다. '선적'이라는 낱말만 있습니다.", "absent"),
     neg_ok=True,
 )
@@ -412,7 +416,8 @@ _clause(
 This Contract shall be governed by and construed in accordance with the laws
 of the Republic of Korea. The United Nations Convention on Contracts for the
 International Sale of Goods (CISG) <shall apply | shall not apply>.""",
-    text_ko="**한국법**을 우선 제안합니다. CISG 적용 여부도 **명시**해야 합니다(안 적으면 기본 적용).",
+    text_ko="**한국법**을 우선 제안합니다. CISG 적용 여부도 **명시**해야 합니다(상대국도 가입국이면 "
+            "안 적어도 적용됩니다).",
     detect=[r"governed by[^.]{0,60}law",
             r"construed[^.]{0,40}(?:under|in accordance with)[^.]{0,40}law",
             r"(?:대한민국|한국)\s*법[^.]{0,30}(?:에 의|따른|따라|적용)",
@@ -872,7 +877,7 @@ _clause(
     text_en="""(살펴볼 문구의 예)
 This Contract shall be automatically renewed for successive one-year periods
 unless either party gives written notice at least 180 days before expiry.""",
-    text_ko="automatically renewed 와 함께 **90일이 넘는 예고기간**이 붙어 있으면 조심하세요.",
+    text_ko="automatically renewed 와 함께 **60일이 넘는 예고기간**이 붙어 있으면 이 조항입니다.",
     detect=[r"\d+\s*일\s*전[^.]{0,30}통지[^.]{0,20}없으면",
             r"(?:통지|통보)[^.]{0,15}없으면[^.]{0,30}(?:갱신|연장)",
             r"renew[^.]{0,70}(?:successive|further|additional|annual)",
@@ -2223,7 +2228,7 @@ obligations in each Member State shall be undertaken and paid by the Seller.""",
             "Seller 부담이 함께 나오면 이 조항입니다.",
     # 이 조항의 예문("registrations, fees and reporting obligations in each Member
     # State … paid by the Seller")이 100자를 넘어 못 찾았습니다. (2026-10-03)
-    detect=[r"extended producer responsibility[^.]{0,180}"
+    detect=[r"extended producer responsibility[^.]{0,260}"
             r"(?:seller|supplier|borne by|at the expense)",
             r"\bEPR\b[^.]{0,80}(?:registration|fee|levy)[^.]{0,80}"
             r"(?:seller|supplier|borne by)",
@@ -2474,7 +2479,7 @@ compensation whatsoever.""",
             r"(?:영업권\s*보상|보상청구권)[^.]{0,40}(?:청구하지|포기)",
             r"대리(?:인|점)[^.]{0,40}(?:영업권\s*보상|보상금|보상청구)[^.]{0,30}(?:청구하지|받지|포기|없)"],
     applies=("always",),
-    fix="보상 포기 문구는 **지워도 효력이 없습니다** — 남겨 두어도 득이 없습니다. 해지 때 "
+    fix="보상 포기 문구는 **적어 두어도 효력이 없습니다**(강행규정) — 믿고 있으면 안 됩니다. 해지 때 "
         "보상이 생긴다고 보고 **예산과 산정 방법을 미리 합의**하거나, 대리인이 아닌 "
         "**판매점(자기 이름으로 사고파는 구조)**으로 갈 수 있는지 변호사와 검토하세요.",
     countries=("EU",),
@@ -2492,7 +2497,8 @@ for the International Sale of Goods (CISG).
 -- 또는 --
 The application of the United Nations Convention on Contracts for the
 International Sale of Goods (CISG) is hereby expressly excluded.""",
-    text_ko="쓸 것인지 뺄 것인지를 **문장으로 적어 두세요.** 안 적으면 자동으로 적용됩니다.",
+    text_ko="쓸 것인지 뺄 것인지를 **문장으로 적어 두세요.** 두 나라가 모두 가입국이거나 가입국 법이 "
+            "준거법이면, 안 적어도 적용됩니다(영국·인도·태국 등은 비가입국).",
     detect=[r"CISG", r"Convention on Contracts for the International Sale of Goods",
             r"(국제물품매매계약에\s*관한\s*)?유엔\s*협약", r"비엔나\s*협약"],
     applies=("always",),
@@ -2585,10 +2591,9 @@ _clause(
     text_en="""(확인할 것 — 이런 문구가 있으면 미국 법원으로 끌려갑니다)
 The Parties hereby submit to the exclusive jurisdiction of the courts of
 New York, and waive any objection to venue therein.""",
-    text_ko="배심재판 포기와 징벌적·간접 손해 배제를 **함께** 넣어야 뜻이 있습니다. "
-            "('trial by jury'·'punitive damages' 라는 낱말 자체는 찾지 않습니다 — "
-            "포기·면책 문장에도 똑같이 나와 편을 가릴 수 없습니다. 미국 관할이 "
-            "보이면 이 위험을 함께 알립니다)",
+    text_ko="미국 법원 관할이 보이거나, 배심재판·징벌적 손해배상을 **인정하는** 문구가 있으면 이 "
+            "조항입니다. 배심 포기·징벌적 손해 배제처럼 **막는** 문구는 우리를 지키는 것이라 짚지 "
+            "않습니다. 넣을 때는 둘을 **함께** 넣어야 뜻이 있습니다.",
     # **제목이 약속한 배심재판·징벌적 손해배상을 실제로 봅니다.** (2026-10-02)
     #
     # 전에는 규칙 다섯 개에 jury · punitive · 배심 · 징벌적 이 하나도 없어,
@@ -2753,7 +2758,9 @@ terms of the Seller's quotation, proforma invoice or order acknowledgement.""",
                       r"(?:buyer|purchaser)",
                       r"seller'?s?\s+(?:general\s+)?(?:terms|conditions)[^.]{0,40}prevail",
                       # "본 계약은 매수인의 발주서**보다** 우선" — 우리 계약이 이깁니다.
-                      r"본\s*계약[^.]{0,30}우선",
+                      # "본 계약**이** 발주서**보다** 우선" 꼴만 — "발주서와 본 계약이 상충하는
+                      # 경우 발주서가 우선한다" 를 걸렀습니다(2회차).
+                      r"본\s*계약(?:이|은)[^.]{0,25}보다\s*우선", r"본\s*계약(?:이|은)\s*우선",
                       r"(?:발주서|주문서|구매\s*(?:약관|조건)|일반\s*거래\s*조건)[^.]{0,5}보다\s*우선"),
 )
 
@@ -2987,20 +2994,30 @@ _amend("uncapped_ld", avoid=(
     r"(?:넘지|초과하지)\s*(?:아니|않)", r"한도로\s*(?:한다|하며|하되)"))
 
 # 전액 선수금이면 B/L 원본 직송은 위험이 아닙니다 — 이 조항의 고치는 법 그대로입니다.
+# 다만 **외상 조건이 하나라도** 있으면 아닙니다 — "견본만 100% 선수금, 본 물량은 B/L 후
+# 60일" 을 선수금 계약으로 봤습니다(2회차). 문서 맨 앞에서 외상 말이 없는지 봅니다.
+_NO_CREDIT = (r"^(?![\s\S]*(?:within|after|from)\s+\d+\s*(?:\(\d+\)\s*)?days?\s+(?:after|from|of)\s+"
+              r"(?:the\s+)?(?:b/?l|bill\s+of\s+lading|shipment|invoice|arrival)|[\s\S]*\bD/[AP]\b|"
+              r"[\s\S]*선적\s*후\s*\d+\s*일)[\s\S]*")
 _amend("docs_before_payment", unless_doc=(
-    r"\b100\s*%\s*(?:of\s+the\s+(?:contract\s+)?(?:price|value|amount)\s+)?(?:by\s+)?"
+    _NO_CREDIT + r"\b100\s*%\s*(?:of\s+the\s+(?:contract\s+)?(?:price|value|amount)\s+)?(?:by\s+)?"
     r"(?:t/?t\s+|telegraphic\s+transfer\s+|wire\s+transfer\s+)?(?:in\s+advance|before\s+shipment|"
     r"prior\s+to\s+shipment)",
-    r"\b(?:full|entire)\s+(?:payment|amount|price)\s+(?:in\s+advance|before\s+shipment)",
-    r"\bcash\s+in\s+advance\b",
-    r"(?:100\s*%|전액)\s*(?:선급|선수금|선지급|사전\s*송금)"))
+    _NO_CREDIT + r"\b(?:full|entire)\s+(?:payment|amount|price)\s+(?:in\s+advance|before\s+shipment)",
+    _NO_CREDIT + r"\bcash\s+in\s+advance\b",
+    _NO_CREDIT + r"(?:100\s*%|전액)\s*(?:선급|선수금|선지급|사전\s*송금)"))
 
-# 예고기간이 60일(2개월) 이하면 고치는 법이 권하는 꼴입니다.
+# 예고기간이 60일(2개월) 이하면 고치는 법이 권하는 꼴입니다. **예고에 붙은** 날수만
+# 봅니다 — "notice shall take effect seven (7) days after receipt" 의 7일로 12개월 예고를
+# 놓쳤습니다(2회차).
+_NUM60 = (r"(?:\b(?:one|two|three|five|seven|ten|fifteen|twenty|thirty|forty(?:-five)?|forty\s+five|fifty|"
+          r"sixty)\s+)?\(?(?<!\d)(?:[1-9]|[1-5]\d|60)\)?|\b(?:one|two|ten|fifteen|thirty|forty(?:-five)?|sixty)")
 _amend("evergreen", avoid=(
-    r"(?:\b(?:one|two|three|five|seven|ten|fifteen|twenty|thirty|forty(?:-five)?|forty\s+five|fifty|sixty)\s+)?"
-    r"\(?(?<!\d)(?:[1-9]|[1-5]\d|60)\)?\s+(?:calendar\s+|business\s+)?days?\b",
-    r"\b(?:one|two|ten|fifteen|thirty|forty(?:-five)?|sixty)\s+(?:calendar\s+)?days?\b",
-    r"(?:\b(?:one|two)\s+)?\(?\b[12]\)?\s+months?\b|\b(?:one|two)\s+months?\b",
+    r"(?:" + _NUM60 + r")\s+(?:calendar\s+|business\s+)?days?['’]?\s*(?:prior\s+)?(?:written\s+)?"
+    r"(?:notice\s+)?(?:before|prior\s+to|in\s+advance|preceding)",
+    r"(?:" + _NUM60 + r")\s+(?:calendar\s+|business\s+)?days?['’]?\s*(?:prior\s+)?(?:written\s+)?notice",
+    r"(?:\b(?:one|two)\s+)?\(?\b[12]\)?\s+months?['’]?\s*(?:prior\s+)?(?:written\s+)?(?:notice|before|prior)",
+    r"\b(?:one|two)\s+months?['’]?\s*(?:prior\s+)?(?:written\s+)?(?:notice|before|prior)",
     r"(?<!\d)(?:[1-9]|[1-5]\d|60)\s*일\s*전", r"(?<!\d)[12]\s*(?:개월|달)\s*전"))
 
 # 반품 운임·전량 반품은 full_return 의 일입니다 — 인증·시험 비용이 아닙니다.
@@ -3008,13 +3025,18 @@ _amend("cert_test_cost", avoid=(r"return\s+freight", r"reject\w*\s+the\s+entire"
                                 r"fails?\s+(?:the\s+)?inspection"))
 
 # 중재지가 홍콩·싱가포르·서울이면 본토 중재가 아닙니다 — 고치는 법이 권하는 곳입니다.
+# **중재지** 말에 붙어야 합니다 — "notices shall be sent to the Seller in Seoul" 의 Seoul 로
+# 본토 중재를 놓쳤습니다(2회차).
 _amend("china_domestic_arb", avoid=(
-    r"hong\s*kong", r"\bHKIAC\b", r"singapore", r"\bSIAC\b", r"\bseoul\b", r"\bKCAB\b",
-    r"korean\s+commercial\s+arbitration", r"홍콩", r"싱가포르", r"대한상사중재원"))
+    r"(?:arbitrat\w*|seat(?:ed)?|venue)[^.]{0,40}\b(?:in|at)\s+(?:hong\s*kong|singapore|seoul)\b",
+    r"\bHKIAC\b", r"\bSIAC\b", r"\bKCAB\b", r"korean\s+commercial\s+arbitration",
+    r"(?:홍콩|싱가포르|서울)[^.]{0,10}(?:에서|을)\s*중재", r"대한상사중재원"))
 
-# "notwithstanding the trade term, the **Buyer** shall bear …" 는 우리에게 유리합니다.
-_amend("term_conflict", avoid=(r"\b(?:buyer|purchaser)\s+shall\s+bear",
-                               r"(?:매수인|바이어)(?:이|가|은|는)[^.]{0,20}부담"))
+# "notwithstanding the trade term, the **Buyer** shall bear all risks …" 는 우리에게 유리합니다.
+# 하역비만 바이어가 지는 꼴은 아닙니다(2회차 — 같은 문장의 "Buyer shall bear the unloading
+# cost" 로 매도인 도착지 위험 부담을 놓쳤습니다).
+_amend("term_conflict", avoid=(r"\b(?:buyer|purchaser)\s+shall\s+bear\s+all\s+(?:the\s+)?risks?",
+                               r"(?:매수인|바이어)(?:이|가|은|는)[^.]{0,20}(?:모든\s*)?위험[^.]{0,20}부담"))
 
 # 독점 지정과 다른 조에 있는 해지 제한, 그리고 대리점 **등록 의무**.
 _amend("gulf_agent_lock", detect=(
@@ -3041,10 +3063,15 @@ _amend("open_warranty",
               r"(?:free\s+from\s+defects|fit\s+for|merchantab)",
               r"\bwarrant\w*\s+shall\s+survive[^.]{0,40}(?:inspection|acceptance|payment)",
               r"(?:매도인|공급자)(?:은|는)[^.]{0,60}(?:하자가\s*없음을|품질을)\s*보증"),
+       # 기간 말이 **보증과 붙어** 있어야 합니다 — "경업금지 2년 after termination" 으로 보증
+       # 기간이 있다고 봤습니다(2회차).
        loose_unless=(r"warranty\s+period", r"guarantee\s+period",
+                     r"warrant\w*[^.]{0,80}\b(?:\d+|one|two|three|six|twelve|eighteen|twenty[- ]four|thirty[- ]six)"
+                     r"\s*(?:\(\d+\)\s*)?(?:months?|years?)\b",
                      r"\b(?:\d+|one|two|three|six|twelve|eighteen|twenty[- ]four|thirty[- ]six)\s*(?:\(\d+\)\s*)?"
-                     r"(?:months?|years?)\s+(?:from|after|following|of)",
-                     r"보증\s*기간", r"하자\s*담보\s*(?:책임\s*)?기간", r"\d+\s*(?:개월|년)\s*(?:간|동안|이내)"))
+                     r"(?:months?|years?)\b[^.]{0,60}warrant",
+                     r"보증\s*기간", r"하자\s*담보\s*(?:책임\s*)?기간",
+                     r"(?:보증|하자)[^.]{0,40}\d+\s*(?:개월|년)", r"\d+\s*(?:개월|년)[^.]{0,40}(?:보증|하자)"))
 
 # 필수 — 있는데 '없다'고 하던 꼴
 _amend("packing", detect=(
@@ -3083,6 +3110,157 @@ _amend("governing_law", weak=(
      _FOREIGN_LAW),
     (r"(?:중국|미국|일본|베트남|인도|러시아|독일|영국|프랑스|싱가포르|홍콩|아랍에미리트|사우디|터키|브라질)"
      r"\s*(?:의\s*)?법", _FOREIGN_LAW)))
+
+
+# ── 전문가·사용성 점검 2회차 보강 (2026-10-04) ────────────────────────────────
+# 새 계약서 7종(베트남 OEM 갑/을 · 인도 L/C+PSI · 사우디 판매점 · 독일 기계 · 일본·미국
+# 구매 기본계약 · 국문 표준)으로 다시 돌려 본 것. tests/test_contract_expert2.py.
+
+# 지연배상 — 국문 "지체 1일당 …%" 와 'penalty … per week' 꼴
+_amend("uncapped_ld", detect=(
+    # 사이의 "0.5%" 소수점을 건넙니다 — [^.] 만 쓰면 거기서 멈췄습니다.
+    r"(?:지체|지연)\s*1\s*일\s*(?:당|마다)(?:[^.]|(?<=\d)\.(?=\d)){0,80}(?:지체상금|지연\s*배상금|위약금)",
+    r"penalt(?:y|ies)[^.]{0,40}per\s+(?:day|week)"))
+
+# 배심 포기·징벌적 배제는 우리를 지키는 문구입니다 — 고치는 법이 권하는 그대로.
+# **배심·징벌에 붙은** 포기·배제만 — "waive any objection to venue"(관할 이의 포기)는
+# 미국 법원으로 끌려가는 문장입니다.
+_amend("us_jury_punitive", avoid=(
+    r"waive\w*\s+(?:its\s+|their\s+|any\s+|all\s+)?(?:right\s+to\s+)?(?:a\s+)?(?:trial\s+by\s+)?jury",
+    r"jury\s+trial[^.]{0,30}waive",
+    r"(?:in\s+no\s+event|neither\s+party|not\s+be\s+liable|no\s+liability|exclud\w*|waive\w*)[^.]{0,80}"
+    r"(?:punitive|exemplary)",
+    r"(?:punitive|exemplary)[^.]{0,60}(?:excluded|waived|shall\s+not)"))
+
+# "확정된 금액만 상계" 는 이 조항의 고치는 법 그대로입니다.
+_amend("buyer_set_off", avoid=(
+    r"\bonly\b[^.]{0,80}(?:finally\s+determined|arbitral\s+award|agreed\s+in\s+writing|undisputed|admitted)",))
+
+# 금형·도면 귀속, '담보 없이 넘어간다'는 보증은 소유권 유보가 아닙니다.
+_amend("title", avoid=(r"mou?lds?|tooling|drawings?|intellectual|금형|도면|지식재산|설계",
+                       r"free\s+(?:of|from)\s+(?:any\s+)?(?:liens?|encumbrances?|claims?)"))
+
+# 양쪽 모두 해지할 수 있는 조항은 '바이어의 일방적' 해지권이 아닙니다(전문가 점검 —
+# 제목과 어긋남). 대신 "Buyer may terminate … at any time" 은 사유·편의 말이 없어도 잡습니다.
+_amend("termination_at_will",
+       detect=(r"\b(?:buyer|purchaser)\s+may\s+terminate[^.]{0,100}\bat\s+any\s+time\b",),
+       avoid=(r"\b(?:either|each)\s+party\b", r"\bboth\s+parties\b", r"어느\s*당사자", r"각\s*당사자"))
+
+# 비전속 관할은 '전속관할'이 아닙니다.
+_amend("foreign_forum", avoid=(r"non-?exclusive", r"비전속"))
+
+# 독립 검사기관이 최종이면 '바이어 단독'이 아닙니다. "바이어가 합격을 알려야만 인수" 는 단독입니다.
+_amend("inspection_buyer_sole",
+       detect=(r"accepted\s+only\s+(?:when|upon|after|if)[^.]{0,60}(?:buyer|purchaser)[^.]{0,40}"
+               r"(?:notif|confirm|approv|issu)",),
+       avoid=(r"independent\s+(?:surveyor|inspector|inspection|laborator)", r"\bSGS\b", r"bureau\s+veritas",
+              r"intertek", r"공인\s*검사", r"제3\s*검사"))
+
+# AQL 불합격 뒤 재검사 비용은 업계 표준입니다.
+_amend("cert_test_cost", avoid=(r"re-?inspection", r"재검사"))
+# 바이어가 지정하고 **바이어가** 내는 꼴은 아닙니다.
+_amend("buyer_nominated_cost", avoid=(r"(?:매수인|바이어)(?:이|가)\s*부담", r"borne\s+by\s+the\s+buyer",
+                                      # "매도인의 공장에서" — 매도인은 장소일 뿐 내는 쪽이 아닙니다.
+                                      r"(?:매도인|공급자)의\s*(?:공장|사업장|창고|소재지)",
+                                      r"at\s+the\s+buyer'?s\s+(?:cost|expense|account)"))
+
+# 다른 조에 간주 인수가 있으면 서명 조건부 지급이 아닙니다 — 고치는 법이 권하는 그대로.
+_amend("acceptance_signature_payment", unless_doc=(r"\bdeemed\s+(?:to\s+have\s+been\s+)?accepted\b",
+                                                   r"\bdeemed\s+acceptance\b",
+                                                   r"(?:인수|검수|합격)(?:한|된)?\s*것으로\s*(?:본다|간주)"))
+
+# 리콜 — "우리가 책임 없음을 증명하지 못하면 우리가 낸다"(일본식 과실 추정)
+_amend("recall_cost", strict=(
+    r"seller\s+shall\s+bear[^.]{0,80}recall[^.]{0,200}unless\s+(?:the\s+)?seller\s+proves",
+    r"recall[^.]{0,80}seller\s+shall\s+bear[^.]{0,160}unless\s+(?:the\s+)?seller\s+proves"))
+
+# 바이어만 불가항력으로 면책되는 꼴 — 문서 어디에도 쌍방 불가항력이 없을 때만.
+_amend("one_way_force_majeure",
+       loose=(r"\b(?:if|where)\s+the\s+buyer\s+is\s+prevented[^.]{0,120}force\s+majeure[^.]{0,80}"
+              r"buyer\s+shall\s+not\s+be\s+liable",
+              r"불가항력[^.]{0,80}매수인(?:은|는)[^.]{0,40}책임을\s*지지\s*(?:아니|않)"),
+       loose_unless=(r"\b(?:either|neither|each)\s+party\b", r"\bboth\s+parties\b",
+                     r"\bseller\s+is\s+prevented", r"어느\s*당사자", r"양\s*당사자",
+                     r"매도인(?:은|는|이)[^.]{0,40}불가항력"))
+
+# L/C 개설 자체를 외환·수입허가에 거는 꼴(인도 RBI 등)
+_amend("payment_fx_approval", detect=(
+    r"\b(?:l/?c|letter\s+of\s+credit)\b[^.]{0,40}(?:opened|issued|established)[^.]{0,30}subject\s+to[^.]{0,100}"
+    r"(?:import\s+licen|foreign\s+exchange|exchange\s+control|central\s+bank|reserve\s+bank|\bRBI\b)",))
+
+# 덤핑방지관세·상계관세를 우리에게 넘기는 꼴(가격조건과 어긋남)
+_amend("tariff_absorption", detect=(
+    r"(?:anti-?dumping|countervailing|safeguard|retaliatory|additional)\s+dut(?:y|ies)[^.]{0,100}"
+    r"(?:borne\s+by\s+(?:the\s+)?seller|seller\s+shall\s+(?:bear|pay)|for\s+the\s+seller'?s\s+account)",
+    r"dut(?:y|ies)[^.]{0,30}imposed\s+(?:in|by)\s+[^.]{0,60}(?:borne\s+by\s+(?:the\s+)?seller|"
+    r"for\s+the\s+seller'?s\s+account)"))
+
+# 바이어가 지정한 기관의 선적 전 검사
+_amend("psi_cost_delay", detect=(
+    r"inspected\s+before\s+shipment\s+by\s+[^.]{0,60}(?:appointed|nominated|designated)\s+by\s+(?:the\s+)?buyer",))
+
+# 발주서가 우선 — "the Purchase Order shall prevail" · "발주서가 우선한다"
+_amend("battle_of_forms", detect=(r"\bpurchase\s+orders?\s+shall\s+(?:prevail|govern|control)",
+                                  r"발주서(?:가|이)\s*우선(?:한다|하여|함)"))
+
+# 한쪽만 비밀유지 — "Seller shall not disclose any information of the Buyer"
+_amend("one_way_nda", detect=(
+    r"\b(?:seller|supplier)\s+shall\s+not\s+disclose[^.]{0,80}(?:of|from)\s+the\s+buyer"
+    r"(?!.{0,320}" + _MUTUAL_NDA_EN + ")",
+    r"매도인(?:은|는)[^.]{0,60}매수인의\s*(?:정보|비밀|기밀)[^.]{0,40}(?:누설|공개)하여서는\s*아니"
+    r"(?!.{0,320}" + _MUTUAL_NDA_KO + ")"))
+
+# 해지·갱신 거절을 대리점 동의에 묶는 꼴
+_amend("gulf_agent_lock", detect=(
+    r"shall\s+not\s+(?:terminate|refuse\s+to\s+renew)[^.]{0,80}without\s+the\s+(?:buyer|distributor|agent)'?s?"
+    r"\s+(?:prior\s+)?(?:written\s+)?consent",))
+
+# 자동 연장 — "renews automatically"
+_amend("evergreen", detect=(r"\brenews?\s+automatically\b",))
+
+# 기간 없는 보증 — "regardless of the time of discovery" · "whenever discovered"
+_amend("open_warranty", detect=(r"regardless\s+of\s+the\s+time\s+of\s+discovery",
+                                r"\bwhenever\s+(?:discovered|arising|found)\b"))
+
+# 준거법 — 낱말 꼴과 외국법
+_amend("governing_law",
+       detect=(r"law\s+governing\s+this\s+(?:contract|agreement)", r"subject\s+to\s+the\s+laws?\s+of",
+               r"construed\s+in\s+accordance\s+with\s+\w+\s+law"),
+       weak=((r"(?:\blaws?\b|governing|construed|준거법|법률)[^.]{0,80}\b(?:english|england|singapore|india|"
+              r"china|people'?s\s+republic|germany|german|federal\s+republic|japan|japanese|new\s+york|california|"
+              r"delaware|illinois|texas|vietnam|hong\s+kong|united\s+arab|dubai|saudi|france|french|switzerland|"
+              r"swiss|netherlands|dutch|italy|spain|brazil|mexico|turkey|indonesia|thailand)\b",
+              _FOREIGN_LAW),
+             (r"(?:중화인민공화국|베트남|일본|미국|싱가포르|인도|독일|영국)\s*(?:의\s*)?법(?:률|령)?", _FOREIGN_LAW)))
+
+# 필수·이익 — 있는데 '없다'고 하던 꼴(2회차)
+_amend("liability_cap", detect=(r"(?:배상\s*책임|책임)[^.]{0,40}(?:을|를)?\s*한도로\s*(?:하며|한다|함|하고)",))
+_amend("claim_period", detect=(r"\d{1,3}\s*일\s*이내[^.]{0,30}(?:클레임|이의|하자)[^.]{0,30}(?:제기|통지|청구)",))
+_amend("no_set_off", detect=(r"without\s+(?:any\s+)?(?:set[- ]?off|deduction|counterclaim)",))
+_amend("lc_deadline", detect=(
+    r"\b(?:l/?c|letter\s+of\s+credit)\b[^.]{0,40}(?:opened|issued|established)\s+within\s+",
+    r"cause\s+(?:the\s+)?(?:l/?c|letter\s+of\s+credit)[^.]{0,30}(?:issued|opened)\s+within\s+"))
+_amend("packing", detect=(r"\bpacking\s+in\s+[^.]{0,40}(?:cartons?|pallets?|cases?|crates?)",))
+_amend("goods", detect=(r"\bgoods\s+(?:are|is|shall\s+be)\s+(?:described|specified|set\s+out)\s+in\s+"
+                        r"(?:annex|schedule|appendix|exhibit)",
+                        r"\bmodel\s+(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{2,}"))
+_amend("shipment", detect=(r"\bdelivery\s+(?:shall\s+be\s+made|date|time|period)\b",))
+_amend("inspection", detect=(r"\bacceptance\s+test",))
+_INSPECTION_REQUIRE = by_key("inspection")["require"]
+_amend("inspection", require=(tuple(_INSPECTION_REQUIRE[0]) + (r"\b(?:at|in)\s+(?:the\s+)?\w+'?s?\s+(?:plant|site)\b",),)
+       + tuple(_INSPECTION_REQUIRE[1:]))
+
+# 지연배상 상한을 **다른 문장**에 적는 꼴 — "… per week of delay. The total liquidated
+# damages shall not exceed 5%." 제목 줄("Liquidated Damages")에서 잡히면 그 문장엔 상한이
+# 없습니다. 문서 어디에든 지연배상의 상한이 있으면 상한 없는 것이 아닙니다.
+_amend("uncapped_ld", unless_doc=(
+    r"(?:liquidated\s+damages|penalt(?:y|ies)|지체상금|지연\s*배상금)[^.]{0,120}(?:shall\s+not\s+"
+    r"(?:in\s+(?:the\s+)?aggregate\s+)?exceed|up\s+to\s+(?:a\s+)?maximum|capped\s+at|limited\s+to|"
+    r"넘지\s*(?:아니|않)|초과하지\s*(?:아니|않)|한도로)",
+    r"(?:maximum|cap|ceiling)\s+(?:amount\s+)?of\s+(?:the\s+)?(?:liquidated\s+damages|penalt)"))
+
+# 국문 준거법 — "본 계약은 중화인민공화국 법률에 따른다"
+_amend("governing_law", detect=(r"(?:법률|법)에\s*(?:따른다|의한다|따라\s*해석)",))
 
 
 # ── 독소조항 묶음 (2026-10-03) ──────────────────────────────────────────────
@@ -3201,7 +3379,9 @@ def analyze(text: str) -> dict:
         return {"clauses": {}, "context": set(), "side": None, "empty": True}
     # 바꿔 읽기 **전에** 정합니다. 바꾼 뒤에는 Party 표지가 없어 못 찾습니다.
     side = our_side(body)
-    body = _as_parties(as_seller_with(side, body))
+    body = as_seller_with(side, body)
+    roles = party_roles(body)
+    body = _as_parties(body, roles)
     context = {row["key"] for row in CLAUSES
                if row["context"] and any(_rx(p).search(body) for p in row["context"])}
     out: dict[str, dict] = {}
@@ -3219,7 +3399,9 @@ def analyze(text: str) -> dict:
         rules = [(p, avoid) for p in row["detect"]]
         rules += [(p, DEFINITION) for p in row["strict"]]
         if row["loose"] and not any(_rx(p).search(body) for p in row["loose_unless"]):
-            rules += [(p, avoid) for p in row["loose"]]
+            # loose 규칙은 부정이 뜻의 일부인 경우가 있어("the Buyer shall **not** be
+            # liable") 뜻풀이만 거릅니다.
+            rules += [(p, DEFINITION) for p in row["loose"]]
         for pattern, veto in rules:
             # **자리마다** 봅니다. 첫 자리가 부정문·미정이어도 다른 자리에 진짜가
             # 있을 수 있습니다.
@@ -3230,7 +3412,7 @@ def analyze(text: str) -> dict:
                 if reason is None:
                     continue
                 judged = {"status": "weak" if reason else "present",
-                          "evidence": _evidence(body, hit, side), "reason": reason}
+                          "evidence": _evidence(body, hit, side, roles), "reason": reason}
                 if not reason:
                     best = judged
                     break
@@ -3247,7 +3429,7 @@ def analyze(text: str) -> dict:
         if mine and mine["status"] == "present" and hits:
             names = ", ".join(by_key(t)["title"] for t in hits)
             mine.update(status="weak", reason=f"{reason} (함께 있는 독소: {names})")
-    return {"clauses": out, "context": context, "side": side}
+    return {"clauses": out, "context": context, "side": side, "roles": roles}
 
 
 # 찾은 자리 **바로 뒤**의 미정 문구. "Incoterms to be agreed later",
@@ -3268,9 +3450,7 @@ _NEG_AFTER_KO = re.compile(
 def _scope(body: str, start: int, end: int, reach: int = 150) -> str:
     """찾은 자리가 든 문장. 표처럼 마침표가 없는 글은 앞뒤 reach 자로 자릅니다."""
 
-    left = max(body.rfind(".", 0, start) + 1, start - reach)
-    right = body.find(".", end)
-    right = min(len(body) if right < 0 else right, end + reach)
+    left, right = _sentence_span(body, start, end, reach)
     return body[left:right]
 
 
@@ -3317,7 +3497,7 @@ def _stop_after(body: str, pos: int) -> int:
     return i
 
 
-def _evidence(body: str, hit, side: dict | None = None) -> str:
+def _evidence(body: str, hit, side: dict | None = None, roles: dict | None = None) -> str:
     """찾은 자리의 문장. **계약서에 적힌 그대로** 보여 줍니다.
 
     Party A/B 계약서는 Seller·Buyer 로 바꿔 읽은 글에서 찾으므로, 근거도 바뀐
@@ -3351,6 +3531,9 @@ def _evidence(body: str, hit, side: dict | None = None) -> str:
     elif side:
         text = re.sub(r"\bthe Seller\b", side["label"], text)
         text = re.sub(r"\bthe Buyer\b", side["other_label"], text)
+    # Supplier·Customer 로 쓴 계약서는 원래 이름으로 — 사용자가 계약서에서 찾을 수 있게.
+    for role, word in (roles or {}).items():
+        text = re.sub(rf"\b{role}\b", word, text)
     return text if len(text) <= 260 else text[:257] + "…"
 
 
@@ -3466,17 +3649,41 @@ def our_side(text: str) -> dict | None:
 # **홀로 선 갑/을**만 — 앞이 한글이 아니고 뒤가 조사이거나 끝인 자리만 바꿉니다.
 # "물품을" 의 을은 앞이 한글이라 그대로입니다.
 _KO_PARTY_DEF = re.compile(
-    r"(?P<name>[^()\n\"“”]{1,60}?)\s*\(\s*이하\s*[\"“'‘]?(?P<label>[갑을])[\"”'’]?"
+    r"(?P<name>[^()\n\"“”「」『』]{1,60}?)\s*\(\s*이하\s*[\"“'‘「『]?(?P<label>[갑을])[\"”'’」』]?"
     r"(?P<rest>[^)]{0,40})\)")
+# 당사자 표 머리 — "갑(매도인): 주식회사 한빛상사" (2회차: 실제 Word 서식이 이 꼴이었습니다)
+_KO_PARTY_TABLE = re.compile(
+    r"(?<![가-힣])(?P<label>[갑을])\s*\(\s*(?P<rest>매도인|매수인|수출자|수입자|공급자|구매자|판매자)\s*\)"
+    r"\s*[:：]?\s*(?P<name>[^\n:：]{1,50}?)(?=\s*(?:\n|$|[갑을]\s*\(|주소|대표|\())")
 _KO_SELLER = re.compile(r"매도인|수출자|공급자|판매자|공급사")
 _KO_BUYER = re.compile(r"매수인|수입자|구매자|바이어|구매사")
 _KO_PARTICLE = r"(?:은|는|이|가|의|에게|에|과|와|을|를|으로|로|도|만|측)?(?![가-힣])"
+# 한국 회사 꼴과 외국 소재 말 — 역할도 주소도 없을 때 쓰는 마지막 단서.
+_KO_COMPANY = re.compile(r"주식회사|\(주\)|㈜|유한회사")
+_FOREIGN_PLACE = re.compile(r"베트남|하노이|호치민|중국|상하이|북경|베이징|미국|일본|인도|독일|태국|인도네시아|"
+                            r"말레이시아|싱가포르|홍콩|대만|러시아|아랍에미리트|두바이|사우디|브라질|멕시코|터키|"
+                            r"\b(?:JSC|LLC|Inc|GmbH|Ltd|Co\.,?\s*Ltd|Pte|S\.A\.|B\.V\.)\b")
+
+
+def _clean_ko_name(raw: str) -> str:
+    """정의문 앞의 이름만 — 문서 제목·조사·주소를 뗍니다(2회차: "와 대한민국 서울 소재 …",
+    "OEM 의류 생산 및 공급 계약서 베트남 …" 이 이름에 붙었습니다)."""
+
+    name = raw.strip(" ,.:")
+    name = re.split(r"계약서\s*", name)[-1]
+    name = re.split(r"소재\s+", name)[-1]
+    name = re.sub(r"^(?:과|와|및|그리고)\s+", "", name)
+    name = re.sub(r"^.*?(?:매도인|매수인|수출자|수입자|공급자|바이어)\s+", "", name)
+    name = name.split(",")[0]
+    return name.strip() or raw.strip()
 
 
 def _korean_side(body: str) -> dict | None:
     defs = list(_KO_PARTY_DEF.finditer(body))
     if len(defs) != 2 or {d.group("label") for d in defs} != {"갑", "을"}:
-        return None
+        defs = list(_KO_PARTY_TABLE.finditer(body))
+        if len(defs) != 2 or {d.group("label") for d in defs} != {"갑", "을"}:
+            return None
     seller = []
     for i, d in enumerate(defs):
         # 역할 말은 괄호 안("갑", 매도인)이나 이름 앞(매수인 ABC)에 옵니다.
@@ -3489,18 +3696,33 @@ def _korean_side(body: str) -> dict | None:
     if len(set(seller)) != 1:
         korean = [i for i, d in enumerate(defs) if _KOREA_HQ.search(d.group("name") + d.group("rest"))]
         if len(korean) != 1:
-            return None
+            # 주소도 역할도 없으면 — 한국 회사 꼴(주식회사)이 하나이고 상대가 외국이면 우리로.
+            company = [i for i, d in enumerate(defs) if _KO_COMPANY.search(d.group("name"))]
+            foreign = [i for i, d in enumerate(defs) if _FOREIGN_PLACE.search(d.group("name"))]
+            if len(company) == 1 and (not foreign or foreign == [1 - company[0]]):
+                korean = company
+            elif len(foreign) == 1:
+                korean = [1 - foreign[0]]
+            else:
+                return None
         seller = korean
     i = seller[0]
-    clean = lambda raw: re.sub(r"^.*?(?:매도인|매수인|수출자|수입자|공급자|바이어)\s*", "",
-                               raw.strip(" ,.:")).strip() or raw.strip()
-    return {"label": defs[i].group("label"), "name": clean(defs[i].group("name")),
-            "other_label": defs[1 - i].group("label"), "other_name": clean(defs[1 - i].group("name")),
+    return {"label": defs[i].group("label"), "name": _clean_ko_name(defs[i].group("name")),
+            "other_label": defs[1 - i].group("label"), "other_name": _clean_ko_name(defs[1 - i].group("name")),
             "korean": True}
 
 
 def _as_seller(body: str) -> str:
     return as_seller_with(our_side(body), body)
+
+
+def normalized(text: str) -> str:
+    """판정과 같은 눈으로 읽은 글 — Party A/B·갑/을·Supplier 를 매도인/매수인으로.
+    주제 분류기(clause_topics)도 이 글을 봐야 '누가 의무를 지는지'를 가립니다."""
+
+    body = re.sub(r"\s+", " ", str(text or ""))
+    body = as_seller_with(our_side(body), body)
+    return _as_parties(body)
 
 
 def as_seller_with(side: dict | None, body: str) -> str:
@@ -3525,8 +3747,14 @@ def as_seller_with(side: dict | None, body: str) -> str:
 # 로 불러서 GDPR 과징금 전가·인증 비용 전가를 놓쳤습니다(전문가 점검). Seller/Buyer
 # 를 당사자로 **쓰지 않는** 계약서에서만, 대문자로 정의된 역할 이름을 바꿔 읽습니다.
 # 매매계약의 "raw material supplier"(제3자)는 건드리지 않습니다.
-_SELLER_ROLES = ("Supplier", "Vendor", "Manufacturer", "Exporter", "Principal")
-_BUYER_ROLES = ("Distributor", "Purchaser", "Importer", "Customer", "Agent", "Dealer", "Reseller")
+#
+# 2회차(2026-10-04): **Principal/Agent 는 바꾸지 않습니다** — 대리인 계약의 "Agent" 가
+# "the Buyer" 가 되어 EU 상업대리인 검출이 꺼졌습니다. 그리고 한쪽씩 따로 봅니다 —
+# 일본·미국 구매사 서식의 **Buyer + Supplier** 는 Buyer 가 있다고 통째로 건너뛰어
+# "Supplier shall bear … recall" 을 놓쳤습니다. 관사·대문자는 적힌 그대로 두고
+# (전에는 "The the Seller"), 근거는 원래 이름으로 되돌립니다(_evidence).
+_SELLER_ROLES = ("Supplier", "Vendor", "Manufacturer", "Exporter")
+_BUYER_ROLES = ("Distributor", "Purchaser", "Importer", "Customer", "Dealer", "Reseller")
 
 
 def _role_word(body: str, roles) -> str | None:
@@ -3536,14 +3764,23 @@ def _role_word(body: str, roles) -> str | None:
     return None
 
 
-def _as_parties(body: str) -> str:
-    if len(re.findall(r"\b(?:seller|buyer)\b", body, re.I)) >= 2:
-        return body
-    seller, buyer = _role_word(body, _SELLER_ROLES), _role_word(body, _BUYER_ROLES)
-    if not seller or not buyer:
-        return body
-    for word, role in ((seller, "Seller"), (buyer, "Buyer")):
-        body = re.sub(rf"\b(?:the\s+|THE\s+)?(?:{word}|{word.upper()})\b", f"the {role}", body)
+def party_roles(body: str) -> dict[str, str]:
+    """{'Seller': 'Supplier', 'Buyer': 'Customer'} — 바꿔 읽을 역할 이름. 없으면 빈 dict."""
+
+    roles = {}
+    for role, words in (("Seller", _SELLER_ROLES), ("Buyer", _BUYER_ROLES)):
+        if len(re.findall(rf"\b{role}\b", body, re.I)) >= 2:
+            continue
+        word = _role_word(body, words)
+        if word:
+            roles[role] = word
+    return roles
+
+
+def _as_parties(body: str, roles: dict[str, str] | None = None) -> str:
+    roles = party_roles(body) if roles is None else roles
+    for role, word in roles.items():
+        body = re.sub(rf"\b(?:{word}|{word.upper()})\b", role, body)
     return body
 
 
@@ -3554,7 +3791,38 @@ def _vetoed(body: str, pos: int, avoid) -> bool:
     있는데, 부정말을 찾는 일에는 해롭지 않습니다 — 창이 좁아질 뿐입니다.
     """
 
-    start = body.rfind(".", 0, pos) + 1
-    end = body.find(".", pos)
-    sentence = body[start:(len(body) if end < 0 else end)]
+    start, end = _sentence_span(body, pos, pos)
+    sentence = body[start:end]
     return any(_rx(word).search(sentence) for word in avoid)
+
+
+def _sentence_span(body: str, start: int, end: int, reach: int = 0) -> tuple[int, int]:
+    """찾은 자리가 든 문장의 (처음, 끝). (2026-10-04 전문가 점검 2회차)
+
+    - 소수점·줄임말의 마침표에서 끊지 않습니다. "0.5% … up to a maximum of 5%" 의
+      상한이 잘려 '상한 없는 지연배상금'으로 짚었습니다.
+    - 찾은 자리가 **제목 줄**("11. Governing Law.", "Delivery Time; Liquidated Damages.")
+      이면 뒤따르는 본문까지 봅니다. 제목에서 먼저 잡혀 본문의 외국법·상한을 안 봤습니다.
+    reach 를 주면 마침표가 없는 표 같은 글은 앞뒤 reach 자로 자릅니다.
+    """
+
+    left = _stop_before(body, start) + 1
+    right = _stop_after(body, end)
+    right = len(body) if right < 0 else right
+    if reach:
+        left, right = max(left, start - reach), min(right, end + reach)
+    if _is_heading(body[left:right]):
+        nxt = _stop_after(body, right + 1)
+        right = len(body) if nxt < 0 else nxt
+    return left, right
+
+
+# 제목 줄 — 짧고, 영어 동사가 없고, 국문 문장 끝('…다')이 아닌 것. 국문 "할 수 있다" 를
+# 동사로 못 봐 제목으로 여기고 **옆 조항**까지 붙여 읽었더니, 조항 순서에 따라 판정이
+# 달라졌습니다(tests/test_contract_deep 순서 시험).
+_HEADING_VERB = re.compile(r"\b(?:shall|will|must|may|is|are|be|has|have|can|agrees?)\b|다\s*$", re.I)
+
+
+def _is_heading(sentence: str) -> bool:
+    text = sentence.strip()
+    return 0 < len(text) < 80 and not _HEADING_VERB.search(text)

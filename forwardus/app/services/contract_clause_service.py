@@ -30,14 +30,32 @@ COUNTRY_ONLY = {"ddp_no_ior"}
 # 이 계약에 **그 거래가 있을 때만** 권하는 이익조항. 어떤 계약에도 같은 13~16개를
 # 권하니, T/T 계약에 신용장 조항을 권해 신뢰를 잃었습니다.
 _LC = r"letter\s+of\s+credit|documentary\s+credit|\bL/?C\b|신용장"
+# 2회차: 'exclusive jurisdiction' 의 exclusiv · CIETAC 'Commission' · 'PSI agency' 로 엉뚱한
+# 조항을 권해, 거래를 가리키는 말에 묶었습니다.
 GAIN_NEEDS = {
     "lc_deadline": _LC,
     "lc_conformity": _LC,
-    "deemed_acceptance": r"commission|install|acceptance\s+(?:test|certificate)|시운전|설치|검수",
-    "min_order": r"exclusiv|독점|총판",
-    "agency_protection": r"\bagen(?:t|cy)\b|distribut|대리점|대리인|총판",
+    "deemed_acceptance": r"\bcommissioning\b|\binstallation\b|acceptance\s+(?:test|certificate)|시운전|설치|검수",
+    "min_order": r"exclusive\s+(?:distribut|agen|right|suppl|purchas|sale|dealer)|독점\s*(?:공급|판매|대리|수입)|총판",
+    "agency_protection": r"\b(?:sales|commercial|exclusive|sole)\s+agen(?:t|cy)\b|\bdistribut(?:or|ion)\s+agreement|"
+                         r"\bappoints?\b[^.]{0,40}\b(?:agent|distributor)|대리점|총판",
 }
 _ICC_C = re.compile(r"(?:\bICC|institute\s+cargo\s+clauses?)\s*\(?\s*C\s*\)?", re.I)
+
+
+_GAB_EUL = re.compile(r"(?<![가-힣])[갑을](?:은|는|이|가|의|에게)\s")
+
+
+def _side_shown(body: str, analysis: dict) -> dict | None:
+    """화면에 '우리 쪽을 … 로 읽었습니다'로 보일 값. Supplier·Customer 계약서도 밝힙니다."""
+
+    if analysis.get("side"):
+        return analysis["side"]
+    roles = analysis.get("roles") or {}
+    if roles:
+        return {"label": roles.get("Seller", "Seller"), "name": "",
+                "other_label": roles.get("Buyer", "Buyer"), "other_name": ""}
+    return None
 
 
 def _relevant(key: str, body: str) -> bool:
@@ -160,12 +178,21 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
                     if row["status"] != "absent" or _relevant(row["key"], body[:MAX_TEXT])]
     # 도착국에 흔한데 **아직 안 보이는** 독소조항. 올린 계약서에 없더라도
     # 협상 중에 들어올 수 있어 미리 알려 줍니다. (2026-10-02)
-    watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]]
+    # DDP 가 아닌 거래에 'DDP 수입자' 주의를 띄우지 않습니다(2회차).
+    deal = (incoterms or "").upper()
+    watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]
+             and not (row["key"] == "ddp_no_ior" and deal not in ("", "DDP"))]
     # 규칙이 **주제째 놓친** 조항 — 주제 분류기가 고릅니다. 판정은 바꾸지 않고
     # 빠진 필수조항에 "이 문장일 수 있습니다"를 덧붙이거나, '확인 필요'로 냅니다.
     # (2026-10-03, app/processors/clause_topics.py)
     category = {row["key"]: row["category"] for row in contract_clauses.CLAUSES}
-    maybe = clause_topics.candidates(body[:MAX_TEXT], analysis["clauses"], category)
+    # 주제 분류기도 갑/을·Supplier 를 바꿔 읽은 글로 봅니다 — 원문을 보면 "누가 의무를 지는지
+    # 가리지 못했습니다"가 나왔습니다(2회차).
+    maybe = clause_topics.candidates(contract_clauses.normalized(body[:MAX_TEXT]), analysis["clauses"], category)
+    # 독소로 이미 짚은 문장은 '직접 확인'에 다시 내지 않습니다(사용성 2회차 — 같은 관할
+    # 문장이 🔴 독소와 ⚪ '양쪽에 같게 걸림'으로 동시에 나왔습니다).
+    toxic_text = " ".join(row.get("evidence", "") for row in analysis["clauses"].values())
+    maybe = [c for c in maybe if c["kind"] != "check" or c["sentence"][:60] not in toxic_text]
     missing = [row for row in rows["must"] if row["status"] == "absent"]
     for row in missing:
         hint = next((c for c in maybe if c["kind"] == "must" and row["key"] in c["keys"]), None)
@@ -185,7 +212,10 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
         "watch_country": watch,
         # Party A/B 계약서에서 누구를 우리(매도인)로 읽었는지. 틀렸으면
         # 사용자가 바로 알아야 합니다 — 방향이 뒤집히면 판정도 뒤집힙니다.
-        "our_side": contract_clauses.our_side(body[:MAX_TEXT]),
+        "our_side": _side_shown(body[:MAX_TEXT], analysis),
+        # 갑/을 계약서인데 누가 우리인지 못 정했으면 알립니다 — 방향이 뒤집히면 우리
+        # 권리를 독소로 짚습니다(2회차).
+        "side_unknown": not analysis["side"] and bool(_GAB_EUL.search(body[:MAX_TEXT])),
         # 40만 자를 넘으면 앞만 봅니다 — 그걸 밝힙니다. 전에는 뒤를 안 보면서
         # 글자 수는 전체를 적어 '다 읽었다'고 했습니다. (2026-10-04)
         "checked": min(len(body), MAX_TEXT),
@@ -357,9 +387,20 @@ _CATEGORY_ORDER = {"toxic": 0, "must": 1, "gain": 2}
 # 독소 문안 머리의 한 줄. 대부분 '빼는 것'이지만, 그 말이 틀린 조항이 있습니다
 # (전문가 점검 2026-10-04): 재수출 통제는 **없을 때** 위험하고, EU 대리인 보상
 # 포기 문구는 지워도 효력이 없습니다.
+# 2회차: 고치는 법이 '빼라'가 아니라 '붙여라·바꿔라'인 조항이 더 있었습니다. 그리고 EU
+# 대리인은 "지워도"가 아니라 "**적어 두어도** 효력이 없다"가 맞습니다(강행규정).
 TOXIC_NOTE = {
     "reexport_control": "이 조항은 **없을 때** 위험합니다 — 아래 문구를 **넣으세요**.",
-    "agency_law_eu": "이 문구는 **지워도 효력이 없습니다** — 보상을 예산에 잡거나 구조를 바꾸세요.",
+    "agency_law_eu": "보상 포기 문구는 **적어 두어도 효력이 없습니다** — 보상을 예산에 잡거나 구조를 바꾸세요.",
+    "uncapped_ld": "지연배상에 **상한**(예: 계약금액의 5~10%)을 **붙이도록** 고치세요.",
+    "exclusive_no_moq": "독점을 주려면 **최소 구매량**을 **함께 넣도록** 고치세요.",
+    "ddp_no_ior": "**DAP 등으로 조건을 바꾸거나**, 우리가 수입자가 될 수 있는지 먼저 확인하세요.",
+    "us_jury_punitive": "**중재로 바꾸거나**, 배심재판 포기·징벌적 손해 배제를 **넣으세요**.",
+}
+# 도착국에서 흔한데 아직 안 보일 때의 한 줄. 대부분은 '들어오면 지우라'지만, 재수출 통제는
+# 없는 것이 위험이라 '넣으라'입니다(2회차 — 두바이 판매점에 거꾸로 안내했습니다).
+WATCH_NOTE = {
+    "reexport_control": "재수출 금지·최종용도 확인 문구를 **넣으세요** — 지금 없는 것이 위험입니다.",
 }
 
 
@@ -565,6 +606,9 @@ def as_text(result: dict) -> str:
     """판정을 사람이 읽는 글로. 무역 상담 답변에 그대로 씁니다."""
 
     lines = ["## 계약서 조항 점검", ""]
+    if result.get("side_unknown"):
+        lines += ["⚠️ 갑/을 중 **누가 우리(매도인)인지 못 정했습니다.** 정의문에 '(이하 \"갑\", 매도인)'처럼 "
+                  "역할을 적어 주시거나, 판정의 방향이 뒤집혔을 수 있으니 확인하세요.", ""]
     if result.get("truncated"):
         lines += [f"⚠️ 계약서가 길어 **앞 {MAX_TEXT:,}자만** 봤습니다. 뒷부분은 따로 나눠 "
                   "올려 주세요.", ""]
@@ -615,9 +659,10 @@ def as_text(result: dict) -> str:
             lines.append(f"- **{row['title']}** — {row['risk']}")
         lines.append("")
     if result.get("watch_country"):
-        lines += [f"### 🌍 도착국({result.get('country', '')})에서 흔한 조항 — 아직 안 보임", ""]
+        lines += [f"### 🌍 도착국({result.get('country', '')})에서 흔한 조항 — 계약서에서 찾지 못함", ""]
         for row in result["watch_country"]:
-            lines.append(f"- **{row['title']}** — 협상 중에 들어오면 지우거나 고치세요.")
+            note = WATCH_NOTE.get(row["key"], "협상 중에 들어오면 지우거나 고치세요.")
+            lines.append(f"- **{row['title']}** — {note}")
         lines.append("")
     if not (result["toxic"] or result["missing"] or result.get("weak")):
         lines += ["필수조항은 다 보이고, 독소조항은 보이지 않습니다. "
