@@ -3262,6 +3262,13 @@ _amend("uncapped_ld", unless_doc=(
 # 국문 준거법 — "본 계약은 중화인민공화국 법률에 따른다"
 _amend("governing_law", detect=(r"(?:법률|법)에\s*(?:따른다|의한다|따라\s*해석)",))
 
+# 사용성 2회차에서 '독소 0개'로 안심시키던 흔한 문장
+_amend("payment_on_resale", detect=(
+    r"\bmonth\s+in\s+which\s+(?:it|the\s+buyer|they)\s+(?:re)?sells?\b",
+    r"(?:판매된|재판매한|팔린)\s*달[^.]{0,40}(?:지급|결제)"))
+_amend("full_return", detect=(r"\breturn\s+(?:any\s+|all\s+)?unsold\s+(?:goods|products|stock|items)",))
+_amend("open_warranty", detect=(r"\bunlimited\s+(?:warranty\s+)?period\b",))
+
 
 # ── 독소조항 묶음 (2026-10-03) ──────────────────────────────────────────────
 #
@@ -3480,6 +3487,9 @@ def _real_stop(body: str, i: int) -> bool:
         return False
     if 0 < i < len(body) - 1 and body[i - 1].isdigit() and body[i + 1].isdigit():
         return False
+    # 대문자 한 글자 뒤 — "U.S.A.", "S.A." (준거법 근거가 "…California, U" 로 잘렸습니다)
+    if i > 0 and body[i - 1].isupper() and (i == 1 or not body[i - 2].isalpha()):
+        return False
     return not _ABBREV_BEFORE.search(body[max(0, i - 8):i])
 
 
@@ -3509,13 +3519,21 @@ def _evidence(body: str, hit, side: dict | None = None, roles: dict | None = Non
     # **찾은 자리를 중심으로** 자릅니다. 문장 앞에서 260자만 보여 주니, 긴 배상
     # 문장에서 정작 "Party A's own instructions or negligence" 직전에서 잘렸습니다
     # (2026-10-03 브라우저 확인). 찾은 자리의 끝이 꼭 들어가게 합니다.
-    left = max(_stop_before(body, hit.start()) + 1, hit.start() - 110)
+    start = _stop_before(body, hit.start()) + 1
+    left = max(start, hit.start() - 110)
     stop = _stop_after(body, hit.end())
-    right = min(len(body) if stop < 0 else stop, hit.end() + 110)
+    end = len(body) if stop < 0 else stop
+    right = min(end, hit.end() + 110)
     if right - left <= 260:
         text = _words(body, left, right)
         # 문장 앞에 붙은 제목 줄("SALES CONTRACT Payment shall …")은 뺍니다.
         text = _LEADING_HEADING.sub("", text) or text
+        # 문장 가운데서 잘랐으면 그렇다고 보이게 — "… epidemic or" 처럼 끝나 문장이 끝난 줄
+        # 알았습니다(사용성 2회차).
+        if left > start and body[start:left].strip():
+            text = "…" + text
+        if right < end and body[right:end].strip():
+            text = text + "…"
     elif hit.end() - hit.start() > 150:
         # 찾은 범위 자체가 길면 **앞과 끝을 함께** — 누가 누구에게("Party B shall
         # indemnify Party A")와 결정적인 끝("… own negligence, without monetary limit").
@@ -3649,7 +3667,10 @@ def our_side(text: str) -> dict | None:
 # **홀로 선 갑/을**만 — 앞이 한글이 아니고 뒤가 조사이거나 끝인 자리만 바꿉니다.
 # "물품을" 의 을은 앞이 한글이라 그대로입니다.
 _KO_PARTY_DEF = re.compile(
-    r"(?P<name>[^()\n\"“”「」『』]{1,60}?)\s*\(\s*이하\s*[\"“'‘「『]?(?P<label>[갑을])[\"”'’」』]?"
+    # OCR 은 "(이 하 " 갑 " 이라 한다)" 처럼 띄어 읽습니다 — 사이 띄어쓰기를 받습니다.
+    # 이름은 비어도 받습니다 — OCR 이 "VINA TRADING )5((" 처럼 괄호를 섞으면 이름이 안 잡혀
+    # 정의 자체를 놓쳤습니다.
+    r"(?P<name>[^()\n\"“”「」『』]{0,60}?)\s*\(\s*이\s*하\s*[\"“'‘「『]?\s*(?P<label>[갑을])\s*[\"”'’」』]?"
     r"(?P<rest>[^)]{0,40})\)")
 # 당사자 표 머리 — "갑(매도인): 주식회사 한빛상사" (2회차: 실제 Word 서식이 이 꼴이었습니다)
 _KO_PARTY_TABLE = re.compile(
@@ -3674,8 +3695,26 @@ def _clean_ko_name(raw: str) -> str:
     name = re.split(r"소재\s+", name)[-1]
     name = re.sub(r"^(?:과|와|및|그리고)\s+", "", name)
     name = re.sub(r"^.*?(?:매도인|매수인|수출자|수입자|공급자|바이어)\s+", "", name)
-    name = name.split(",")[0]
-    return name.strip() or raw.strip()
+    # 주소는 쉼표 뒤에서 떼되, "Co., Ltd." 의 쉼표는 이름입니다.
+    name = re.split(r",(?!\s*(?:Ltd|Inc|LLC|Limited|JSC|GmbH|Corp|S\.A|Pte)\b)\s*", name)[0]
+    return name.strip(" ,") or raw.strip()
+
+
+# 표 머리처럼 역할만 붙은 꼴 — "구분 갑 (매도인) 을 (매수인) 상호 …". 이름은 다른 줄(상호)에
+# 있어 못 붙이고, 방향만 정합니다.
+_KO_ROLE_TAG = re.compile(r"(?<![가-힣])(?P<label>[갑을])\s*\(\s*(?P<role>매도인|매수인|수출자|수입자|공급자|"
+                          r"구매자|판매자)\s*\)")
+
+
+def _korean_side_by_tag(body: str) -> dict | None:
+    tags = {m.group("label"): m.group("role") for m in _KO_ROLE_TAG.finditer(body[:3000])}
+    if set(tags) != {"갑", "을"}:
+        return None
+    seller = [label for label, role in tags.items() if _KO_SELLER.search(role)]
+    if len(seller) != 1 or _KO_SELLER.search(tags[{"갑": "을", "을": "갑"}[seller[0]]]):
+        return None
+    other = {"갑": "을", "을": "갑"}[seller[0]]
+    return {"label": seller[0], "name": "", "other_label": other, "other_name": "", "korean": True}
 
 
 def _korean_side(body: str) -> dict | None:
@@ -3683,7 +3722,7 @@ def _korean_side(body: str) -> dict | None:
     if len(defs) != 2 or {d.group("label") for d in defs} != {"갑", "을"}:
         defs = list(_KO_PARTY_TABLE.finditer(body))
         if len(defs) != 2 or {d.group("label") for d in defs} != {"갑", "을"}:
-            return None
+            return _korean_side_by_tag(body)
     seller = []
     for i, d in enumerate(defs):
         # 역할 말은 괄호 안("갑", 매도인)이나 이름 앞(매수인 ABC)에 옵니다.

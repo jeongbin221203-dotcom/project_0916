@@ -144,6 +144,11 @@ for turn in range(ROUNDS):
         # 뽑히면 일방 비밀유지가 아닙니다 — one_way_nda 규칙이 일부러 거릅니다.
         if key == "one_way_nda" and "confidential" in want:
             continue
+        # 문서 어디에 이 말이 있으면 위험이 아닌 조항(unless_doc) — 다른 예문의 "deemed
+        # accepted" 가 서명 조건부 지급을 풀어 주는 것이 맞습니다(2026-10-04).
+        row = C.by_key(key)
+        if row["unless_doc"] and any(re.search(p, " ".join(paper.split()), re.I) for p in row["unless_doc"]):
+            continue
         miss[key] = miss.get(key, 0) + 1
     # 조항 본문끼리 말이 겹쳐 다른 조항이 함께 걸리는 것은 오탐이 아닙니다.
     # 우리 조항을 **하나도 안 넣은** 회차에서 걸린 것만 셉니다.

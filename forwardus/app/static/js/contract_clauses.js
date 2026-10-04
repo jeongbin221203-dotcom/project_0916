@@ -37,18 +37,35 @@
           <b>${esc(item.title)}</b>
           ${item.present ? `<span class="cc_found">${group === "toxic" ? "들어 있음" : "있음"}</span>` : ""}
           ${item.status === "weak" ? `<span class="cc_weak_tag">적혀 있으나 부족</span>` : ""}
+          ${item.for_country ? `<span class="cc_country_tag">🌍 도착국에 흔함</span>` : ""}
         </label>
         ${item.status === "weak" && item.reason ? `<p class="cc_reason">${rich(item.reason)}</p>` : ""}
         ${item.evidence ? `<blockquote class="cc_evidence">근거 — “${esc(item.evidence)}”</blockquote>` : ""}
         ${item.maybe ? `<blockquote class="cc_evidence cc_maybe">규칙은 못 찾았지만 이 문장일 수 있습니다 — “${esc(item.maybe)}”</blockquote>` : ""}
-        <p class="cc_why">${rich(item.why)}</p>
-        <p class="cc_risk">${rich(item.risk)}</p>
+        ${item.status === "weak" ? ""
+          // '보완' 칸에는 '없으면 생기는 일' 설명이 맞지 않습니다 — 적혀 있으니까요(사용성 2회차).
+          : `<p class="cc_why">${rich(item.why)}</p>
+        <p class="cc_risk">${rich(item.risk)}</p>`}
         ${item.text_ko ? (group === "toxic"
           // 독소의 text_ko 는 '찾는 법'(탐지 낱말)이라 일반 이용자에겐 어렵습니다 — 접어 둡니다.
           ? `<details class="cc_more"><summary>계약서에서 이렇게 보입니다</summary><p class="cc_how">${rich(item.text_ko)}</p></details>`
           : `<p class="cc_how">${rich(item.text_ko)}</p>`) : ""}
-        ${item.fix ? `<p class="cc_fix">고치는 법 — ${rich(item.fix)}</p>` : ""}
+        ${item.fix ? `<p class="${group === "toxic" ? "cc_fix" : "cc_fix cc_fix_calm"}">고치는 법 — ${rich(item.fix)}</p>` : ""}
       </li>`;
+  }
+
+  /* 도착국에서 흔한데 계약서에서 찾지 못한 독소 — 협상 중에 들어올 수 있어 미리 알립니다. */
+  function watchBlock(items, country) {
+    if (!items || !items.length) return "";
+    return `
+      <section class="cc_group">
+        <h4>🌍 도착국(${esc(country)})에서 흔한 조항 — 계약서에서 찾지 못함 <span class="cc_count">${items.length}</span></h4>
+        <ul class="cc_list">${items.map((item) => `
+          <li class="cc_row"><span class="cc_tag cc_toxic">독소</span> <b>${esc(item.title)}</b>
+            <p class="cc_why">${item.key === "reexport_control"
+              ? "재수출 금지·최종용도 확인 문구를 <b>넣으세요</b> — 지금 없는 것이 위험입니다."
+              : "협상 중에 들어오면 지우거나 고치세요."}</p></li>`).join("")}</ul>
+      </section>`;
   }
 
   /* 규칙이 주제째 놓친 조항 — 주제 분류기가 고른 것. 판정이 아니라 "직접 보세요"입니다. */
@@ -135,7 +152,8 @@
         </div>
         <form class="cc_upload" data-cc-form>${dealFields}
           <label class="cc_file">
-            <span>계약서 파일 (PDF · Word · 사진 · 텍스트, 20MB까지)</span>
+            <span>계약서 파일 (PDF · Word · 사진 · 텍스트, 20MB까지)
+              <small class="cc_hint">한글(hwp) 파일은 PDF로 저장해 올려 주세요.</small></span>
             <input type="file" name="file" accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp">
           </label>
           <details class="cc_paste">
@@ -151,6 +169,10 @@
           <p class="cc_status" data-cc-status role="status"></p>
         </form>
         <div class="cc_body" data-cc-body></div>
+        <div class="cc_pickbar" data-cc-pickbar hidden>
+          <button class="button primary" type="button" data-cc-export="docx" disabled>Word로 받기</button>
+          <button class="button ghost" type="button" data-cc-export="txt" disabled>텍스트로 받기</button>
+        </div>
       </div>`;
 
     const body = host.querySelector("[data-cc-body]");
@@ -162,6 +184,7 @@
     const EXPORT_LABEL = { docx: "Word로 받기", txt: "텍스트로 받기" };
 
     const hint = host.querySelector("[data-cc-hint]");
+    const pickbar = host.querySelector("[data-cc-pickbar]");
     const submitBtn = host.querySelector("[data-cc-submit]");
     const paste = host.querySelector(".cc_paste");
     let judged = false;   // 판정 결과가 떠 있는가 — 인코텀즈를 바꿔도 결과를 지우지 않습니다.
@@ -179,6 +202,8 @@
       });
       // 단추가 왜 막혀 있는지 알려 줍니다(사용성 점검 2026-10-04).
       hint.hidden = count > 0;
+      // 고르면 아래에 붙는 막대 — 휴대폰에서 받기 단추가 6,000px 위에 있었습니다(2회차).
+      pickbar.hidden = count === 0;
     }
 
     host.addEventListener("change", (event) => {
@@ -188,12 +213,17 @@
     function draw(groups, found) {
       // 다시 그려도 **고른 조항은 그대로** — 판정하기를 누르면 다 풀렸습니다.
       const keep = new Set(picked());
-      const side = groups.side ? `<p class="cc_side">우리 쪽(매도인·수출자)을 <b>${esc(groups.side.label)} — ${esc(groups.side.name)}</b>,
-            상대(매수인)를 <b>${esc(groups.side.other_label)} — ${esc(groups.side.other_name)}</b> 로 읽었습니다.
-            반대라면 판정도 반대가 됩니다.</p>` : "";
+      // "우리 쪽을 을 — …" 은 "을을"로 읽혀 어색했습니다(사용성 2회차) — 이름표 꼴로.
+      const who = (label, name) => `<b>${esc(label)}${name ? ` — ${esc(name)}` : ""}</b>`;
+      const side = groups.side ? `<p class="cc_side">우리 쪽(매도인·수출자): ${who(groups.side.label, groups.side.name)}
+            · 상대(매수인): ${who(groups.side.other_label, groups.side.other_name)}
+            — 반대라면 판정도 반대가 됩니다.</p>`
+        : groups.sideUnknown ? `<p class="cc_side cc_side_warn">⚠️ 갑/을 중 <b>누가 우리(매도인)인지 못 정했습니다.</b>
+            정의문에 '(이하 "갑", 매도인)'처럼 역할을 적어 주세요 — 판정의 방향이 뒤집혔을 수 있습니다.</p>` : "";
       body.innerHTML = side + (found
         // 판정 뒤: 위험한 것부터, 직접 확인할 것은 독소 바로 아래, 다 갖춘 필수는 접어서.
         ? groupBlock("🔴 지우거나 고쳐야 할 조항", groups.toxic, "toxic", false)
+          + watchBlock(groups.watch, groups.country)
           + checkBlock(groups.check)
           + groupBlock("🟡 적혀 있으나 제 구실을 못 하는 조항", groups.weak, "weak")
           + groupBlock("🟠 빠진 필수조항", groups.must, "must")
@@ -203,10 +233,14 @@
         : groupBlock("🟠 있어야 할 조항 (필수)", groups.must, "must")
           + groupBlock("🔵 챙기면 이로운 조항 (이익)", groups.gain, "gain")
           + groupBlock("🔴 조심할 조항 (독소) — 묶음을 눌러 펼치세요", groups.toxic, "toxic", true));
+      const shown = new Set();
       host.querySelectorAll("[data-cc-pick]").forEach((input) => {
         input.checked = keep.has(input.value);
+        shown.add(input.value);
       });
       refreshExport();
+      // 고른 조항이 '이미 있음'으로 빠졌으면 말없이 줄이지 않고 알립니다(사용성 2회차).
+      return Array.from(keep).filter((key) => !shown.has(key));
     }
 
     async function load() {
@@ -233,7 +267,10 @@
       }
       // 파일과 붙여 넣은 글이 함께 있으면 서버는 파일을 읽습니다 — 말없이 버리지 않게 알립니다.
       const both = file && file.name && text;
-      status.textContent = "읽는 중입니다… (올린 파일은 저장하지 않습니다)";
+      // 스캔본·사진은 OCR 로 읽어 오래 걸립니다 — 기다리는 이유를 알립니다(사용성 2회차).
+      const slow = file && file.name && (/\.(png|jpe?g|webp)$/i.test(file.name) || file.size > 2 * 1024 * 1024);
+      status.textContent = "읽는 중입니다… (올린 파일은 저장하지 않습니다)"
+        + (slow ? " 스캔본·사진이면 글자를 그림에서 읽느라 1분까지 걸릴 수 있습니다." : "");
       // 판정 중에는 다시 누르지 못하게 — 긴 계약서는 몇 초씩 걸립니다.
       submitBtn.disabled = true;
       form.setAttribute("aria-busy", "true");
@@ -248,24 +285,30 @@
         form.removeAttribute("aria-busy");
       }
       if (!answer.success) {
-        // 앞서 본 계약서의 결과가 남아 있으면 새 파일의 결과처럼 보입니다 — 비웁니다.
-        body.innerHTML = "";
+        // 앞서 본 계약서의 결과가 새 파일의 결과처럼 보이지 않게 지우되, **점검표는 다시**
+        // 그립니다 — 통째로 비우니 고를 목록도 사라졌습니다(사용성 2회차).
         judged = false;
-        refreshExport();
-        status.textContent = answer.message || "읽지 못했습니다.";
+        const message = answer.message || "읽지 못했습니다.";
+        await load();
+        status.textContent = message;
         return;
       }
       const result = answer.data;
+      const lost = draw({ toxic: result.toxic, weak: result.weak || [], must: result.missing,
+             gain: result.gain, side: result.our_side, sideUnknown: result.side_unknown,
+             check: result.check || [], ok: result.ok_must || [],
+             watch: result.watch_country || [], country: result.country || "" }, true);
+      const titles = lost.map((key) => (result.ok_must || []).find((row) => row.key === key))
+        .filter(Boolean).map((row) => `‘${row.title}’`);
       status.textContent =
         (both ? "파일을 읽었습니다(붙여 넣은 글은 쓰지 않았습니다). " : "")
+        + (result.notes && result.notes.length ? result.notes.join(" ") + " " : "")
         + (result.truncated
           ? `계약서가 길어 앞 ${result.checked.toLocaleString()}자만 봤습니다 — 뒷부분은 나눠 올려 주세요. `
           : `${result.checked.toLocaleString()}자를 읽었습니다. `)
         + `독소 ${result.toxic.length}개 · 직접 확인 ${(result.check || []).length}개 · `
-        + `보완 ${(result.weak || []).length}개 · 빠진 필수 ${result.missing.length}개.`;
-      draw({ toxic: result.toxic, weak: result.weak || [], must: result.missing,
-             gain: result.gain, side: result.our_side, check: result.check || [],
-             ok: result.ok_must || [] }, true);
+        + `보완 ${(result.weak || []).length}개 · 빠진 필수 ${result.missing.length}개.`
+        + (titles.length ? ` 고른 ${titles.join("·")}은(는) 계약서에 이미 있어 목록에서 뺐습니다.` : "");
       judged = true;
       if (paste) paste.open = false;
       // 결과로 갑니다 — 휴대폰에서 결과가 첫 화면 아래라 안 보였습니다.
@@ -312,15 +355,27 @@
     // 다음 '판정하기'부터 새 값으로 봅니다).
     const termsInput = host.querySelector("[data-cc-terms]");
     const countryInput = host.querySelector("[data-cc-country]");
+    // 판정 뒤에 조건을 바꾸면 옛 결과가 남아 있다는 것을 알립니다(사용성 2회차).
+    function dealChanged() {
+      if (judged) status.textContent = "인코텀즈·도착국이 바뀌었습니다 — 결과는 바꾸기 전 기준입니다. 다시 '읽고 판정하기'를 눌러 주세요.";
+      else load();
+    }
     if (termsInput) {
-      termsInput.addEventListener("change", () => { incoterms = termsInput.value; if (!judged) load(); });
+      termsInput.addEventListener("change", () => { incoterms = termsInput.value; dealChanged(); });
     }
     if (countryInput) {
+      // 영국은 흔히 UK 로 적습니다 — ISO 로는 GB 입니다. 알 수 없는 값은 말없이 버리지 않습니다.
+      const ALIAS = { UK: "GB", EL: "GR" };
       countryInput.addEventListener("change", () => {
-        const code = countryInput.value.trim().toUpperCase();
+        let code = countryInput.value.trim().toUpperCase();
+        code = ALIAS[code] || code;
         countryInput.value = code;
-        country = /^[A-Z]{2}$/.test(code) ? code : "";
-        if (!judged) load();
+        if (code && !/^[A-Z]{2}$/.test(code)) {
+          status.textContent = "도착국은 영문 두 글자로 적어 주세요 (예: US · CN · AE · GB).";
+          return;
+        }
+        country = code;
+        dealChanged();
       });
     }
 

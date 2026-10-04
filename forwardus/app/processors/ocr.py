@@ -132,7 +132,12 @@ def _prepare(image):
     from PIL import Image, ImageOps
 
     picture = image.convert("L")
-    picture = ImageOps.autocontrast(picture, cutoff=1)
+    # 잉크가 1% 남짓인 쪽(조항 두세 줄·서명 쪽)은 cutoff=1 이 **글자까지** 잘라 하얗게
+    # 만들었습니다 — 8쪽 스캔 계약서에서 3~7쪽이 통째로 빠졌습니다(사용성 점검
+    # 2026-10-04). 잉크가 적으면 자르지 않고 늘리기만 합니다.
+    histogram = picture.histogram()
+    ink = sum(histogram[:160]) / max(1, sum(histogram))
+    picture = ImageOps.autocontrast(picture, cutoff=1 if ink >= 0.03 else 0)
     longest = max(picture.size)
     scale = 1.0
     if longest < MIN_EDGE:

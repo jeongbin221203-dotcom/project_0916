@@ -330,6 +330,17 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     text = (question or "").strip()
     if not text:
         raise ServiceError("무엇이 궁금한지 적어주세요.", "VALIDATION_ERROR")
+    # **긴 계약서는 상담 창으로 판정하지 않습니다.** 입력칸이 2,000자에서 말없이 자르는데,
+    # 잘린 글로 판정하면 뒤쪽 준거법·중재를 '빠졌다'고 잘못 말합니다(사용성 점검 2회차).
+    contract_long = len(text) >= MAX_QUESTION and _contract_titled(text)
+    if contract_long:
+        return {"success": True, "source": "contract", "data": {
+            "answer": (f"계약서가 길어 상담 창에는 앞 {MAX_QUESTION:,}자만 들어옵니다. 잘린 글로 판정하면 "
+                       "뒤쪽 조항을 '빠졌다'고 잘못 알려 드리게 되어, 여기서는 판정하지 않았습니다. "
+                       "📜 **계약서 조항 점검** 창에 파일로 올리거나 본문 전체를 붙여 넣어 주세요."),
+            "route": "contract",
+            "links": [{"label": "📜 계약서 조항 점검 열기", "url": "/#contract-check"}],
+        }}
     if len(text) > MAX_QUESTION:
         raise ServiceError(f"질문은 {MAX_QUESTION:,}자까지 보낼 수 있습니다.", "VALIDATION_ERROR")
     # 계좌번호·SWIFT는 AI로 보내지 않습니다. 앞 대화에 있던 것도 같이 가립니다.
@@ -790,6 +801,18 @@ def _cargo_only_answer(text: str, current) -> dict | None:
     return {"success": True, "source": "calculated", "data": {
         "answer": "\n".join(lines), "route": "cargo", "cargo": summary,
     }}
+
+
+def _contract_titled(text: str) -> bool:
+    """머리에 계약서 제목이 있는가 — 길이 한도에 걸린 글이 계약서인지 볼 때만 씁니다."""
+
+    from app.collectors.base_client import get_config
+    from app.services import contract_clause_service
+
+    if not get_config("CONTRACT_CLAUSES_ON", False):
+        return False
+    head = contract_clause_service._title_area(text)
+    return any(word in head for word in contract_clause_service.CONTRACT_TITLES)
 
 
 def _incoterms_of(current) -> str:

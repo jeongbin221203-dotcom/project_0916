@@ -389,7 +389,8 @@ def test_영문_문안은_문장_가운데서_줄이_끊기지_않는다():
 
     box = _opened(service.clause_docx(["payment"])).tables[0].cell(0, 0)
     lines = [p.text for p in box.paragraphs]
-    assert lines[0] == "3. PAYMENT"
+    # 조 번호("3.")는 뗍니다 — 이용자 계약서의 번호와 부딪힙니다(사용성 점검 2회차).
+    assert lines[0] == "PAYMENT"
     assert "first-class bank acceptable to the Seller, at least" in lines[1]
     assert "Seller by a first-class" in service.clause_plain(["payment"])
 

@@ -28,23 +28,42 @@
       });
       mounted = true;
     }
-    // 키보드·화면낭독기 사용자를 창 안으로 데려갑니다.
-    const first = modal.querySelector("[data-contract-close]");
+    // 키보드·화면낭독기 사용자를 창 안으로 데려갑니다. 첫 [data-contract-close] 는 초점을
+    // 못 받는 배경이라, 닫기 **단추**를 집어야 합니다(사용성 2회차 — 초점이 안 옮겨졌습니다).
+    const first = modal.querySelector("button[data-contract-close]");
     if (first) first.focus();
   }
 
   function close() {
     modal.hidden = true;
     document.body.classList.remove("hs_modal_open");
+    // 주소의 #contract-check 를 지웁니다 — 남아 있으면 같은 링크를 다시 눌러도 열리지 않고,
+    // 새로고침하면 매번 열렸습니다(사용성 2회차).
+    if (location.hash === "#contract-check") {
+      history.replaceState(null, "", location.pathname + location.search);
+    }
     if (returnTo && returnTo.focus) returnTo.focus();
   }
 
   document.addEventListener("click", (event) => {
     if (event.target.closest("[data-contract-open]")) { event.preventDefault(); open(); }
     else if (event.target.closest("[data-contract-close]")) close();
+    else if (event.target.closest('a[href$="#contract-check"]')) { event.preventDefault(); open(); }
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) close();
+    if (modal.hidden) return;
+    if (event.key === "Escape") { close(); return; }
+    // Tab 이 창 밖으로 나가지 않게 가둡니다.
+    if (event.key === "Tab") {
+      const items = Array.from(modal.querySelectorAll(
+        "button, [href], input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"))
+        .filter((el) => !el.disabled && el.offsetParent !== null);
+      if (!items.length) return;
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === firstItem) { event.preventDefault(); lastItem.focus(); }
+      else if (!event.shiftKey && document.activeElement === lastItem) { event.preventDefault(); firstItem.focus(); }
+    }
   });
   // 상담 답변의 "조항 문안 받기" 링크(/#contract-check)로 오면 창을 엽니다. 전에는
   // 링크가 없는 주소(/documents)라 404 였습니다.

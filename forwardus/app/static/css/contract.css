@@ -31,6 +31,15 @@
 .cc_hint[hidden] { display: none; }
 .cc_more > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
 .cc_upload[aria-busy="true"] { opacity: .75; }
+/* 2회차 (2026-10-04) */
+.cc_pickbar { position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 12px; padding: 10px 0; background: var(--surface); border-top: 1px solid var(--line); }
+.cc_pickbar[hidden] { display: none; }
+.cc_country_tag { padding: 1px 8px; border-radius: 999px; background: #e0f2fe; color: #075985;
+  font-size: 11.5px; font-weight: 700; }
+.cc_side_warn { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+.cc_fix_calm { background: #f1f5f9; color: #334155; }
+[data-cc-pick] { width: 18px; height: 18px; }
 .cc_sub:first-of-type { margin-top: 2px; }
 .cc_count { margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--surface);
   color: var(--muted); font-size: 12px; font-weight: 800; }

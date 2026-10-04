@@ -225,33 +225,84 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
 
 
 def read_file(filename: str, data: bytes) -> str:
-    """계약서 파일에서 글자만 꺼냅니다. (PDF·사진·텍스트)
+    """계약서 파일에서 글자만 꺼냅니다. (PDF·Word·사진·텍스트) — read_contract 의 글자."""
 
-    서류 읽기와 같은 길을 씁니다. 사진·스캔이면 OCR로 읽고, OCR을 쓸 수 없으면
-    빈 글자가 나옵니다. **AI는 부르지 않습니다.**
+    return read_contract(filename, data)[0]
+
+
+def read_contract(filename: str, data: bytes) -> tuple[str, list[str]]:
+    """계약서 파일의 (글자, 알림). 알림은 화면 상태줄에 그대로 붙입니다.
+
+    사진·스캔이면 우리 컴퓨터의 OCR 로 읽고, 쓸 수 없으면 빈 글자입니다. **AI는 부르지
+    않습니다.** 어디까지 읽었는지를 말없이 버리지 않게 알림으로 냅니다(사용성 점검
+    2회차 — 60쪽·10쪽 넘는 부분과 OCR 이 못 읽은 쪽을 말없이 버렸습니다).
     """
 
     from app.services import document_extract_service as extract
 
     name = str(filename or "").lower()
-    if not data:
+    if not data or not data.strip():
         raise ServiceError("빈 파일입니다. 내용이 있는 계약서 파일을 올려 주세요.", "VALIDATION_ERROR")
     if name.endswith((".txt", ".md")):
-        return _decode(data)
+        text = _decode(data)
+        if not text.strip():
+            raise ServiceError("빈 파일입니다. 내용이 있는 계약서 파일을 올려 주세요.", "VALIDATION_ERROR")
+        return text, []
     if name.endswith(".docx"):
-        return _read_docx(data)
+        return _read_docx(data), []
+    notes: list[str] = []
     if name.endswith(".pdf"):
-        text, images = _read_contract_pdf(data)
+        text, images, pages = _read_contract_pdf(data)
+        if pages > MAX_PDF_PAGES:
+            notes.append(f"PDF 가 {pages}쪽이라 앞 {MAX_PDF_PAGES}쪽만 봤습니다 — 뒷부분은 나눠 올려 주세요.")
     else:
-        text, images = "", extract._read_image(data)
-    # **본문이 거의 없으면 OCR.** 쪽 번호("Page 1 of 1")만 글자로 박힌 스캔본이
-    # 흔한데, 전에는 글자가 조금이라도 있으면 OCR 을 건너뛰어 '본문을 못 찾았다'고
-    # 거절했습니다. (사용성 점검 2026-10-04)
+        text, images, pages = "", extract._read_image(data), 1
+    # **본문이 거의 없으면 OCR.** 쪽 번호("Page 1 of 1")만 글자로 박힌 스캔본도 OCR 합니다.
     if images and _body_chars(text) < extract.SCANNED_TEXT_CHARS:
-        found = extract.ocr_text("", images)
+        found, blank = _ocr_pages(images)
         if _body_chars(found) > _body_chars(text):
-            return found
-    return text
+            notes.append("스캔본이라 그림에서 글자를 읽었습니다(OCR) — 틀린 글자가 있을 수 있으니 "
+                         "중요한 조항은 원문과 맞춰 보세요.")
+            if pages > MAX_OCR_PAGES:
+                notes.append(f"스캔본은 앞 {MAX_OCR_PAGES}쪽만 읽습니다 — 뒷부분은 나눠 올려 주세요.")
+            if blank:
+                notes.append(f"{', '.join(map(str, blank))}쪽은 글자를 읽지 못했습니다.")
+            return found, notes
+    return text, notes
+
+
+def _ocr_pages(images: list) -> tuple[str, list[int]]:
+    """쪽마다 OCR — (글자, 못 읽은 쪽 번호). 국문은 글자마다 띄어 읽는 버릇을 고칩니다."""
+
+    from app.processors import bank_redaction, ocr
+
+    if not (ocr.available() and bank_redaction.ocr_available()):
+        return "", []
+    pages, blank = [], []
+    for no, image in enumerate(images, 1):
+        page = _join_hangul(ocr.read_text(image))
+        if page.strip():
+            pages.append(f"[{no}쪽]\n{page}" if len(images) > 1 else page)
+        else:
+            blank.append(no)
+    return "\n\n".join(pages), blank
+
+
+def _join_hangul(text: str) -> str:
+    """OCR 이 국문을 "갑 은 언제든지 서면 통 지 로" 처럼 글자마다 띄어 읽으면 규칙이 하나도
+    안 걸립니다(사용성 점검 2회차 — 국문 스캔·사진이 '독소 0개'). 한 글자짜리 한글 낱말이
+    줄의 절반을 넘는 줄만, 한 글자 낱말 앞뒤의 띄어쓰기를 붙입니다."""
+
+    out = []
+    for line in text.splitlines():
+        words = line.split()
+        singles = sum(1 for word in words if re.fullmatch(r"[가-힣]", word))
+        if len(words) >= 4 and singles * 2 >= len(words):
+            line = re.sub(r"(?<=[가-힣]) (?=[가-힣](?:\s|$))", "", line)
+            line = re.sub(r"(?:(?<=^[가-힣])|(?<=\s[가-힣])) (?=[가-힣])", "", line)
+            line = re.sub(r"(?<=[가-힣]) (?=[가-힣](?:\s|$))", "", line)
+        out.append(line)
+    return "\n".join(out)
 
 
 # 계약서 읽기 한도 (2026-10-04). 오퍼시트용 읽기 함수(앞 5쪽·스캔 3쪽)를 같이 써서
@@ -274,6 +325,8 @@ def _decode(data: bytes) -> str:
     나왔습니다. 둘 다 아니면 깨진 채로 판정하지 않습니다.
     """
 
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16")
     for encoding in ("utf-8-sig", "cp949"):
         try:
             return data.decode(encoding)
@@ -305,7 +358,7 @@ def _read_docx(data: bytes) -> str:
     return "\n".join(lines)
 
 
-def _read_contract_pdf(data: bytes) -> tuple[str, list]:
+def _read_contract_pdf(data: bytes) -> tuple[str, list, int]:
     """PDF 의 **모든 쪽**(60쪽까지) 글자와, 스캔본에 쓸 앞 10쪽 그림."""
 
     import io
@@ -316,6 +369,7 @@ def _read_contract_pdf(data: bytes) -> tuple[str, list]:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             if not pdf.pages:
                 raise ServiceError("빈 PDF입니다. 내용이 있는 파일을 올려 주세요.", "VALIDATION_ERROR")
+            total = len(pdf.pages)
             pages = pdf.pages[:MAX_PDF_PAGES]
             text = "\n".join((page.extract_text() or "") for page in pages)
             images = []
@@ -328,7 +382,7 @@ def _read_contract_pdf(data: bytes) -> tuple[str, list]:
         raise ServiceError("PDF를 열지 못했습니다. 암호가 걸려 있거나 파일이 손상되었을 수 "
                            "있습니다. 다시 저장해 올리거나 본문을 붙여 넣어 주세요.",
                            "VALIDATION_ERROR")
-    return text.strip(), images
+    return text.strip(), images, total
 
 
 
@@ -451,6 +505,20 @@ def _plain(text: str) -> str:
 _EN_HEAD = re.compile(r"^\(.*\)$|^(?:\d+(?:\.\d+)*\.?\s+)?[A-Z][A-Z0-9 &/,'()-]*[A-Z)]$")
 
 
+def _export_lines(text_en: str) -> tuple[str, list[str]]:
+    """내려받는 문안 — (안내 한 줄, 붙여 쓸 줄들).
+
+    "(넣을 문구의 예)" 는 붙여 쓸 글이 아니라 안내라서 상자 밖으로 뺍니다. 조 번호
+    ("9. ARBITRATION")는 이용자의 계약서 번호와 부딪혀 뗍니다(사용성 점검 2회차).
+    """
+
+    lines = _reflow(text_en)
+    note = lines[0] if lines and re.fullmatch(r"\(.*\)", lines[0]) else ""
+    body = lines[1:] if note else lines
+    body = [re.sub(r"^\d+(?:\.\d+)*\.?\s+(?=[A-Z][A-Z &/,'()-]*$)", "", line) for line in body]
+    return note, body
+
+
 def _reflow(text_en: str) -> list[str]:
     """영문 문안을 문단으로. 소스에 80자로 꺾어 둔 줄을 도로 잇습니다.
 
@@ -490,7 +558,8 @@ def clause_plain(keys) -> str:
             lines += ["★ " + _plain(toxic_note(row["key"])), ""]
             if row["fix"]:
                 lines += [f"고치는 법: {_plain(row['fix'])}", ""]
-        lines += ["[영문 문안]", "", *_reflow(row["text_en"]), "",
+        note, wording = _export_lines(row["text_en"])
+        lines += ["[영문 문안]" + (f" {note}" if note else ""), "", *wording, "",
                   _plain(row["text_ko"]), "", ""]
     # 메모장·옛 편집기가 한글을 깨뜨리지 않게 BOM 과 CRLF 로 냅니다.
     return "﻿" + "\r\n".join(lines).rstrip() + "\r\n"
@@ -523,6 +592,9 @@ def _boxed(document, text: str) -> None:
     from docx.oxml.ns import qn
     from docx.shared import Pt
 
+    note, lines = _export_lines(text)
+    if note:
+        _runs(document.add_paragraph(), note, color="666666", size=9.5)
     cell = document.add_table(rows=1, cols=1, style="Table Grid").cell(0, 0)
     shade = OxmlElement("w:shd")
     shade.set(qn("w:val"), "clear")
@@ -531,7 +603,7 @@ def _boxed(document, text: str) -> None:
     cell.paragraphs[0].text = ""
     from docx.enum.text import WD_COLOR_INDEX
 
-    for i, line in enumerate(_reflow(text)):
+    for i, line in enumerate(lines):
         paragraph = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
         # <30>·<INCOTERMS> 같은 빈칸은 노랗게 — 그대로 붙여 쓰면 놓칩니다(사용성 점검 2026-10-04).
         for part in re.split(r"(<[^<>]{1,40}>)", line):
@@ -691,6 +763,8 @@ CONTRACT_TITLES = (
 # 조항 개수만 보면 전부 계약서로 걸립니다. 실제로 오퍼시트 세 장이 모두
 # 계약서로 판정되어, 서류 칸이 빈 채로 "13가지가 누락되었습니다"가 떴습니다.
 # (2026-09-28)
+TERMS_TITLES = ("purchase order terms", "terms and conditions of purchase", "terms and conditions of sale",
+                "general terms and conditions", "구매약관", "구매 약관", "거래약관", "일반거래조건")
 NOT_CONTRACT_TITLES = (
     "offer sheet", "firm offer", "quotation", "proforma invoice",
     "commercial invoice", "packing list", "bill of lading", "air waybill",
@@ -769,9 +843,15 @@ def looks_like_contract(text: str) -> bool:
     # 서류를 본문에서 언급합니다. 그것 때문에 진짜 계약서를 놓쳤습니다.
     # (2026-09-28 — 본문 2,038번째 글자의 "commercial invoice" 에 걸렸습니다)
     head = _title_area(body)
+    # **약관**이라고 적힌 발주서는 계약서입니다 — "PURCHASE ORDER TERMS AND CONDITIONS" 가
+    # 'purchase order' 에 걸려 서류로 빠졌습니다(사용성 점검 2회차). 실무에서는 바이어의
+    # 발주서 약관이 곧 계약 조건입니다.
+    terms = any(word in head for word in TERMS_TITLES)
     # 스스로 오퍼시트·송장이라고 적어 둔 것은 계약서가 아닙니다.
-    if any(word in head for word in NOT_CONTRACT_TITLES):
+    if not terms and any(word in head for word in NOT_CONTRACT_TITLES):
         return False
+    if terms:
+        return len(contract_clauses.find_in(body)) >= CONTRACT_MIN_CLAUSES
     if any(word in head for word in CONTRACT_TITLES):
         return len(contract_clauses.find_in(body)) >= CONTRACT_MIN_CLAUSES
     # 제목이 없으면 **계약서다운 조항**만 셉니다.

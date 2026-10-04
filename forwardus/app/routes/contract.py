@@ -66,16 +66,19 @@ def review():
             if len(data) > MAX_UPLOAD_BYTES:
                 raise ValidationError(
                     f"계약서는 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB까지 읽습니다.", "file")
-            text = contract_clause_service.read_file(name, data)
+            text, notes = contract_clause_service.read_contract(name, data)
             if not text.strip():
                 raise ServiceError(
                     "글자를 읽지 못했습니다. 스캔본이면 글자가 있는 PDF로 다시 저장하거나, "
                     "계약서 본문을 붙여 넣어 주세요.", "UNREADABLE")
         else:
+            notes = []
             text = (request.form.get("text") or
                     ((request.json or {}).get("text") if request.is_json else "") or "")
         result = contract_clause_service.review(text, str(incoterms or ""),
                                                 str(country or ""))
+        # 어디까지·어떻게 읽었는지(OCR·쪽 한도) — 상태줄에 붙입니다(사용성 점검 2회차).
+        result["notes"] = notes
     except (ValidationError, ServiceError) as exc:
         return error_response(exc)
     result["summary"] = contract_clause_service.as_text(result)
