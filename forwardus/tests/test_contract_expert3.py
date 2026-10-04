@@ -31,6 +31,30 @@ SAFE = [
     ("us_jury_punitive", "The parties submit to the exclusive jurisdiction of the courts located in Chicago, "
                          "Illinois. EACH PARTY WAIVES ITS RIGHT TO A JURY TRIAL. In no event shall either "
                          "party be liable for punitive damages."),
+    # 말뭉치(EDGAR·CUAD) 3회차에서 새로 걸렸던 정상 문장
+    ("battle_of_forms", "The Buyer shall return all Confidential Information then in the Buyer's possession, "
+                        "custody or control."),
+    ("reexport_control", "The Buyer will be solely responsible for any warranties the Buyer may make to any "
+                         "reseller of the Products."),
+    ("reexport_control", "The Buyer may not distribute or re-export any Products outside the Territory without "
+                         "the written consent of the Seller."),
+    ("one_way_nda", "Information that the Buyer supplies to the Seller will not be treated as confidential by "
+                    "the Seller unless the Seller agrees in writing."),
+    ("buyer_set_off", "If the Buyer is required by law to withhold any taxes from the price, the Buyer shall "
+                      "deduct any such amount and remit it."),
+    ("assignment_one_way", "Neither the Seller nor the Buyer may assign this Contract to a third party without "
+                           "the prior written consent of the other party."),
+    ("assignment_one_way", "The Buyer may assign this Contract without the Seller's consent to an Affiliate of "
+                           "the Buyer."),
+    ("ip_assignment", MSA + "Company's patents, know-how and inventions shall remain the sole and exclusive "
+                            "property of Company."),
+    ("open_warranty", "This guarantee shall apply to all Guaranteed Obligations whenever arising."),
+    ("open_warranty", "This Contract is entered into for an unlimited period of time."),
+    ("one_way_nda", "The Licensed Technology is Confidential Information of the Seller even if not marked "
+                    "* Confidential Treatment Requested “confidential”."),
+    ("one_way_nda", "FTSI and Seller shall hold all Confidential Information in confidence."),
+    ("one_way_nda", "The Buyer shall treat any Seller Confidential Information in the same confidential manner "
+                    "as the Seller is obliged to treat Confidential Information."),
 ]
 
 

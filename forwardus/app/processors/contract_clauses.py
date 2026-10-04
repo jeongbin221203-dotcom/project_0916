@@ -2201,7 +2201,7 @@ disclose the end user and end use on request, and shall pass these obligations
 to any subsequent purchaser.""",
     text_ko="중계무역 거점(홍콩·싱가포르·두바이 등)으로 보내는데 **재수출 제한·최종용도 "
             "확인**이 없으면 이 조항입니다. 계약서에서 re-export 와 end use 를 찾아보세요.",
-    detect=[r"(?:buyer|purchaser)[^.]{0,80}(?:free to|may)[^.]{0,40}re[- ]?(?:export|sell)"
+    detect=[r"(?:buyer|purchaser)[^.]{0,80}(?:free to|may)[^.]{0,40}re[- ]?(?:export|sell)\b"
             r"[^.]{0,60}(?:any|without)",
             r"no restriction[^.]{0,60}(?:re[- ]?export|destination|end use)",
             r"(?:매수인|바이어)[^.]{0,50}(?:재수출|전매)[^.]{0,40}"
@@ -2742,7 +2742,7 @@ The terms and conditions of the Buyer's purchase order shall prevail over any
 terms of the Seller's quotation, proforma invoice or order acknowledgement.""",
     text_ko="Buyer's purchase order · our purchase terms 와 prevail · exclusively 가 함께 "
             "나오면 이 조항입니다.",
-    detect=[r"(?:buyer|purchaser)'?s?\s+(?:purchase\s+orders?|P\.?O\.?s?|general\s+(?:terms|conditions)"
+    detect=[r"(?:buyer|purchaser)'?s?\s+(?:purchase\s+orders?|P\.?O\.?s?\b|general\s+(?:terms|conditions)"
             r"(?:\s+of\s+purchase)?|purchase\s+(?:terms|conditions)|standard\s+terms"
             r"|terms\s+and\s+conditions(?:\s+of\s+purchase)?)[^.]{0,80}"
             r"(?:prevail|govern|control|take\s+precedence|apply\s+exclusively)",
@@ -3224,7 +3224,7 @@ _amend("evergreen", detect=(r"\brenews?\s+automatically\b",))
 
 # 기간 없는 보증 — "regardless of the time of discovery" · "whenever discovered"
 _amend("open_warranty", detect=(r"regardless\s+of\s+the\s+time\s+of\s+discovery",
-                                r"\bwhenever\s+(?:discovered|arising|found)\b"))
+                                r"(?:warrant\w*|defect\w*)[^.]{0,120}\bwhenever\s+(?:discovered|arising|found)\b"))
 
 # 준거법 — 낱말 꼴과 외국법
 _amend("governing_law",
@@ -3280,7 +3280,9 @@ _amend("payment_on_resale", detect=(
     r"\bmonth\s+in\s+which\s+(?:it|the\s+buyer|they)\s+(?:re)?sells?\b",
     r"(?:판매된|재판매한|팔린)\s*달[^.]{0,40}(?:지급|결제)"))
 _amend("full_return", detect=(r"\breturn\s+(?:any\s+|all\s+)?unsold\s+(?:goods|products|stock|items)",))
-_amend("open_warranty", detect=(r"\bunlimited\s+(?:warranty\s+)?period\b",))
+# 계약 기간("entered into for an unlimited period of time")이 아니라 보증 기간일 때만(말뭉치 3회차).
+_amend("open_warranty", detect=(r"\bunlimited\s+warranty\s+period\b",
+                                r"warrant\w*[^.]{0,80}\bunlimited\s+period\b"))
 
 
 # ── 전문가 점검 3회차 보강 (2026-10-04) ─────────────────────────────────────
@@ -3395,8 +3397,8 @@ _amend("spec_change_no_price", detect=(
 
 # 개발 성과 귀속 — "inventions … shall be the exclusive property of Company"
 _amend("ip_assignment", detect=(
-    r"\b(?:inventions?|developments?|improvements?|work\s+product|deliverables)\b[^.]{0,120}(?:shall\s+be|become|"
-    r"remain)\s+(?:the\s+)?(?:sole\s+and\s+)?(?:exclusive\s+)?property\s+of\s+(?:the\s+)?buyer",))
+    r"\b(?:inventions?|developments?|improvements?|work\s+product|deliverables)\b[^.]{0,120}(?:shall\s+be|become)"
+    r"\s+(?:the\s+)?(?:sole\s+and\s+)?(?:exclusive\s+)?property\s+of\s+(?:the\s+)?buyer",))
 
 # 독점 지정 — "appoints … as its exclusive representative". 최소 구매가 문서 어디에 있으면
 # 독점의 대가가 있는 것입니다.
@@ -3445,6 +3447,22 @@ by_key("shipment")["detect"] = (
     r"\bshipment\s+(?:shall|will|must|is\s+to|to)\s+be\s+(?:made|effected)\b",
     r"\b(?:time|date|port|period)\s+of\s+shipment\b", r"\blatest\s+(?:date\s+of\s+)?shipment\b",
 ) + tuple(by_key("shipment")["detect"])
+
+# 말뭉치(EDGAR·CUAD 1,310건) 3회차에서 새로 걸린 오탐
+_amend("reexport_control", avoid=(r"\b(?:may|shall|will)\s+not\b", r"not\s+(?:be\s+)?(?:permitted|allowed|entitled)"))
+_amend("one_way_nda", avoid=(
+    r"\bnot\s+be\s+(?:treated|held|kept)\b",
+    r"confidential\s+treatment\s+requested",                                # 공시 문서의 표시
+    r"\band\s+(?:the\s+)?(?:seller|supplier)\s+shall\s+(?:hold|keep|treat)",  # "FTSI and Supplier shall hold"
+    r"in\s+the\s+same\s+(?:confidential\s+)?manner\s+as"))                  # 상호 비밀유지
+_amend("buyer_set_off", avoid=(r"withh?old\w*\s+(?:any\s+|such\s+)?(?:\w+\s+)?tax", r"required\s+by\s+law\s+to\s+withhold"))
+# 쌍방 제한("neither HOKU nor CUSTOMER may assign")과 계열사·영업양수인 예외는 일방 양도가 아닙니다.
+_amend("assignment_one_way", avoid=(
+    r"\bneither\b[^.]{0,40}\bnor\b[^.]{0,40}\bmay\s+(?:assign|transfer)",
+    # "to an Affiliate" 만 — "to any affiliate **or third party**" 는 진짜 일방 양도입니다.
+    r"\bto\s+(?:an?\s+|its\s+)?affiliates?\b(?![^.]{0,15}\bor\s+(?:any\s+|a\s+)?third)",
+    r"successor\s+in\s+interest",
+    r"(?:purchaser|acquirer|successor)\s+(?:of|to)\s+all\s+or\s+substantially\s+all"))
 
 # 제목만 '최소 구매', 본문은 "의무가 없다"
 _amend("min_order", avoid=(
