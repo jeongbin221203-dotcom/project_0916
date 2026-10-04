@@ -1684,6 +1684,106 @@ Seller may cancel this Contract and claim the costs already incurred.""",
              "신용장을 연다고만 적혀 있고 **언제까지** 열어야 하는지가 없습니다."),
 )
 
+# ── 실제 분쟁에서 나온 이익조항 (2026-10-04) ────────────────────────────────
+# 독소조항 lc_soft_clause · acceptance_signature_payment 의 반대편, 그리고 대금이
+# 엉뚱한 계좌로 간 사건. tests/test_contract_gain_disputes.py 에 사건과 문구가 있습니다.
+
+_clause(
+    "lc_conformity", "신용장-계약 일치 (L/C Conformity)", "gain",
+    why="신용장은 계약서가 아니라 **신용장 글자대로** 지급됩니다. 계약과 다른 조건이 들어온 "
+        "신용장을 그대로 받으면, 계약은 지켜도 은행이 돈을 안 줍니다. 독소조항 "
+        "lc_soft_clause 의 반대편입니다.",
+    risk="수익자 이름 한 글자(Bulgrains Co → Bulgrains & Co, Sung Jun → Sung Jin) 차이로 "
+         "지급이 거절됐습니다(Bulgrains v. Shinhan 2013, Hanil Bank v. BNI 2000). 바이어가 "
+         "선적 기간을 일방적으로 바꾼 신용장도 있었습니다(RBRG v. Sinocore 2018).",
+    text_en="""(넣을 문구의 예)
+The Letter of Credit shall strictly conform to the terms of this Contract. Any term
+of the L/C or any amendment inconsistent with this Contract shall not bind the
+Seller without its prior written consent. If a conforming L/C or amendment is not
+received within seven (7) days of the Seller's request, the Seller may terminate
+this Contract and claim damages.""",
+    text_ko="**신용장은 본 계약과 일치해야 하고, 다른 조건은 매도인 서면 동의가 있어야** 한다고 "
+            "적습니다. 신용장을 받으면 **수익자 이름·물품명·서류 목록을 글자 단위로** 계약서와 "
+            "맞춰 보고, 다르면 바로 조건변경(amend)을 요구하세요.",
+    detect=[r"\b(?:letter\s+of\s+credit|documentary\s+credit|l/?c)\b[^.]{0,60}(?:shall\s+)?(?:strictly\s+)?"
+            r"(?:conform|comply|be\s+consistent|correspond)\w*\s+(?:with|to)\s+(?:the\s+terms\s+of\s+)?"
+            r"(?:this|the)\s+(?:contract|agreement)",
+            r"신용장[^.]{0,40}(?:본\s*계약|계약\s*조건)[^.]{0,20}(?:일치|부합|합치)"],
+    # "계약과 **다른** 조건은 매도인 동의 없이 **구속하지 않는다**" — 부정이 뜻입니다.
+    # 신용장 말이 앞에 있어야 합니다 — "purchase orders inconsistent with this Agreement
+    # shall have no effect" 는 발주서 얘기입니다(실제 계약서 검증).
+    strict=[r"\b(?:l/?c|letter\s+of\s+credit|documentary\s+credit)\b[^.]{0,60}"
+            r"(?:inconsistent|non-?conforming|not\s+in\s+(?:conformity|accordance))\s+with\s+"
+            r"(?:this|the)\s+(?:contract|agreement)[^.]{0,80}(?:(?:seller'?s|its)\s+(?:prior\s+)?(?:written\s+)?consent"
+            r"|reject|terminat)",
+            r"(?:계약과|본\s*계약과)\s*(?:다른|불일치하는|일치하지\s*않는)[^.]{0,40}(?:신용장|조건변경)"
+            r"[^.]{0,40}(?:동의|거절|해제)"],
+    fix="",
+    avoid=(r"\bneed\s+not\b",),
+)
+
+_clause(
+    "payment_account", "지정 계좌 (Designated Account)", "gain",
+    why="대금을 **어느 계좌로** 받는지 계약서에 없으면, 중개인이나 사칭 메일이 알려 준 다른 "
+        "계좌로 돈이 가도 바이어는 '이미 냈다'고 합니다.",
+    risk="중개인 지시로 대금이 관계없는 미국 계좌로 갔고, 무역보험공사가 대위해 소송했지만 "
+         "회수가 막혔습니다(Korea Trade Insurance v. Oved Apparel, S.D.N.Y. 2015). "
+         "계좌 변경을 사칭한 이메일 사기도 같은 구멍으로 들어옵니다.",
+    text_en="""(넣을 문구의 예)
+All payments shall be made only to the Seller's account at <BANK>, account no.
+<NUMBER>, in the name of <SELLER>. Any change of account shall be valid only if
+notified in a letter signed by the Seller's authorised representative and
+confirmed by telephone. Payment to any other account shall not discharge the
+Buyer's payment obligation.""",
+    text_ko="**은행·계좌번호·예금주**를 박고, **계좌 변경은 대표자 서명 서면으로만**, "
+            "**다른 계좌로 보낸 돈은 지급이 아니다**까지 적습니다.",
+    detect=[r"(?:payments?|remit\w*)[^.]{0,60}(?:only|solely|exclusively)\s+(?:be\s+made\s+)?to\s+"
+            r"the\s+seller'?s\s+(?:designated\s+)?(?:bank\s+)?account",
+            r"(?:change|modif\w*|alteration)[^.]{0,30}(?:bank\s+)?account[^.]{0,80}"
+            r"(?:only|valid)[^.]{0,60}(?:signed|in\s+writing|confirm)",
+            r"(?:지정|아래|다음)\s*계좌[^.]{0,30}(?:로만|에만)\s*(?:지급|송금|결제)",
+            r"계좌[^.]{0,6}(?:변경|를\s*바꾸)[^.]{0,40}(?:서면|서명|대표자)"],
+    # "다른 계좌로 보낸 돈은 지급이 **아니다**" — 부정이 뜻입니다.
+    strict=[r"payment\s+to\s+any\s+other\s+account[^.]{0,40}(?:shall|does|will)\s+not\s+"
+            r"(?:discharge|release|constitute)",
+            r"다른\s*계좌[^.]{0,30}(?:지급|송금)[^.]{0,30}(?:변제|지급)[^.]{0,10}(?:효력이\s*없|로\s*보지\s*않)"],
+    fix="",
+    neg_ok=True,
+)
+
+_clause(
+    "deemed_acceptance", "간주 인수 (Deemed Acceptance)", "gain",
+    why="검수·시운전 확인서에 바이어가 서명하지 않거나 이의 없이 시간이 지나면 **인수한 것으로 "
+        "본다**는 조항입니다. 바이어가 서명을 미뤄 대금을 미루는 길을 막습니다. 독소조항 "
+        "acceptance_signature_payment 의 반대편입니다.",
+    risk="러시아 바이어가 시운전 확인서 서명을 거부하며 지급기가 아니라고 버텨, 한국 매도인은 "
+         "대법원까지 가서야 받았습니다(대법원 2025.3.27. 2021다242185). 신용장의 검수서 "
+         "조건도 '미발행 시 수익자 진술로 대체'가 있어야 풀립니다(ACR Systems v. Woori Bank).",
+    text_en="""(넣을 문구의 예)
+If the Buyer does not issue the acceptance certificate or notify any defect in
+writing within ten (10) days after commissioning, the Goods shall be deemed
+accepted and payment shall become due.""",
+    text_ko="**N일 안에 서명·서면 이의가 없으면 인수한 것으로 본다**를 적고, 지급기를 그 날에 "
+            "묶습니다.",
+    detect=[r"\b(?:goods|products?|equipment|machine\w*|delivery|shipment|works?)\s+(?:shall|will)\s+be\s+"
+            r"deemed\s+(?:to\s+have\s+been\s+)?accepted",
+            r"\bacceptance\s+(?:shall|will)\s+be\s+deemed\s+(?:to\s+have\s+been\s+)?(?:given|made|granted)",
+            # "deemed acceptance" 는 **물건**의 인수일 때만 — 실제 계약서에서 발주서·약관의
+            # 승낙("deemed acceptance of this Order / of AB's Terms")과 "acceptance or deemed
+            # acceptance" 같은 언급이 걸렸습니다. (2026-10-04)
+            r"(?<!acceptance or )(?<!acceptance or \()"
+            r"\bdeemed\s+acceptance\s+of\s+(?:the\s+|such\s+|any\s+|all\s+)?(?:goods|products?|"
+            r"deliverables?|shipments?|equipment|deliver(?:y|ies)|works?)\b",
+            r"[(\"“]\s*deemed\s+acceptance\s*[)\"”]",
+            r"\bdeemed\s+acceptance\s+(?:shall|will)\s+(?:occur|take\s+place|be\s+effective)",
+            r"(?:인수|검수|수령|합격)(?:한|된)?\s*것으로\s*(?:간주|본다)"],
+    fix="",
+    # 우리(매도인)가 바이어 발주를 승낙한 것으로 보는 꼴은 이 조항이 아닙니다.
+    avoid=(r"\bseller\s+(?:shall|will)\s+be\s+deemed\s+to\s+have\s+accepted",
+           r"(?:purchase\s+)?orders?\s+(?:shall|will)\s+be\s+deemed\s+accepted",
+           r"\bnot\s+be\s+deemed\b"),
+)
+
 _clause(
     "buyer_design_ip", "바이어 도면의 권리 보증 (Buyer's Design Indemnity)", "gain",
     why="바이어가 준 도면·상표로 만들었는데 제3자 특허·상표를 침해하면, 만든 우리가 "
