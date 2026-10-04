@@ -332,7 +332,10 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
         raise ServiceError("무엇이 궁금한지 적어주세요.", "VALIDATION_ERROR")
     # **긴 계약서는 상담 창으로 판정하지 않습니다.** 입력칸이 2,000자에서 말없이 자르는데,
     # 잘린 글로 판정하면 뒤쪽 준거법·중재를 '빠졌다'고 잘못 말합니다(사용성 점검 2회차).
-    contract_long = len(text) >= MAX_QUESTION and _contract_titled(text)
+    # 입력칸이 자른 뒤 브라우저가 앞뒤 공백·줄바꿈을 지우면 1,998자가 되어 이 검사를
+    # 빠져나갔습니다(사용성 3회차). 끝 무렵까지 찬 계약서는 잘렸을 수 있다고 봅니다 —
+    # 안 잘린 것을 점검 창으로 보내는 것은 해가 없습니다.
+    contract_long = len(text) >= MAX_QUESTION - 100 and _contract_titled(text)
     if contract_long:
         return {"success": True, "source": "contract", "data": {
             "answer": (f"계약서가 길어 상담 창에는 앞 {MAX_QUESTION:,}자만 들어옵니다. 잘린 글로 판정하면 "

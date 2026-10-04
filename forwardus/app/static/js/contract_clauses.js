@@ -172,6 +172,7 @@
         <div class="cc_pickbar" data-cc-pickbar hidden>
           <button class="button primary" type="button" data-cc-export="docx" disabled>Word로 받기</button>
           <button class="button ghost" type="button" data-cc-export="txt" disabled>텍스트로 받기</button>
+          <span class="cc_pickmsg" data-cc-pickmsg aria-live="polite"></span>
         </div>
       </div>`;
 
@@ -185,6 +186,17 @@
 
     const hint = host.querySelector("[data-cc-hint]");
     const pickbar = host.querySelector("[data-cc-pickbar]");
+    const pickmsg = host.querySelector("[data-cc-pickmsg]");
+    // 조항 이름 — 고른 조항이 목록에서 빠질 때 이름으로 알립니다(사용성 3회차).
+    const titles = new Map();
+    function names(keys) {
+      return keys.map((key) => `‘${titles.get(key) || key}’`).join("·");
+    }
+    // 받기 결과는 아래 막대에도 — 판정 뒤엔 상태줄이 화면 밖이라 안 보였습니다(사용성 3회차).
+    function sayExport(message) {
+      status.textContent = message;
+      if (pickmsg) pickmsg.textContent = message;
+    }
     const submitBtn = host.querySelector("[data-cc-submit]");
     const paste = host.querySelector(".cc_paste");
     let judged = false;   // 판정 결과가 떠 있는가 — 인코텀즈를 바꿔도 결과를 지우지 않습니다.
@@ -213,6 +225,9 @@
     function draw(groups, found) {
       // 다시 그려도 **고른 조항은 그대로** — 판정하기를 누르면 다 풀렸습니다.
       const keep = new Set(picked());
+      Object.values(groups).forEach((rows) => {
+        if (Array.isArray(rows)) rows.forEach((row) => { if (row && row.key && row.title) titles.set(row.key, row.title); });
+      });
       // "우리 쪽을 을 — …" 은 "을을"로 읽혀 어색했습니다(사용성 2회차) — 이름표 꼴로.
       const who = (label, name) => `<b>${esc(label)}${name ? ` — ${esc(name)}` : ""}</b>`;
       const side = groups.side ? `<p class="cc_side">우리 쪽(매도인·수출자): ${who(groups.side.label, groups.side.name)}
@@ -251,7 +266,11 @@
       status.textContent = "";
       if (!answer.success) { status.textContent = answer.message || "불러오지 못했습니다."; return; }
       note.textContent = `※ ${answer.data.note}`;
-      draw(answer.data.groups, false);
+      const lost = draw(answer.data.groups, false);
+      // 인코텀즈를 바꿔 해당 없는 조항이 말없이 빠졌습니다(사용성 3회차).
+      if (lost.length) {
+        status.textContent = `${incoterms || "이 조건"}에는 해당하지 않아 고른 ${names(lost)}을(를) 뺐습니다.`;
+      }
     }
 
     form.addEventListener("submit", async (event) => {
@@ -274,6 +293,11 @@
       // 판정 중에는 다시 누르지 못하게 — 긴 계약서는 몇 초씩 걸립니다.
       submitBtn.disabled = true;
       form.setAttribute("aria-busy", "true");
+      // 크기로만 가르니 2MB 밑의 스캔본(11~20초)에 안내가 없었습니다 — 3초가 지나도 답이
+      // 없으면 알립니다(사용성 3회차).
+      const slowTimer = slow ? null : setTimeout(() => {
+        status.textContent += " 스캔본이면 글자를 그림에서 읽느라 1분까지 걸릴 수 있습니다.";
+      }, 3000);
       let answer;
       try {
         const response = await fetch(config.reviewUrl, { method: "POST", body: data });
@@ -281,6 +305,7 @@
       } catch (error) {
         answer = { success: false, message: "읽지 못했습니다. 잠시 뒤 다시 해 주세요." };
       } finally {
+        clearTimeout(slowTimer);
         submitBtn.disabled = false;
         form.removeAttribute("aria-busy");
       }
@@ -298,9 +323,12 @@
              gain: result.gain, side: result.our_side, sideUnknown: result.side_unknown,
              check: result.check || [], ok: result.ok_must || [],
              watch: result.watch_country || [], country: result.country || "" }, true);
-      const titles = lost.map((key) => (result.ok_must || []).find((row) => row.key === key))
-        .filter(Boolean).map((row) => `‘${row.title}’`);
-      status.textContent =
+      // 고른 조항이 목록에서 빠진 까닭 — 이미 있음 / 이 계약에 해당 없음(사용성 3회차: 필수만
+      // 말하고 신용장·최소 주문 조항은 말없이 사라졌습니다).
+      const have = new Set(result.present || []);
+      const already = lost.filter((key) => have.has(key));
+      const notHere = lost.filter((key) => !have.has(key));
+      const summary =
         (both ? "파일을 읽었습니다(붙여 넣은 글은 쓰지 않았습니다). " : "")
         + (result.notes && result.notes.length ? result.notes.join(" ") + " " : "")
         + (result.truncated
@@ -308,7 +336,12 @@
           : `${result.checked.toLocaleString()}자를 읽었습니다. `)
         + `독소 ${result.toxic.length}개 · 직접 확인 ${(result.check || []).length}개 · `
         + `보완 ${(result.weak || []).length}개 · 빠진 필수 ${result.missing.length}개.`
-        + (titles.length ? ` 고른 ${titles.join("·")}은(는) 계약서에 이미 있어 목록에서 뺐습니다.` : "");
+        + (already.length ? ` 고른 ${names(already)}은(는) 계약서에 이미 있어 목록에서 뺐습니다.` : "")
+        + (notHere.length ? ` 고른 ${names(notHere)}은(는) 이 계약에 해당하지 않아 뺐습니다.` : "");
+      status.textContent = summary;
+      // 결과 맨 위에도 같은 요약 — 결과로 화면을 옮기면 상태줄(OCR·쪽 한도 알림)이 화면
+      // 밖이었습니다(사용성 3회차).
+      body.insertAdjacentHTML("afterbegin", `<p class="cc_summary">${esc(summary)}</p>`);
       judged = true;
       if (paste) paste.open = false;
       // 결과로 갑니다 — 휴대폰에서 결과가 첫 화면 아래라 안 보였습니다.
@@ -327,7 +360,7 @@
           // 서버가 왜 못 만들었는지 적어 보내면 그 말을 그대로 보여 줍니다.
           let message = "문안을 만들지 못했습니다.";
           try { message = (await response.json()).message || message; } catch (error) { /* 글이 아님 */ }
-          status.textContent = message;
+          sayExport(message);
           return;
         }
         const blob = await response.blob();
@@ -341,9 +374,9 @@
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
-        status.textContent = `조항 ${keys.length}개 문안을 내려받았습니다.`;
+        sayExport(`조항 ${keys.length}개 문안을 내려받았습니다.`);
       } catch (error) {
-        status.textContent = "문안을 받지 못했습니다. 연결을 확인하고 다시 눌러 주세요.";
+        sayExport("문안을 받지 못했습니다. 연결을 확인하고 다시 눌러 주세요.");
       }
     }
 

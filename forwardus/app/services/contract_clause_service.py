@@ -30,6 +30,12 @@ COUNTRY_ONLY = {"ddp_no_ior"}
 # 이 계약에 **그 거래가 있을 때만** 권하는 이익조항. 어떤 계약에도 같은 13~16개를
 # 권하니, T/T 계약에 신용장 조항을 권해 신뢰를 잃었습니다.
 _LC = r"letter\s+of\s+credit|documentary\s+credit|\bL/?C\b|신용장"
+_MAKE = (r"\b(?:moulds?|molds?|tooling|dies|jigs?|drawings?|designs?|artwork|OEM|ODM|prototypes?|"
+         r"develop(?:ment|ed)?|custom(?:ized|ised|-made)?)\b|금형|도면|설계|디자인|개발|주문\s*제작|시제품")
+# 재수출을 이미 막아 둔 계약서 — 넣으라는 주의를 띄우지 않습니다(3회차).
+_REEXPORT_SET = re.compile(r"(?:shall|may)\s+not\s+(?:\w+\s+){0,3}?re-?(?:export|sell)|\bend[- ]use(?:r)?\s+"
+                           r"(?:certificate|statement|declaration|undertaking)|재수출[^.]{0,30}(?:금지|제한|하여서는"
+                           r"\s*아니|할\s*수\s*없)", re.I)
 # 2회차: 'exclusive jurisdiction' 의 exclusiv · CIETAC 'Commission' · 'PSI agency' 로 엉뚱한
 # 조항을 권해, 거래를 가리키는 말에 묶었습니다.
 GAIN_NEEDS = {
@@ -39,6 +45,10 @@ GAIN_NEEDS = {
     "min_order": r"exclusive\s+(?:distribut|agen|right|suppl|purchas|sale|dealer)|독점\s*(?:공급|판매|대리|수입)|총판",
     "agency_protection": r"\b(?:sales|commercial|exclusive|sole)\s+agen(?:t|cy)\b|\bdistribut(?:or|ion)\s+agreement|"
                          r"\bappoints?\b[^.]{0,40}\b(?:agent|distributor)|대리점|총판",
+    # 금형·도면·개발이 없는 원자재 매매에 금형 소유권·도면 보증·금형 인수를 권했습니다(3회차).
+    "ip": _MAKE,
+    "buyer_design_ip": _MAKE,
+    "exit_buyback": _MAKE,
 }
 _ICC_C = re.compile(r"(?:\bICC|institute\s+cargo\s+clauses?)\s*\(?\s*C\s*\)?", re.I)
 
@@ -131,7 +141,9 @@ def checklist(incoterms: str = "", present: set[str] | None = None,
             "evidence": seen.get("evidence", ""),
             "reason": seen.get("reason", ""),
             "countries": list(row["countries"]),
-            "for_country": bool(tags & set(row["countries"])),
+            # DDP 가 아닌 거래에 'DDP 수입자' 배지를 달지 않습니다 — 판정 뒤 도착국 칸과 맞춥니다(3회차).
+            "for_country": bool(tags & set(row["countries"]))
+                           and not (row["key"] == "ddp_no_ior" and (incoterms or "").upper() not in ("", "DDP")),
             "group": group_id, "group_label": group_label,
         })
     if tags:
@@ -180,8 +192,17 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
     # 협상 중에 들어올 수 있어 미리 알려 줍니다. (2026-10-02)
     # DDP 가 아닌 거래에 'DDP 수입자' 주의를 띄우지 않습니다(2회차).
     deal = (incoterms or "").upper()
+    # **DDP 로 그 나라에 보낸다고 직접 넣었으면** 문장이 없어도 독소입니다 — 거래 조건
+    # 자체가 문제입니다. 전에는 '협상 중에 들어올 수 있다'(주의)로만 냈습니다(3회차).
+    if tags and (deal == "DDP" or (not deal and re.search(r"\bDDP\b", body[:MAX_TEXT]))):
+        for row in rows["toxic"]:
+            if row["key"] == "ddp_no_ior" and row["for_country"] and not row["present"]:
+                row.update(present=True, status="present",
+                           reason=f"인코텀즈 DDP · 도착국 {country.upper()} 로 넣으셨습니다 — 계약서에 "
+                                  "문장이 없어도 이 거래 조건이 문제입니다.")
     watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]
-             and not (row["key"] == "ddp_no_ior" and deal not in ("", "DDP"))]
+             and not (row["key"] == "ddp_no_ior" and deal not in ("", "DDP"))
+             and not (row["key"] == "reexport_control" and _REEXPORT_SET.search(body[:MAX_TEXT]))]
     # 규칙이 **주제째 놓친** 조항 — 주제 분류기가 고릅니다. 판정은 바꾸지 않고
     # 빠진 필수조항에 "이 문장일 수 있습니다"를 덧붙이거나, '확인 필요'로 냅니다.
     # (2026-10-03, app/processors/clause_topics.py)
@@ -189,10 +210,20 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
     # 주제 분류기도 갑/을·Supplier 를 바꿔 읽은 글로 봅니다 — 원문을 보면 "누가 의무를 지는지
     # 가리지 못했습니다"가 나왔습니다(2회차).
     maybe = clause_topics.candidates(contract_clauses.normalized(body[:MAX_TEXT]), analysis["clauses"], category)
+    # 보여 줄 문장은 **계약서에 적힌 이름**으로 — "Seller warrants that Buyer may …" 는
+    # 계약서에서 찾을 수 없습니다. 독소 근거와 겹치는지도 원문끼리 봅니다(3회차).
+    for c in maybe:
+        c["sentence"] = contract_clauses.original_words(c["sentence"], analysis.get("side"),
+                                                        analysis.get("roles"))
     # 독소로 이미 짚은 문장은 '직접 확인'에 다시 내지 않습니다(사용성 2회차 — 같은 관할
     # 문장이 🔴 독소와 ⚪ '양쪽에 같게 걸림'으로 동시에 나왔습니다).
     toxic_text = " ".join(row.get("evidence", "") for row in analysis["clauses"].values())
-    maybe = [c for c in maybe if c["kind"] != "check" or c["sentence"][:60] not in toxic_text]
+    # 앞 60자만 견주면, 확인 문장이 제목("13. DISPUTE RESOLUTION All disputes …")부터 시작하고
+    # 독소 근거는 그 안의 뒷문장일 때 못 거릅니다(3회차) — 근거가 문장 **안에** 드는지도 봅니다.
+    cores = [core for core in (row.get("evidence", "").strip("… ")[:40] for row in analysis["clauses"].values()
+                               if row["status"] == "present") if len(core) >= 25]
+    maybe = [c for c in maybe if c["kind"] != "check"
+             or not (c["sentence"][:60] in toxic_text or any(core in c["sentence"] for core in cores))]
     missing = [row for row in rows["must"] if row["status"] == "absent"]
     for row in missing:
         hint = next((c for c in maybe if c["kind"] == "must" and row["key"] in c["keys"]), None)
@@ -252,16 +283,22 @@ def read_contract(filename: str, data: bytes) -> tuple[str, list[str]]:
         return _read_docx(data), []
     notes: list[str] = []
     if name.endswith(".pdf"):
-        text, images, pages = _read_contract_pdf(data)
+        texts, scans, pages = _read_contract_pdf(data)
         if pages > MAX_PDF_PAGES:
             notes.append(f"PDF 가 {pages}쪽이라 앞 {MAX_PDF_PAGES}쪽만 봤습니다 — 뒷부분은 나눠 올려 주세요.")
+        text = "\n".join(texts).strip()
+        # 글자 있는 쪽이 하나라도 있으면 빈 쪽만 OCR 합니다. 전부 그림이면 아래의 스캔본 길.
+        if scans and any(_body_chars(page_text) >= 40 for page_text in texts):
+            return _with_scanned_pages(texts, scans, notes)
+        images = list(scans.values())
     else:
         text, images, pages = "", extract._read_image(data), 1
     # **본문이 거의 없으면 OCR.** 쪽 번호("Page 1 of 1")만 글자로 박힌 스캔본도 OCR 합니다.
     if images and _body_chars(text) < extract.SCANNED_TEXT_CHARS:
         found, blank = _ocr_pages(images)
         if _body_chars(found) > _body_chars(text):
-            notes.append("스캔본이라 그림에서 글자를 읽었습니다(OCR) — 틀린 글자가 있을 수 있으니 "
+            kind = "스캔본" if name.endswith(".pdf") else "사진"
+            notes.append(f"{kind}이라 그림에서 글자를 읽었습니다(OCR) — 틀린 글자가 있을 수 있으니 "
                          "중요한 조항은 원문과 맞춰 보세요.")
             if pages > MAX_OCR_PAGES:
                 notes.append(f"스캔본은 앞 {MAX_OCR_PAGES}쪽만 읽습니다 — 뒷부분은 나눠 올려 주세요.")
@@ -278,14 +315,45 @@ def _ocr_pages(images: list) -> tuple[str, list[int]]:
 
     if not (ocr.available() and bank_redaction.ocr_available()):
         return "", []
+    # 쪽 표시("[2쪽]")는 넣지 않습니다 — 근거 문장에 "[2쪽] 제 6 조 …" 로 섞였습니다(사용성 3회차).
     pages, blank = [], []
     for no, image in enumerate(images, 1):
         page = _join_hangul(ocr.read_text(image))
         if page.strip():
-            pages.append(f"[{no}쪽]\n{page}" if len(images) > 1 else page)
+            pages.append(page)
         else:
             blank.append(no)
     return "\n\n".join(pages), blank
+
+
+def _with_scanned_pages(texts: list[str], scans: dict, notes: list[str]) -> tuple[str, list[str]]:
+    """글자 쪽과 스캔 쪽이 **섞인** PDF — 글자가 없는 쪽만 OCR 해서 제자리에 끼웁니다.
+
+    전에는 문서 전체에 글자가 있으면 그림을 안 만들어, 서명 뒤에 스캔해 붙인 쪽의
+    준거법·중재를 '빠진 필수'로 냈습니다(사용성 3회차 — 글자 6쪽 + 스캔 2쪽).
+    """
+
+    from app.processors import bank_redaction, ocr
+
+    numbers = [no + 1 for no in sorted(scans)]
+    if not (ocr.available() and bank_redaction.ocr_available()):
+        notes.append(f"{', '.join(map(str, numbers))}쪽은 스캔(그림)이라 읽지 못했습니다 — 그 쪽의 조항은 "
+                     "판정에 들어가지 않았습니다.")
+        return "\n".join(texts).strip(), notes
+    out, blank = list(texts), []
+    for index, image in scans.items():
+        page = _join_hangul(ocr.read_text(image))
+        if page.strip():
+            out[index] = page
+        else:
+            blank.append(index + 1)
+    read = [no for no in numbers if no not in blank]
+    if read:
+        notes.append(f"{', '.join(map(str, read))}쪽은 스캔(그림)이라 OCR 로 읽었습니다 — 틀린 글자가 있을 "
+                     "수 있으니 그 쪽의 조항은 원문과 맞춰 보세요.")
+    if blank:
+        notes.append(f"{', '.join(map(str, blank))}쪽은 비어 있거나 글자를 읽지 못했습니다.")
+    return "\n".join(out).strip(), notes
 
 
 def _join_hangul(text: str) -> str:
@@ -358,8 +426,8 @@ def _read_docx(data: bytes) -> str:
     return "\n".join(lines)
 
 
-def _read_contract_pdf(data: bytes) -> tuple[str, list, int]:
-    """PDF 의 **모든 쪽**(60쪽까지) 글자와, 스캔본에 쓸 앞 10쪽 그림."""
+def _read_contract_pdf(data: bytes) -> tuple[list[str], dict, int]:
+    """PDF 의 쪽마다 글자(60쪽까지), 글자가 없는 쪽의 그림 {쪽 index: 그림}(10쪽까지), 전체 쪽 수."""
 
     import io
 
@@ -371,18 +439,16 @@ def _read_contract_pdf(data: bytes) -> tuple[str, list, int]:
                 raise ServiceError("빈 PDF입니다. 내용이 있는 파일을 올려 주세요.", "VALIDATION_ERROR")
             total = len(pdf.pages)
             pages = pdf.pages[:MAX_PDF_PAGES]
-            text = "\n".join((page.extract_text() or "") for page in pages)
-            images = []
-            if _body_chars(text) < 40:
-                images = [page.to_image(resolution=150).original.copy()
-                          for page in pages[:MAX_OCR_PAGES]]
+            texts = [(page.extract_text() or "") for page in pages]
+            empty = [i for i, page_text in enumerate(texts) if _body_chars(page_text) < 40]
+            images = {i: pages[i].to_image(resolution=150).original.copy() for i in empty[:MAX_OCR_PAGES]}
     except ServiceError:
         raise
     except Exception:
         raise ServiceError("PDF를 열지 못했습니다. 암호가 걸려 있거나 파일이 손상되었을 수 "
                            "있습니다. 다시 저장해 올리거나 본문을 붙여 넣어 주세요.",
                            "VALIDATION_ERROR")
-    return text.strip(), images, total
+    return texts, images, total
 
 
 
@@ -686,9 +752,14 @@ def as_text(result: dict) -> str:
                   "올려 주세요.", ""]
     side = result.get("our_side")
     if side:
-        lines += [f"우리 쪽(매도인·수출자)을 **{side['label']} — {side['name']}**, "
-                  f"상대(매수인)를 **{side['other_label']} — {side['other_name']}** 로 "
-                  "읽었습니다. 반대라면 판정도 반대가 됩니다.", ""]
+        # 역할 이름만 정한 계약서(Supplier/Company)는 이름이 없습니다 — "Supplier — " 로
+        # 빈 자리가 나왔습니다(3회차). 화면(contract_clauses.js who())과 같은 꼴로.
+        def who(label: str, name: str) -> str:
+            return f"**{label} — {name}**" if name else f"**{label}**"
+        # "…을 **을 — …**" 이 '을을'로 읽혀 화면처럼 이름표 꼴로 씁니다(사용성 3회차).
+        lines += [f"우리 쪽(매도인·수출자): {who(side['label'], side['name'])} · "
+                  f"상대(매수인): {who(side['other_label'], side['other_name'])} — "
+                  "반대라면 판정도 반대가 됩니다.", ""]
     if result["toxic"]:
         lines += [f"### 🔴 지우거나 고쳐야 할 조항 {len(result['toxic'])}개", ""]
         last = None

@@ -50,14 +50,21 @@
     else if (event.target.closest("[data-contract-close]")) close();
     else if (event.target.closest('a[href$="#contract-check"]')) { event.preventDefault(); open(); }
   });
+  // 접힌 <details> 안의 것은 초점을 못 받습니다. 그것을 마지막 항목으로 잡아 Shift+Tab 이
+  // 멈추고 Tab 이 창 밖으로 나갔습니다(사용성 3회차). 접힌 묶음의 <summary> 는 받습니다.
+  function folded(el) {
+    const from = el.tagName === "SUMMARY" ? el.parentElement.parentElement : el;
+    return Boolean(from && from.closest("details:not([open])"));
+  }
   document.addEventListener("keydown", (event) => {
     if (modal.hidden) return;
-    if (event.key === "Escape") { close(); return; }
+    // preventDefault — 아래에 깔린 상담 창이 같은 Esc 로 닫히지 않게(support_chat.js).
+    if (event.key === "Escape") { event.preventDefault(); close(); return; }
     // Tab 이 창 밖으로 나가지 않게 가둡니다.
     if (event.key === "Tab") {
       const items = Array.from(modal.querySelectorAll(
         "button, [href], input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"))
-        .filter((el) => !el.disabled && el.offsetParent !== null);
+        .filter((el) => !el.disabled && el.offsetParent !== null && !folded(el));
       if (!items.length) return;
       const firstItem = items[0];
       const lastItem = items[items.length - 1];

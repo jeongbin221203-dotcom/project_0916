@@ -26,7 +26,7 @@
 .cc_deal { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .cc_deal label { display: grid; gap: 4px; }
 .cc_deal select, .cc_deal input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
-  font: inherit; font-weight: 400; color: inherit; background: var(--surface); }
+  font: inherit; font-weight: 400; color: var(--ink, inherit); background: var(--surface); }
 .cc_deal input { width: 7em; text-transform: uppercase; }
 .cc_hint[hidden] { display: none; }
 .cc_more > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
@@ -37,8 +37,9 @@
 .cc_pickbar[hidden] { display: none; }
 .cc_country_tag { padding: 1px 8px; border-radius: 999px; background: #e0f2fe; color: #075985;
   font-size: 11.5px; font-weight: 700; }
-.cc_side_warn { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
-.cc_fix_calm { background: #f1f5f9; color: #334155; }
+/* 같은 우선순위의 .cc_side · .cc_fix 가 뒤에 있어 덮였습니다(사용성 3회차) — 둘을 겹쳐 씁니다. */
+.cc_side.cc_side_warn { border: 1px solid #fcd34d; background: #fffbeb; color: #92400e; }
+.cc_fix.cc_fix_calm { background: #f1f5f9; color: #334155; }
 [data-cc-pick] { width: 18px; height: 18px; }
 .cc_sub:first-of-type { margin-top: 2px; }
 .cc_count { margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--surface);
@@ -100,3 +101,8 @@
 [data-contract-modal] .hs_modal_body::-webkit-scrollbar-track { background: transparent; }
 /* 붙여 넣는 칸이 너무 길면 창을 통째로 밀어냅니다. 그 칸도 제 안에서 굴립니다. */
 .cc_paste textarea { max-height: 34vh; }
+/* 3회차 (2026-10-04) — 결과 맨 위 요약 · 받기 막대 안 알림 */
+.cc_summary { margin: 0 0 10px; padding: 9px 12px; border-radius: 10px; background: #f1f5f9;
+  color: var(--ink); font-size: 12.5px; line-height: 1.7; }
+.cc_pickmsg { align-self: center; color: var(--muted); font-size: 12.5px; }
+.cc_pickmsg:empty { display: none; }

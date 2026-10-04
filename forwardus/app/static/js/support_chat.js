@@ -195,6 +195,10 @@
     send(input.value);
   });
   document.addEventListener("keydown", (event) => {
+    // 위에 다른 창(계약서 점검 등)이 떠 있으면 그 창만 닫히게 둡니다 — Esc 한 번에 둘 다
+    // 닫혀 상담 맥락을 잃었습니다(사용성 3회차).
+    // 계약서 창은 먼저 실려 먼저 닫히므로, 닫으면서 preventDefault 로 알립니다.
+    if (event.defaultPrevented || document.querySelector(".hs_modal:not([hidden])")) return;
     if (event.key === "Escape" && !panel.hidden) close();
   });
 
