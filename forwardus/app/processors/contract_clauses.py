@@ -3455,7 +3455,10 @@ _amend("one_way_nda", avoid=(
     r"confidential\s+treatment\s+requested",                                # 공시 문서의 표시
     r"\band\s+(?:the\s+)?(?:seller|supplier)\s+shall\s+(?:hold|keep|treat)",  # "FTSI and Supplier shall hold"
     r"in\s+the\s+same\s+(?:confidential\s+)?manner\s+as"))                  # 상호 비밀유지
-_amend("buyer_set_off", avoid=(r"withh?old\w*\s+(?:any\s+|such\s+)?(?:\w+\s+)?tax", r"required\s+by\s+law\s+to\s+withhold"))
+_amend("buyer_set_off", avoid=(
+    # "(subject to the Seller's right to deduct from the Deposit …)" — 공제하는 쪽이 우리입니다.
+    r"(?:seller|supplier)(?:'s|’s)?\s+right\s+to\s+(?:deduct|set[- ]?off|withhold)",
+    r"withh?old\w*\s+(?:any\s+|such\s+)?(?:\w+\s+)?tax", r"required\s+by\s+law\s+to\s+withhold"))
 # 쌍방 제한("neither HOKU nor CUSTOMER may assign")과 계열사·영업양수인 예외는 일방 양도가 아닙니다.
 _amend("assignment_one_way", avoid=(
     r"\bneither\b[^.]{0,40}\bnor\b[^.]{0,40}\bmay\s+(?:assign|transfer)",

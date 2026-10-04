@@ -106,3 +106,10 @@
   color: var(--ink); font-size: 12.5px; line-height: 1.7; }
 .cc_pickmsg { align-self: center; color: var(--muted); font-size: 12.5px; }
 .cc_pickmsg:empty { display: none; }
+.cc_country_name { font-weight: 400; color: var(--ink); }
+/* 휴대폰 — 글자 12px·누를 곳 20px 였습니다(사용성 3회차) */
+@media (max-width: 620px) {
+  .cc_hint, .cc_note, .cc_status, .cc_why, .cc_risk, .cc_how, .cc_fix, .cc_reason, .cc_evidence,
+  .cc_summary, .cc_side { font-size: 13.5px; }
+  .cc_paste > summary, .cc_more > summary, .cc_fold > summary { padding: 7px 0; }
+}

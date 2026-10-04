@@ -40,7 +40,11 @@
           ${item.for_country ? `<span class="cc_country_tag">🌍 도착국에 흔함</span>` : ""}
         </label>
         ${item.status === "weak" && item.reason ? `<p class="cc_reason">${rich(item.reason)}</p>` : ""}
-        ${item.evidence ? `<blockquote class="cc_evidence">근거 — “${esc(item.evidence)}”</blockquote>` : ""}
+        ${group === "toxic" && item.reason && !item.evidence ? `<p class="cc_reason">${rich(item.reason)}</p>` : ""}
+        ${item.same_as
+          // 같은 문장을 두 번 늘어놓지 않습니다(사용성 3회차).
+          ? `<blockquote class="cc_evidence">근거 — 위 ‘${esc(item.same_as)}’ 조항과 같은 문장</blockquote>`
+          : item.evidence ? `<blockquote class="cc_evidence">근거 — “${esc(item.evidence)}”</blockquote>` : ""}
         ${item.maybe ? `<blockquote class="cc_evidence cc_maybe">규칙은 못 찾았지만 이 문장일 수 있습니다 — “${esc(item.maybe)}”</blockquote>` : ""}
         ${item.status === "weak" ? ""
           // '보완' 칸에는 '없으면 생기는 일' 설명이 맞지 않습니다 — 적혀 있으니까요(사용성 2회차).
@@ -141,6 +145,7 @@
             </label>
             <label>도착국 (영문 2자리, 예: US · CN · AE)
               <input data-cc-country maxlength="2" autocomplete="off" placeholder="모름">
+              <small class="cc_country_name" data-cc-country-name aria-live="polite"></small>
             </label>
           </div>` : "";
     host.innerHTML = `
@@ -185,6 +190,7 @@
     const EXPORT_LABEL = { docx: "Word로 받기", txt: "텍스트로 받기" };
 
     const hint = host.querySelector("[data-cc-hint]");
+    let actionsInView = false;
     const pickbar = host.querySelector("[data-cc-pickbar]");
     const pickmsg = host.querySelector("[data-cc-pickmsg]");
     // 조항 이름 — 고른 조항이 목록에서 빠질 때 이름으로 알립니다(사용성 3회차).
@@ -201,6 +207,16 @@
     const paste = host.querySelector(".cc_paste");
     let judged = false;   // 판정 결과가 떠 있는가 — 인코텀즈를 바꿔도 결과를 지우지 않습니다.
 
+    function regionName(code) {
+      if (!code) return "";
+      try {
+        const name = new Intl.DisplayNames(["ko"], { type: "region" }).of(code);
+        return name && name !== code ? name : "";
+      } catch (error) {
+        return code;   // Intl 이 없는 브라우저는 확인 없이 받습니다.
+      }
+    }
+
     function picked() {
       return Array.from(host.querySelectorAll("[data-cc-pick]:checked")).map((input) => input.value);
     }
@@ -215,7 +231,8 @@
       // 단추가 왜 막혀 있는지 알려 줍니다(사용성 점검 2026-10-04).
       hint.hidden = count > 0;
       // 고르면 아래에 붙는 막대 — 휴대폰에서 받기 단추가 6,000px 위에 있었습니다(2회차).
-      pickbar.hidden = count === 0;
+      // 위쪽 받기 단추가 화면에 보이면 숨깁니다 — 휴대폰에서 받기 단추가 4개 보였습니다(사용성 3회차).
+      pickbar.hidden = count === 0 || actionsInView;
     }
 
     host.addEventListener("change", (event) => {
@@ -329,7 +346,7 @@
       const already = lost.filter((key) => have.has(key));
       const notHere = lost.filter((key) => !have.has(key));
       const summary =
-        (both ? "파일을 읽었습니다(붙여 넣은 글은 쓰지 않았습니다). " : "")
+        (both ? "파일을 읽었습니다(붙여 넣은 글은 쓰지 않아 비웠습니다). " : "")
         + (result.notes && result.notes.length ? result.notes.join(" ") + " " : "")
         + (result.truncated
           ? `계약서가 길어 앞 ${result.checked.toLocaleString()}자만 봤습니다 — 뒷부분은 나눠 올려 주세요. `
@@ -344,6 +361,8 @@
       body.insertAdjacentHTML("afterbegin", `<p class="cc_summary">${esc(summary)}</p>`);
       judged = true;
       if (paste) paste.open = false;
+      // 파일로 판정했으면 붙여 넣은 칸을 비웁니다 — 남아 있어 올릴 때마다 같은 안내가 되풀이됐습니다.
+      if (both) form.querySelector("textarea[name=text]").value = "";
       // 결과로 갑니다 — 휴대폰에서 결과가 첫 화면 아래라 안 보였습니다.
       body.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -383,6 +402,13 @@
     exportBtns.forEach((btn) => {
       btn.addEventListener("click", () => download(btn.dataset.ccExport));
     });
+    const actions = host.querySelector(".cc_actions");
+    if (actions && "IntersectionObserver" in window) {
+      new IntersectionObserver((entries) => {
+        actionsInView = entries.some((entry) => entry.isIntersecting);
+        refreshExport();
+      }).observe(actions);
+    }
 
     // 인코텀즈·도착국을 바꾸면 점검표를 다시 받습니다(판정 결과가 있으면 그대로 둡니다 —
     // 다음 '판정하기'부터 새 값으로 봅니다).
@@ -407,6 +433,15 @@
           status.textContent = "도착국은 영문 두 글자로 적어 주세요 (예: US · CN · AE · GB).";
           return;
         }
+        // 이름으로 확인시킵니다 — 'XX' 를 말없이 받고, VN 과 VI 를 헷갈려도 몰랐습니다(사용성 3회차).
+        const shown = host.querySelector("[data-cc-country-name]");
+        const named = regionName(code);
+        if (code && !named) {
+          if (shown) shown.textContent = "";
+          status.textContent = `‘${code}’ 는 알 수 없는 나라 코드입니다 — 영문 두 글자로 다시 적어 주세요 (예: US · CN · AE · GB).`;
+          return;
+        }
+        if (shown) shown.textContent = named ? `→ ${named}` : "";
         country = code;
         dealChanged();
       });

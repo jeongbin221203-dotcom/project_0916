@@ -68,6 +68,19 @@ def _side_shown(body: str, analysis: dict) -> dict | None:
     return None
 
 
+def _mark_same_evidence(rows: list[dict]) -> list[dict]:
+    """같은 문장이 두 독소의 근거면 뒤의 것에 same_as(앞 조항 제목)를 답니다 — 지연배상 한
+    문장이 '무제한 손해배상'과 '상한 없는 지연배상금'에 똑같이 두 번 나왔습니다(사용성 3회차)."""
+
+    seen: dict[str, str] = {}
+    for row in rows:
+        evidence = row.get("evidence") or ""
+        row["same_as"] = seen.get(evidence, "") if evidence else ""
+        if evidence and evidence not in seen:
+            seen[evidence] = row["title"]
+    return rows
+
+
 def _relevant(key: str, body: str) -> bool:
     need = GAIN_NEEDS.get(key)
     return not need or bool(re.search(need, body, re.I))
@@ -231,7 +244,7 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
     return {
         "missing": missing,
         "check": [c for c in maybe if c["kind"] == "check"],
-        "toxic": [row for row in rows["toxic"] if row["present"]],
+        "toxic": _mark_same_evidence([row for row in rows["toxic"] if row["present"]]),
         # **적혀 있으나 제 구실을 못 하는** 필수·이익조항 — 미정·부정·불리·무력.
         # '있다'고 하면 안심시키고, '없다'고 하면 이미 쓴 사람에게 넣으라고
         # 합니다. 둘 다 아니라서 따로 냅니다. (2026-10-02)
@@ -281,6 +294,18 @@ def read_contract(filename: str, data: bytes) -> tuple[str, list[str]]:
         return text, []
     if name.endswith(".docx"):
         return _read_docx(data), []
+    text, notes, pages = _read_pages(name, data)
+    note = _missing_pages(text, pages)
+    if note:
+        notes.append(note)
+    return text, notes
+
+
+def _read_pages(name: str, data: bytes) -> tuple[str, list[str], int]:
+    """PDF·사진의 (글자, 알림, 올라온 쪽 수)."""
+
+    from app.services import document_extract_service as extract
+
     notes: list[str] = []
     if name.endswith(".pdf"):
         texts, scans, pages = _read_contract_pdf(data)
@@ -289,7 +314,7 @@ def read_contract(filename: str, data: bytes) -> tuple[str, list[str]]:
         text = "\n".join(texts).strip()
         # 글자 있는 쪽이 하나라도 있으면 빈 쪽만 OCR 합니다. 전부 그림이면 아래의 스캔본 길.
         if scans and any(_body_chars(page_text) >= 40 for page_text in texts):
-            return _with_scanned_pages(texts, scans, notes)
+            return (*_with_scanned_pages(texts, scans, notes), pages)
         images = list(scans.values())
     else:
         text, images, pages = "", extract._read_image(data), 1
@@ -304,8 +329,30 @@ def read_contract(filename: str, data: bytes) -> tuple[str, list[str]]:
                 notes.append(f"스캔본은 앞 {MAX_OCR_PAGES}쪽만 읽습니다 — 뒷부분은 나눠 올려 주세요.")
             if blank:
                 notes.append(f"{', '.join(map(str, blank))}쪽은 글자를 읽지 못했습니다.")
-            return found, notes
-    return text, notes
+            return found, notes, pages
+    return text, notes, pages
+
+
+# "Page 1 of 3" · "1 / 3" · "- 1 of 3 -" — 문서가 스스로 적은 전체 쪽 수.
+_PAGE_OF = re.compile(r"\b(?:page|p\.)\s*(\d{1,3})\s*(?:of|/)\s*(\d{1,3})\b|(\d{1,3})\s*/\s*(\d{1,3})\s*쪽", re.I)
+
+
+def _missing_pages(text: str, pages: int) -> str:
+    """문서가 'Page 1 of 3' 이라고 적었는데 그보다 적은 쪽이 올라왔으면 알림.
+
+    사진 한 장(1쪽)만 올리고 '빠진 필수 9개'를 받았습니다 — 나머지 쪽에 있었을 수 있습니다
+    (사용성 3회차).
+    """
+
+    totals = [int(m.group(2) or m.group(4)) for m in _PAGE_OF.finditer(text or "")]
+    totals = [total for total in totals if 1 < total <= 300]
+    if not totals:
+        return ""
+    total = max(totals)
+    if pages >= total:
+        return ""
+    return (f"문서에 전체 {total}쪽이라고 적혀 있는데 {pages}쪽만 올라왔습니다 — 나머지 쪽도 올려 "
+            "주셔야 '빠진 조항' 판정이 맞습니다.")
 
 
 def _ocr_pages(images: list) -> tuple[str, list[int]]:
@@ -769,8 +816,13 @@ def as_text(result: dict) -> str:
                 lines += ([""] if last else []) + [f"**{row['group_label']}**"]
                 last = row["group_label"]
             lines.append(f"- **{row['title']}** — {row['risk']}")
-            if row.get("evidence"):
+            if row.get("same_as"):
+                lines.append(f"  - 근거: 위 ‘{row['same_as']}’ 조항과 같은 문장")
+            elif row.get("evidence"):
                 lines.append(f"  - 근거: “{row['evidence']}”")
+            elif row.get("reason"):
+                # 문장이 아니라 거래 조건(DDP + 도착국)으로 짚은 것 — 왜 짚었는지 적습니다.
+                lines.append(f"  - 까닭: {row['reason']}")
             if row["fix"]:
                 lines.append(f"  - 고치는 법: {row['fix']}")
         lines.append("")

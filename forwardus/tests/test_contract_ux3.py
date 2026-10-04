@@ -136,3 +136,50 @@ def test_결과_위에_요약을_두고_뺀_조항을_모두_이름으로_알린
     assert "에는 해당하지 않아 고른" in js           # 인코텀즈를 바꿔 빠진 것
     assert "setTimeout" in js and "clearTimeout(slowTimer)" in js
     assert "data-cc-pickmsg" in js
+
+
+# ── 3회차 마무리 (2026-10-04, '수정하고 다시 확인') ─────────────────────────────
+def test_같은_근거_문장은_두_번째부터_앞_조항을_가리킨다():
+    doc = ("SALES CONTRACT\nIn case of delay in shipment, the Seller shall pay liquidated damages of 2% of "
+           "the contract price per day of delay, without any maximum limit.")
+    result = service.review(doc, "FOB")
+    same = [row for row in result["toxic"] if row["same_as"]]
+    firsts = [row for row in result["toxic"] if not row["same_as"]]
+    assert len(result["toxic"]) >= 2 and same and firsts
+    assert "조항과 같은 문장" in service.as_text(result | {"summary": ""})
+
+
+def test_다른_근거_문장은_가리키지_않는다():
+    doc = ("SALES CONTRACT\nThe Buyer may set off any amount claimed against any sum payable to the Seller. "
+           "This warranty shall survive indefinitely.")
+    assert not [row for row in service.review(doc, "FOB")["toxic"] if row["same_as"]]
+
+
+def test_거래_조건으로_짚은_독소는_까닭을_적는다():
+    result = service.review("SALES CONTRACT\nDelivery DDP Sao Paulo.", "DDP", "BR")
+    text = service.as_text(result | {"summary": ""})
+    assert "까닭: 인코텀즈 DDP" in text
+
+
+def test_전체_쪽보다_적게_올리면_나머지를_올리라고_한다():
+    assert "2쪽이라고" in service._missing_pages("SALES CONTRACT ... Page 1 of 2", 1)
+
+
+@pytest.mark.parametrize("text,pages", [("Page 1 of 1", 1), ("Page 2 of 2", 2), ("Annex 1. Price list", 1),
+                                        ("USD 1/3 of the price", 1)])
+def test_쪽을_다_올렸거나_쪽_표시가_없으면_알리지_않는다(text, pages):
+    assert service._missing_pages(text, pages) == ""
+
+
+def test_우리가_공제하는_권리는_바이어_상계가_아니다():
+    doc = ("SALES CONTRACT\nThe Seller shall refund the Deposit to the Buyer (subject to the Seller's right to "
+           "deduct from the Deposit any then-outstanding amounts owed by the Buyer).")
+    assert "buyer_set_off" not in contract_clauses.find_in(doc)
+
+
+def test_화면은_도착국_이름을_확인시키고_받기_단추를_겹쳐_보이지_않는다():
+    js = (STATIC / "js" / "contract_clauses.js").read_text(encoding="utf-8")
+    assert "Intl.DisplayNames" in js and "알 수 없는 나라 코드" in js
+    assert "IntersectionObserver" in js and "actionsInView" in js
+    assert 'textarea[name=text]").value = ""' in js
+    assert "조항과 같은 문장" in js
