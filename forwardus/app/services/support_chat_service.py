@@ -357,14 +357,19 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     # 그냥 AI에게 넘기면 "요약해 드릴게요"가 돌아옵니다. 정작 알고 싶은 것은
     # 빠진 필수조항과 들어 있는 독소조항입니다. 그건 AI 없이 우리가 찾습니다.
     # 계약서로 보일 때만 나섭니다(제목 + 조항 두 가지 이상). (2026-09-26)
-    if contract_clause_service.looks_like_contract(text):
+    # 기능을 내렸으면(CONTRACT_CLAUSES_ON=0) 상담 창에서도 판정하지 않습니다 — 화면에서는
+    # 사라졌는데 여기서만 나왔습니다(사용성 점검 2026-10-04).
+    from app.collectors.base_client import get_config
+
+    if get_config("CONTRACT_CLAUSES_ON", False) and contract_clause_service.looks_like_contract(text):
         judged = contract_clause_service.review(text, _incoterms_of(current))
         return {"success": True, "source": "contract", "data": {
             "answer": contract_clause_service.as_text(judged),
             "route": "contract",
             "contract": {key: judged[key] for key in ("missing", "toxic", "weak", "gain", "present")},
+            # 홈의 계약서 창을 엽니다(contract_modal.js). 전에는 없는 주소 /documents 였습니다.
             "links": [{"label": "📜 조항 문안 받기 · 계약서 다시 올리기",
-                       "url": "/documents"}],
+                       "url": "/#contract-check"}],
         }}
 
     # HS부호만 적어 보내는 일이 아주 흔합니다. 그것만으로도 답할 것이 있습니다.

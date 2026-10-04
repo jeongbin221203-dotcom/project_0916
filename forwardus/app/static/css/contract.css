@@ -17,6 +17,20 @@
 .cc_group { margin-top: 4px; }
 .cc_group h4 { margin: 0 0 8px; font-size: 14px; font-weight: 900; }
 .cc_sub { margin: 14px 0 7px; font-size: 13px; font-weight: 800; color: #b91c1c; }
+/* 접는 묶음 (2026-10-04) — 독소 ①~⑧, 확인된 필수조항 */
+.cc_fold > summary { cursor: pointer; list-style: revert; padding: 4px 0; }
+.cc_fold > .cc_list { margin-top: 6px; }
+.cc_fold summary.cc_sub { display: list-item; }
+.cc_inline { display: inline; margin: 0; }
+.cc_hint { margin: 0; font-size: 12px; color: var(--muted); }
+.cc_deal { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.cc_deal label { display: grid; gap: 4px; }
+.cc_deal select, .cc_deal input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
+  font: inherit; font-weight: 400; color: inherit; background: var(--surface); }
+.cc_deal input { width: 7em; text-transform: uppercase; }
+.cc_hint[hidden] { display: none; }
+.cc_more > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.cc_upload[aria-busy="true"] { opacity: .75; }
 .cc_sub:first-of-type { margin-top: 2px; }
 .cc_count { margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--surface);
   color: var(--muted); font-size: 12px; font-weight: 800; }

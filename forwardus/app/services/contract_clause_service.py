@@ -24,6 +24,37 @@ MAX_TEXT = 400_000
 DISCLAIMER = ("법률 자문이 아닙니다. 여기 문안은 출발점이고, 최종 계약서는 "
               "변호사 검토를 받으세요.")
 
+# ── 거래에 맞춘 판정 (전문가 점검 2026-10-04) ─────────────────────────────────
+# 도착국을 알 때, 목록에 없는 나라에서는 독소로 단정하지 않는 조항.
+COUNTRY_ONLY = {"ddp_no_ior"}
+# 이 계약에 **그 거래가 있을 때만** 권하는 이익조항. 어떤 계약에도 같은 13~16개를
+# 권하니, T/T 계약에 신용장 조항을 권해 신뢰를 잃었습니다.
+_LC = r"letter\s+of\s+credit|documentary\s+credit|\bL/?C\b|신용장"
+GAIN_NEEDS = {
+    "lc_deadline": _LC,
+    "lc_conformity": _LC,
+    "deemed_acceptance": r"commission|install|acceptance\s+(?:test|certificate)|시운전|설치|검수",
+    "min_order": r"exclusiv|독점|총판",
+    "agency_protection": r"\bagen(?:t|cy)\b|distribut|대리점|대리인|총판",
+}
+_ICC_C = re.compile(r"(?:\bICC|institute\s+cargo\s+clauses?)\s*\(?\s*C\s*\)?", re.I)
+
+
+def _relevant(key: str, body: str) -> bool:
+    need = GAIN_NEEDS.get(key)
+    return not need or bool(re.search(need, body, re.I))
+
+
+def _judge_by_deal(analysis: dict, body: str, incoterms: str) -> None:
+    """인코텀즈에 따라 달라지는 판정. CIP 인데 ICC(C) 로 부보하면 보험은 '부족'입니다."""
+
+    insurance = analysis["clauses"].get("insurance")
+    if (incoterms or "").upper() == "CIP" and insurance and insurance["status"] == "present" \
+            and _ICC_C.search(body):
+        insurance.update(status="weak", reason="CIP 인데 **ICC(C)** 로 부보합니다 — 2020판 CIP 는 "
+                                               "ICC(A) 가 기본입니다. 바이어와 따로 합의하지 않았다면 "
+                                               "ICC(A) 로 바꾸세요.")
+
 
 def _readable(text: str) -> str:
     """조항 설명 속 **내부 이름**(buyer_set_off 등)을 화면 이름으로.
@@ -34,10 +65,15 @@ def _readable(text: str) -> str:
     """
 
     def name(m: re.Match) -> str:
-        row = contract_clauses.by_key(m.group(0))
+        row = contract_clauses.by_key(m.group("short") or m.group("long"))
         return f"‘{row['title']}’" if row else m.group(0)
 
-    return re.sub(r"\b[a-z]+(?:_[a-z]+)+\b", name, str(text or ""))
+    # 밑줄 없는 key(ip)는 '…조항 ip' 꼴일 때만 바꿉니다. 바로 뒤의 "(최소 주문…)" 같은
+    # 덧붙인 이름은 지웁니다 — "‘최소 주문…’(최소 주문…)" 처럼 두 번 나왔습니다.
+    # 그리고 "‘…’ 를" 의 띄어쓰기를 붙입니다. (전문가 점검 2026-10-04)
+    out = re.sub(r"(?:(?<=조항 )(?P<short>[a-z]+(?:_[a-z]+)*)|\b(?P<long>[a-z]+(?:_[a-z]+)+))\b"
+                 r"(?:\s*\([^)]*\))?", name, str(text or ""))
+    return re.sub(r"’ (?=(?:을|를|은|는|이|가|의|와|과|에|로|으로)(?:\s|$))", "’", out)
 
 
 def checklist(incoterms: str = "", present: set[str] | None = None,
@@ -108,8 +144,20 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
         raise ServiceError("쪽 번호·머리글만 읽혔고 계약서 본문을 찾지 못했습니다. 스캔본이면 "
                            "글자가 있는 PDF로 다시 저장하거나, 본문을 붙여 넣어 주세요.",
                            "UNREADABLE")
+    _judge_by_deal(analysis, body[:MAX_TEXT], incoterms)
     found ={key for key, row in analysis["clauses"].items() if row["status"] == "present"}
     rows = checklist(incoterms, found, country, analysis)
+    # 도착국에서 문제가 안 되는 나라별 독소 — 독일 DDP 는 EORI·간접대리인으로 수입자가
+    # 될 수 있습니다(전문가 점검 2026-10-04). 도착국을 모르면 그대로 짚습니다.
+    tags = contract_clauses.groups_for(country)
+    if tags:
+        rows["toxic"] = [row for row in rows["toxic"]
+                         if not (row["key"] in COUNTRY_ONLY and row["countries"]
+                                 and not tags & set(row["countries"]))]
+    # 이 계약에 맞지 않는 이익조항은 권하지 않습니다 — T/T 계약에 신용장 조항, 일반
+    # 매매에 대리점 보호법, 비독점에 최소 주문, 소비재에 시운전 간주 인수.
+    rows["gain"] = [row for row in rows["gain"]
+                    if row["status"] != "absent" or _relevant(row["key"], body[:MAX_TEXT])]
     # 도착국에 흔한데 **아직 안 보이는** 독소조항. 올린 계약서에 없더라도
     # 협상 중에 들어올 수 있어 미리 알려 줍니다. (2026-10-02)
     watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]]
@@ -293,10 +341,10 @@ def clause_text(keys) -> str:
             lines += [f"# 🔴 {head}", ""]
         mark = contract_clauses.CATEGORIES[row["category"]]
         lines += [f"## [{mark}] {row['title']}", "",
-                  f"왜 필요한가: {_readable(row['why'])}",
-                  f"빠지면/있으면: {_readable(row['risk'])}", ""]
+                  f"{_labels(row)[0]}: {_readable(row['why'])}",
+                  f"{_labels(row)[1]}: {_readable(row['risk'])}", ""]
         if row["category"] == "toxic":
-            lines += ["이 조항은 **넣는 것이 아니라 빼는 것**입니다.", ""]
+            lines += [toxic_note(row["key"]), ""]
             if row["fix"]:
                 lines += [f"고치는 법: {_readable(row['fix'])}", ""]
         lines += ["```", row["text_en"], "```", "", _readable(row["text_ko"]), "", "---", ""]
@@ -304,6 +352,27 @@ def clause_text(keys) -> str:
 
 
 _CATEGORY_ORDER = {"toxic": 0, "must": 1, "gain": 2}
+
+
+# 독소 문안 머리의 한 줄. 대부분 '빼는 것'이지만, 그 말이 틀린 조항이 있습니다
+# (전문가 점검 2026-10-04): 재수출 통제는 **없을 때** 위험하고, EU 대리인 보상
+# 포기 문구는 지워도 효력이 없습니다.
+TOXIC_NOTE = {
+    "reexport_control": "이 조항은 **없을 때** 위험합니다 — 아래 문구를 **넣으세요**.",
+    "agency_law_eu": "이 문구는 **지워도 효력이 없습니다** — 보상을 예산에 잡거나 구조를 바꾸세요.",
+}
+
+
+def _labels(row: dict) -> tuple[str, str]:
+    """설명 두 줄의 머리. 독소에 "왜 필요한가"는 어색했습니다(전문가·사용성 점검)."""
+
+    if row["category"] == "toxic":
+        return "왜 위험한가", "있으면 생기는 일"
+    return "왜 필요한가", "없으면 생기는 일"
+
+
+def toxic_note(key: str) -> str:
+    return TOXIC_NOTE.get(key, "이 조항은 **넣는 것이 아니라 빼는 것**입니다.")
 
 
 def _picked(keys) -> list[tuple[str, dict]]:
@@ -374,10 +443,10 @@ def clause_plain(keys) -> str:
             lines += ["", f"■ {head}", ""]
         mark = contract_clauses.CATEGORIES[row["category"]]
         lines += [rule, f"[{mark}] {row['title']}", rule, "",
-                  f"왜 필요한가: {_plain(row['why'])}",
-                  f"빠지면/있으면: {_plain(row['risk'])}", ""]
+                  f"{_labels(row)[0]}: {_plain(row['why'])}",
+                  f"{_labels(row)[1]}: {_plain(row['risk'])}", ""]
         if row["category"] == "toxic":
-            lines += ["★ 이 조항은 넣는 것이 아니라 빼는 것입니다.", ""]
+            lines += ["★ " + _plain(toxic_note(row["key"])), ""]
             if row["fix"]:
                 lines += [f"고치는 법: {_plain(row['fix'])}", ""]
         lines += ["[영문 문안]", "", *_reflow(row["text_en"]), "",
@@ -419,11 +488,19 @@ def _boxed(document, text: str) -> None:
     shade.set(qn("w:fill"), "F4F6F8")
     cell._tc.get_or_add_tcPr().append(shade)
     cell.paragraphs[0].text = ""
+    from docx.enum.text import WD_COLOR_INDEX
+
     for i, line in enumerate(_reflow(text)):
         paragraph = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
-        run = paragraph.add_run(line)
-        run.font.name = "Times New Roman"
-        run.font.size = Pt(10.5)
+        # <30>·<INCOTERMS> 같은 빈칸은 노랗게 — 그대로 붙여 쓰면 놓칩니다(사용성 점검 2026-10-04).
+        for part in re.split(r"(<[^<>]{1,40}>)", line):
+            if not part:
+                continue
+            run = paragraph.add_run(part)
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(10.5)
+            if part.startswith("<") and part.endswith(">"):
+                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
     document.add_paragraph()
 
 
@@ -469,8 +546,8 @@ def clause_docx(keys) -> bytes:
         _runs(head, f"**[{mark}] {row['title']}**", color=_INK[category], size=13)
         if category == "toxic":
             warn = document.add_paragraph()
-            _runs(warn, "■ 이 조항은 **넣는 것이 아니라 빼는 것**입니다.", color=_RED)
-        for label, field in (("왜 필요한가", "why"), ("빠지면/있으면", "risk")):
+            _runs(warn, "■ " + toxic_note(row["key"]), color=_RED)
+        for label, field in zip(_labels(row), ("why", "risk")):
             line = document.add_paragraph()
             _runs(line, f"**{label}:** {row[field]}")
         if category == "toxic" and row["fix"]:
@@ -536,6 +613,11 @@ def as_text(result: dict) -> str:
         lines += [f"### 🔵 챙기면 이로운 조항 {len(result['gain'])}개", ""]
         for row in result["gain"]:
             lines.append(f"- **{row['title']}** — {row['risk']}")
+        lines.append("")
+    if result.get("watch_country"):
+        lines += [f"### 🌍 도착국({result.get('country', '')})에서 흔한 조항 — 아직 안 보임", ""]
+        for row in result["watch_country"]:
+            lines.append(f"- **{row['title']}** — 협상 중에 들어오면 지우거나 고치세요.")
         lines.append("")
     if not (result["toxic"] or result["missing"] or result.get("weak")):
         lines += ["필수조항은 다 보이고, 독소조항은 보이지 않습니다. "
