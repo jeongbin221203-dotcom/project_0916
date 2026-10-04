@@ -20,7 +20,7 @@ contract_bp = Blueprint("contract", __name__, url_prefix="/contract")
 
 # 계약서는 서류보다 깁니다. 그래도 한도를 둡니다.
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-ALLOWED_SUFFIXES = (".pdf", ".txt", ".md", ".png", ".jpg", ".jpeg", ".webp")
+ALLOWED_SUFFIXES = (".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".webp")
 
 
 @contract_bp.get("/clauses")
@@ -60,8 +60,8 @@ def review():
             name = upload.filename
             if not name.lower().endswith(ALLOWED_SUFFIXES):
                 raise ValidationError(
-                    "PDF·사진·텍스트 파일만 읽을 수 있습니다. "
-                    "한글(hwp)·워드는 PDF로 저장해 올려 주세요.", "file")
+                    "PDF·Word(docx)·사진·텍스트 파일만 읽을 수 있습니다. "
+                    "한글(hwp)·옛 워드(doc)는 PDF로 저장해 올려 주세요.", "file")
             data = upload.stream.read(MAX_UPLOAD_BYTES + 1)
             if len(data) > MAX_UPLOAD_BYTES:
                 raise ValidationError(

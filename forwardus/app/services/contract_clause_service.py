@@ -138,7 +138,10 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
         # Party A/B 계약서에서 누구를 우리(매도인)로 읽었는지. 틀렸으면
         # 사용자가 바로 알아야 합니다 — 방향이 뒤집히면 판정도 뒤집힙니다.
         "our_side": contract_clauses.our_side(body[:MAX_TEXT]),
-        "checked": len(body),
+        # 40만 자를 넘으면 앞만 봅니다 — 그걸 밝힙니다. 전에는 뒤를 안 보면서
+        # 글자 수는 전체를 적어 '다 읽었다'고 했습니다. (2026-10-04)
+        "checked": min(len(body), MAX_TEXT),
+        "truncated": len(body) > MAX_TEXT,
         "note": DISCLAIMER,
     }
 
@@ -152,14 +155,102 @@ def read_file(filename: str, data: bytes) -> str:
 
     from app.services import document_extract_service as extract
 
-    name = str(filename or "")
-    if name.lower().endswith((".txt", ".md")):
-        return data.decode("utf-8", errors="replace")
-    text, images = extract.read_upload(name, data)
-    if text.strip():
-        return text
-    # 스캔본이면 우리 컴퓨터의 OCR로 읽습니다. 없으면 빈 글자입니다.
-    return extract.ocr_text(text, images)
+    name = str(filename or "").lower()
+    if not data:
+        raise ServiceError("빈 파일입니다. 내용이 있는 계약서 파일을 올려 주세요.", "VALIDATION_ERROR")
+    if name.endswith((".txt", ".md")):
+        return _decode(data)
+    if name.endswith(".docx"):
+        return _read_docx(data)
+    if name.endswith(".pdf"):
+        text, images = _read_contract_pdf(data)
+    else:
+        text, images = "", extract._read_image(data)
+    # **본문이 거의 없으면 OCR.** 쪽 번호("Page 1 of 1")만 글자로 박힌 스캔본이
+    # 흔한데, 전에는 글자가 조금이라도 있으면 OCR 을 건너뛰어 '본문을 못 찾았다'고
+    # 거절했습니다. (사용성 점검 2026-10-04)
+    if images and _body_chars(text) < extract.SCANNED_TEXT_CHARS:
+        found = extract.ocr_text("", images)
+        if _body_chars(found) > _body_chars(text):
+            return found
+    return text
+
+
+# 계약서 읽기 한도 (2026-10-04). 오퍼시트용 읽기 함수(앞 5쪽·스캔 3쪽)를 같이 써서
+# 8쪽 계약서 끝의 중재 조항을 '빠짐'이라 하고 뒤쪽 독소를 놓쳤습니다.
+MAX_PDF_PAGES = 60
+MAX_OCR_PAGES = 10
+
+
+def _body_chars(text: str) -> int:
+    """쪽 머리글·목차를 걷어 낸 본문 글자 수."""
+
+    body = contract_clauses._drop_page_furniture(contract_clauses._drop_table_of_contents(text or ""))
+    return len(re.sub(r"\s+", "", body))
+
+
+def _decode(data: bytes) -> str:
+    """텍스트 파일 — UTF-8(BOM 포함) 다음 CP949(메모장 기본 저장)를 봅니다.
+
+    전에는 UTF-8 로만 읽어, 메모장으로 저장한 국문 계약서가 깨진 채 '독소 0개'가
+    나왔습니다. 둘 다 아니면 깨진 채로 판정하지 않습니다.
+    """
+
+    for encoding in ("utf-8-sig", "cp949"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    text = data.decode("utf-8", errors="replace")
+    if text.count("�") > max(3, len(text) // 100):
+        raise ServiceError("글자를 읽지 못했습니다. 메모장에서 '다른 이름으로 저장 → 인코딩 UTF-8'로 "
+                           "저장해 올리거나, 본문을 붙여 넣어 주세요.", "UNREADABLE")
+    return text
+
+
+def _read_docx(data: bytes) -> str:
+    """Word 계약서 — 문단과 표 칸의 글자. 실무 계약서는 docx 가 가장 흔합니다."""
+
+    import io
+
+    import docx
+
+    try:
+        document = docx.Document(io.BytesIO(data))
+    except Exception:
+        raise ServiceError("Word 파일을 열지 못했습니다. 암호가 걸려 있거나 손상되었을 수 있습니다. "
+                           "PDF로 저장해 올려 주세요.", "VALIDATION_ERROR")
+    lines = [p.text for p in document.paragraphs]
+    for table in document.tables:
+        for row in table.rows:
+            lines.append(" ".join(cell.text for cell in row.cells))
+    return "\n".join(lines)
+
+
+def _read_contract_pdf(data: bytes) -> tuple[str, list]:
+    """PDF 의 **모든 쪽**(60쪽까지) 글자와, 스캔본에 쓸 앞 10쪽 그림."""
+
+    import io
+
+    import pdfplumber
+
+    try:
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            if not pdf.pages:
+                raise ServiceError("빈 PDF입니다. 내용이 있는 파일을 올려 주세요.", "VALIDATION_ERROR")
+            pages = pdf.pages[:MAX_PDF_PAGES]
+            text = "\n".join((page.extract_text() or "") for page in pages)
+            images = []
+            if _body_chars(text) < 40:
+                images = [page.to_image(resolution=150).original.copy()
+                          for page in pages[:MAX_OCR_PAGES]]
+    except ServiceError:
+        raise
+    except Exception:
+        raise ServiceError("PDF를 열지 못했습니다. 암호가 걸려 있거나 파일이 손상되었을 수 "
+                           "있습니다. 다시 저장해 올리거나 본문을 붙여 넣어 주세요.",
+                           "VALIDATION_ERROR")
+    return text.strip(), images
 
 
 
@@ -397,6 +488,9 @@ def as_text(result: dict) -> str:
     """판정을 사람이 읽는 글로. 무역 상담 답변에 그대로 씁니다."""
 
     lines = ["## 계약서 조항 점검", ""]
+    if result.get("truncated"):
+        lines += [f"⚠️ 계약서가 길어 **앞 {MAX_TEXT:,}자만** 봤습니다. 뒷부분은 따로 나눠 "
+                  "올려 주세요.", ""]
     side = result.get("our_side")
     if side:
         lines += [f"우리 쪽(매도인·수출자)을 **{side['label']} — {side['name']}**, "

@@ -102,8 +102,8 @@
         </div>
         <form class="cc_upload" data-cc-form>
           <label class="cc_file">
-            <span>계약서 파일 (PDF · 사진 · 텍스트)</span>
-            <input type="file" name="file" accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp">
+            <span>계약서 파일 (PDF · Word · 사진 · 텍스트, 20MB까지)</span>
+            <input type="file" name="file" accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp">
           </label>
           <details class="cc_paste">
             <summary>파일 대신 본문 붙여 넣기</summary>
@@ -189,7 +189,9 @@
       if (!answer.success) { status.textContent = answer.message || "읽지 못했습니다."; return; }
       const result = answer.data;
       status.textContent =
-        `${result.checked.toLocaleString()}자를 읽었습니다. `
+        (result.truncated
+          ? `계약서가 길어 앞 ${result.checked.toLocaleString()}자만 봤습니다 — 뒷부분은 나눠 올려 주세요. `
+          : `${result.checked.toLocaleString()}자를 읽었습니다. `)
         + `독소 ${result.toxic.length}개 · 보완 ${(result.weak || []).length}개 · `
         + `빠진 필수 ${result.missing.length}개.`;
       draw({ toxic: result.toxic, weak: result.weak || [], must: result.missing,

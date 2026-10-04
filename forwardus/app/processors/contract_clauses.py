@@ -685,7 +685,10 @@ expenses of whatever nature, including loss of profit, without limitation.""",
             CONSEQUENTIAL_KO],
     fix="책임 한도(Limitation of Liability) 조항을 넣어 **송장 금액 상한**과 **간접손해 배제**로 바꿔 달라고 하세요.",
     # 서로 배상하는 상호 조항("hold one another harmless")은 우리만 무는 것이 아닙니다.
-    avoid=INDEMNIFY_SELLER + (r"\bone\s+another\b", r"\beach\s+other\b"),
+    avoid=INDEMNIFY_SELLER + (r"\bone\s+another\b", r"\beach\s+other\b",
+                              # 국문 — 매수인이 무는 문장("매수인은 매도인의 모든 손해를
+                              # 한도 없이 배상한다")은 우리에게 유리합니다. (2026-10-04)
+                              r"(?:매수인|바이어|수입자)(?:은|는|이|가)[^.]{0,50}(?:배상|보상)"),
 )
 
 _clause(
@@ -3035,7 +3038,7 @@ def analyze(text: str) -> dict:
         return {"clauses": {}, "context": set(), "side": None, "empty": True}
     # 바꿔 읽기 **전에** 정합니다. 바꾼 뒤에는 Party 표지가 없어 못 찾습니다.
     side = our_side(body)
-    body = _as_seller(body)
+    body = _as_parties(as_seller_with(side, body))
     context = {row["key"] for row in CLAUSES
                if row["context"] and any(_rx(p).search(body) for p in row["context"])}
     out: dict[str, dict] = {}
@@ -3228,7 +3231,7 @@ def our_side(text: str) -> dict | None:
     defs = list(_PARTY_DEF.finditer(body))
     labels = {re.sub(r"\s+", " ", d.group("label")) for d in defs}
     if len(defs) != 2 or len(labels) != 2:
-        return None
+        return _korean_side(body)
     names = [_clean_name(d.group("name")) for d in defs]
     name_at = [d.end("name") - len(d.group("name").rstrip(" ,")) +
                d.group("name").rstrip(" ,").rfind(n) for d, n in zip(defs, names)]
@@ -3251,6 +3254,49 @@ def our_side(text: str) -> dict | None:
             "other_name": names[1 - i]}
 
 
+# ── 국문 갑/을 (2026-10-04) ──────────────────────────────────────────────────
+#
+# 중소기업 국문 계약서는 대부분 갑/을로 씁니다. 전에는 "을은 조사와 글자가 같아
+# 바꾸면 문장이 망가진다"며 다루지 않았는데, 그러면 규칙이 방향을 못 봐서 **우리
+# 해지권·상계권을 독소로** 짚었습니다(전문가 점검). 당사자 정의
+#   주식회사 대한산업(이하 "갑", 매도인)  ·  매수인 ABC(이하 "갑")
+# 에서 매도인/매수인을 읽고, 못 읽으면 한국에 있는 쪽을 우리로 봅니다. 바꿀 때는
+# **홀로 선 갑/을**만 — 앞이 한글이 아니고 뒤가 조사이거나 끝인 자리만 바꿉니다.
+# "물품을" 의 을은 앞이 한글이라 그대로입니다.
+_KO_PARTY_DEF = re.compile(
+    r"(?P<name>[^()\n\"“”]{1,60}?)\s*\(\s*이하\s*[\"“'‘]?(?P<label>[갑을])[\"”'’]?"
+    r"(?P<rest>[^)]{0,40})\)")
+_KO_SELLER = re.compile(r"매도인|수출자|공급자|판매자|공급사")
+_KO_BUYER = re.compile(r"매수인|수입자|구매자|바이어|구매사")
+_KO_PARTICLE = r"(?:은|는|이|가|의|에게|에|과|와|을|를|으로|로|도|만|측)?(?![가-힣])"
+
+
+def _korean_side(body: str) -> dict | None:
+    defs = list(_KO_PARTY_DEF.finditer(body))
+    if len(defs) != 2 or {d.group("label") for d in defs} != {"갑", "을"}:
+        return None
+    seller = []
+    for i, d in enumerate(defs):
+        # 역할 말은 괄호 안("갑", 매도인)이나 이름 앞(매수인 ABC)에 옵니다.
+        start = defs[0].end() if i == 1 else max(0, d.start() - 15)
+        around = body[start:d.start("label")] + d.group("rest")
+        if _KO_SELLER.search(around) and not _KO_BUYER.search(around):
+            seller.append(i)
+        elif _KO_BUYER.search(around) and not _KO_SELLER.search(around):
+            seller.append(1 - i)
+    if len(set(seller)) != 1:
+        korean = [i for i, d in enumerate(defs) if _KOREA_HQ.search(d.group("name") + d.group("rest"))]
+        if len(korean) != 1:
+            return None
+        seller = korean
+    i = seller[0]
+    clean = lambda raw: re.sub(r"^.*?(?:매도인|매수인|수출자|수입자|공급자|바이어)\s*", "",
+                               raw.strip(" ,.:")).strip() or raw.strip()
+    return {"label": defs[i].group("label"), "name": clean(defs[i].group("name")),
+            "other_label": defs[1 - i].group("label"), "other_name": clean(defs[1 - i].group("name")),
+            "korean": True}
+
+
 def _as_seller(body: str) -> str:
     return as_seller_with(our_side(body), body)
 
@@ -3261,9 +3307,41 @@ def as_seller_with(side: dict | None, body: str) -> str:
 
     if not side:
         return body
+    if side.get("korean"):
+        for label, role in ((side["label"], "매도인"), (side["other_label"], "매수인")):
+            body = re.sub(rf"(?<![가-힣]){label}(?={_KO_PARTICLE})", role, body)
+        return body
     for label, role in ((side["label"], "the Seller"), (side["other_label"], "the Buyer")):
         words = r"\s+".join(map(re.escape, label.split()))
         body = re.sub(rf"\b(?:the\s+)?{words}\b", role, body)
+    return body
+
+
+# ── Supplier · Distributor 로 부르는 계약서 (2026-10-04) ───────────────────────
+#
+# 규칙은 Seller/Buyer 로 방향을 봅니다. EU·중동 판매점 계약서는 Supplier/Distributor
+# 로 불러서 GDPR 과징금 전가·인증 비용 전가를 놓쳤습니다(전문가 점검). Seller/Buyer
+# 를 당사자로 **쓰지 않는** 계약서에서만, 대문자로 정의된 역할 이름을 바꿔 읽습니다.
+# 매매계약의 "raw material supplier"(제3자)는 건드리지 않습니다.
+_SELLER_ROLES = ("Supplier", "Vendor", "Manufacturer", "Exporter", "Principal")
+_BUYER_ROLES = ("Distributor", "Purchaser", "Importer", "Customer", "Agent", "Dealer", "Reseller")
+
+
+def _role_word(body: str, roles) -> str | None:
+    for word in roles:
+        if len(re.findall(rf"\b(?:{word}|{word.upper()})\b", body)) >= 2:
+            return word
+    return None
+
+
+def _as_parties(body: str) -> str:
+    if len(re.findall(r"\b(?:seller|buyer)\b", body, re.I)) >= 2:
+        return body
+    seller, buyer = _role_word(body, _SELLER_ROLES), _role_word(body, _BUYER_ROLES)
+    if not seller or not buyer:
+        return body
+    for word, role in ((seller, "Seller"), (buyer, "Buyer")):
+        body = re.sub(rf"\b(?:the\s+|THE\s+)?(?:{word}|{word.upper()})\b", f"the {role}", body)
     return body
 
 
