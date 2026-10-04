@@ -27,6 +27,7 @@ detect
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 CATEGORIES = {"must": "필수", "gain": "이익", "toxic": "독소"}
 CATEGORY_NOTE = {
@@ -36,6 +37,19 @@ CATEGORY_NOTE = {
 }
 
 CLAUSES: list[dict] = []
+
+
+@lru_cache(maxsize=None)
+def _rx(pattern: str, flags: int = re.I) -> re.Pattern:
+    """규칙을 **한 번만** 컴파일합니다. (2026-10-03)
+
+    re 모듈의 컴파일 캐시는 512개입니다. 조항·가드·약함 규칙이 그보다 많아지자
+    캐시가 돌려 막기를 해서 **부를 때마다 다시 컴파일**했고, 분석 시간의 3분의 1이
+    컴파일이었습니다. 규칙 글자는 바뀌지 않으므로 끝까지 들고 있습니다.
+    """
+
+    return re.compile(pattern, flags)
+
 
 # 한국어 부정 가드. 찾은 말 **뒤** 40자 안에 부정말이 오면 그 조항이 아닙니다.
 #
@@ -1412,10 +1426,10 @@ Seller free of charge and shall become the property of the Buyer.""",
     text_ko="tooling/moulds 와 free of charge · at no cost 가 함께 나오면 이 조항입니다. "
             "**소유권이 누구에게 가는지** 함께 보세요.",
     detect=[r"(?:seller|supplier)[^.]{0,40}bears?[^.]{0,40}(?:entire|whole|full|all)[^.]{0,20}cost[^.]{0,50}(?:jigs?|dies|moulds?|molds?|tooling)",
-            r"(?:moulds?|molds?|tooling|jigs?|dies|fixtures?)[^.]{0,90}(?:at (?:its|the seller\'?s|their) own expense|seller bears|bears? the (?:entire|whole) cost)",
+            r"\b(?:moulds?|molds?|tooling|jigs?|dies|fixtures?)\b[^.]{0,90}(?:at (?:its|the seller\'?s|their) own expense|seller bears|bears? the (?:entire|whole) cost)",
             r"(?:금형|치공구|지그)[^.]{0,40}(?:제작비|비용)[^.]{0,40}(?:매도인|공급자)[^.]{0,25}(?:부담|전액)",
             r"자비로[^.]{0,25}(?:제작|공급|제공)",
-            r"(tooling|moulds?|molds?|jigs?|dies)[^.]{0,100}"
+            r"\b(tooling|moulds?|molds?|jigs?|dies)\b[^.]{0,100}"
             r"(free of charge|at no cost|without charge|no charge to the buyer)",
             r"(free of charge|at no cost)[^.]{0,80}(tooling|moulds?|molds?|jigs?)",
             r"(금형|치공구|사출\s*금형|지그)[^.]{0,60}(무상|무료)[^.]{0,30}"
@@ -1619,7 +1633,7 @@ internationally recognised surveyor. Claims notified later shall be deemed waive
             #   Tokyo District Court 2020.12.8 · OLG Saarbrücken 1993 · Arnhem 2009
             # 실제 계약서에서 "불만은 90 일 안에 종결", "하자는 30 일 안에 수리" 가
             # 걸려서, 클레임을 **내는** 동사가 있어야 합니다.
-            r"(?:complain\w*|claims?|notice\s+of\s+(?:defects?|non-?conformit\w*)|defects?|rejections?)"
+            r"\b(?:complain\w*|claims?|notice\s+of\s+(?:defects?|non-?conformit\w*)|defects?|rejections?)"
             r"[^.]{0,120}\b(?:made|raised|notif\w*|reported|submitted|given|lodged|filed|asserted|occur)\b"
             r"[^.]{0,60}within\s+\(?\d{1,3}\)?\s*(?:working\s+|business\s+|calendar\s+)?days"],
     fix="",
@@ -1876,6 +1890,16 @@ and shall bear all costs and charges thereof.""",
     avoid=NEGATION,
 )
 
+# 비밀유지가 **쌍방**이라는 말 — 쌍방 낱말 바로 뒤에 비밀·공개 얘기가 와야 합니다.
+# 순서는 양쪽 다 — "each party shall protect the other's data" ·
+# "this confidentiality obligation shall be mutual".
+_MUTUAL_NDA_EN = (r"(?:(?:each party|both parties|mutual\w*|reciprocal\w*)[^.]{0,80}"
+                  r"(?:confiden|disclos|secre|protect|data|information)"
+                  r"|(?:confiden|disclos|secre)\w*[^.]{0,80}(?:each party|both parties|mutual\w*|reciprocal\w*)"
+                  r"|buyer shall.{0,40}confidential)")
+_MUTUAL_NDA_KO = (r"(?:(?:양\s*당사자|쌍방|상호)[^.]{0,40}(?:비밀|기밀|누설|공개)"
+                  r"|매수인.{0,40}(?:비밀|기밀))")
+
 _clause(
     "one_way_nda", "비밀유지가 우리에게만 걸림", "toxic",
     why="비밀유지 의무가 **매도인에게만** 있고 바이어는 자유로운 조항입니다. "
@@ -1894,14 +1918,15 @@ shall not disclose it to any third party.""",
     #    The Buyer shall likewise keep confidential ... from the Seller."
     # 다른 규칙이 쓰는 `[^.]` 는 첫 문장에서 끊겨 뒤 문장을 못 봅니다. 그래서
     # **쌍방인데 일방이라고** 짚었습니다. 이 가드만 `.`(re.S) 로 넘깁니다.
-    detect=[r"(?:seller|supplier)[^.]{0,50}(?:undertakes to )?treat[^.]{0,45}confidential(?!.{0,320}(?:each party|both parties|mutual|buyer shall.{0,40}confidential))",
-            r"(?:seller|supplier)[^.]{0,50}hold(?:s)? in confidence(?!.{0,320}(?:each party|both parties|mutual))",
-            r"(?:매도인|공급자)[^.]{0,50}(?:비밀로|기밀을)[^.]{0,25}(?:유지|지)(?!.{0,320}(?:양\s*당사자|쌍방|상호))",
-            r"seller shall (keep|treat|hold)[^.]{0,40}confidential"
-            r"(?!.{0,320}(each party|both parties|mutual|reciprocal"
-            r"|buyer shall.{0,40}confidential))",
-            r"(매도인|공급자)[^.]{0,30}(비밀|기밀)[^.]{0,20}유지"
-            r"(?!.{0,320}(양\s*당사자|쌍방|상호|매수인.{0,40}(비밀|기밀)))"],
+    #
+    # **그런데 쌍방 말은 비밀유지 얘기여야 합니다.** (2026-10-03) 320자 안의 아무
+    # "both parties" 나 보니, 다음 조항의 "signed by both parties"(계약 변경)·
+    # "binding on both parties"(검사) 때문에 일방 비밀유지를 놓쳤습니다.
+    detect=[r"(?:seller|supplier)[^.]{0,50}(?:undertakes to )?treat[^.]{0,45}confidential(?!.{0,320}" + _MUTUAL_NDA_EN + ")",
+            r"(?:seller|supplier)[^.]{0,50}hold(?:s)? in confidence(?!.{0,320}" + _MUTUAL_NDA_EN + ")",
+            r"(?:매도인|공급자)[^.]{0,50}(?:비밀로|기밀을)[^.]{0,25}(?:유지|지)(?!.{0,320}" + _MUTUAL_NDA_KO + ")",
+            r"seller shall (keep|treat|hold)[^.]{0,40}confidential(?!.{0,320}" + _MUTUAL_NDA_EN + ")",
+            r"(매도인|공급자)[^.]{0,30}(비밀|기밀)[^.]{0,20}유지(?!.{0,320}" + _MUTUAL_NDA_KO + ")"],
     fix="**Each party / 양 당사자**로 바꿉니다. 바꿔 주지 않으면 그 자체가 신호입니다 — "
         "우리 정보를 쓸 생각이 있다는 뜻입니다.",
 )
@@ -2551,7 +2576,8 @@ writing, in accordance with applicable customs requirements.""",
 # tests/test_contract_disputes.py 에 있습니다.
 
 # 다른 나라 말. 영문·국문이 우선하는 꼴은 우리에게 문제가 없습니다.
-_FOREIGN_LANG = (r"(?:chinese|japanese|vietnamese|russian|arabic|spanish|portuguese|french"
+# 맨 앞의 \b 는 속도 때문입니다 — 낱말 가운데 자리마다 21개 이름을 대 보지 않게.
+_FOREIGN_LANG = (r"\b(?:chinese|japanese|vietnamese|russian|arabic|spanish|portuguese|french"
                  r"|german|italian|indonesian|thai|turkish|hindi|polish|dutch|persian|farsi"
                  r"|malay|mongolian|uzbek|kazakh)")
 
@@ -2627,7 +2653,7 @@ The first instalment shall become due on the date on which the commissioning
 confirmation document is signed by the Buyer.""",
     text_ko="payment(instalment) 과 acceptance · commissioning certificate … signed 가 함께 "
             "나오고 **'서명하지 않으면 인수로 본다'가 없으면** 이 조항입니다.",
-    detect=[r"(?:payment|instal+ments?|balance|price|amount)[^.]{0,80}(?:upon|after|against|following"
+    detect=[r"\b(?:payment|instal+ments?|balance|price|amount)[^.]{0,80}(?:upon|after|against|following"
             r"|on\s+the\s+date\s+on\s+which|from\s+the\s+date\s+(?:on\s+which|of)|subject\s+to)[^.]{0,40}"
             r"(?:acceptance|commissioning|completion|installation|final\s+inspection|performance)\s+"
             r"(?:test\s+)?(?:certificate|confirmation|protocol|document|report)",
@@ -2660,7 +2686,7 @@ The Seller shall furnish a performance guarantee payable on first written demand
 without proof or conditions.""",
     text_ko="performance(advance payment) bond · guarantee 와 on (first) demand · without proof 가 "
             "함께 나오면 이 조항입니다. '수익자가 판단하여 서면으로 청구하면 조건 없이'도 같습니다.",
-    detect=[r"(?:performance|advance\s+payment|down\s*payment|refund|warranty|retention)\s+"
+    detect=[r"\b(?:performance|advance\s+payment|down\s*payment|refund|warranty|retention)\s+"
             r"(?:bond|guarantee|security|standby)[^.]{0,120}"
             r"(?:on\s+(?:first\s+)?(?:written\s+)?demand|first\s+(?:written\s+)?demand)",
             r"(?:payable|pay)\s+(?:up)?on\s+(?:first\s+)?(?:written\s+)?demand\s+without\s+"
@@ -2732,7 +2758,7 @@ If the Seller fails to deliver on time, the Buyer may purchase substitute goods
 from a third party and the Seller shall bear all excess costs.""",
     text_ko="substitute(replacement) goods 와 Seller's cost · Seller shall bear 가 함께 나오고 "
             "**상한이 없으면** 이 조항입니다.",
-    detect=[r"(?:purchase|procure|buy|obtain|source)\s+(?:substitute|replacement|equivalent|alternative|similar)\s+"
+    detect=[r"\b(?:purchase|procure|buy|obtain|source)\s+(?:substitute|replacement|equivalent|alternative|similar)\s+"
             r"goods[^.]{0,150}(?:(?:seller|supplier|vendor)'?s?\s+(?:cost|expense|account|risk)"
             r"|(?:seller|supplier)\s+shall\s+(?:bear|pay|reimburse|compensate|be\s+liable))",
             r"\bcover\s+(?:purchases?|costs?)\b[^.]{0,80}(?:seller|supplier)",
@@ -2911,7 +2937,7 @@ def analyze(text: str) -> dict:
     side = our_side(body)
     body = _as_seller(body)
     context = {row["key"] for row in CLAUSES
-               if row["context"] and any(re.search(p, body, re.I) for p in row["context"])}
+               if row["context"] and any(_rx(p).search(body) for p in row["context"])}
     out: dict[str, dict] = {}
     for row in CLAUSES:
         if row["context"] and row["key"] not in context:
@@ -2927,7 +2953,7 @@ def analyze(text: str) -> dict:
         for pattern, veto in rules:
             # **자리마다** 봅니다. 첫 자리가 부정문·미정이어도 다른 자리에 진짜가
             # 있을 수 있습니다.
-            for hit in re.finditer(pattern, body, re.I | re.S):
+            for hit in _rx(pattern, re.I | re.S).finditer(body):
                 if veto and _vetoed(body, hit.start(), veto):
                     continue
                 reason = "" if row["category"] == "toxic" else _weakness(row, body, hit)
@@ -3042,7 +3068,7 @@ def _weakness(row: dict, body: str, hit) -> str | None:
             return "부정문입니다 — 이 조항이 '없다'고 적혀 있습니다."
     scope = _scope(body, hit.start(), hit.end())
     for pattern, reason in row["weak"]:
-        if re.search(pattern, scope, re.I):
+        if _rx(pattern).search(scope):
             return reason
     if row["require"]:
         # 셋째 칸이 "absent" 면, 필수 요소가 없는 자리는 이 조항이 **아닙니다**
@@ -3051,7 +3077,7 @@ def _weakness(row: dict, body: str, hit) -> str | None:
         # '부족'으로 내면 보증 조항을 선적 조항이라며 근거로 보여 줍니다. (2026-10-03)
         patterns, reason = row["require"][:2]
         absent = row["require"][2:] == ("absent",)
-        if not any(re.search(p, scope, re.I) for p in patterns):
+        if not any(_rx(p).search(scope) for p in patterns):
             return None if absent else reason
     return ""
 
@@ -3151,4 +3177,4 @@ def _vetoed(body: str, pos: int, avoid) -> bool:
     start = body.rfind(".", 0, pos) + 1
     end = body.find(".", pos)
     sentence = body[start:(len(body) if end < 0 else end)]
-    return any(re.search(word, sentence, re.I) for word in avoid)
+    return any(_rx(word).search(sentence) for word in avoid)

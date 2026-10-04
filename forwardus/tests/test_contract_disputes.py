@@ -117,6 +117,8 @@ SAFE = [
     ("time_essence_cancel", "If the Supplier fails to deliver the Products after thirty (30) days "
                             "after the prescribed deadline, the Purchaser shall be entitled to "
                             "cancel the Order of such batch of Products."),
+    # "stu**dies**" 의 dies 를 금형(dies)으로 읽었습니다 — 낱말 경계 (2026-10-03)
+    ("tooling_free", "The Buyer shall provide market studies free of charge to the Seller."),
     ("time_essence_cancel", "If Buyer establishes a revised delivery date and Seller fails to "
                             "deliver by that revised date, Buyer may cancel the Order."),
     ("time_essence_cancel", "If such delay continues for more than two (2) months following the "

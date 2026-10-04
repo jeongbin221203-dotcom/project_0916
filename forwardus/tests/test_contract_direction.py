@@ -90,6 +90,35 @@ def test_우리에게_불리한_방향은_독소다(key, _, theirs):
     assert key in contract_clauses.find_in("SALES CONTRACT\n" + theirs)
 
 
+ONE_WAY_NDA_THEN_OTHER = [
+    # 다음 조항의 "both parties"(서명·검사)는 비밀유지 얘기가 아닙니다 (m_contract 2026-10-03)
+    "The Seller shall keep confidential all information received from the Buyer and shall not "
+    "disclose it to any third party. 19. AMENDMENT No amendment shall be effective unless "
+    "signed by the authorised representatives of both parties.",
+    "The Seller shall keep confidential all information received from the Buyer and shall not "
+    "disclose it to any third party. 5. INSPECTION The certificate shall be final and binding "
+    "on both parties as to quality and quantity.",
+]
+MUTUAL_NDA = [
+    "The Seller shall keep confidential all information received from the Buyer. The Buyer "
+    "shall likewise keep confidential all information received from the Seller.",
+    "The Seller shall keep confidential all information received from the Buyer. Each party "
+    "shall keep confidential the information disclosed by the other party.",
+    "The Seller shall keep confidential all information received from the Buyer. This "
+    "confidentiality obligation shall be mutual and binding on both parties.",
+]
+
+
+@pytest.mark.parametrize("doc", ONE_WAY_NDA_THEN_OTHER)
+def test_다른_조항의_both_parties_로_일방_비밀유지를_놓치지_않는다(doc):
+    assert "one_way_nda" in contract_clauses.find_in("SALES CONTRACT\n" + doc)
+
+
+@pytest.mark.parametrize("doc", MUTUAL_NDA)
+def test_비밀유지가_쌍방이면_일방이_아니다(doc):
+    assert "one_way_nda" not in contract_clauses.find_in("SALES CONTRACT\n" + doc)
+
+
 def test_양쪽_모두_해지할_수_있어도_우리에게는_위험하다():
     """'Either party' 는 바이어도 할 수 있다는 뜻입니다 — 생산한 뒤 끊기는 위험은 그대로."""
 
