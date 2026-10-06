@@ -26,7 +26,8 @@ ROWS = [row for row in contract_clauses.CLAUSES if row["key"] not in NOT_SELF]
 
 
 def _example(row: dict) -> str:
-    text = row["text_en"]
+    # 빈칸(‹CURRENCY›·‹DATE›)을 채워서 봅니다 — 빈칸 그대로면 '부족'이 맞습니다(사용성 4회차).
+    text = contract_clauses.fill_blanks(row["text_en"])
     return text.split(")", 1)[1] if text.startswith("(") else text
 
 

@@ -113,3 +113,14 @@
   .cc_summary, .cc_side { font-size: 13.5px; }
   .cc_paste > summary, .cc_more > summary, .cc_fold > summary { padding: 7px 0; }
 }
+/* 4회차 (2026-10-05) */
+.cc_tag.cc_watch { background: #f1f5f9; color: #475569; }
+.cc_head.cc_head_static { cursor: default; }
+.cc_summary > p { margin: 0 0 6px; }
+.cc_summary > p:last-of-type { margin-bottom: 0; }
+.cc_summary [data-cc-report] { margin-top: 8px; }
+/* 아래에 붙는 받기 막대가 키보드 초점을 가렸습니다 — 그만큼 비워 두고 굴립니다. */
+[data-contract-modal] .hs_modal_body { scroll-padding-bottom: 120px; }
+@media (max-width: 620px) {
+  .cc_pickbar .button { flex: 1 1 0; padding: 8px 6px; font-size: 13px; }
+}

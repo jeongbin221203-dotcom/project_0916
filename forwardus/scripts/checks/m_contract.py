@@ -117,7 +117,8 @@ for turn in range(ROUNDS):
     blocks = []
     for key in want:
         row = C.by_key(key)
-        blocks.append(row["text_en"])   # text_ko 는 조언 한 줄이라 계약서가 아닙니다
+        # text_ko 는 조언 한 줄이라 계약서가 아닙니다. 빈칸은 채웁니다 — 빈칸 그대로면 '부족'이 맞습니다.
+        blocks.append(C.fill_blanks(row["text_en"]))
     # 우리 조항이 아닌 글을 섞습니다 (오탐 측정)
     for _ in range(random.randint(0, 6)):
         blocks.append(random.choice(NOISE))

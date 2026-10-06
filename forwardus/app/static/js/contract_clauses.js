@@ -31,7 +31,7 @@
     const pickable = group !== "toxic";
     return `
       <li class="cc_row ${item.present ? "is_found" : ""}">
-        <label class="cc_head">
+        <label class="cc_head${pickable ? "" : " cc_head_static"}">
           ${pickable ? `<input type="checkbox" data-cc-pick value="${esc(item.key)}">` : ""}
           <span class="cc_tag ${TONE[group]}">${MARK[group]}</span>
           <b>${esc(item.title)}</b>
@@ -63,13 +63,22 @@
     if (!items || !items.length) return "";
     return `
       <section class="cc_group">
-        <h4>🌍 도착국(${esc(country)})에서 흔한 조항 — 계약서에서 찾지 못함 <span class="cc_count">${items.length}</span></h4>
+        <h4>🌍 도착국(${esc(regionLabel(country))})에서 흔한 조항 — 계약서에서 찾지 못함 <span class="cc_count">${items.length}</span></h4>
         <ul class="cc_list">${items.map((item) => `
-          <li class="cc_row"><span class="cc_tag cc_toxic">독소</span> <b>${esc(item.title)}</b>
+          <li class="cc_row"><span class="cc_tag cc_watch">주의</span> <b>${esc(item.title)}</b>
             <p class="cc_why">${item.key === "reexport_control"
               ? "재수출 금지·최종용도 확인 문구를 <b>넣으세요</b> — 지금 없는 것이 위험입니다."
               : "협상 중에 들어오면 지우거나 고치세요."}</p></li>`).join("")}</ul>
       </section>`;
+  }
+
+  function regionLabel(code) {
+    try {
+      const name = new Intl.DisplayNames(["ko"], { type: "region" }).of(code);
+      return name && name !== code ? `${name} ${code}` : code;
+    } catch (error) {
+      return code;
+    }
   }
 
   /* 규칙이 주제째 놓친 조항 — 주제 분류기가 고른 것. 판정이 아니라 "직접 보세요"입니다. */
@@ -144,7 +153,7 @@
               <select data-cc-terms><option value="">모름</option>${TERMS.map((t) => `<option>${t}</option>`).join("")}</select>
             </label>
             <label>도착국 (영문 2자리, 예: US · CN · AE)
-              <input data-cc-country maxlength="2" autocomplete="off" placeholder="모름">
+              <input data-cc-country maxlength="20" autocomplete="off" placeholder="모름">
               <small class="cc_country_name" data-cc-country-name aria-live="polite"></small>
             </label>
           </div>` : "";
@@ -163,7 +172,7 @@
           </label>
           <details class="cc_paste">
             <summary>파일 대신 본문 붙여 넣기</summary>
-            <textarea name="text" rows="5" placeholder="계약서 본문을 붙여 넣으세요"></textarea>
+            <textarea name="text" rows="5" aria-label="계약서 본문 붙여 넣기" placeholder="계약서 본문을 붙여 넣으세요"></textarea>
           </details>
           <div class="cc_actions">
             <button class="button primary" type="submit" data-cc-submit>읽고 판정하기</button>
@@ -205,7 +214,11 @@
     }
     const submitBtn = host.querySelector("[data-cc-submit]");
     const paste = host.querySelector(".cc_paste");
-    let judged = false;   // 판정 결과가 떠 있는가 — 인코텀즈를 바꿔도 결과를 지우지 않습니다.
+    let judged = false;
+    // 파일과 붙여 넣은 글 중 **마지막에 넣은 쪽**으로 판정합니다 — 앞서 고른 파일이 남아 새로 붙여 넣은
+    // 계약서를 버리고 옛 파일을 다시 판정했습니다(사용성 4회차).
+    let lastSource = "";
+    let lastReport = "";   // 판정 결과가 떠 있는가 — 인코텀즈를 바꿔도 결과를 지우지 않습니다.
 
     function regionName(code) {
       if (!code) return "";
@@ -215,6 +228,34 @@
       } catch (error) {
         return code;   // Intl 이 없는 브라우저는 확인 없이 받습니다.
       }
+    }
+
+    function basisLine(result) {
+      const parts = [];
+      if (result.incoterms) parts.push(result.incoterms_from_doc ? `${result.incoterms}(계약서에서 읽음)` : result.incoterms);
+      if (result.country) parts.push(`도착국 ${regionLabel(result.country)}`);
+      let line = parts.length ? `판정 기준: ${parts.join(" · ")}` : "";
+      if (result.incoterms_mismatch) {
+        line += ` — 고르신 인코텀즈는 ${result.incoterms}인데 계약서에는 ${result.incoterms_mismatch}가 적혀 있습니다`;
+      }
+      return line;
+    }
+
+    function today() {
+      // toISOString 은 UTC 라 한국 오전 9시 전엔 전날 날짜가 붙었습니다(사용성 4회차).
+      const d = new Date();
+      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function saveText(text, name) {
+      const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     }
 
     function picked() {
@@ -237,6 +278,15 @@
 
     host.addEventListener("change", (event) => {
       if (event.target.matches("[data-cc-pick]")) refreshExport();
+      if (event.target.matches("input[type=file]") && event.target.files.length) lastSource = "file";
+    });
+    host.addEventListener("input", (event) => {
+      if (event.target.matches("textarea[name=text]") && event.target.value.trim()) lastSource = "text";
+    });
+    host.addEventListener("click", (event) => {
+      if (event.target.closest("[data-cc-report]") && lastReport) {
+        saveText(lastReport, `계약서-판정-결과-${today()}.txt`);
+      }
     });
 
     function draw(groups, found) {
@@ -250,8 +300,8 @@
       const side = groups.side ? `<p class="cc_side">우리 쪽(매도인·수출자): ${who(groups.side.label, groups.side.name)}
             · 상대(매수인): ${who(groups.side.other_label, groups.side.other_name)}
             — 반대라면 판정도 반대가 됩니다.</p>`
-        : groups.sideUnknown ? `<p class="cc_side cc_side_warn">⚠️ 갑/을 중 <b>누가 우리(매도인)인지 못 정했습니다.</b>
-            정의문에 '(이하 "갑", 매도인)'처럼 역할을 적어 주세요 — 판정의 방향이 뒤집혔을 수 있습니다.</p>` : "";
+        : groups.sideUnknown ? `<p class="cc_side cc_side_warn">⚠️ 갑/을(Party A/B) 중 <b>누가 우리(매도인)인지 못 정했습니다.</b>
+            판정의 방향이 뒤집혔거나 위험한 조항을 못 짚었을 수 있습니다 — 당사자 정의에 '매도인'·'Seller' 표시가 있는지 확인하세요.</p>` : "";
       body.innerHTML = side + (found
         // 판정 뒤: 위험한 것부터, 직접 확인할 것은 독소 바로 아래, 다 갖춘 필수는 접어서.
         ? groupBlock("🔴 지우거나 고쳐야 할 조항", groups.toxic, "toxic", false)
@@ -303,8 +353,11 @@
       }
       // 파일과 붙여 넣은 글이 함께 있으면 서버는 파일을 읽습니다 — 말없이 버리지 않게 알립니다.
       const both = file && file.name && text;
+      const useText = both ? lastSource === "text" : !(file && file.name);
+      if (both) data.delete(useText ? "file" : "text");
+      const judgedWhat = useText ? "붙여 넣은 글" : `파일 ${file.name}`;
       // 스캔본·사진은 OCR 로 읽어 오래 걸립니다 — 기다리는 이유를 알립니다(사용성 2회차).
-      const slow = file && file.name && (/\.(png|jpe?g|webp)$/i.test(file.name) || file.size > 2 * 1024 * 1024);
+      const slow = !useText && (/\.(png|jpe?g|webp)$/i.test(file.name) || file.size > 2 * 1024 * 1024);
       status.textContent = "읽는 중입니다… (올린 파일은 저장하지 않습니다)"
         + (slow ? " 스캔본·사진이면 글자를 그림에서 읽느라 1분까지 걸릴 수 있습니다." : "");
       // 판정 중에는 다시 누르지 못하게 — 긴 계약서는 몇 초씩 걸립니다.
@@ -312,7 +365,8 @@
       form.setAttribute("aria-busy", "true");
       // 크기로만 가르니 2MB 밑의 스캔본(11~20초)에 안내가 없었습니다 — 3초가 지나도 답이
       // 없으면 알립니다(사용성 3회차).
-      const slowTimer = slow ? null : setTimeout(() => {
+      // 붙여 넣은 글은 스캔이 아니라 이 안내가 맞지 않습니다.
+      const slowTimer = slow || useText ? null : setTimeout(() => {
         status.textContent += " 스캔본이면 글자를 그림에서 읽느라 1분까지 걸릴 수 있습니다.";
       }, 3000);
       let answer;
@@ -346,7 +400,9 @@
       const already = lost.filter((key) => have.has(key));
       const notHere = lost.filter((key) => !have.has(key));
       const summary =
-        (both ? "파일을 읽었습니다(붙여 넣은 글은 쓰지 않아 비웠습니다). " : "")
+        `판정한 것: ${judgedWhat}${both ? " (다른 쪽은 쓰지 않았습니다)" : ""}. `
+        + (basisLine(result) ? basisLine(result) + ". " : "")
+        + (result.blanks ? `빈칸 ${result.blanks}곳이 채워지지 않았습니다. ` : "")
         + (result.notes && result.notes.length ? result.notes.join(" ") + " " : "")
         + (result.truncated
           ? `계약서가 길어 앞 ${result.checked.toLocaleString()}자만 봤습니다 — 뒷부분은 나눠 올려 주세요. `
@@ -358,11 +414,17 @@
       status.textContent = summary;
       // 결과 맨 위에도 같은 요약 — 결과로 화면을 옮기면 상태줄(OCR·쪽 한도 알림)이 화면
       // 밖이었습니다(사용성 3회차).
-      body.insertAdjacentHTML("afterbegin", `<p class="cc_summary">${esc(summary)}</p>`);
+      lastReport = result.report || "";
+      body.insertAdjacentHTML("afterbegin", `<div class="cc_summary" tabindex="-1"><p>${esc(summary)}</p>
+        ${result.toxic.length || result.missing.length || (result.weak || []).length ? ""
+          : "<p>※ 글자를 찾은 결과일 뿐이라 내용까지 맞다는 뜻은 아닙니다.</p>"}
+        ${lastReport ? `<button class="button ghost" type="button" data-cc-report>판정 결과 받기 (텍스트)</button>` : ""}</div>`);
+      // 판정 중 단추를 막아 초점이 창 밖으로 떨어졌습니다 — 결과 요약으로 옮깁니다(사용성 4회차).
+      const summaryBox = body.querySelector(".cc_summary");
+      if (summaryBox) summaryBox.focus({ preventScroll: true });
       judged = true;
       if (paste) paste.open = false;
-      // 파일로 판정했으면 붙여 넣은 칸을 비웁니다 — 남아 있어 올릴 때마다 같은 안내가 되풀이됐습니다.
-      if (both) form.querySelector("textarea[name=text]").value = "";
+
       // 결과로 갑니다 — 휴대폰에서 결과가 첫 화면 아래라 안 보였습니다.
       body.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -385,10 +447,10 @@
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
         link.href = url;
         // 날짜를 붙여, 여러 번 받아도 (1)·(2) 가 붙지 않고 언제 받은 것인지 알 수 있게.
-        link.download = `계약서-조항-문안-${today}.${format}`;
+        link.download = `계약서-조항-문안-${today()}.${format}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -424,13 +486,28 @@
     }
     if (countryInput) {
       // 영국은 흔히 UK 로 적습니다 — ISO 로는 GB 입니다. 알 수 없는 값은 말없이 버리지 않습니다.
-      const ALIAS = { UK: "GB", EL: "GR" };
+      // 세 글자(ARE → AR 아르헨티나 로 잘렸습니다)·한글 이름도 받습니다(사용성 4회차).
+      const ALIAS = { UK: "GB", EL: "GR", USA: "US", CHN: "CN", JPN: "JP", VNM: "VN", IND: "IN", IDN: "ID",
+        DEU: "DE", GBR: "GB", FRA: "FR", ITA: "IT", ESP: "ES", NLD: "NL", ARE: "AE", SAU: "SA", TUR: "TR",
+        BRA: "BR", MEX: "MX", RUS: "RU", THA: "TH", MYS: "MY", PHL: "PH", SGP: "SG", HKG: "HK", TWN: "TW",
+        AUS: "AU", CAN: "CA", EGY: "EG", NGA: "NG", ARG: "AR", CHL: "CL", POL: "PL", AUT: "AT", CHE: "CH",
+        KOR: "KR", "미국": "US", "중국": "CN", "일본": "JP", "베트남": "VN", "인도": "IN", "인도네시아": "ID",
+        "독일": "DE", "영국": "GB", "프랑스": "FR", "이탈리아": "IT", "스페인": "ES", "네덜란드": "NL",
+        "아랍에미리트": "AE", "UAE": "AE", "두바이": "AE", "사우디": "SA", "사우디아라비아": "SA", "터키": "TR",
+        "튀르키예": "TR", "브라질": "BR", "멕시코": "MX", "러시아": "RU", "태국": "TH", "말레이시아": "MY",
+        "필리핀": "PH", "싱가포르": "SG", "홍콩": "HK", "대만": "TW", "호주": "AU", "캐나다": "CA",
+        "이집트": "EG", "칠레": "CL", "폴란드": "PL", "오스트리아": "AT", "스위스": "CH" };
       countryInput.addEventListener("change", () => {
-        let code = countryInput.value.trim().toUpperCase();
-        code = ALIAS[code] || code;
+        const raw = countryInput.value.trim();
+        let code = ALIAS[raw] || ALIAS[raw.toUpperCase()] || raw.toUpperCase();
         countryInput.value = code;
         if (code && !/^[A-Z]{2}$/.test(code)) {
-          status.textContent = "도착국은 영문 두 글자로 적어 주세요 (예: US · CN · AE · GB).";
+          // 잘못 적으면 앞의 나라가 조용히 남았습니다 — 비우고 다시 그립니다.
+          status.textContent = "도착국은 영문 두 글자나 나라 이름으로 적어 주세요 (예: US · CN · AE · 베트남).";
+          country = "";
+          const shown = host.querySelector("[data-cc-country-name]");
+          if (shown) shown.textContent = "";
+          dealChanged();
           return;
         }
         // 이름으로 확인시킵니다 — 'XX' 를 말없이 받고, VN 과 VI 를 헷갈려도 몰랐습니다(사용성 3회차).
@@ -439,6 +516,8 @@
         if (code && !named) {
           if (shown) shown.textContent = "";
           status.textContent = `‘${code}’ 는 알 수 없는 나라 코드입니다 — 영문 두 글자로 다시 적어 주세요 (예: US · CN · AE · GB).`;
+          country = "";
+          dealChanged();
           return;
         }
         if (shown) shown.textContent = named ? `→ ${named}` : "";

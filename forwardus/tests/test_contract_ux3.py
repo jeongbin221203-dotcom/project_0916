@@ -181,5 +181,147 @@ def test_화면은_도착국_이름을_확인시키고_받기_단추를_겹쳐_�
     js = (STATIC / "js" / "contract_clauses.js").read_text(encoding="utf-8")
     assert "Intl.DisplayNames" in js and "알 수 없는 나라 코드" in js
     assert "IntersectionObserver" in js and "actionsInView" in js
-    assert 'textarea[name=text]").value = ""' in js
+    assert 'lastSource === "text"' in js          # 4회차: 비우지 않고 마지막에 넣은 쪽으로 판정
     assert "조항과 같은 문장" in js
+
+
+# ── 사용성 4회차 (2026-10-05) ──────────────────────────────────────────────────
+FILLED = ("SALES CONTRACT\n1. GOODS Polypropylene 500 MT.\n2. PRICE FOB Busan, all prices in USD.\n"
+          "3. PAYMENT T/T within 30 days after B/L date.\n4. SHIPMENT not later than 30 Nov. 2026.")
+
+
+def test_빈칸이_그대로인_계약서는_다_갖췄다고_하지_않는다():
+    blank = ("SALES CONTRACT\n1. PAYMENT <L/C at sight | T/T>.\n2. SHIPMENT Latest date of shipment: ________.\n"
+             "3. PRICE FOB Busan, all prices are in [●].")
+    result = service.review(blank, "FOB")
+    assert result["blanks"] >= 3
+    weak = {row["key"] for row in result["weak"]}
+    assert {"shipment"} <= weak
+    assert "빈칸" in service.as_text(result)
+
+
+def test_채운_계약서와_수치_괄호_이메일은_빈칸이_아니다():
+    doc = FILLED + "\nContact: <sales@hana.co.kr>. Late interest <3>% per month."
+    assert service.review(doc, "FOB")["blanks"] == 0
+
+
+def test_본문의_CIF_를_읽어_보험_누락을_짚는다():
+    doc = ("SALES CONTRACT\n1. GOODS Steel coil 500 MT.\n2. PRICE CIF Rotterdam, USD 500 per MT.\n"
+           "3. PAYMENT T/T within 30 days after B/L date.")
+    result = service.review(doc, "")
+    assert result["incoterms"] == "CIF" and result["incoterms_from_doc"] == "CIF"
+    assert "insurance" in {row["key"] for row in result["missing"]}
+
+
+def test_고른_인코텀즈와_본문이_다르면_알린다():
+    doc = "SALES CONTRACT\n2. PRICE CIF Rotterdam, USD 500 per MT. PAYMENT T/T."
+    result = service.review(doc, "DDP")
+    assert result["incoterms_mismatch"] == "CIF"
+    assert "CIF" in service.as_text(result) and "다시 판정" in service.as_text(result)
+
+
+@pytest.mark.parametrize("text", ["hello", "안녕하세요 견적 부탁드립니다", "\x00" * 200])
+def test_계약서가_아닌_글은_판정하지_않는다(text):
+    with pytest.raises(service.ServiceError) as caught:
+        service.review(text, "FOB")
+    assert caught.value.error_code in {"NOT_CONTRACT", "VALIDATION_ERROR"}
+
+
+def test_중국어_계약서는_독소_0개로_안심시키지_않는다():
+    doc = "销售合同\n甲方可随时无理由解除本合同。乙方不得抵销任何款项。争议提交上海国际仲裁中心仲裁，适用中华人民共和国法律。" * 5
+    with pytest.raises(service.ServiceError) as caught:
+        service.review(doc, "FOB", "CN")
+    assert caught.value.error_code == "UNSUPPORTED_LANG"
+
+
+def test_도착국은_두_글자가_아니면_비운다():
+    doc = FILLED
+    assert service.review(doc, "FOB", "<B>X</B>" * 20)["country"] == ""
+    assert service.review(doc, "FOB", "vn")["country"] == "VN"
+
+
+def test_Word_변경_추적으로_넣은_문장도_읽는다():
+    import docx
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+
+    document = docx.Document()
+    document.add_paragraph("SALES CONTRACT")
+    paragraph = document.add_paragraph("The Seller shall deliver the goods. ")
+    ins = parse_xml(f'<w:ins {nsdecls("w")} w:id="1" w:author="Buyer" w:date="2026-10-01T00:00:00Z"><w:r>'
+                    f'<w:t>The Buyer may terminate this Contract at any time for convenience.</w:t></w:r></w:ins>')
+    paragraph._p.append(ins)
+    deleted = parse_xml(f'<w:del {nsdecls("w")} w:id="2" w:author="Buyer" w:date="2026-10-01T00:00:00Z"><w:r>'
+                        f'<w:delText>DELETED-SENTENCE</w:delText></w:r></w:del>')
+    paragraph._p.append(deleted)
+    section = document.sections[0]
+    section.footer.paragraphs[0].text = "Footer: The Buyer may set off any amount claimed against the price."
+    out = io.BytesIO()
+    document.save(out)
+    text, notes = service.read_contract("tracked.docx", out.getvalue())
+    assert "terminate this Contract at any time" in text and "DELETED-SENTENCE" not in text
+    assert "set off any amount" in text
+    assert any("변경 추적" in note for note in notes)
+    assert "termination_at_will" in contract_clauses.find_in(text)
+
+
+def _client():
+    app = create_app(TestConfig)
+    ctx = app.app_context()
+    ctx.push()
+    db.create_all()
+    return app.test_client(), ctx
+
+
+def test_JSON_배열을_보내도_500이_아니다():
+    client, ctx = _client()
+    try:
+        response = client.post("/contract/review", data="[1,2,3]", content_type="application/json")
+        assert response.status_code == 400
+        response = client.post("/contract/review", json={"text": ["x"]})
+        assert response.status_code == 400
+    finally:
+        db.session.remove(); db.drop_all(); ctx.pop()
+
+
+def test_받기는_겹친_조항을_빼고_상한을_둔다():
+    client, ctx = _client()
+    try:
+        response = client.post("/contract/export", json={"keys": ["payment"] * 2000, "format": "txt"})
+        body = response.get_data(as_text=True)
+        assert response.status_code == 200 and body.count("[필수]") == 1
+        assert response.headers["Content-Type"].count("charset") == 1
+    finally:
+        db.session.remove(); db.drop_all(); ctx.pop()
+
+
+def test_받는_문안에_빈칸_설명과_설명_표시가_있다():
+    text = service.clause_plain(["payment", "shipment"])
+    assert "고쳐 넣을 칸" in text and "설명:" in text
+
+
+def test_판정_결과를_파일로_받을_수_있다():
+    result = service.review("SALES CONTRACT\nThe Buyer may set off any amount against the price.", "FOB")
+    report = service.report_plain(result)
+    assert report.startswith("﻿") and "\r\n" in report and "지우거나 고쳐야 할 조항" in report
+    client, ctx = _client()
+    try:
+        data = client.post("/contract/review", json={"text": "SALES CONTRACT\nThe Buyer may set off any amount "
+                                                              "against the price."}).get_json()["data"]
+        assert "지우거나 고쳐야 할 조항" in data["report"]
+    finally:
+        db.session.remove(); db.drop_all(); ctx.pop()
+
+
+def test_독소가_없어도_직접_확인_항목이_있으면_안심시키지_않는다():
+    result = service.review(FILLED, "FOB", "SA")
+    result["toxic"], result["missing"], result["weak"] = [], [], []
+    result["watch_country"] = [{"key": "x", "title": "t", "risk": "r"}]
+    assert "직접 확인하세요" in service.as_text(result)
+
+
+def test_화면은_마지막에_넣은_쪽으로_판정하고_기준을_적는다():
+    js = (STATIC / "js" / "contract_clauses.js").read_text(encoding="utf-8")
+    assert "판정한 것:" in js and "판정 기준:" in js and "data-cc-report" in js
+    assert 'class="cc_tag cc_watch">주의' in js and "ALIAS" in js and "ARE:" in js
+    assert 'aria-label="계약서 본문 붙여 넣기"' in js and "getFullYear()" in js

@@ -56,6 +56,13 @@ _ICC_C = re.compile(r"(?:\bICC|institute\s+cargo\s+clauses?)\s*\(?\s*C\s*\)?", r
 _GAB_EUL = re.compile(r"(?<![가-힣])[갑을](?:은|는|이|가|의|에게)\s")
 
 
+def _party_ab_unknown(body: str) -> bool:
+    """Party A/B 로만 부르는데 매도인·매수인을 못 정한 계약서."""
+
+    return (len(re.findall(r"\bParty\s+[AB]\b", body)) >= 2
+            and len(re.findall(r"\b(?:seller|buyer)\b", body, re.I)) < 2)
+
+
 def _side_shown(body: str, analysis: dict) -> dict | None:
     """화면에 '우리 쪽을 … 로 읽었습니다'로 보일 값. Supplier·Customer 계약서도 밝힙니다."""
 
@@ -66,6 +73,34 @@ def _side_shown(body: str, analysis: dict) -> dict | None:
         return {"label": roles.get("Seller", "Seller"), "name": "",
                 "other_label": roles.get("Buyer", "Buyer"), "other_name": ""}
     return None
+
+
+_CJK = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff]")
+_READABLE = re.compile(r"[A-Za-z가-힣]")
+_CONTRACTISH = re.compile(r"\b(?:contract|agreement|terms\s+and\s+conditions|purchase\s+order|seller|buyer|"
+                          r"supplier|party\s+[AB])\b|계약|매도인|매수인|(?<![가-힣])[갑을](?:은|는|이|가)\s", re.I)
+_INCOTERMS = re.compile(r"\b(EXW|FCA|FAS|FOB|CFR|CIF|CPT|CIP|DAP|DPU|DDP)\b")
+
+
+def _language_note(text: str) -> str:
+    """중국어·일본어 계약서는 판정하지 못합니다 — '독소 0개'로 안심시켰습니다(사용성 4회차)."""
+
+    cjk, readable = len(_CJK.findall(text)), len(_READABLE.findall(text))
+    if cjk > readable:
+        raise ServiceError("중국어·일본어 계약서는 아직 판정하지 못합니다 — 이대로 보면 위험한 조항을 '없다'고 "
+                           "잘못 알려 드리게 됩니다. 영문본이나 국문본을 올려 주세요.", "UNSUPPORTED_LANG")
+    if cjk >= 100:
+        return "중국어·일본어로만 적힌 부분은 읽지 못합니다 — 그 부분의 조항은 판정에 들어가지 않았습니다."
+    return ""
+
+
+def _terms_in(text: str) -> str:
+    """본문에 가장 많이 나온 인코텀즈(같으면 먼저 나온 것)."""
+
+    found = _INCOTERMS.findall(text)
+    if not found:
+        return ""
+    return max(dict.fromkeys(found), key=found.count)
 
 
 def _mark_same_evidence(rows: list[dict]) -> list[dict]:
@@ -187,6 +222,20 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
         raise ServiceError("쪽 번호·머리글만 읽혔고 계약서 본문을 찾지 못했습니다. 스캔본이면 "
                            "글자가 있는 PDF로 다시 저장하거나, 본문을 붙여 넣어 주세요.",
                            "UNREADABLE")
+    head = body[:MAX_TEXT]
+    lang_note = _language_note(head)
+    if not analysis["clauses"] and not _CONTRACTISH.search(head):
+        # "hello" · 견적 문의 글에 '빠진 필수 13개'를 냈습니다(사용성 4회차).
+        raise ServiceError("계약서로 보이지 않습니다 — 결제·선적·준거법 같은 계약 조항을 하나도 찾지 못했습니다. "
+                           "계약서 본문이나 파일을 넣어 주세요.", "NOT_CONTRACT")
+    country = (country or "").strip().upper()
+    if not re.fullmatch(r"[A-Z]{2}", country):
+        country = ""
+    # 인코텀즈를 '모름'으로 두면 계약서의 CIF 를 보고도 보험 누락을 안 짚었습니다(사용성 4회차) —
+    # 본문에서 읽어 쓰고, 고른 값과 다르면 알립니다.
+    chosen = (incoterms or "").strip().upper()
+    in_doc = _terms_in(head)
+    incoterms = chosen or in_doc
     _judge_by_deal(analysis, body[:MAX_TEXT], incoterms)
     found ={key for key, row in analysis["clauses"].items() if row["status"] == "present"}
     rows = checklist(incoterms, found, country, analysis)
@@ -259,10 +308,18 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
         "our_side": _side_shown(body[:MAX_TEXT], analysis),
         # 갑/을 계약서인데 누가 우리인지 못 정했으면 알립니다 — 방향이 뒤집히면 우리
         # 권리를 독소로 짚습니다(2회차).
-        "side_unknown": not analysis["side"] and bool(_GAB_EUL.search(body[:MAX_TEXT])),
+        # Party A/B 도 — 정의를 못 읽으면 판정이 전부 0건이었는데 아무 말이 없었습니다(전문가 4회차).
+        "side_unknown": not analysis["side"] and (bool(_GAB_EUL.search(body[:MAX_TEXT]))
+                                                  or _party_ab_unknown(body[:MAX_TEXT])),
         # 40만 자를 넘으면 앞만 봅니다 — 그걸 밝힙니다. 전에는 뒤를 안 보면서
         # 글자 수는 전체를 적어 '다 읽었다'고 했습니다. (2026-10-04)
         "checked": min(len(body), MAX_TEXT),
+        # 판정 기준 — 결과 위에 "CIF · 중국(CN) 기준"으로 적습니다(사용성 4회차).
+        "incoterms": (incoterms or "").upper(),
+        "incoterms_from_doc": in_doc if not chosen else "",
+        "incoterms_mismatch": in_doc if chosen and in_doc and in_doc != chosen else "",
+        "blanks": len(contract_clauses._BLANK.findall(head)),
+        "review_notes": [lang_note] if lang_note else [],
         "truncated": len(body) > MAX_TEXT,
         "note": DISCLAIMER,
     }
@@ -293,7 +350,7 @@ def read_contract(filename: str, data: bytes) -> tuple[str, list[str]]:
             raise ServiceError("빈 파일입니다. 내용이 있는 계약서 파일을 올려 주세요.", "VALIDATION_ERROR")
         return text, []
     if name.endswith(".docx"):
-        return _read_docx(data), []
+        return _read_docx_with_notes(data)
     text, notes, pages = _read_pages(name, data)
     note = _missing_pages(text, pages)
     if note:
@@ -454,6 +511,22 @@ def _decode(data: bytes) -> str:
     return text
 
 
+def _read_docx_with_notes(data: bytes) -> tuple[str, list[str]]:
+    import io
+
+    import docx
+
+    try:
+        document = docx.Document(io.BytesIO(data))
+    except Exception:
+        raise ServiceError("Word 파일을 열지 못했습니다. 암호가 걸려 있거나 손상되었을 수 있습니다. "
+                           "PDF로 저장해 올려 주세요.", "VALIDATION_ERROR")
+    text, tracked = _docx_text(document)
+    notes = ["Word 의 **변경 추적(수정 표시)**이 있어, 수정을 반영한 본문(넣은 글 포함 · 지운 글 제외)으로 "
+             "판정했습니다. 상대가 새로 넣은 문장도 판정에 들어갔습니다."] if tracked else []
+    return text, notes
+
+
 def _read_docx(data: bytes) -> str:
     """Word 계약서 — 문단과 표 칸의 글자. 실무 계약서는 docx 가 가장 흔합니다."""
 
@@ -466,11 +539,44 @@ def _read_docx(data: bytes) -> str:
     except Exception:
         raise ServiceError("Word 파일을 열지 못했습니다. 암호가 걸려 있거나 손상되었을 수 있습니다. "
                            "PDF로 저장해 올려 주세요.", "VALIDATION_ERROR")
-    lines = [p.text for p in document.paragraphs]
-    for table in document.tables:
-        for row in table.rows:
-            lines.append(" ".join(cell.text for cell in row.cells))
-    return "\n".join(lines)
+    return _docx_text(document)[0]
+
+
+def _docx_text(document) -> tuple[str, bool]:
+    """(글자, 변경 추적 여부). python-docx 의 .text 는 변경 추적으로 **넣은 글**(w:ins)·콘텐츠
+    컨트롤(w:sdt)·머리글/바닥글을 빼서, 바이어가 수정 표시로 넣어 돌려준 독소조항을 놓쳤습니다
+    (사용성 4회차). 문단 XML 의 w:t 를 모두 모읍니다 — 지운 글(w:delText)은 들어가지 않습니다."""
+
+    from docx.oxml.ns import qn
+
+    W_P, W_T, W_TAB, W_BR = qn("w:p"), qn("w:t"), qn("w:tab"), qn("w:br")
+
+    def para(p) -> str:
+        return "".join((node.text or "") if node.tag == W_T else " " for node in p.iter(W_T, W_TAB, W_BR))
+
+    body = document.element.body
+    lines = []
+    for child in body.iterchildren():
+        if child.tag == qn("w:tbl"):
+            for tr in child.iter(qn("w:tr")):
+                cells = [" ".join(para(p) for p in tc.iter(W_P)) for tc in tr.iterchildren(qn("w:tc"))]
+                lines.append(" ".join(cells))
+        else:
+            lines.extend(para(p) for p in ([child] if child.tag == W_P else child.iter(W_P)))
+    seen = set()
+    for section in document.sections:
+        for part in (section.header, section.footer):
+            try:
+                element = part._element
+            except Exception:
+                continue
+            for p in element.iter(W_P):
+                text = para(p)
+                if text.strip() and text not in seen:
+                    seen.add(text)
+                    lines.append(text)
+    tracked = body.find(".//" + qn("w:ins")) is not None or body.find(".//" + qn("w:del")) is not None
+    return "\n".join(lines), tracked
 
 
 def _read_contract_pdf(data: bytes) -> tuple[list[str], dict, int]:
@@ -659,7 +765,7 @@ def clause_plain(keys) -> str:
     """고른 조항의 문안을 평문(.txt)으로. 기호 없이, 메모장에서 그대로 읽힙니다."""
 
     rule = "=" * 60
-    lines = ["계약서 조항 문안", rule, "", f"※ {DISCLAIMER}", ""]
+    lines = ["계약서 조항 문안", rule, "", f"※ {DISCLAIMER}", f"※ {BLANK_HELP}", ""]
     for head, row in _picked(keys):
         if head:
             lines += ["", f"■ {head}", ""]
@@ -673,9 +779,21 @@ def clause_plain(keys) -> str:
                 lines += [f"고치는 법: {_plain(row['fix'])}", ""]
         note, wording = _export_lines(row["text_en"])
         lines += ["[영문 문안]" + (f" {note}" if note else ""), "", *wording, "",
-                  _plain(row["text_ko"]), "", ""]
+                  "설명: " + _plain(row["text_ko"]), "", ""]
     # 메모장·옛 편집기가 한글을 깨뜨리지 않게 BOM 과 CRLF 로 냅니다.
     return "﻿" + "\r\n".join(lines).rstrip() + "\r\n"
+
+
+# 받은 문안의 빈칸·한글 문단이 무엇인지 몰랐습니다(사용성 4회차).
+BLANK_HELP = "‹ › · < > 안은 고쳐 넣을 칸입니다 — '|' 로 나뉜 것은 하나를 고르고, 나머지는 이 거래의 값으로 채우세요."
+
+
+def report_plain(result: dict) -> str:
+    """판정 결과를 평문(.txt)으로 — 화면의 '판정 결과 받기'. 메모장에서 그대로 읽힙니다."""
+
+    text = as_text(result).replace("**", "")
+    text = re.sub(r"^#+\s*", "", text, flags=re.M)
+    return "\ufeff" + text.replace("\n", "\r\n").rstrip() + "\r\n"
 
 
 _RED = "C0392B"
@@ -756,6 +874,7 @@ def clause_docx(keys) -> bytes:
     _runs(title, "**계약서 조항 문안**", size=18)
     note = document.add_paragraph()
     _runs(note, f"※ {DISCLAIMER}", color="666666", size=9.5)
+    _runs(document.add_paragraph(), f"※ {BLANK_HELP}", color="666666", size=9.5)
 
     for group, row in picked:
         if group:
@@ -780,11 +899,27 @@ def clause_docx(keys) -> bytes:
             line = document.add_paragraph()
             _runs(line, f"**고치는 법:** {row['fix']}")
         _boxed(document, row["text_en"])
-        _runs(document.add_paragraph(), row["text_ko"])
+        _runs(document.add_paragraph(), "설명: " + row["text_ko"])
 
     out = io.BytesIO()
     document.save(out)
     return out.getvalue()
+
+
+def _basis_line(result: dict) -> str:
+    """판정 기준 한 줄 — "판정 기준: CIF(계약서에서 읽음) · 도착국 CN"."""
+
+    parts = []
+    terms = result.get("incoterms") or ""
+    if terms:
+        parts.append(f"{terms}(계약서에서 읽음)" if result.get("incoterms_from_doc") else terms)
+    if result.get("country"):
+        parts.append(f"도착국 {result['country']}")
+    line = f"판정 기준: {' · '.join(parts)}" if parts else ""
+    if result.get("incoterms_mismatch"):
+        line += (f" — ⚠️ 고르신 인코텀즈는 {terms} 인데 계약서에는 **{result['incoterms_mismatch']}** 가 "
+                 "적혀 있습니다. 맞는 쪽으로 다시 판정하세요.")
+    return line
 
 
 def as_text(result: dict) -> str:
@@ -792,11 +927,17 @@ def as_text(result: dict) -> str:
 
     lines = ["## 계약서 조항 점검", ""]
     if result.get("side_unknown"):
-        lines += ["⚠️ 갑/을 중 **누가 우리(매도인)인지 못 정했습니다.** 정의문에 '(이하 \"갑\", 매도인)'처럼 "
-                  "역할을 적어 주시거나, 판정의 방향이 뒤집혔을 수 있으니 확인하세요.", ""]
+        lines += ["⚠️ 갑/을(Party A/B) 중 **누가 우리(매도인)인지 못 정했습니다.** 판정의 방향이 뒤집혔거나 "
+                  "위험한 조항을 못 짚었을 수 있습니다. 당사자 정의에 '매도인'·'Seller' 표시가 있는지 확인하세요.", ""]
     if result.get("truncated"):
         lines += [f"⚠️ 계약서가 길어 **앞 {MAX_TEXT:,}자만** 봤습니다. 뒷부분은 따로 나눠 "
                   "올려 주세요.", ""]
+    basis = _basis_line(result)
+    if basis:
+        lines += [basis, ""]
+    if result.get("blanks"):
+        lines += [f"⚠️ 채우지 않은 **빈칸이 {result['blanks']}곳** 있습니다(____ · [●] · ‹…› · TBD). 빈칸이 든 조항은 "
+                  "'적혀 있으나 부족'으로 봤습니다.", ""]
     side = result.get("our_side")
     if side:
         # 역할 이름만 정한 계약서(Supplier/Company)는 이름이 없습니다 — "Supplier — " 로
@@ -860,8 +1001,10 @@ def as_text(result: dict) -> str:
             lines.append(f"- **{row['title']}** — {note}")
         lines.append("")
     if not (result["toxic"] or result["missing"] or result.get("weak")):
-        lines += ["필수조항은 다 보이고, 독소조항은 보이지 않습니다. "
-                  "다만 **글자를 찾은 결과**일 뿐이라 내용까지 맞다는 뜻은 아닙니다.", ""]
+        # ⚪ 직접 확인·🌍 도착국 주의가 있는데 "독소조항은 보이지 않습니다"로 끝냈습니다(사용성 4회차).
+        rest = " 위의 ⚪·🌍 항목은 직접 확인하세요." if (result.get("check") or result.get("watch_country")) else ""
+        lines += ["필수조항은 다 보이고, 짚은 독소조항은 없습니다." + rest +
+                  " 다만 **글자를 찾은 결과**일 뿐이라 내용까지 맞다는 뜻은 아닙니다.", ""]
     lines += [f"※ {result['note']}"]
     return "\n".join(lines)
 
