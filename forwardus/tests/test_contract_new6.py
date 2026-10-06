@@ -32,6 +32,13 @@ SAFE = [
     ("withholding_no_grossup", "The Seller shall bear its own income taxes in Korea."),
     ("withholding_no_grossup", "원천징수세액은 매수인이 부담하고 매도인에게 대금 전액을 지급한다."),
     ("withholding_no_grossup", "The Buyer shall not withhold or deduct any tax from the price."),
+    # 말뭉치(EDGAR·CUAD)에서 새로 걸렸던 정상 문장 — 재무 정의·회계·바이어가 세금을 보전
+    ("withholding_no_grossup", "Net Proceeds are all payments which Purchaser receives in a Liquidity Event net of "
+                               "any Taxes payable by Purchaser."),
+    ("withholding_no_grossup", "Income taxes paid, net of tax refunds received, were 86,066 in thousands."),
+    ("withholding_no_grossup", "The prices set forth in Attachment A are net of all taxes and duties, and the "
+                               "Buyer will reimburse the Seller for any taxes imposed in connection with this "
+                               "Agreement."),
     # 중재인 — 합의·각자 지명·기관 규칙·우리가 지명
     ("arbitrator_one_sided", "The arbitrators shall be appointed in accordance with the ICC Rules."),
     ("arbitrator_one_sided", "Each party shall appoint one arbitrator, and the two arbitrators shall appoint the "

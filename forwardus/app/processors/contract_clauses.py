@@ -3610,7 +3610,11 @@ _clause(
 All payments shall be made after deduction of any withholding tax at source. The
 Buyer shall not be required to gross up any payment.""",
     text_ko="withholding tax · deduction of tax 와 'not required to gross up' 이 나오면 이 조항입니다.",
-    detect=[r"(?:after\s+deduct\w*\s+of|net\s+of)\s+(?:any\s+|all\s+|applicable\s+|the\s+)?(?:withholding\s+)?tax(?:es)?",
+    # "net of … tax" 만으로는 재무 정의("Net Proceeds … net of any Taxes")·회계 문장("net of tax refunds")·
+    # 바이어가 세금을 보전하는 가격("net of all taxes … will reimburse")까지 잡았습니다(말뭉치 4회차) —
+    # 'net of' 는 **withholding** 을 말할 때만 봅니다.
+    detect=[r"after\s+deduct\w*\s+of\s+(?:any\s+|all\s+|applicable\s+|the\s+)?(?:withholding\s+)?tax(?:es)?",
+            r"\bnet\s+of\s+(?:any\s+|all\s+|applicable\s+|the\s+)?withholding\s+tax(?:es)?",
             r"(?:withholding\s+tax(?:es)?|tax(?:es)?\s+(?:withheld|deducted)(?:\s+at\s+source)?)[^.]{0,80}"
             r"(?:(?:borne\s+by|for\s+the\s+account\s+of|at\s+the\s+(?:cost|expense)\s+of|paid\s+by)\s+(?:the\s+)?"
             r"(?:seller|supplier)|for\s+the\s+(?:seller|supplier)'?s?\s+account)",
