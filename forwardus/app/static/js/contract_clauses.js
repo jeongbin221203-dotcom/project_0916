@@ -66,9 +66,7 @@
         <h4>🌍 도착국(${esc(regionLabel(country))})에서 흔한 조항 — 계약서에서 찾지 못함 <span class="cc_count">${items.length}</span></h4>
         <ul class="cc_list">${items.map((item) => `
           <li class="cc_row"><span class="cc_tag cc_watch">주의</span> <b>${esc(item.title)}</b>
-            <p class="cc_why">${item.key === "reexport_control"
-              ? "재수출 금지·최종용도 확인 문구를 <b>넣으세요</b> — 지금 없는 것이 위험입니다."
-              : "협상 중에 들어오면 지우거나 고치세요."}</p></li>`).join("")}</ul>
+            <p class="cc_why">${rich(item.watch_note || "협상 중에 들어오면 지우거나 고치세요.")}</p></li>`).join("")}</ul>
       </section>`;
   }
 

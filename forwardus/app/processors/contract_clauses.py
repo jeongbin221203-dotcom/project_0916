@@ -1651,7 +1651,7 @@ internationally recognised surveyor. Claims notified later shall be deemed waive
     text_ko="**도착 후 30일** 같은 기한을 박고, **제3 검사기관 보고서**를 함께 내게 "
             "합니다. 기한이 지나면 **포기한 것으로 본다**까지 적어야 닫힙니다.",
     detect=[r"(?:claim|notif)[^.]{0,80}within[^.]{0,30}(?:seven|ten|fourteen|fifteen|twenty|thirty|sixty|ninety)\s+days",
-            r"claims?[^.]{0,80}within[^.]{0,20}\(?\d{1,3}\)?[^.]{0,20}days",
+            r"\bclaims?\b[^.]{0,80}within[^.]{0,20}\(?\d{1,3}\)?[^.]{0,20}days",
             r"(claim|notification)[^.]{0,60}deemed waived",
             r"(클레임|이의|하자)[^.]{0,40}\d{1,3}\s*일[^.]{0,30}(이내|내에)"
             r"[^.]{0,30}(통지|서면)",
@@ -3431,7 +3431,8 @@ _amend("no_set_off", detect=(
     r"(?:buyer|purchaser)\s+(?:shall|may)\s+not\s+(?:(?:withhold|set[- ]?off|deduct|reduce|counterclaim)\w*,?\s+"
     r"(?:or\s+)?){1,3}",))
 _amend("claim_period", detect=(
-    r"notif\w*[^.]{0,60}(?:defects?|non-?conformit\w*|claims?|shortages?|damage)[^.]{0,60}within\s+\(?\d{1,3}\)?"
+    r"notif\w*[^.]{0,60}(?:defects?|non-?conformit\w*|shortages?|damage\w*|warranty\s+claims?|quality\s+claims?)"
+    r"[^.]{0,60}within\s+\(?\d{1,3}\)?"
     r"\s*(?:working\s+|business\s+|calendar\s+)?days",))
 _amend("lc_deadline", detect=(
     r"\b(?:l/?c|letter\s+of\s+credit)\b[^.]{0,80}(?:to\s+be\s+)?(?:opened|issued|established)\s+within\s+",))
@@ -3510,7 +3511,8 @@ _amend("title", weak=(
      r"즉시|하는\s*때|한\s*때)[^.]{0,30}(?:매수인|바이어)[^.]{0,10}(?:이전|귀속|넘어)",
      "소유권이 **선적·인도 때** 넘어갑니다 — 대금을 받기 전에 물건이 바이어 것이 됩니다. '대금 완납 시까지 "
      "매도인에게 유보'로 바꾸세요."),),
-       detect=(r"(?:retains?|reserves?)\s+(?:the\s+)?(?:title|ownership|property)\b",
+       detect=(r"\b(?:seller|supplier)\s+(?:retains?|reserves?)\s+(?:the\s+)?(?:title|ownership|property)\b"
+               r"[^.]{0,100}\b(?:until|pending|unless)\b",
                r"property\s+in\s+the\s+goods\s+shall\s+not\s+pass",
                r"\btitle\s+(?:to\s+the\s+goods\s+)?shall\s+not\s+pass\s+(?:to\s+the\s+buyer\s+)?until",
                r"seller'?s\s+property\s+until",
@@ -3546,7 +3548,7 @@ _amend("termination_at_will",
                r"(?:\s+or\s+any\s+purchase\s+orders?)?\s+(?:at\s+any\s+time\s+)?(?:without\s+cause\s+)?(?:up)?on\s+"
                r"(?:\w+\s+)?(?:\(\d+\)\s+)?(?:days?|months?|weeks?)'?s?'?\s+(?:prior\s+)?(?:written\s+)?notice",
                r"\b(?:buyer|purchaser)\s+may\s+terminate[^.]{0,60}\bwithout\s+cause\b",
-               r"\bfor\s+any\s+reason\s+or\s+(?:for\s+)?no\s+reason\b",
+               r"\b(?:buyer|purchaser|customer)\b[^.]{0,80}\bfor\s+any\s+reason\s+or\s+(?:for\s+)?no\s+reason\b",
                r"\b(?:buyer|purchaser|customer)\s+may\s+cancel\s+or\s+reschedule[^.]{0,120}without\s+(?:charge|liability|"
                r"cost|penalty)"))
 _amend("payment_fx_approval", detect=(
@@ -3592,6 +3594,180 @@ _amend("governing_law",
               "적으세요."),))
 
 
+# ── 새 독소조항 6종 (2026-10-06) ────────────────────────────────────────────
+#
+# 전문가 점검 4회차가 "수출자에게 꼭 필요한데 아예 없다"고 짚은 것. 모두 **독소**(지우거나
+# 고칠 조항)이고, 반대 방향(바이어가 지는 꼴)과 정상 문장을 먼저 시험합니다.
+# 사건과 문구는 tests/test_contract_new6.py.
+
+_clause(
+    "withholding_no_grossup", "원천징수 세금을 우리가 떠안음 (gross-up 없음)", "toxic",
+    why="인도(TDS)·인도네시아(PPh 26)·베트남(FCT) 같은 나라는 바이어가 대금에서 **세금을 떼고** 보냅니다. "
+        "계약서에 'gross-up'(떼인 만큼 더 지급)이 없으면 그 세금은 우리 몫입니다.",
+    risk="송장 100을 보냈는데 80~90만 들어옵니다. 한국에서 외국납부세액공제를 받으려면 원천징수 증명서도 "
+         "필요한데 그것도 못 받을 수 있습니다.",
+    text_en="""(지울 문구의 예)
+All payments shall be made after deduction of any withholding tax at source. The
+Buyer shall not be required to gross up any payment.""",
+    text_ko="withholding tax · deduction of tax 와 'not required to gross up' 이 나오면 이 조항입니다.",
+    detect=[r"(?:after\s+deduct\w*\s+of|net\s+of)\s+(?:any\s+|all\s+|applicable\s+|the\s+)?(?:withholding\s+)?tax(?:es)?",
+            r"(?:withholding\s+tax(?:es)?|tax(?:es)?\s+(?:withheld|deducted)(?:\s+at\s+source)?)[^.]{0,80}"
+            r"(?:(?:borne\s+by|for\s+the\s+account\s+of|at\s+the\s+(?:cost|expense)\s+of|paid\s+by)\s+(?:the\s+)?"
+            r"(?:seller|supplier)|for\s+the\s+(?:seller|supplier)'?s?\s+account)",
+            r"(?:seller|supplier)\s+(?:shall|will)\s+(?:bear|pay|be\s+(?:liable|responsible)\s+for)[^.]{0,40}"
+            r"withholding\s+tax",
+            r"원천\s*징수(?:세|세액)?[^.]{0,40}(?:매도인|공급자)[^.]{0,15}(?:부담|책임)" + NO_NEG_KO,
+            r"(?:대금|금액)[^.]{0,30}원천\s*징수(?:세|세액)?[^.]{0,10}(?:공제|차감)(?:한|하고)\s*(?:후|금액|잔액|지급)"],
+    # 'gross up 의무가 없다'는 부정이 뜻의 일부입니다.
+    strict=[r"(?:shall|will)\s+not\s+(?:be\s+)?(?:required|obliged|obligated)\s+to\s+gross[- ]?up",
+            r"\bno\s+gross[- ]?up\b", r"\bwithout\s+(?:any\s+)?gross[- ]?up\b",
+            # gross-up 이라는 말 없이 같은 뜻 — "withholding … shall not be required to increase any payment"
+            r"(?:withh\w+|deduct\w+|tax\w*)[^.]{0,120}(?:shall|will)\s+not\s+(?:be\s+)?(?:required|obliged|obligated)"
+            r"\s+to\s+(?:increase|pay\s+(?:any\s+)?(?:additional|more|further)|compensate|reimburse|make\s+up)",
+            r"gross[- ]?up[^.]{0,20}(?:하지\s*(?:아니|않)|의무[^.]{0,6}없)"],
+    # 문서 어디에 gross-up 의무(더 지급)가 있으면 우리가 떠안는 것이 아닙니다.
+    unless_doc=[r"(?:shall|will|agrees\s+to|must)\s+gross[- ]?up\b",
+                r"(?:shall|will)\s+pay\s+(?:to\s+the\s+seller\s+)?(?:such\s+)?additional\s+(?:amounts?|sums?)",
+                r"gross[- ]?up\s*(?:하여|한다|합니다)|세금[^.]{0,20}추가(?:로)?\s*지급"],
+    fix="바이어가 세금을 떼면 **떼인 만큼 더 보내도록(gross-up)** 고치세요: 'if the Buyer is required by law to "
+        "withhold, the Buyer shall pay such additional amounts so that the Seller receives the full invoice "
+        "amount, and shall deliver the tax receipt (e.g. Form 16A) within 30 days.'",
+    countries=("IN", "ID", "VN", "TH", "PH", "PK", "BD", "EG", "NG"),
+    avoid=NEGATION,
+)
+
+_clause(
+    "arbitrator_one_sided", "중재인을 상대가 혼자 지명", "toxic",
+    why="중재인을 **바이어가 단독으로 고르는** 조항입니다. 판정하는 사람이 한쪽이 고른 사람이면 공정한 "
+        "중재라고 보기 어렵습니다. 인도 대법원은 2024년 공공 계약의 일방 지명 조항이 평등 원칙에 어긋난다고 "
+        "봤습니다(민간 계약은 나라마다 다릅니다).",
+    risk="이길 가능성이 낮아지고, 다투려면 먼저 그 조항의 효력부터 법원에서 다퉈야 해 시간과 비용이 듭니다.",
+    text_en="""(지울 문구의 예)
+The arbitration shall be conducted by a sole arbitrator appointed by the Buyer.""",
+    text_ko="arbitrator ... appointed by the Buyer 가 나오면 이 조항입니다.",
+    detect=[r"arbitrators?\s+(?:shall\s+be\s+|is\s+to\s+be\s+|will\s+be\s+)?(?:appointed|nominated|selected|"
+            r"designated|chosen)\s+(?:solely\s+|exclusively\s+|unilaterally\s+)?by\s+(?:the\s+)?(?:buyer|purchaser)\b",
+            r"\b(?:buyer|purchaser)\s+(?:shall|may|has\s+the\s+right\s+to|shall\s+have\s+the\s+right\s+to)\s+"
+            r"(?:solely\s+|unilaterally\s+)?(?:appoint|nominate|select|designate)\s+(?:the\s+|a\s+)?sole\s+arbitrator",
+            r"중재인[^.]{0,20}(?:매수인|바이어)(?:이|가|은|는)\s*(?:단독으로\s*)?(?:지명|선정|선임|지정)"],
+    fix="중재인은 **중재기관 규칙(KCAB·SIAC·ICC 등)에 따라 정하거나, 양쪽이 한 명씩 고르고 그 둘이 의장을 "
+        "고르게** 바꾸세요.",
+    avoid=NEGATION + (r"\beach\s+party\b", r"\bboth\s+parties\b", r"\bmutual", r"\bjointly\b",
+                      r"agreement\s+of\s+the\s+parties", r"\band\s+(?:the\s+)?(?:seller|supplier)\b",
+                      r"(?:seller|supplier)\s+(?:shall|may)\s+(?:also\s+)?(?:appoint|nominate|select)",
+                      r"양\s*당사자|쌍방|각\s*당사자"),
+)
+
+_clause(
+    "licence_in_buyer_name", "제품 인허가를 바이어 명의로", "toxic",
+    why="사우디 SFDA·중국 NMPA·인도 CDSCO 같은 수입 허가·제품 등록이 **바이어 이름**으로 나가면, 그 나라에서는 "
+        "바이어가 허가 보유자입니다. 판매점을 바꾸려면 허가를 새로 받아야 합니다.",
+    risk="거래를 끊으면 그 나라 판매가 몇 달~몇 년 막힙니다. 의료기기·화장품·식품·의약품에 치명적입니다.",
+    text_en="""(지울 문구의 예)
+The marketing authorisation and product registration shall be held in the name of
+the Distributor.""",
+    text_ko="marketing authorisation · registration 과 in the name of the Distributor 가 나오면 이 조항입니다.",
+    detect=[r"(?:marketing\s+authori[sz]ations?|product\s+registrations?|registrations?|licen[cs]es?|permits?|"
+            r"import\s+certificates?|approvals?)[^.]{0,60}\b(?:held|registered|issued|filed|obtained|maintained|made)"
+            r"\s+in\s+the\s+name\s+of\s+(?:the\s+)?(?:buyer|purchaser|distributor|agent|importer)\b",
+            r"\b(?:buyer|purchaser|distributor|importer)\s+(?:shall|will)\s+(?:obtain|hold|apply\s+for|maintain)"
+            r"(?:\s+and\s+(?:obtain|hold|maintain))?\s+(?:all\s+|the\s+)?(?:product\s+)?(?:registrations?|marketing\s+authori[sz]ations?|licen[cs]es?|"
+            r"permits?)[^.]{0,40}\bin\s+(?:its|their)\s+own\s+name",
+            r"(?:SFDA|NMPA|CFDA|CDSCO|MFDS|COFEPRIS|ANVISA)[^.]{0,60}(?:registration|approval|certificate|"
+            r"licen[cs]e)[^.]{0,60}(?:name\s+of|held\s+by)\s+(?:the\s+)?(?:buyer|distributor|importer)",
+            r"(?:인허가|허가증|등록증|판매\s*허가|제품\s*등록|수입\s*허가)[^.]{0,30}(?:매수인|바이어|대리점|판매점|수입자)"
+            r"[^.]{0,10}명의" + NO_NEG_KO],
+    fix="허가·등록은 **우리(제조사) 명의로** 받고, 바이어에게는 **수입·판매 권한만** 주세요. 불가능한 나라면 "
+        "'계약이 끝나면 허가를 우리가 지정한 자에게 **무상 이전**하고 필요한 서류에 서명한다'를 넣으세요.",
+    countries=("GULF", "SA", "CN", "IN", "ID", "VN", "TH", "EG", "TR"),
+    avoid=NEGATION + (r"trade\s*marks?|\bbrand\b|상표",),
+)
+
+_clause(
+    "receivables_assign_ban", "매출채권 양도 금지 (팩토링·무역보험 막힘)", "toxic",
+    why="'매도인은 대금 채권을 양도할 수 없다'는 조항입니다. 외상 수출 대금을 **은행·팩토링사에 넘겨 현금화**하거나 "
+        "무역보험(K-SURE)·포페이팅을 쓰려면 채권을 넘길 수 있어야 합니다.",
+    risk="D/A 180일처럼 길게 외상으로 팔고도 돈이 들어올 때까지 자금이 묶입니다. 보험·금융을 못 써 거래 규모를 "
+         "키우지 못합니다.",
+    text_en="""(지울 문구의 예)
+The Seller shall not assign, transfer or factor any receivables arising under this
+Contract.""",
+    text_ko="Seller shall not assign ... receivables 가 나오면 이 조항입니다.",
+    detect=[r"(?:assign\w*|transfer\w*|factoring|sale)\s+of\s+(?:the\s+)?(?:seller'?s\s+)?(?:receivables?|invoices?)"
+            r"[^.]{0,60}\b(?:is|are|shall\s+be)\s+prohibited\b",
+            r"\bprohibit\w*[^.]{0,30}(?:assign\w*|transfer\w*|factoring)[^.]{0,40}receivables?"],
+    # '금지'가 뜻 그 자체라 부정으로 거르지 않습니다.
+    strict=[r"(?:seller|supplier)\s+(?:shall|may|will)\s+not\s+(?:\w+,?\s+){0,3}?(?:assign|transfer|sell|factor|"
+            r"discount|pledge|encumber)[^.]{0,80}(?:receivables?|invoices?|accounts?\s+receivable|payment\s+claims?|"
+            r"claims?\s+for\s+payment|right\s+to\s+payment)",
+            r"(?:seller|supplier)'?s?\s+(?:receivables?|payment\s+claims?|right\s+to\s+payment)[^.]{0,60}"
+            r"(?:shall|may|will)\s+not\s+be\s+(?:assigned|transferred|sold|factored|discounted|pledged)",
+            r"\b(?:factoring|forfaiting|invoice\s+discounting)\b[^.]{0,60}(?:is\s+|are\s+|shall\s+be\s+)?"
+            r"(?:prohibited|not\s+(?:be\s+)?(?:permitted|allowed))",
+            r"(?:매도인|공급자)(?:은|는)[^.]{0,50}(?:매출\s*)?채권[^.]{0,25}(?:양도|매각|담보로\s*제공)[^.]{0,20}"
+            r"(?:할\s*수\s*없|하여서는\s*아니|하지\s*못|금지)"],
+    # 은행·팩토링사·보험사로는 넘길 수 있다는 예외가 있으면 막힌 것이 아닙니다.
+    unless_doc=[r"(?:seller|supplier)\s+may\s+(?:freely\s+)?(?:assign|transfer|sell|factor|pledge)[^.]{0,60}"
+                r"(?:receivables?|invoices?)",
+                r"except[^.]{0,40}(?:bank|factor|financ|insur|lender)",
+                r"(?:은행|금융기관|보험|팩토링)[^.]{0,30}채권[^.]{0,20}양도[^.]{0,10}(?:할\s*수\s*있|가능|허용)"],
+    fix="'매도인은 **은행·팩토링사·무역보험사에** 대금 채권을 양도하거나 담보로 제공할 수 있고, 매수인은 그 통지를 "
+        "받으면 그쪽에 지급한다'로 고치세요. 양도를 완전히 막는 것이 어렵다면 **금융기관에 대한 양도만** 예외로 "
+        "두세요.",
+)
+
+_clause(
+    "esg_cost_shift", "공급망 강제노동·탄소 비용을 우리에게 전가 (ESG)", "toxic",
+    why="바이어가 미국 UFLPA(강제노동 수입금지)·EU CBAM(탄소국경조정)·공급자 행동규범을 이유로 **자기 손실·"
+        "탄소 비용·검사비를 전부 우리가 물게** 하는 조항입니다. 입증하지 못해도 책임지라는 꼴까지 있습니다.",
+    risk="우리 잘못이 아니어도 억류된 화물 전체의 손실을 물게 됩니다. 탄소 비용은 매출과 무관하게 불어납니다. "
+         "행동규범을 바이어가 일방적으로 고치면 이미 계약한 의무가 늘어납니다.",
+    text_en="""(지울 문구의 예)
+The Seller shall bear all costs and losses arising from any detention under forced
+labour laws, regardless of whether forced labour is proven.""",
+    text_ko="Seller shall bear ... forced labour · CBAM · carbon 이나 'regardless of whether ... proven' 이 나오면 이 조항입니다.",
+    detect=[r"(?:seller|supplier)\s+(?:shall|will|must)\s+(?:bear|pay|reimburse|indemnif\w*)[^.]{0,140}"
+            r"(?:forced\s+labou?r|UFLPA|CBAM|carbon\s+(?:border|price|tax|certificate|cost)|emission\s+allowances?|"
+            r"due\s+diligence\s+costs?)",
+            r"regardless\s+of\s+whether\s+(?:forced\s+labou?r|the\s+(?:violation|allegation))[^.]{0,30}(?:is\s+)?proven",
+            r"(?:CBAM|carbon\s+border|carbon\s+price|carbon\s+tax)[^.]{0,100}(?:borne\s+by|for\s+the\s+account\s+of|"
+            r"at\s+the\s+(?:cost|expense)\s+of)\s+(?:the\s+)?(?:seller|supplier)",
+            r"\b(?:buyer|purchaser)\s+may\s+(?:unilaterally\s+)?(?:amend|modify|update|revise)[^.]{0,40}"
+            r"(?:code\s+of\s+conduct|supplier\s+code|supplier\s+policy)[^.]{0,80}(?:binding|effective)",
+            r"(?:탄소국경|CBAM|강제\s*노동|탄소\s*배출권)[^.]{0,60}(?:매도인|공급자)[^.]{0,20}(?:부담|배상)" + NO_NEG_KO],
+    fix="**우리가 실제로 어긴 경우로 한정**하고(입증 책임은 바이어), 책임에는 **상한**을 두세요. 탄소 비용은 "
+        "'각자 부담' 또는 '바이어가 수입자로서 부담'으로, 행동규범은 **서명 당시 버전**으로 고정하세요.",
+    avoid=NEGATION,
+)
+
+_clause(
+    "br_agent_indemnity", "브라질 대리인 해지 보상 (법 4.886/65 · 수수료의 1/12)", "toxic",
+    why="브라질은 상사대리인 법(4.886/65)으로 **정당한 사유 없이 계약을 끝내면 전체 수수료의 1/12 이상**을 "
+        "대리인에게 줘야 합니다. 계약서로 없앨 수 없는 강행 규정입니다.",
+    risk="대리인을 바꾸거나 거래를 줄일 때 큰 돈이 나갑니다. 독점·장기 계약일수록 커집니다.",
+    text_en="""(지울 문구의 예)
+Upon termination without just cause, the Seller shall pay the Representative an
+indemnity equal to 1/12 of the total commissions earned during the term of the
+Agreement, in accordance with Law No. 4.886/65.""",
+    text_ko="Law 4.886 · indemnity ... 1/12 of total commissions 가 나오면 이 조항입니다.",
+    detect=[r"\brepresentante\s+comercial\b",
+            r"\bBrazil\w*[^.]{0,60}\b(?:agent|representative|agency)\b[^.]{0,60}\b(?:indemnit\w+|compensation)\b",
+            r"브라질[^.]{0,40}대리인[^.]{0,30}(?:보상|해지)"],
+    # 해지 금지·보상이 뜻 그 자체라 부정으로 거르지 않습니다.
+    strict=[r"\bLaw\s+(?:No\.?\s*)?4[.,]?886\b",
+            r"indemnit\w*\s+(?:equal\s+to|of|corresponding\s+to|not\s+less\s+than)\s+(?:1\s*/\s*12|one[- ]twelfth)\s+"
+            r"of\s+(?:the\s+)?(?:total\s+)?(?:commissions?|remuneration|compensation)",
+            r"(?:commercial\s+)?(?:agent|representative)[^.]{0,80}(?:1\s*/\s*12|one[- ]twelfth)[^.]{0,30}"
+            r"(?:commissions?|remuneration)",
+            r"12분의\s*1[^.]{0,30}(?:수수료|보수|보상)"],
+    fix="대리인을 두기 전에 **판매점(자기 계산으로 사서 재판매) 구조**로 바꿀 수 있는지 보세요 — 판매점은 보통 이 법의 "
+        "대상이 아닙니다(실제 구조에 따라 다르니 현지 변호사 확인). 대리인이 꼭 필요하면 보상액을 **예산에 "
+        "잡고**, 계약 기간을 짧게 두세요.",
+    countries=("BR",),
+    avoid=NEGATION,
+)
+
+
 # ── 독소조항 묶음 (2026-10-03) ──────────────────────────────────────────────
 #
 # 55개가 한 줄로 늘어서면 읽히지 않습니다. 수출자가 먼저 묻는 것 — **돈을 못
@@ -3608,6 +3784,11 @@ TOXIC_GROUPS = [
     ("sanctions", "⑧ 제재·대리점·가공"),
 ]
 TOXIC_GROUP = {
+    **dict.fromkeys(("withholding_no_grossup", "receivables_assign_ban"), "payment"),
+    **dict.fromkeys(("arbitrator_one_sided",), "dispute"),
+    **dict.fromkeys(("licence_in_buyer_name",), "ip"),
+    **dict.fromkeys(("esg_cost_shift",), "cost"),
+    **dict.fromkeys(("br_agent_indemnity",), "sanctions"),
     **dict.fromkeys(("payment_on_resale", "payment_fx_approval", "fx_risk_local",
                      "docs_before_payment", "lc_soft_clause", "payment_retention",
                      "acceptance_signature_payment", "buyer_set_off", "retro_price_deduction",

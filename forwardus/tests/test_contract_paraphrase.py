@@ -444,6 +444,49 @@ CASES = {
         "No force majeure event shall relieve the Seller of its delivery obligations.",
         "제38조 불가항력 조항은 매수인에게만 적용된다.",
     ],
+    # 새 독소조항 6종(2026-10-06)
+    "withholding_no_grossup": [
+        "Payments shall be made net of withholding taxes and the Buyer shall not be required to increase "
+        "any payment.",
+        "All amounts payable to the Seller shall be paid after deduction of any taxes required by law, and "
+        "no gross-up shall apply.",
+        "Any tax withheld at source in the Buyer's country shall be for the Seller's account.",
+        "제21조 원천징수세는 매도인의 부담으로 한다.",
+    ],
+    "arbitrator_one_sided": [
+        "Any dispute shall be finally settled by a single arbitrator selected by the Buyer in its sole "
+        "discretion.",
+        "The Purchaser shall have the right to nominate the sole arbitrator.",
+        "The arbitral tribunal shall consist of one arbitrator designated unilaterally by the Buyer.",
+        "제20조 중재인은 매수인이 지정하는 1인으로 한다.",
+    ],
+    "licence_in_buyer_name": [
+        "The import licence for the Products shall be issued in the name of the Importer.",
+        "The Distributor shall apply for and hold all product registrations in its own name.",
+        "The NMPA registration certificate shall be registered under the name of the Distributor.",
+        "제12조 제품 등록증은 대리점 명의로 발급받는다.",
+    ],
+    "receivables_assign_ban": [
+        "The Seller may not transfer, sell or pledge its accounts receivable hereunder.",
+        "Assignment of the Seller's receivables to any third party, including factors, is prohibited.",
+        "Factoring or forfaiting of the invoices under this Contract shall not be allowed.",
+        "제15조 매도인은 대금채권을 제3자에게 양도하거나 담보로 제공하여서는 아니 된다.",
+    ],
+    "esg_cost_shift": [
+        "The Seller shall reimburse the Buyer for all CBAM certificate costs in respect of the Goods.",
+        "The Seller shall indemnify the Buyer against any seizure under the UFLPA of goods produced with "
+        "forced labour.",
+        "Carbon price costs on the Goods shall be at the expense of the Seller.",
+        "제22조 CBAM 인증서 구매 비용은 매도인이 부담한다.",
+    ],
+    "br_agent_indemnity": [
+        "Upon termination, the Agent shall be entitled to an indemnity of one-twelfth of the total "
+        "remuneration earned.",
+        "The Representative's rights are governed by Brazilian Law 4.886/65 on commercial representation.",
+        "The Seller shall compensate the commercial agent in an amount not less than 1/12 of all commissions "
+        "earned.",
+        "제30조 해지 시 대리인에게 지급 기간 전체 수수료의 12분의 1 이상을 보상한다.",
+    ],
     "unilateral_amendment": [
         "Purchaser reserves the right to modify these terms from time to time by notice.",
         "The Buyer may change the unit prices at any time upon written notice.",

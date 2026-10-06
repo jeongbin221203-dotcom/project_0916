@@ -265,6 +265,8 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
     watch = [row for row in rows["toxic"] if row["for_country"] and not row["present"]
              and not (row["key"] == "ddp_no_ior" and deal not in ("", "DDP"))
              and not (row["key"] == "reexport_control" and _REEXPORT_SET.search(body[:MAX_TEXT]))]
+    for row in watch:
+        row["watch_note"] = WATCH_NOTE.get(row["key"], "")
     # 규칙이 **주제째 놓친** 조항 — 주제 분류기가 고릅니다. 판정은 바꾸지 않고
     # 빠진 필수조항에 "이 문장일 수 있습니다"를 덧붙이거나, '확인 필요'로 냅니다.
     # (2026-10-03, app/processors/clause_topics.py)
@@ -669,11 +671,22 @@ TOXIC_NOTE = {
     "exclusive_no_moq": "독점을 주려면 **최소 구매량**을 **함께 넣도록** 고치세요.",
     "ddp_no_ior": "**DAP 등으로 조건을 바꾸거나**, 우리가 수입자가 될 수 있는지 먼저 확인하세요.",
     "us_jury_punitive": "**중재로 바꾸거나**, 배심재판 포기·징벌적 손해 배제를 **넣으세요**.",
+    "withholding_no_grossup": "**gross-up(떼인 만큼 더 지급)과 원천징수 증명서 교부**를 넣도록 고치세요.",
+    "arbitrator_one_sided": "상대가 혼자 정하는 문구를 **빼고**, 중재기관 규칙이나 **양쪽 합의**로 정하게 고치세요.",
+    "receivables_assign_ban": "양도 금지를 **빼거나**, 은행·팩토링사·무역보험사로의 양도는 **허용하도록** 고치세요.",
+    "br_agent_indemnity": "보상 문구는 **지워도 효력이 없습니다** — 보상을 예산에 잡거나 판매점 구조로 바꾸세요.",
 }
 # 도착국에서 흔한데 아직 안 보일 때의 한 줄. 대부분은 '들어오면 지우라'지만, 재수출 통제는
 # 없는 것이 위험이라 '넣으라'입니다(2회차 — 두바이 판매점에 거꾸로 안내했습니다).
 WATCH_NOTE = {
     "reexport_control": "재수출 금지·최종용도 확인 문구를 **넣으세요** — 지금 없는 것이 위험입니다.",
+    # 새 조항 6종(2026-10-06) — 문장이 없을 때 해야 할 일이 다릅니다.
+    "withholding_no_grossup": "바이어가 대금에서 세금을 떼는 나라입니다 — **떼인 만큼 더 지급(gross-up)하고 원천징수 "
+                              "증명서를 주는 문구**를 넣으세요. 없으면 그 세금은 우리 몫입니다.",
+    "licence_in_buyer_name": "수입 허가·제품 등록이 필요하면 **우리 명의로** 받거나, 바이어 명의라면 계약이 끝날 때 "
+                             "**무상 이전**하는 문구를 넣으세요.",
+    "br_agent_indemnity": "브라질에 **대리인**을 두면 해지 때 수수료의 1/12 보상이 법으로 정해져 있습니다 — 대리인이 "
+                          "아니라 판매점(수입 후 재판매)이면 해당 없습니다.",
 }
 
 

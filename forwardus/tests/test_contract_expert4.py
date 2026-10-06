@@ -54,7 +54,28 @@ SAFE = [
     ("lc_soft_clause", "Shipment shall be made on a vessel subject to the Buyer's nomination under FOB terms."),
     ("lc_soft_clause", "Shipment within 30 days after receipt of L/C on the vessel as per the Buyer's nomination."),
     ("unlimited_damages", "매도인은 어떠한 경우에도 무제한의 손해배상 책임을 지지 아니한다."),
+    # 말뭉치(EDGAR·CUAD) 4회차에서 새로 걸렸던 정상 문장
+    ("termination_at_will", "The Seller may terminate this Agreement for any reason or no reason upon 90 days "
+                            "written notice."),
+    ("termination_at_will", "The Company may terminate this Agreement and the Contractor's engagement for Cause "
+                            "at any time on written notice."),
 ]
+
+
+@pytest.mark.parametrize("doc", [
+    "The Customer will at all times retain title to and ownership of the Product and any work in process.",
+    "The subject Party retains title ownership after the transaction to properties and assets.",
+    "GSK reserves and retains title and all rights not expressly granted hereunder.",
+    "If the Buyer rejects the Aircraft, the Seller will retain title to the Aircraft.",
+])
+def test_바이어나_제3자가_가지는_소유권은_매도인의_소유권_유보가_아니다(doc):
+    assert "title" not in _found(doc)
+
+
+def test_불가항력_통지는_클레임_기한이_아니다():
+    doc = ("The Party claiming the Force Majeure Event shall notify the other Party in writing within ten (10) "
+           "days of such event.")
+    assert "claim_period" not in _found(doc)
 
 
 @pytest.mark.parametrize("key,doc", SAFE, ids=[f"{k}:{d[:24]}" for k, d in SAFE])
