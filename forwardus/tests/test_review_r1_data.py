@@ -308,3 +308,101 @@ def test_한국_시각_기준_날짜를_쓴다(monkeypatch):
             return datetime(2025, 12, 31, 16, 0, tzinfo=timezone.utc).astimezone(tz)  # UTC 12/31 16:00
     monkeypatch.setattr(timeutil, "datetime", Late)
     assert timeutil.today_kst().isoformat() == "2026-01-01"          # UTC 로는 전날이지만 한국은 다음 날 01:00
+
+
+# ── 1회차 마무리(2026-10-06): 순중량 합계 · 보험료 · 초안 금액 · 품목 표 · 예시 스케줄 ─────────────────
+def test_순중량이_하나라도_비면_합계를_내지_않는다():
+    from app.processors import cargo_calculator
+
+    line = {"length_cm": 50, "width_cm": 40, "height_cm": 30, "quantity": 10, "weight_per_package_kg": 8,
+            "package_type": "carton"}
+    some = cargo_calculator.calculate_cargo_lines([{**line, "net_weight_kg": 50}, {**line}], strict=False)
+    assert some["net_weight_kg"] is None
+    every = cargo_calculator.calculate_cargo_lines(
+        [{**line, "net_weight_kg": 50}, {**line, "net_weight_kg": 60}], strict=False)
+    assert every["net_weight_kg"] == 110
+
+
+def test_운임이_송장에_들어_있는_조건은_보험료에_운임을_또_더하지_않는다():
+    from app.processors.cost_calculator import FREIGHT_IN_PRICE, calculate_insurance_premium
+
+    assert {"CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"} == set(FREIGHT_IN_PRICE)
+    plain = calculate_insurance_premium(25000, 1580, 1380)
+    included = calculate_insurance_premium(25000, 1580, 1380, freight_included=True)
+    assert included < plain
+    assert round(included / plain, 4) == round(25000 / (25000 + 1580), 4)
+
+
+def test_견적의_보험료는_조건에_따라_운임을_더하거나_더하지_않는다():
+    from app.processors.cost_calculator import calculate_logistics_cost
+
+    metrics = {"container_quantity": 1, "billable_revenue_ton": 3}
+    kwargs = dict(transport_mode="SEA", sea_mode="LCL", freight_usd=1580, freight_source="mock",
+                  invoice_value_usd=25000, metrics=metrics, exchange_rate=1380)
+
+    def insurance(incoterms):
+        result = calculate_logistics_cost(incoterms=incoterms, **kwargs)
+        return next(row["krw_amount"] for row in result["lines"] if row["code"] == "insurance")
+
+    assert insurance("CIF") < insurance("FOB")          # CIF 는 송장 금액에 운임이 이미 포함
+
+
+@pytest.mark.parametrize("value", ["nan", "-500", "inf", "abc", None, ""])
+def test_초안_서류_금액은_nan_음수를_그대로_찍지_않는다(value):
+    from app.services import draft_document_service
+
+    assert draft_document_service._number(value) == 0.0
+    assert draft_document_service._number("1,234.5") == 1234.5
+
+
+def _items_check(items, invoice_value):
+    return [r["message"] for r in cross.validate_documents(
+        {"commercial_invoice": {"invoice_value": invoice_value, "items": items}}, {})["findings"]
+        if r["kind"] == "items"]
+
+
+def test_품목_표가_맞으면_걸리지_않는다():
+    items = [{"quantity": 500, "unit_price": 10.0, "amount": 5000.0},
+             {"quantity": 100, "unit_price": 10.0, "amount": 1000.0}]
+    assert _items_check(items, 6000.0) == []
+
+
+def test_품목_줄_금액을_엉터리로_고치면_검증에_걸린다():
+    items = [{"quantity": 3, "unit_price": 999.0, "amount": 1.0},
+             {"quantity": 100, "unit_price": 10.0, "amount": 1000.0}]
+    messages = _items_check(items, 6000.0)
+    assert any("품목 1줄" in m for m in messages) and any("합계" in m for m in messages)
+
+
+def test_품목_합계가_송장_금액과_다르면_걸린다():
+    items = [{"quantity": 500, "unit_price": 10.0, "amount": 5000.0}]
+    assert any("합계" in m for m in _items_check(items, 6000.0))
+
+
+def test_아직_안_적은_품목_칸은_다르다고_하지_않는다():
+    assert _items_check([{"quantity": 3, "unit_price": "", "amount": ""}], 6000.0) == []
+
+
+def test_품목_표_숫자_칸에_글자를_넣으면_저장하지_않는다():
+    current = {"items": [{"description": "A", "quantity": 5, "unit_price": 10.0, "amount": 50.0}]}
+    for name, value in (("item-0-amount", "abc"), ("item-0-quantity", "-3"), ("item-0-unit_price", "nan")):
+        with pytest.raises(ValidationError, match="품목 1줄"):
+            editing.clean_document_fields({name: value}, current)
+    saved = editing.clean_document_fields({"item-0-amount": "55.00", "item-0-description": "B"}, current)
+    assert saved["items"][0]["amount"] == "55.00" and saved["items"][0]["description"] == "B"
+
+
+def test_예시_스케줄로_만든_건은_서류_센터에_경고가_뜬다(app, create_shipment):
+    shipment = create_shipment()
+    shipment.schedule_source = "mock"
+    db.session.commit()
+    client = app.test_client()
+    client.post("/auth/signup", data={"email": "mk@example.com", "password": "secret123",
+                                      "password_confirm": "secret123"})
+    shipment.user_id = User.query.filter_by(email="mk@example.com").one().id
+    db.session.commit()
+    html = client.get(f"/documents/{shipment.shipment_id}").get_data(as_text=True)
+    assert "data-mock-schedule-warning" in html and "예시 스케줄" in html
+    shipment.schedule_source = "api"
+    db.session.commit()
+    assert "data-mock-schedule-warning" not in client.get(f"/documents/{shipment.shipment_id}").get_data(as_text=True)

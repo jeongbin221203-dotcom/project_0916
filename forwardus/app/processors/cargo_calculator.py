@@ -275,7 +275,10 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         # 0.01 이 스무 줄 쌓였을 때 총액이 한 푼 어긋납니다. 은행이 다시 셈합니다.
         "amount": (sum_money(line["amount"] for line in lines)
                    if lines and all(line.get("amount") is not None for line in lines) else None),
-        "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
+        # 하나라도 비면 합계를 내지 않습니다. 둘째 품목의 순중량이 없는데 3,500 으로 나가면 총중량 8,000 에
+        # 순중량 3,500 이라는 틀린 서류가 됩니다(전수 점검 1회차).
+        "net_weight_kg": (sum(line["net_weight_kg"] for line in lines)
+                          if lines and all(line.get("net_weight_kg") for line in lines) else None),
         "total_cbm": round_volume(total_cbm),
         "total_weight_kg": _fix(total_weight_kg, 2),
         "revenue_ton": _fix(revenue_ton, 3),

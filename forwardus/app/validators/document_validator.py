@@ -86,6 +86,8 @@ def _check_changed(key: str, new: str, old) -> None:
             raise ValidationError(f"날짜로 읽히지 않습니다. ('{new[:30]}') 2026-10-21 처럼 적어 주세요.", key)
 
 
+ITEM_NUMERIC = {"quantity": "수량", "unit_price": "단가", "amount": "금액"}
+
 # 품목 표의 칸은 "item-<줄번호>-<칸이름>" 이름으로 들어옵니다.
 ITEM_FIELD_PATTERN = re.compile(r"^item-(\d+)-([a-z_]+)$")
 
@@ -100,7 +102,11 @@ def clean_document_items(form: dict, current: list) -> list:
             continue
         index, key = int(match.group(1)), match.group(2)
         if 0 <= index < len(rows) and key in rows[index]:
-            rows[index][key] = str(value or "").strip()[:200]
+            text = str(value or "").strip()[:200]
+            if key in ITEM_NUMERIC and text and text != str(rows[index][key]).strip():
+                # 바뀐 칸만 — 숫자가 아니거나 음수·nan 이면 "품목 2줄 금액" 처럼 어느 칸인지 알려 줍니다.
+                parse_number(text, f"품목 {index + 1}줄의 {ITEM_NUMERIC[key]}", allow_zero=True, field=name)
+            rows[index][key] = text
     return rows
 
 

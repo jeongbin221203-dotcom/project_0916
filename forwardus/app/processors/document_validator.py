@@ -323,6 +323,45 @@ def _missing_findings(documents, labels, form_fields, reported) -> list[dict]:
     return findings
 
 
+def _item_findings(documents, labels) -> list[dict]:
+    """품목 표의 셈. 은행은 신용장 서류에서 단가 × 수량 = 금액, 줄 합계 = 송장 금액을 다시 셉니다.
+
+    CI 품목을 `item-0-amount = 1.00` 으로 고쳐도 검증을 통과해 확정됐습니다(전수 점검 1회차).
+    값이 하나라도 비면(아직 안 적음) 그 줄은 건너뜁니다 — 없는 것은 '다르다'가 아닙니다.
+    """
+
+    findings = []
+    for doc_type, data in documents.items():
+        items = data.get("items") if isinstance(data, dict) else None
+        if not isinstance(items, list) or not items:
+            continue
+        name = labels.get(doc_type, doc_type)
+        amounts = []
+        for number, row in enumerate(items, start=1):
+            if not isinstance(row, dict):
+                continue
+            qty, price, amount = (_as_number(row.get(k)) for k in ("quantity", "unit_price", "amount"))
+            amounts.append(amount)
+            if None in (qty, price, amount) or qty <= 0:
+                continue
+            if abs(qty * price - amount) > 0.01 + qty * 0.00005:
+                findings.append({
+                    "status": "warning", "kind": "items", "field": "items", "field_label": "품목 표",
+                    "document": doc_type, "document_label": name, "expected": round(qty * price, 2),
+                    "actual": row.get("amount"),
+                    "message": f"{name} 품목 {number}줄의 수량 × 단가({qty:g} × {price:g} = {qty * price:,.2f})가 "
+                               f"금액({amount:,.2f})과 맞지 않습니다."})
+        total = _as_number(data.get("invoice_value"))
+        if amounts and None not in amounts and total is not None and abs(sum(amounts) - total) > 0.01:
+            findings.append({
+                "status": "warning", "kind": "items", "field": "invoice_value", "field_label": "Invoice Value",
+                "document": doc_type, "document_label": name, "expected": round(sum(amounts), 2),
+                "actual": data.get("invoice_value"),
+                "message": f"{name}의 품목 금액 합계({sum(amounts):,.2f})가 Invoice Value({total:,.2f})와 "
+                           "다릅니다."})
+    return findings
+
+
 # 날짜로 읽혀야 하는 칸. 송장 작성일에 "zzz" 를 적어도 검증을 통과해 확정됐습니다(전수 점검 1회차).
 DATE_FIELDS = {"doc_date": "작성일", "etd": "출항일 (ETD)", "eta": "도착일 (ETA)", "validity_date": "유효기간",
                "date_ordered": "주문일", "date_shipped": "선적일"}
@@ -428,6 +467,7 @@ def validate_documents(documents: dict[str, dict], reference: dict,
                                     reference))
     findings.extend(_missing_findings(documents, labels, form_fields, reported))
     findings.extend(_date_findings(documents, labels, form_fields))
+    findings.extend(_item_findings(documents, labels))
 
     return {
         "status": "warning" if findings else "passed",

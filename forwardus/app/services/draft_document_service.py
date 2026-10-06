@@ -15,6 +15,8 @@ Shipment 없이는 저장할 수 없고, 그게 맞습니다. 초안은 아직 �
 
 from __future__ import annotations
 
+import math
+
 from app.timeutil import today_kst
 
 from datetime import date
@@ -198,10 +200,16 @@ def _line(item: dict) -> dict:
 
 
 def _number(value):
+    """금액. 숫자가 아니거나 nan·무한대·음수면 0.0(입력 없음)입니다.
+
+    전에는 "nan" 이 PDF 의 Invoice value 에, "-500" 이 단가 -5 로 그대로 찍혔습니다(전수 점검 1회차).
+    """
+
     try:
-        return float(str(value).replace(",", "").strip())
+        number = float(str(value).replace(",", "").strip())
     except (TypeError, ValueError):
         return 0.0
+    return number if math.isfinite(number) and number >= 0 else 0.0
 
 
 def _as_date(value):
