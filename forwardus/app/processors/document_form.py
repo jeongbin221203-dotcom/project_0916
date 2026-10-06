@@ -256,7 +256,9 @@ def _wrap(draw, text: str, font, width: int) -> list[str]:
     """칸 너비에 맞춰 줄을 나눕니다. 한글은 띄어쓰기가 드물어 글자 단위로도 자릅니다."""
 
     lines: list[str] = []
-    for paragraph in str(text).split("\n"):
+    # 띄어쓰기 없는 긴 글이 오면 글자를 하나씩 줄여 가며 폭을 재는 아래 방식이 O(n²) 라 2,000자에
+    # 88초가 걸렸습니다(전수 점검 1회차 — 로그인 없이 부르는 초안 PDF). 길이를 막고 이진 탐색을 씁니다.
+    for paragraph in str(text)[:2000].split("\n"):
         current = ""
         for word in paragraph.split(" "):
             trial = f"{current} {word}".strip()
@@ -266,12 +268,16 @@ def _wrap(draw, text: str, font, width: int) -> list[str]:
             else:
                 current = trial
             # 한 낱말이 칸보다 길면 글자 단위로 끊습니다.
-            while draw.textlength(current, font=font) > width and len(current) > 1:
-                cut = len(current)
-                while cut > 1 and draw.textlength(current[:cut], font=font) > width:
-                    cut -= 1
-                lines.append(current[:cut])
-                current = current[cut:]
+            while len(current) > 1 and draw.textlength(current, font=font) > width:
+                low, high = 1, len(current)           # 폭에 들어가는 가장 긴 앞부분
+                while low < high:
+                    mid = (low + high + 1) // 2
+                    if draw.textlength(current[:mid], font=font) > width:
+                        high = mid - 1
+                    else:
+                        low = mid
+                lines.append(current[:low])
+                current = current[low:]
         lines.append(current)
     return [line for line in lines if line != ""] or [""]
 

@@ -122,6 +122,21 @@ def migrate_cost_sources(database) -> None:
             f"WHERE source = 'mock' AND code IN ({codes})"))
 
 
+def migrate_buyer_columns(database) -> None:
+    """바이어를 등록한 회원 칸을 기존 buyers 표에 덧붙입니다. 옛 줄은 주인 없음(NULL)으로 둡니다."""
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "buyers" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("buyers")}
+    if "user_id" not in columns:
+        with database.engine.begin() as connection:
+            connection.execute(text("ALTER TABLE buyers ADD COLUMN user_id INTEGER"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_buyers_user_id ON buyers (user_id)"))
+
+
 def migrate_user_columns(database) -> None:
     """마스터 표시 칸을 기존 users 표에 덧붙입니다."""
 
@@ -134,7 +149,7 @@ def migrate_user_columns(database) -> None:
     if "is_master" not in columns:
         with database.engine.begin() as connection:
             connection.execute(text(
-                "ALTER TABLE users ADD COLUMN is_master BOOLEAN NOT NULL DEFAULT 0"))
+                "ALTER TABLE users ADD COLUMN is_master BOOLEAN NOT NULL DEFAULT FALSE"))
 
 
 def ensure_master_account(database, email: str, password: str) -> None:
@@ -223,6 +238,7 @@ def setup_database(flask_app) -> None:
         migrate_cost_sources(db)
         migrate_requirement_documents(db)
         migrate_user_columns(db)
+        migrate_buyer_columns(db)
         ensure_master_account(db, flask_app.config.get("MASTER_EMAIL", ""),
                               flask_app.config.get("MASTER_PASSWORD", ""))
     except (IntegrityError, ProgrammingError, OperationalError):
@@ -246,6 +262,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         Path(db_uri.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
 
     db.init_app(flask_app)
+
+    # 쿠키·출처 확인·횟수 제한·응답 머리글·비밀키 점검 (app/security.py)
+    from app import security
+    security.install(flask_app)
 
     from app import models  # noqa: F401  Registers model metadata.
     from app.routes import register_blueprints

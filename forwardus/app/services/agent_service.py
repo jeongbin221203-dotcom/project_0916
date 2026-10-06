@@ -353,7 +353,9 @@ def turn(payload: dict) -> dict:
     if len(message) > MAX_MESSAGE:
         raise ValidationError(f"{MAX_MESSAGE:,}자 아래로 줄여 주세요.", "message")
 
-    draft = dict(payload.get("draft") or {})
+    # draft 가 숫자·글자·목록이면 dict() 가 TypeError/ValueError 로 500 을 냈습니다(1회차).
+    raw_draft = payload.get("draft")
+    draft = dict(raw_draft) if isinstance(raw_draft, dict) else {}
     kind = draft.get("kind") or detect_kind(message)
 
     # 1) 어떤 서류인지 아직 모릅니다.

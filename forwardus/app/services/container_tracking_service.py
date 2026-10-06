@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 from datetime import date
 
 from app.collectors import container_client
@@ -55,7 +57,7 @@ def deadline_status(load_deadline: str, shipped: bool, today: date | None = None
         due = date.fromisoformat(load_deadline)
     except ValueError:
         return {}
-    days = (due - (today or date.today())).days
+    days = (due - (today or today_kst())).days
 
     if shipped:
         return {"kind": "done", "days": days, "due": load_deadline,

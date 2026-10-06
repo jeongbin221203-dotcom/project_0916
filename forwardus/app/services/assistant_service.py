@@ -7,6 +7,8 @@ explains them. Numbers come from code; the assistant describes them.
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 from datetime import date
 
 from app.collectors import customs_client
@@ -202,7 +204,7 @@ def add_logistics_payment(shipment) -> None:
         shipment,
         label="물류비 (수출자 부담분)",
         amount_krw=-explanation["exporter_cost_krw"],
-        due_date=shipment.etd or date.today(),
+        due_date=shipment.etd or today_kst(),
         source="calculated",
     )
     shipment_repository.commit()

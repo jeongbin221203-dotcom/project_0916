@@ -14,8 +14,13 @@
 from __future__ import annotations
 
 import math
+import re
+from datetime import datetime
 
+from app.processors.cost_calculator import INCOTERMS_INFO
 from app.processors.korean import particle
+
+_INCOTERM_CODES = {row["code"] for row in INCOTERMS_INFO}
 
 # Fields compared across documents, with the document types that carry them.
 VALIDATION_FIELDS = {
@@ -117,6 +122,17 @@ def _normalize(value, field: str = ""):
     if field == "hs_code":
         digits = "".join(ch for ch in str(value or "") if ch.isdigit())
         return digits[:6] if len(digits) >= 6 else " ".join(str(value or "").split()).upper()
+    # **Incoterms 는 앞 세 글자(코드)만 맞댑니다.** Incoterms 2020 은 지정 장소를 요구하고 L/C 도
+    # "CIF LOS ANGELES" 처럼 적는데, 완전 일치로 보니 서류를 그렇게 고치면 네 장 모두 "기준값과 다릅니다"가
+    # 되어 영영 확정할 수 없었습니다(전수 점검 1회차).
+    if field == "incoterms":
+        text = " ".join(str(value or "").split()).upper()
+        match = re.match(r"([A-Z]{3})\b", text)
+        return match.group(1) if match and match.group(1) in _INCOTERM_CODES else text
+    # 항구는 "BUSAN, KOREA"·"Busan (KRPUS)" 가 같은 곳입니다 — 쉼표·괄호 앞의 이름만 맞댑니다.
+    if field in ("pol", "pod"):
+        text = " ".join(str(value or "").split())
+        return re.split(r"[,(]", text)[0].strip().upper() if text else ""
     if field in NUMERIC_FIELDS:
         number = _as_number(value)
         if number is not None:
@@ -307,6 +323,46 @@ def _missing_findings(documents, labels, form_fields, reported) -> list[dict]:
     return findings
 
 
+# 날짜로 읽혀야 하는 칸. 송장 작성일에 "zzz" 를 적어도 검증을 통과해 확정됐습니다(전수 점검 1회차).
+DATE_FIELDS = {"doc_date": "작성일", "etd": "출항일 (ETD)", "eta": "도착일 (ETA)", "validity_date": "유효기간",
+               "date_ordered": "주문일", "date_shipped": "선적일"}
+_DATE_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d", "%d %b %Y", "%d %B %Y", "%b %d, %Y",
+                 "%B %d, %Y", "%d-%b-%Y", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y")
+
+
+def _is_date(value) -> bool:
+    text = " ".join(str(value or "").replace(",", ", ").split()).replace(" ,", ",").strip()
+    if not text:
+        return True                                  # 비어 있는 것은 여기서 따지지 않습니다
+    for pattern in _DATE_FORMATS:
+        try:
+            datetime.strptime(text.title() if "%b" in pattern or "%B" in pattern else text, pattern)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def _date_findings(documents, labels, form_fields) -> list[dict]:
+    findings = []
+    for doc_type, data in documents.items():
+        shown = form_fields.get(doc_type)
+        for field, label in DATE_FIELDS.items():
+            if field not in data or (shown is not None and field not in shown):
+                continue
+            if _is_date(data[field]):
+                continue
+            name = labels.get(doc_type, doc_type)
+            findings.append({
+                "status": "warning", "kind": "format", "field": field, "field_label": label,
+                "document": doc_type, "document_label": name,
+                "expected": None, "actual": data[field],
+                "message": f"{name}의 {label}{particle(label, '이')} 날짜로 읽히지 않습니다"
+                           f" ('{str(data[field])[:30]}'). 2026-10-21 처럼 적어 주세요.",
+            })
+    return findings
+
+
 def validate_documents(documents: dict[str, dict], reference: dict,
                        labels: dict[str, str] | None = None,
                        form_fields: dict[str, list] | None = None) -> dict:
@@ -371,6 +427,7 @@ def validate_documents(documents: dict[str, dict], reference: dict,
     findings.extend(_cross_findings(documents, labels, form_fields, reported,
                                     reference))
     findings.extend(_missing_findings(documents, labels, form_fields, reported))
+    findings.extend(_date_findings(documents, labels, form_fields))
 
     return {
         "status": "warning" if findings else "passed",

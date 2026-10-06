@@ -14,6 +14,9 @@ instance/
 
 # 키. 절대 이미지에 넣지 않습니다 — 값은 Render 대시보드에서 넣습니다.
 .env
+# scripts/tidy_env.py 가 만드는 .env.bak 에는 실제 키가 들어 있습니다 — 로컬 docker build 에 딸려 들어가지 않게.
+.env.*
+!.env.example
 
 # 시험·개발에만 쓰는 것
 tests/

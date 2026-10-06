@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 import re
 
 from app.collectors import ai_client
@@ -327,7 +329,8 @@ def ask(question: str, history: list | None = None, *, brief: bool = False,
     memory는 지난 상담을 줄여 둔 글입니다. (chat_memory_service · 로그인한 회원만)
     """
 
-    text = (question or "").strip()
+    # question 이 객체·숫자로 오면 .strip() 이 500 을 냈습니다(전수 점검 1회차 — 로그인 없이 가능).
+    text = (question if isinstance(question, str) else "").strip()
     if not text:
         raise ServiceError("무엇이 궁금한지 적어주세요.", "VALIDATION_ERROR")
     # **긴 계약서는 상담 창으로 판정하지 않습니다.** 입력칸이 2,000자에서 말없이 자르는데,
@@ -860,7 +863,7 @@ def _today_note() -> str:
 
     from datetime import date
 
-    today = date.today()
+    today = today_kst()
     return (f"오늘은 {today.isoformat()}입니다. 사용자가 해를 말하지 않으면 target_year를 비워 두세요. "
             f"도구가 최근 완결 연도({today.year - 1}년)로 조회합니다.")
 

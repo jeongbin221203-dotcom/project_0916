@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, abort, jsonify, render_template, request
 
+from app.routes.auth import current_user, login_required_response
 from app.services import ServiceError, lookup_service
 
 lookup_bp = Blueprint("lookup", __name__, url_prefix="/lookup")
@@ -53,8 +54,21 @@ def api_incoterms():
                     "data": {"terms": INCOTERMS_INFO, "steps": INCOTERMS_FLOW_STEPS}})
 
 
+def _admin_only():
+    """운영자 진단 화면 — 어떤 키가 설정돼 있는지 보이고, check 는 외부 API 를 실제로 부릅니다.
+    로그인 없이 열려 있어 호출 한도를 소진시킬 수 있었습니다(전수 점검 1회차)."""
+
+    denied = login_required_response()
+    if denied is not None:
+        abort(denied)
+    viewer = current_user()
+    if not (viewer and viewer.is_admin):
+        abort(403)
+
+
 @lookup_bp.get("/sources")
 def sources():
+    _admin_only()
     """연결된 바깥 자료원 현황."""
 
     return render_template("lookup/sources.html", data=lookup_service.data_sources())
@@ -62,6 +76,7 @@ def sources():
 
 @lookup_bp.get("/sources/check")
 def sources_check():
+    _admin_only()
     """연결된 API를 실제로 한 번씩 불러 봅니다. 시간이 좀 걸립니다."""
 
     return render_template("lookup/sources.html",

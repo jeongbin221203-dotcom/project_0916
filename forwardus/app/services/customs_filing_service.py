@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 from app.processors.korean import particle
 from app.validators.cargo_validator import PACKAGE_TYPES, PACKAGE_UNITS, priced_by_units
 
@@ -207,6 +209,11 @@ def filing_sheet(shipment) -> dict:
 
     missing = [row["label"] for section in sections for row in section["rows"] if _blank(row["value"])]
     missing += [f"품목 {item['line_no']} HS CODE" for item in lines if _blank(item["hs_code"])]
+    # 수출신고는 10자리 HSK 로 합니다. 6자리(3304.99)는 "완료"로 나가 관세사에게 그대로 전달됐습니다
+    # (전수 점검 1회차). 앞의 6자리는 맞을 수 있으니 '10자리로 마저 적기'로 알립니다.
+    missing += [f"품목 {item['line_no']} HS CODE 10자리(HSK) — 지금 {len(_digits(item['hs_code']))}자리"
+                for item in lines
+                if not _blank(item["hs_code"]) and len(_digits(item["hs_code"])) < 10]
 
     # 따로 발급받은 서류(원산지증명서·인증서·검역증 …)도 함께 넘깁니다.
     # 관세사는 신고할 때 이 파일들을 첨부합니다. 여기 없으면 "빠진 서류"가 됩니다.
@@ -282,6 +289,21 @@ def as_text(sheet: dict) -> str:
     return "\n".join(lines)
 
 
+def _digits(value) -> str:
+    return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def _country_code(value) -> str:
+    """'US' 는 그대로, '미국'·'United States' 는 코드로. 못 알아보면 비교하지 않습니다(오탐 방지)."""
+
+    from app.collectors import location_client
+
+    text = (value or "").strip()
+    if len(text) == 2 and text.isascii() and text.isalpha():     # "미국" 도 두 글자라 ASCII 를 따집니다
+        return text.upper()
+    return location_client.find_country_by_name(text) or ""
+
+
 def _mismatches(shipment) -> list[str]:
     """값은 다 찼는데 앞뒤가 안 맞는 것.
 
@@ -290,7 +312,7 @@ def _mismatches(shipment) -> list[str]:
     """
 
     found = []
-    buyer = (getattr(shipment.buyer, "country", "") or "").strip().upper()
+    buyer = _country_code(getattr(shipment.buyer, "country", ""))
     place = (shipment.destination_country or "").strip().upper()
     if buyer and place and buyer != place:
         found.append(
@@ -323,7 +345,7 @@ def _mismatches(shipment) -> list[str]:
     # 적을 때 앞뒤가 안 맞습니다.
     from datetime import date as _date
 
-    if shipment.requested_departure_date and shipment.requested_departure_date < _date.today():
+    if shipment.requested_departure_date and shipment.requested_departure_date < today_kst():
         found.append(
             f"출발 희망일({shipment.requested_departure_date})이 이미 지난 날입니다. "
             f"실제 출항일은 {shipment.etd or '미정'}입니다. 희망일을 고쳐 두시면 "

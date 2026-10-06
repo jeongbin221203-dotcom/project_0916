@@ -15,6 +15,8 @@ Shipment 없이는 저장할 수 없고, 그게 맞습니다. 초안은 아직 �
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 from datetime import date
 from types import SimpleNamespace
 
@@ -265,7 +267,7 @@ def _draft_numbers(draft: dict) -> dict:
 
     given = str(draft.get("invoice_no") or "").strip()
     return {
-        "doc_date": date.today().isoformat(),
+        "doc_date": today_kst().isoformat(),
         "doc_no": given,
         "invoice_no": given,
         "order_no": str(draft.get("order_no") or "").strip(),
@@ -340,7 +342,7 @@ def with_private(draft: dict, private: dict | None) -> dict:
     연락처 칸이 따로 없어, 그렇게 하지 않으면 PDF 어디에도 찍히지 않습니다.
     """
 
-    merged = dict(draft or {})
+    merged = dict(draft) if isinstance(draft, dict) else {}
     private = private if isinstance(private, dict) else {}
     bank = str(private.get("bank_info") or "").strip()[:500]
     address = str(private.get("buyer_address") or "").strip()[:500]

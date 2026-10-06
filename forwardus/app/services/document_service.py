@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 from datetime import date
 
 from app.models.document import DOCUMENT_TYPES, document_role
@@ -469,6 +471,10 @@ def _summary_unit_price(shipment, cargo):
 
     if not cargo:
         return None
+    # 품목이 둘 이상이면 하나의 단가가 없습니다. 총액을 첫 줄 수량으로 나눠 6,000 ÷ 500 = 12.0 같은 틀린
+    # 단가가 찍혔습니다(전수 점검 1회차). 줄마다의 단가는 품목 표에 있습니다.
+    if len(list(shipment.cargos)) > 1:
+        return None
     if priced_by_units(cargo):
         if cargo.unit_price is None:
             return ""
@@ -564,7 +570,7 @@ def _generate_data(shipment, doc_type: str, reference: dict) -> dict:
     if "doc_no" in data:
         data["doc_no"] = f"{DOC_PREFIX[doc_type]}-{shipment.shipment_id}"
     if "doc_date" in data:
-        data["doc_date"] = date.today().isoformat()
+        data["doc_date"] = today_kst().isoformat()
     items = build_items(shipment, doc_type)
     if items:
         data["items"] = items

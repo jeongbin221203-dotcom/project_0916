@@ -459,7 +459,9 @@ def _validate_money(payload: dict, quantity: int, unit_quantity: float | None = 
         # 낱개 기준에서 나누어떨어지지 않는 단가(100 ÷ 3 = 33.3333)는 지어내지 않습니다.
         # 33.3333 × 3 = 99.9999라 반올림하면 100처럼 보이지만, 송장에 찍힌 단가로
         # 되곱하면 금액이 안 나옵니다. 정확히 되곱해질 때만 채우고, 아니면 비워 둡니다.
-        if by_units and abs(unit_price * basis - amount) > 1e-6:
+        # 포장 개수 기준도 같습니다 — 3 CTN 에 1,000 이면 단가 333.3333 이 찍히고, 되곱하면 999.9999 입니다
+        # (전수 점검 1회차). 정확히 되곱해질 때만 채웁니다.
+        if abs(unit_price * basis - amount) > 1e-6:
             unit_price = None
     elif unit_price is not None and amount is not None and basis:
         # **둘 다 적었으면 언제나 맞대어 봅니다.**

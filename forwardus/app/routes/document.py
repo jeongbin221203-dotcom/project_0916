@@ -162,8 +162,9 @@ def suggest_name():
 
     payload = json_body()
     items = payload.get("items")
+    # items 안에 숫자·글자가 섞여 오면 500 이 났습니다(1회차) — 객체만 씁니다.
     name = document_start_service.suggest_project_name(
-        payload, items if isinstance(items, list) else [])
+        payload, [row for row in items if isinstance(row, dict)] if isinstance(items, list) else [])
     return jsonify({"success": True, "data": {"project_name": name}})
 
 
