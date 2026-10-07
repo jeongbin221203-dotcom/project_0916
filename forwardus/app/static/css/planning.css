@@ -195,7 +195,12 @@
 .dg_steps { margin: 0; padding-left: 20px; display: grid; gap: 5px; font-size: 12px; font-weight: 600; line-height: 1.6; }
 .dg_refs { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; font-weight: 700; }
 .dg_refs a { color: var(--blue); }
-@media (max-width: 720px) { .dg_fields { grid-template-columns: 1fr; } }
+/* 열을 1개로 줄일 때 안의 span2 도 풀어야 합니다 — `grid-column: span 2` 가 남으면 보이지 않는 둘째 열이
+   생겨 UN 번호 입력칸이 36px 로 눌렸습니다(사용성 점검 2회차, 390px 에서 측정). */
+@media (max-width: 720px) {
+  .dg_fields { grid-template-columns: 1fr; }
+  .dg_fields .field.span2 { grid-column: auto; }
+}
 .tariff_where { grid-column: 1 / -1; font-size: 11.5px; font-weight: 600; line-height: 1.55; color: var(--blue_dark); }
 
 /* 도착국이 실제로 매기는 관세와 세분 부호 */

@@ -168,17 +168,17 @@ def extract_text(path: Path, suffix: str) -> str:
     사진(PNG·JPG)과 글자가 없는 스캔 PDF는 Tesseract OCR로 읽습니다. (app/processors/ocr.py)
     """
 
-    from app.processors import ocr
+    from app.processors import ocr, safe_files
 
     try:
         if suffix == ".txt":
-            return path.read_text(encoding="utf-8", errors="replace")
+            return safe_files.clip(path.read_text(encoding="utf-8", errors="replace"))
         if suffix in (".png", ".jpg", ".jpeg"):
-            from PIL import Image
-
-            with Image.open(path) as image:
+            # 가로×세로가 한도를 넘으면 읽지 않습니다 — 258KB PNG 하나가 메모리를 631MB 까지 올렸습니다
+            # (전수 점검 3회차). 거절은 "못 읽었다"로 넘어가 화면이 이유를 알려 줍니다.
+            with safe_files.open_image(path) as image:
                 image.load()
-                return ocr.read_text(image)
+                return safe_files.clip(ocr.read_text(image))
         if suffix == ".pdf":
             import pdfplumber
 
@@ -186,14 +186,15 @@ def extract_text(path: Path, suffix: str) -> str:
                 # 증명서는 보통 한두 장입니다. 앞 5장이면 충분합니다.
                 text = "\n".join((page.extract_text() or "") for page in pdf.pages[:5])
                 if len(text.strip()) < SCANNED_TEXT_CHARS and ocr.available():
-                    scanned = [ocr.read_text(page.to_image(resolution=200).original)
+                    scanned = [ocr.read_text(safe_files.render_page(page, 200))
                                for page in pdf.pages[:OCR_PDF_PAGES]]
                     text = "\n\n".join(page for page in scanned if page.strip()) or text
                 return text
         if suffix == ".docx":
             import docx
 
-            return "\n".join(paragraph.text for paragraph in docx.Document(path).paragraphs)
+            safe_files.check_docx(path)                  # 풀리면 너무 큰 압축 폭탄은 열지 않습니다
+            return safe_files.clip("\n".join(paragraph.text for paragraph in docx.Document(path).paragraphs))
     except Exception:
         # 어떤 형식이든 읽기에 실패하면 "못 읽었다"로 넘깁니다. 화면에서 이유를 알려 줍니다.
         return ""
@@ -265,7 +266,11 @@ def analyze(shipment, document_id: int) -> RequirementDocument:
     context["확인하려는_요건"] = document.requirement_title
     if document.agreement:
         context["적용하려는_협정"] = document.agreement
-    result = ai_client.review_document(_clean(text), context)
+    # 증명서·인보이스 본문에는 계좌번호가 흔한데 가리지 않고 OpenAI 로 갔습니다(전수 점검 3회차). 다른 경로
+    # (서류 읽기·상담·intake)는 모두 가리는데 이 경로만 빠져 있었습니다.
+    from app.processors import bank_redaction
+
+    result = ai_client.review_document(bank_redaction.strip_bank_numbers(_clean(text))[0], context)
 
     if not result["success"]:
         document.review_status = "failed"

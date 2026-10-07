@@ -673,7 +673,10 @@ def _rule_read(message: str, draft: dict) -> dict:
 # "1번 품목: …" / "품목 2 - …" / "#3 …" — 품목 번호를 앞에 붙인 패킹 답
 ITEM_LINE = re.compile(r"^\s*(?:(?:품목|item)\s*#?\s*(\d{1,2})|#?(\d{1,2})\s*번(?:\s*품목)?)"
                        r"\s*[:：\-–)]?\s*(.+?)\s*$", re.I)
-_WEIGHT = r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|톤|ton|t|g)?"
+# MT·lb 를 몰라 "12.5 MT" 를 12.5kg(맞는 값 12,500), "3000 lbs" 를 3000kg(맞는 값 1,360.8)으로 읽었습니다
+# (전수 점검 1회차). 단위 뒤에 영문자가 바로 이어지면 단위가 아닙니다 — "5 total" 의 t 를 톤으로 읽지 않게.
+_WEIGHT = (r"(\d[\d,]*(?:\.\d+)?)\s*"
+           r"(kgs?|킬로|톤|metric\s*tons?|tonnes?|tons?|mt|lbs?|pounds?|t|g)?(?![a-z])")
 _NET = re.compile(r"(?:순\s*중량|net\s*(?:weight|wt)?|n\.\s*w\.?)\s*[:=]?\s*" + _WEIGHT, re.I)
 _GROSS = re.compile(r"(?:총\s*중량|gross\s*(?:weight|wt)?|g\.\s*w\.?)\s*[:=]?\s*"
                     r"(박스당|상자당|포장당|per\s*(?:box|carton|ctn|pkg))?\s*" + _WEIGHT, re.I)
@@ -685,9 +688,11 @@ _CARTONS = re.compile(r"(\d[\d,]*)\s*(박스|상자|boxes|box|ctns|ctn|cartons|c
 
 def _kg(number: str, unit: str | None) -> str:
     value = float(number.replace(",", ""))
-    unit = (unit or "kg").lower()
-    if unit in ("톤", "ton", "t"):
+    unit = re.sub(r"\s+", "", (unit or "kg").lower())
+    if unit in ("톤", "ton", "tons", "tonne", "tonnes", "t", "mt", "metricton", "metrictons"):
         value *= 1000
+    elif unit in ("lb", "lbs", "pound", "pounds"):
+        value *= 0.45359237
     elif unit == "g":
         value /= 1000
     return f"{value:.3f}".rstrip("0").rstrip(".")

@@ -30,7 +30,10 @@ def show():
 
 @work_draft_bp.put("")
 def save():
-    payload = json_body()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        # json_body() 는 목록·글자를 빈 dict 로 바꿔 200 을 돌려줬습니다 — 저장 안 됐는데 성공으로 보입니다.
+        return error_response(ServiceError("저장할 내용을 읽지 못했습니다.", "VALIDATION_ERROR"))
     try:
         data = work_draft_service.save(current_user(), payload, str(payload.get("source") or ""))
     except ServiceError as exc:

@@ -23,6 +23,8 @@ L/C에는 날짜가 둘 있고, 둘 다 지켜야 은행에서 대금을 받습�
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 from datetime import date, timedelta
 
 from app.processors.schedule_calculator import LEAD_TIMES, grade_margin
@@ -116,7 +118,7 @@ def plan(*, latest_shipment: date | None = None, expiry: date | None = None,
     if latest_shipment is None and expiry is None:
         return None
 
-    today = today or date.today()
+    today = today or today_kst()
     days, stated = presentation_days(presentation)
     mode = _mode(transport_mode)
     notes: list[str] = []

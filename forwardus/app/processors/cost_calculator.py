@@ -324,15 +324,25 @@ INCOTERMS_INFO = [
 ]
 
 
+# 송장 금액이 **이미 운임을 포함하는** 조건. 여기서는 송장 금액이 곧 CIF 값에 가깝습니다.
+FREIGHT_IN_PRICE = frozenset({"CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"})
+
+
 def calculate_insurance_premium(
     invoice_value_usd: float,
     freight_usd: float,
     exchange_rate: float,
     insurance_rate: float = INSURANCE_RATE,
+    freight_included: bool = False,
 ) -> float:
-    """Cargo insurance premium in KRW on CIF value × 110 %."""
+    """Cargo insurance premium in KRW on CIF value × 110 %.
 
-    insured_value_usd = (invoice_value_usd + freight_usd) * 1.1
+    freight_included 면 송장 금액에 운임이 이미 들어 있으므로 또 더하지 않습니다. 전에는 CIF 25,000 USD 에
+    운임 1,580 USD 가 한 번 더 합산됐습니다(전수 점검 1회차).
+    """
+
+    base = invoice_value_usd if freight_included else invoice_value_usd + freight_usd
+    insured_value_usd = base * 1.1
     return max(INSURANCE_MIN_KRW, insured_value_usd * insurance_rate * exchange_rate)
 
 
@@ -386,7 +396,8 @@ def calculate_logistics_cost(
     lines.append(_line("Freight", "freight", "freight", "항공운임" if service == "AIR" else "해상운임", "USD",
                        freight_usd, exchange_rate, freight_source))
 
-    insurance_krw = calculate_insurance_premium(invoice_value_usd, freight_usd, exchange_rate)
+    insurance_krw = calculate_insurance_premium(invoice_value_usd, freight_usd, exchange_rate,
+                                                freight_included=incoterms in FREIGHT_IN_PRICE)
     lines.append(_line("Insurance", "insurance", "insurance", "적하보험료", "KRW", insurance_krw, exchange_rate, "calculated"))
     lines.append(_line("Destination Charge", "destination", "destination_charge", "도착지 비용(THC·D/O)", "KRW",
                        LOCAL_CHARGES_KRW["destination_charge"][service] * containers, exchange_rate, rate_source))

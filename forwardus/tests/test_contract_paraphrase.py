@@ -389,6 +389,110 @@ CASES = {
         "제31조 매수인이 공급한 원자재는 대금 정산 전에는 매수인의 동의 없이 가공할 수 없다.",
         "제31조 위탁가공 원사는 매수인의 승낙 없이 가공하지 못한다.",
     ],
+    # ── 실제 분쟁에서 나온 독소조항 (2026-10-03, tests/test_contract_disputes.py) ──
+    "battle_of_forms": [
+        "In the event of any conflict, the Purchaser's standard terms and conditions of "
+        "purchase shall govern.",
+        "Buyer's PO terms take precedence over any Seller quotation or acknowledgement.",
+        "All deliveries are accepted solely on the terms stated herein; our purchase "
+        "conditions apply exclusively.",
+        "제32조 본 거래에는 매수인의 구매약관이 우선하여 적용된다.",
+    ],
+    "foreign_language_prevails": [
+        "This Agreement is executed in English and Vietnamese; the Vietnamese version "
+        "shall govern in case of inconsistency.",
+        "Should the texts differ, the Russian text shall be authoritative.",
+        "In case of conflict, precedence shall be given to the Arabic version.",
+        "제33조 국문과 중문이 다를 때에는 중문을 우선한다.",
+    ],
+    "acceptance_signature_payment": [
+        "The balance of 70% shall be paid within 30 days after the final acceptance "
+        "certificate is signed by the Buyer.",
+        "Payment of the remaining amount is subject to the installation report approved "
+        "by the end user.",
+        "The Commissioning Certificate signed by the Purchaser is required before any "
+        "payment becomes payable.",
+        "제34조 잔금은 매수인이 시운전 완료 확인서에 서명한 날부터 30일 이내에 지급한다.",
+    ],
+    "on_demand_bond": [
+        "Supplier shall provide an advance payment guarantee payable upon the Buyer's "
+        "first written demand.",
+        "A 10% performance bond, callable on first demand, shall be issued by a "
+        "first-class bank.",
+        "The bank shall pay on demand without any proof of default.",
+        "제35조 매도인은 매수인의 서면 청구만으로 조건 없이 지급되는 이행보증서를 제출한다.",
+    ],
+    "time_essence_cancel": [
+        "Time is of the essence with respect to all delivery dates under this Agreement.",
+        "Delivery dates are of the essence; should the Supplier be late, the Purchaser "
+        "is entitled to terminate the purchase forthwith.",
+        "If the Seller fails to ship by the agreed date, the Buyer may immediately "
+        "cancel the order.",
+        "제36조 선적이 3일 이상 지연되면 매수인은 즉시 계약을 해제할 수 있다.",
+    ],
+    "cover_purchase": [
+        "Should the Supplier fail to deliver, the Purchaser may procure replacement "
+        "goods elsewhere at the Supplier's expense.",
+        "Buyer may buy equivalent goods from other sources and Seller shall reimburse "
+        "the price difference.",
+        "All cover purchases made by the Buyer shall be charged to the Seller.",
+        "제37조 매도인이 납기를 어기면 매수인은 제3자로부터 구매하고 그 차액을 매도인이 부담한다.",
+    ],
+    "one_way_force_majeure": [
+        "Force majeure may be invoked by the Buyer only.",
+        "The force majeure provisions apply solely to the Purchaser.",
+        "No force majeure event shall relieve the Seller of its delivery obligations.",
+        "제38조 불가항력 조항은 매수인에게만 적용된다.",
+    ],
+    # 새 독소조항 6종(2026-10-06)
+    "withholding_no_grossup": [
+        "Payments shall be made net of withholding taxes and the Buyer shall not be required to increase "
+        "any payment.",
+        "All amounts payable to the Seller shall be paid after deduction of any taxes required by law, and "
+        "no gross-up shall apply.",
+        "Any tax withheld at source in the Buyer's country shall be for the Seller's account.",
+        "제21조 원천징수세는 매도인의 부담으로 한다.",
+    ],
+    "arbitrator_one_sided": [
+        "Any dispute shall be finally settled by a single arbitrator selected by the Buyer in its sole "
+        "discretion.",
+        "The Purchaser shall have the right to nominate the sole arbitrator.",
+        "The arbitral tribunal shall consist of one arbitrator designated unilaterally by the Buyer.",
+        "제20조 중재인은 매수인이 지정하는 1인으로 한다.",
+    ],
+    "licence_in_buyer_name": [
+        "The import licence for the Products shall be issued in the name of the Importer.",
+        "The Distributor shall apply for and hold all product registrations in its own name.",
+        "The NMPA registration certificate shall be registered under the name of the Distributor.",
+        "제12조 제품 등록증은 대리점 명의로 발급받는다.",
+    ],
+    "receivables_assign_ban": [
+        "The Seller may not transfer, sell or pledge its accounts receivable hereunder.",
+        "Assignment of the Seller's receivables to any third party, including factors, is prohibited.",
+        "Factoring or forfaiting of the invoices under this Contract shall not be allowed.",
+        "제15조 매도인은 대금채권을 제3자에게 양도하거나 담보로 제공하여서는 아니 된다.",
+    ],
+    "esg_cost_shift": [
+        "The Seller shall reimburse the Buyer for all CBAM certificate costs in respect of the Goods.",
+        "The Seller shall indemnify the Buyer against any seizure under the UFLPA of goods produced with "
+        "forced labour.",
+        "Carbon price costs on the Goods shall be at the expense of the Seller.",
+        "제22조 CBAM 인증서 구매 비용은 매도인이 부담한다.",
+    ],
+    "br_agent_indemnity": [
+        "Upon termination, the Agent shall be entitled to an indemnity of one-twelfth of the total "
+        "remuneration earned.",
+        "The Representative's rights are governed by Brazilian Law 4.886/65 on commercial representation.",
+        "The Seller shall compensate the commercial agent in an amount not less than 1/12 of all commissions "
+        "earned.",
+        "제30조 해지 시 대리인에게 지급 기간 전체 수수료의 12분의 1 이상을 보상한다.",
+    ],
+    "unilateral_amendment": [
+        "Purchaser reserves the right to modify these terms from time to time by notice.",
+        "The Buyer may change the unit prices at any time upon written notice.",
+        "Buyer shall be entitled to revise the contract terms unilaterally.",
+        "제39조 매수인은 통지만으로 본 계약의 조건을 변경할 수 있다.",
+    ],
 }
 
 CASE_LIST = [(key, body) for key, bodies in CASES.items() for body in bodies]

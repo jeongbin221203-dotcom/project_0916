@@ -28,6 +28,11 @@ LOOKUP_LINKS = {
         "how": "품목 사양을 넣어 전략물자인지 스스로 판정합니다. 판정서를 받아 두면 "
                "통관에서 다시 묻지 않습니다.",
     },
+    "수산물": {
+        "label": "국립수산물품질관리원 · 수산물 수출",
+        "url": "https://www.nfqs.go.kr",
+        "how": "수산물은 위생증명·수출 검사를 이곳에서 받습니다. 활어는 수산생물질병관리원 검역증명이 따로 필요합니다.",
+    },
     "식품": {
         "label": "식품안전나라 · 해외 수출 정보",
         "url": "https://www.foodsafetykorea.go.kr",
@@ -66,9 +71,13 @@ LOOKUP_LINKS = {
 }
 
 
-def _rule(key, title, chapters, documents, agency, law, why, link, headings=()):
+def _rule(key, title, chapters, documents, agency, law, why, link, headings=(), exclude=(), prefixes=()):
+    """exclude — 류는 걸리지만 이 세번은 **다른 소관**일 때 뺍니다(김·어류 가공품 등).
+    prefixes — 류·호 전체가 아니라 **이 세번 접두**만 해당할 때(해조류 1212.21·1212.29 등)."""
+
     return {
         "key": key, "title": title, "chapters": set(chapters), "headings": set(headings),
+        "exclude": tuple(exclude), "prefixes": tuple(prefixes),
         "documents": documents, "agency": agency, "law": law, "why": why, "link": link,
     }
 
@@ -77,8 +86,9 @@ def _rule(key, title, chapters, documents, agency, law, why, link, headings=()):
 RULES = [
     _rule(
         "food", "식품 · 위생증명",
-        chapters=["04", "07", "08", "09", "10", "11", "15", "16", "17", "18", "19",
+        chapters=["03", "04", "07", "08", "09", "10", "11", "15", "16", "17", "18", "19",
                   "20", "21", "22"],
+        prefixes=["121221", "121229"],     # 김·미역 같은 해조류는 식품입니다(12류의 나머지는 아닙니다)
         documents=["위생증명서 (Health Certificate)", "자유판매증명서 (CFS)",
                    "성분·제조공정 설명서"],
         agency="식품의약품안전처 · 지방식약청",
@@ -90,6 +100,7 @@ RULES = [
     _rule(
         "plant", "농산물 · 식물검역",
         chapters=["06", "07", "08", "09", "10", "11", "12", "13", "14", "44"],
+        exclude=["121221", "121229"],        # 김·미역 등 해조류 — 식품·수산물 소관입니다
         documents=["식물검역증명서 (Phytosanitary Certificate)"],
         agency="농림축산검역본부",
         law="식물방역법",
@@ -99,13 +110,59 @@ RULES = [
     ),
     _rule(
         "animal", "축산물 · 동물검역",
-        chapters=["01", "02", "03", "05", "16"],
+        chapters=["01", "02", "04", "05", "16"],     # 04류: 우유·유제품·알(전수 점검 4회차에서 빠진 것)
+        exclude=["0409", "1603", "1604", "1605"],    # 어류·갑각류 가공품 — 수산물 규칙으로
         documents=["동물검역증명서 (Veterinary Certificate)", "도축·가공시설 등록 확인"],
         agency="농림축산검역본부",
         law="가축전염병 예방법",
         why="고기·유제품·알과 그 가공품은 수입국이 우리 검역기관의 증명서를 요구합니다. "
             "수출 가능한 작업장이 나라별로 따로 지정돼 있습니다.",
         link="검역",
+    ),
+    _rule(
+        "fishery", "수산물 · 위생증명·수출 검사",
+        chapters=["03"],
+        headings=["1603", "1604", "1605"],
+        prefixes=["121221", "121229", "051191"],   # 해조류, 어류 부산물(0511.91)
+        documents=["수산물 위생증명서 (Health Certificate for Fishery Products)",
+                   "수출 수산물 검사 증명 (수입국이 요구하는 경우)",
+                   "수산생물 검역증명서 (활어·살아 있는 수산생물)"],
+        agency="해양수산부 · 국립수산물품질관리원 · 수산생물질병관리원",
+        law="수산물품질관리법 · 수산생물질병 관리법",
+        why="수산물은 농림축산검역본부의 동물검역이 아니라 **해양수산부 소관**입니다. 수입국이 요구하는 위생증명과 "
+            "수출 검사, 활어의 경우 수산생물 검역증명을 따로 받아야 합니다. 김·미역 같은 해조류도 식품·수산물로 봅니다.",
+        link="수산물",
+    ),
+    _rule(
+        "explosive", "화약류 · 총포",
+        chapters=["36", "93"],
+        documents=["화약류 수출 허가·신고 서류", "총포·도검 수출 허가 (해당 시)", "전략물자 판정서"],
+        agency="경찰청 · 지방경찰청",
+        law="총포·도검·화약류 등의 안전관리에 관한 법률",
+        why="화약·폭죽·성냥·총포류는 일반 공산품처럼 보낼 수 없습니다. 제조·판매 허가가 있어도 수출마다 "
+            "허가·신고가 따로 필요한 경우가 많고, 위험물 서류도 함께 갖춰야 합니다.",
+        link="통합공고",
+    ),
+    _rule(
+        "feed", "사료 · 수출 검역",
+        chapters=["23"],
+        documents=["사료 수출 위생증명서", "성분 분석 성적서", "사료 제조업 등록 확인"],
+        agency="농림축산검역본부 · 농림축산식품부",
+        law="사료관리법 · 가축전염병 예방법",
+        why="사료는 수입국이 우리 검역기관의 위생증명과 성분 확인을 요구하는 경우가 많습니다. "
+            "동물 유래 성분이 들어 있으면 조건이 더 까다롭습니다.",
+        link="검역",
+    ),
+    _rule(
+        "alcohol", "주류 · 수출 신고",
+        chapters=[],
+        headings=["2203", "2204", "2205", "2206", "2207", "2208"],
+        documents=["주류 수출 신고·면세 관련 서류", "주류 제조·판매 면허 확인", "수입국 주류 라벨 규정 확인서"],
+        agency="국세청 · 지방국세청 · 식품의약품안전처",
+        law="주세법 · 식품위생법",
+        why="주류는 수출분에 대한 주세 처리(면세) 절차가 따로 있고, 수입국마다 도수·라벨·수입 허가 규정이 "
+            "다릅니다. 식품 위생증명이 함께 필요한 나라도 있습니다.",
+        link="통합공고",
     ),
     _rule(
         "pharma", "의약품 · 의료기기",
@@ -145,6 +202,7 @@ RULES = [
         "strategic", "전략물자 해당 여부",
         chapters=["28", "29", "38", "72", "73", "76", "81", "84", "85", "87", "88",
                   "89", "90", "93"],
+        headings=["6815"],           # 탄소섬유 제품(6815.11·.12·.13)은 전략물자 후보입니다
         documents=["전략물자 판정서", "수출허가서 (해당하는 경우)"],
         agency="전략물자관리원 · 산업통상자원부",
         law="대외무역법 제19조",
@@ -229,7 +287,10 @@ def check(hs_code: str, *, is_dangerous: bool = False,
     found = []
     if digits:
         for rule in RULES:
-            if chapter in rule["chapters"] or (heading and heading in rule["headings"]):
+            if any(digits.startswith(prefix) for prefix in rule["exclude"]):
+                continue
+            if (chapter in rule["chapters"] or (heading and heading in rule["headings"])
+                    or any(digits.startswith(prefix) for prefix in rule["prefixes"])):
                 found.append(_as_item(rule))
     if is_dangerous:
         found.append(_as_item(DANGEROUS_RULE))
@@ -257,7 +318,9 @@ def summary(hs_code: str, items: list[dict]) -> str:
     if not _digits(hs_code):
         return "HS부호를 입력하면 이 품목에 걸린 수출 요건을 짚어 드립니다."
     if not items:
-        return ("이 류에는 흔히 걸리는 수출 요건이 없습니다. 그래도 세번 10자리 기준으로는 "
-                "달라질 수 있어 관세법령정보포털에서 한 번 확인해 주세요.")
+        # 규칙표는 모든 품목을 다루지 않습니다. "요건이 없다"가 아니라 "이 표에 없다"입니다 —
+        # 화약류·사료·주류·탄소섬유가 "없음"으로 나왔습니다(전수 점검 2회차).
+        return ("이 앱의 규칙표에는 이 품목에 걸린 수출 요건이 없습니다. 그렇다고 요건이 없다는 뜻은 아닙니다 — "
+                "세번 10자리 기준으로 관세법령정보포털(통합공고)에서 꼭 확인해 주세요.")
     titles = " · ".join(item["title"] for item in items)
     return f"확인할 것이 {len(items)}가지입니다. {titles}"

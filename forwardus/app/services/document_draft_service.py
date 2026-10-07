@@ -98,8 +98,10 @@ def get(viewer, draft_id) -> "DocumentDraft":                     # noqa: F821
     _require_viewer(viewer)
     try:
         draft_id = int(draft_id)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise ServiceError("초안을 찾지 못했습니다.", "DRAFT_NOT_FOUND", 404) from None
+    if not 0 < draft_id < 2 ** 62:      # DB 정수 범위 밖이면 조회가 오류를 냅니다
+        raise ServiceError("초안을 찾지 못했습니다.", "DRAFT_NOT_FOUND", 404)
     record = DocumentDraft.query.filter_by(id=draft_id, user_id=viewer.id).first()
     if record is None:
         # 남의 것인지 없는 것인지 구별해 주지 않습니다.

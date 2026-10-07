@@ -14,7 +14,8 @@ CARGO = {"product_description": "페인트", "package_type": "drum", "quantity":
          "length_cm": 40, "width_cm": 40, "height_cm": 60, "weight_per_package_kg": 50}
 
 
-DG = {"is_dangerous": True, "un_number": "UN1263", "dg_class": "3",
+# 3급(인화성 액체)은 포장등급이 필수입니다 — 비워 두면 경고가 나옵니다(전수 점검 2회차). 완전한 예시는 PG II.
+DG = {"is_dangerous": True, "un_number": "UN1263", "dg_class": "3", "packing_group": "II",
       "proper_shipping_name": "PAINT"}
 
 

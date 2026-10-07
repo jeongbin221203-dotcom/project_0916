@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 import re
 from datetime import date
 
@@ -83,4 +85,4 @@ def _day(day: date | str | None) -> str:
     if isinstance(day, date):
         return day.strftime("%Y%m%d")
     digits = "".join(ch for ch in str(day or "") if ch.isdigit())
-    return digits[:8] if len(digits) >= 8 else date.today().strftime("%Y%m%d")
+    return digits[:8] if len(digits) >= 8 else today_kst().strftime("%Y%m%d")

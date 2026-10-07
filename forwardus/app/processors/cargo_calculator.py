@@ -171,6 +171,41 @@ def calculate_chargeable_weight(
     return max(total_weight_kg, total_cbm * volume_factor)
 
 
+# 컨테이너 안쪽 치수(cm) 길이·폭·높이. 단일 포장이 이것을 넘으면 일반 컨테이너에 못 싣습니다.
+CONTAINER_INTERIOR_CM = {"20GP": (590, 235, 239), "40GP": (1200, 235, 239), "40HC": (1200, 235, 269)}
+def oversize_warnings(line: dict) -> list[str]:
+    """한 포장(품목 한 줄)의 가로·세로·높이가 컨테이너 안쪽 치수를 넘으면 알립니다.
+
+    1500×350×320cm 12t 한 개가 "40GP × 3" 으로, 높이 250cm 가 40GP 로 경고 없이 나왔습니다(전수 점검 2회차).
+    계산을 막지는 않습니다 — 이런 화물은 OOG(Flat Rack·Open Top·Break-bulk) 대상이라 포워더 확인이 먼저입니다.
+    항공 높이 한도는 항공사마다 달라 여기서는 판단하지 않습니다.
+    """
+
+    try:
+        dims = sorted((float(line.get(key) or 0) for key in ("length_cm", "width_cm", "height_cm")), reverse=True)
+    except (TypeError, ValueError):
+        return []
+    if not all(dims):
+        return []
+    from itertools import permutations
+
+    def fits(container: str) -> bool:
+        # 눕히거나 돌려서 실을 수 있는 모든 방향(길이·폭·높이)을 봅니다 — 가장 유리한 방향으로.
+        length, width, height = CONTAINER_INTERIOR_CM[container]
+        return any(a <= length and b <= width and c <= height for a, b, c in permutations(dims))
+
+    notes = []
+    shown = "×".join(f"{value:g}" for value in dims)
+    if not fits("40HC"):
+        length, width, height = CONTAINER_INTERIOR_CM["40HC"]
+        notes.append(f"포장 하나({shown}cm)가 컨테이너 안쪽 치수(40HC 기준 {length}×{width}×{height}cm)에 "
+                     "어느 방향으로도 들어가지 않습니다. Flat Rack·Open Top·Break-bulk(OOG) 여부를 포워더에 확인하세요.")
+    elif not fits("40GP"):
+        notes.append(f"포장 하나({shown}cm)는 40GP(안쪽 높이 {CONTAINER_INTERIOR_CM['40GP'][2]}cm)에는 안 들어가고 "
+                     "**40HC(High Cube)** 가 필요합니다. 견적의 컨테이너는 40GP 기준이라 운임이 달라질 수 있습니다.")
+    return notes
+
+
 def calculate_container_quantity(
     total_cbm: float, total_weight_kg: float, container_type: str = DEFAULT_CONTAINER_TYPE
 ) -> int:
@@ -221,6 +256,8 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
         "net_weight_kg": net_weight,
         "net_weight_warning": net_warning,
         "density_warning": density_note(float(shown_cbm), float(shown_weight)),
+        # 포장 하나가 컨테이너에 안 들어가는 크기면 알립니다(OOG). 계산은 그대로 합니다.
+        "oversize_warning": " ".join(oversize_warnings(payload)),
         "total_cbm": float(shown_cbm),
         "total_weight_kg": float(shown_weight),
         "revenue_ton": _fix(revenue_ton, 3),
@@ -266,7 +303,7 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
                         for index, line in enumerate(lines, start=1) if line.get("dg_warning")],
         "warnings": [{"line_no": index, "message": line[key]}
                      for index, line in enumerate(lines, start=1)
-                     for key in ("net_weight_warning", "units_warning", "density_warning")
+                     for key in ("net_weight_warning", "units_warning", "density_warning", "oversize_warning")
                      if line.get(key)],
         "quantity": sum(line["quantity"] for line in lines),
         # 품목별 금액을 모두 적었으면 그 합이 송장 금액입니다.
@@ -275,7 +312,10 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         # 0.01 이 스무 줄 쌓였을 때 총액이 한 푼 어긋납니다. 은행이 다시 셈합니다.
         "amount": (sum_money(line["amount"] for line in lines)
                    if lines and all(line.get("amount") is not None for line in lines) else None),
-        "net_weight_kg": sum(line.get("net_weight_kg") or 0 for line in lines) or None,
+        # 하나라도 비면 합계를 내지 않습니다. 둘째 품목의 순중량이 없는데 3,500 으로 나가면 총중량 8,000 에
+        # 순중량 3,500 이라는 틀린 서류가 됩니다(전수 점검 1회차).
+        "net_weight_kg": (sum(line["net_weight_kg"] for line in lines)
+                          if lines and all(line.get("net_weight_kg") for line in lines) else None),
         "total_cbm": round_volume(total_cbm),
         "total_weight_kg": _fix(total_weight_kg, 2),
         "revenue_ton": _fix(revenue_ton, 3),

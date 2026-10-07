@@ -198,7 +198,7 @@ html.modal_open, html.modal_open body { overflow: hidden; }
 .duty_who { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 800; white-space: nowrap; }
 .who_seller { background: #dbeafe; color: #1d4ed8; }
 .who_buyer { background: #f1f5f9; color: #475569; }
-.who_none { background: #f8fafc; color: #94a3b8; }
+.who_none { background: #f8fafc; color: #64748b; }
 .who_varies { background: #fef3c7; color: #92400e; }
 .incoterm_note { margin: 12px 2px 0; font-size: 12.5px; line-height: 1.7; }
 @media (max-width: 520px) {

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 import re
 from datetime import date
 
@@ -176,12 +178,13 @@ def _hs_name_hints(query: str) -> list[str]:
     import json
 
     from app.collectors import ai_client
+    from app.processors import bank_redaction
 
     if not ai_client.available():
         return []
     result = ai_client.chat([
         {"role": "system", "content": HS_HINT_PROMPT},
-        {"role": "user", "content": query[:200]},
+        {"role": "user", "content": bank_redaction.strip_bank_numbers(query[:200])[0]},
     ], max_tokens=120)
     if not result["success"]:
         return []
@@ -1241,6 +1244,10 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
     """
 
     route = validate_route(payload)
+    if route["requested_departure_date"] < today_kst():
+        raise ValidationError(
+            f"출발 희망일({route['requested_departure_date']})이 이미 지났습니다. 오늘 이후 날짜를 골라 주세요.",
+            "requested_departure_date")
     origin, destination = _resolve_locations(route, payload)
     parties = validate_parties(payload)
 
@@ -1293,13 +1300,13 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
 
     buyer = buyer_repository.get_or_create(
         parties["buyer_name"], parties["buyer_country"] or destination["country"],
-        parties["buyer_address"], parties["buyer_email"],
+        parties["buyer_address"], parties["buyer_email"], user_id=user_id,
     )
     etd = date.fromisoformat(schedule["etd"])
     eta = date.fromisoformat(schedule["eta"])
 
     shipment = Shipment(
-        shipment_id=shipment_repository.next_shipment_id(date.today().year),
+        shipment_id=shipment_repository.next_shipment_id(today_kst().year),
         project_name=route["project_name"],
         user_id=user_id,
         buyer=buyer,
@@ -1337,7 +1344,9 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
             line_no=index,
             product_description=optional_text(item.get("product_description"), max_length=300)
             or product_description,
-            hs_code=parse_hs_code(item.get("hs_code")) or hs_code,
+            # 위의 hs_code 는 첫 품목의 값입니다. 둘째 줄부터 비워 둔 칸에 그것을 복사하면 다른 품목이
+            # 첫 줄의 세번으로 신고됩니다(전수 점검 1회차) — 비워 두면 수출신고 자료의 '빠진 것'에 걸립니다.
+            hs_code=parse_hs_code(item.get("hs_code")) or (hs_code if index == 1 else ""),
             package_type=line["package_type"],
             is_dangerous=line["is_dangerous"],
             temperature_requirement=line["temperature_requirement"],
@@ -1370,7 +1379,7 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
         )
         for index, (item, line) in enumerate(zip(items, metrics["lines"]), start=1)
     ]
-    shipment_repository.add(shipment)
+    shipment_repository.add_unique(shipment, today_kst().year)
     shipment_repository.replace_costs(shipment, costs["lines"])
     shipment_repository.commit()
     return shipment

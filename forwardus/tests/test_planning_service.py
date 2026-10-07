@@ -733,9 +733,13 @@ def test_net_weight_is_kept_per_item(app, shipment_payload, cargo_input):
     shipment = planning_service.create_shipment(payload)
 
     assert [cargo.net_weight_kg for cargo in shipment.cargos] == [100, 250, None]
-    # 합계에도 모든 품목이 들어갑니다.
+    # 합계는 **모든 품목에 순중량이 있을 때만** 냅니다. 하나라도 비면 일부만 더한 값(350)이 총중량과
+    # 나란히 나가 앞뒤가 안 맞습니다 — 서류 쪽 _summed 와 같은 규칙입니다(전수 점검 1회차).
     metrics = planning_service.cargo_metrics(payload)
-    assert metrics["net_weight_kg"] == 350
+    assert metrics["net_weight_kg"] is None
+    complete = {**payload, "cargo": {"items": [
+        {**cargo_input, "net_weight_kg": 100}, {**cargo_input, "product_description": "두 번째", "net_weight_kg": 250}]}}
+    assert planning_service.cargo_metrics(complete)["net_weight_kg"] == 350
 
 
 def test_wrong_net_weight_warns_while_typing_but_blocks_on_save(app, shipment_payload, cargo_input):

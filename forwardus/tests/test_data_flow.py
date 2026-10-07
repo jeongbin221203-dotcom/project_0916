@@ -107,7 +107,8 @@ def test_서류에_찍히는_값도_같은_자리다(app, create_shipment):
     # 서류의 칸 이름은 exporter·consignee입니다. 값이 그 자리에 들어가야 합니다.
     assert reference["exporter"] == shipment.exporter_name
     assert reference["exporter_address"] == shipment.exporter_address
-    assert reference["incoterms"] == shipment.incoterms
+    # 코드 뒤에 지정 장소·판이 붙습니다(전수 점검 4회차) — 서류 간 대조는 앞 세 글자 코드로 합니다.
+    assert reference["incoterms"].startswith(shipment.incoterms)
     if shipment.buyer:
         assert reference["consignee"] == shipment.buyer.name
         # 수출자 주소가 수하인 주소 칸으로 가면 안 됩니다.

@@ -316,9 +316,15 @@ def test_도착국을_주면_그_나라_조항을_앞세운다(client):
     toxic = got["groups"]["toxic"]
     assert got["country"] == "CN"
     assert set(got["country_watch"]) >= {"cn_tech_transfer", "cn_trademark_buyer"}
-    # 앞의 세 줄이 중국 것입니다.
-    assert all(row["for_country"] for row in toxic[:3]), \
-        [row["key"] for row in toxic[:3]]
+    # 독소조항은 위험 종류 묶음(① 대금 … ⑧ 제재) 순서로 나오고, **묶음 안에서**
+    # 중국 것이 앞에 옵니다. (2026-10-03 — 전에는 전체의 맨 앞 세 줄이었습니다)
+    by_group: dict[str, list[dict]] = {}
+    for row in toxic:
+        by_group.setdefault(row["group"], []).append(row)
+    for rows in by_group.values():
+        flags = [row["for_country"] for row in rows]
+        assert flags == sorted(flags, reverse=True), [row["key"] for row in rows]
+    assert by_group["ip"][0]["key"] in {"cn_tech_transfer", "cn_trademark_buyer", "tooling_free"}
     # 나머지는 그대로 있습니다 — 걸러 내는 것이 아니라 순서만 바꿉니다.
     # 가공계약에서만 보는 조항(context)은 계약서를 올리기 전에는 내지 않습니다. (2026-10-02)
     assert len(toxic) == len([r for r in contract_clauses.CLAUSES

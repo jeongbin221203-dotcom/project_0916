@@ -149,7 +149,7 @@ html.rail_expanded .rail_inner [data-tip]:not(.rail_toggle)::after { display: no
     border-bottom: 1px solid var(--line); background: var(--white);
   }
   .rail_inner {
-    position: static; flex-direction: row; justify-content: center; height: auto;
+    position: static; flex-direction: row; justify-content: safe center; height: auto;
     gap: 2px; padding: 10px 8px; overflow-x: auto;
     transition: none;
   }

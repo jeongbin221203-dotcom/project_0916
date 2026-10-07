@@ -14,8 +14,13 @@
 from __future__ import annotations
 
 import math
+import re
+from datetime import datetime
 
+from app.processors.cost_calculator import INCOTERMS_INFO
 from app.processors.korean import particle
+
+_INCOTERM_CODES = {row["code"] for row in INCOTERMS_INFO}
 
 # Fields compared across documents, with the document types that carry them.
 VALIDATION_FIELDS = {
@@ -117,6 +122,17 @@ def _normalize(value, field: str = ""):
     if field == "hs_code":
         digits = "".join(ch for ch in str(value or "") if ch.isdigit())
         return digits[:6] if len(digits) >= 6 else " ".join(str(value or "").split()).upper()
+    # **Incoterms 는 앞 세 글자(코드)만 맞댑니다.** Incoterms 2020 은 지정 장소를 요구하고 L/C 도
+    # "CIF LOS ANGELES" 처럼 적는데, 완전 일치로 보니 서류를 그렇게 고치면 네 장 모두 "기준값과 다릅니다"가
+    # 되어 영영 확정할 수 없었습니다(전수 점검 1회차).
+    if field == "incoterms":
+        text = " ".join(str(value or "").split()).upper()
+        match = re.match(r"([A-Z]{3})\b", text)
+        return match.group(1) if match and match.group(1) in _INCOTERM_CODES else text
+    # 항구는 "BUSAN, KOREA"·"Busan (KRPUS)" 가 같은 곳입니다 — 쉼표·괄호 앞의 이름만 맞댑니다.
+    if field in ("pol", "pod"):
+        text = " ".join(str(value or "").split())
+        return re.split(r"[,(]", text)[0].strip().upper() if text else ""
     if field in NUMERIC_FIELDS:
         number = _as_number(value)
         if number is not None:
@@ -307,6 +323,133 @@ def _missing_findings(documents, labels, form_fields, reported) -> list[dict]:
     return findings
 
 
+_QTY_WITH_UNIT = re.compile(r"^\s*([\d,]+(?:\.\d+)?)\s*[A-Za-z./]{0,12}\s*$")
+
+
+def _qty_number(value):
+    """수량 칸은 "2,000 PCS" 처럼 단위가 붙어 나옵니다. 숫자만 읽습니다(없으면 None).
+
+    단위가 붙은 줄은 qty × price 검산을 통째로 건너뛰어, 6,400 이어야 할 금액이 5,000 이어도 통과했습니다
+    (전수 점검 4회차).
+    """
+
+    number = _as_number(value)
+    if number is not None:
+        return number
+    match = _QTY_WITH_UNIT.match(str(value or ""))
+    return float(match.group(1).replace(",", "")) if match else None
+
+
+def _item_findings(documents, labels) -> list[dict]:
+    """품목 표의 셈. 은행은 신용장 서류에서 단가 × 수량 = 금액, 줄 합계 = 송장 금액을 다시 셉니다.
+
+    CI 품목을 `item-0-amount = 1.00` 으로 고쳐도 검증을 통과해 확정됐습니다(전수 점검 1회차).
+    값이 하나라도 비면(아직 안 적음) 그 줄은 건너뜁니다 — 없는 것은 '다르다'가 아닙니다.
+    """
+
+    findings = []
+    for doc_type, data in documents.items():
+        items = data.get("items") if isinstance(data, dict) else None
+        if not isinstance(items, list) or not items:
+            continue
+        name = labels.get(doc_type, doc_type)
+        amounts = []
+        for number, row in enumerate(items, start=1):
+            if not isinstance(row, dict):
+                continue
+            qty, price, amount = (_qty_number(row.get("quantity")), _as_number(row.get("unit_price")),
+                                  _as_number(row.get("amount")))
+            amounts.append(amount)
+            if None in (qty, price, amount) or qty <= 0:
+                continue
+            if abs(qty * price - amount) > 0.01 + qty * 0.00005:
+                findings.append({
+                    "status": "warning", "kind": "items", "field": "items", "field_label": "품목 표",
+                    "document": doc_type, "document_label": name, "expected": round(qty * price, 2),
+                    "actual": row.get("amount"),
+                    "message": f"{name} 품목 {number}줄의 수량 × 단가({qty:g} × {price:g} = {qty * price:,.2f})가 "
+                               f"금액({amount:,.2f})과 맞지 않습니다."})
+        total = _as_number(data.get("invoice_value"))
+        if amounts and None not in amounts and total is not None and abs(sum(amounts) - total) > 0.01:
+            findings.append({
+                "status": "warning", "kind": "items", "field": "invoice_value", "field_label": "Invoice Value",
+                "document": doc_type, "document_label": name, "expected": round(sum(amounts), 2),
+                "actual": data.get("invoice_value"),
+                "message": f"{name}의 품목 금액 합계({sum(amounts):,.2f})가 Invoice Value({total:,.2f})와 "
+                           "다릅니다."})
+    return findings
+
+
+# 날짜로 읽혀야 하는 칸. 송장 작성일에 "zzz" 를 적어도 검증을 통과해 확정됐습니다(전수 점검 1회차).
+DATE_FIELDS = {"doc_date": "작성일", "etd": "출항일 (ETD)", "eta": "도착일 (ETA)", "validity_date": "유효기간",
+               "date_ordered": "주문일", "date_shipped": "선적일"}
+_DATE_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d", "%d %b %Y", "%d %B %Y", "%b %d, %Y",
+                 "%B %d, %Y", "%d-%b-%Y", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y")
+
+
+def _is_date(value) -> bool:
+    text = " ".join(str(value or "").replace(",", ", ").split()).replace(" ,", ",").strip()
+    if not text:
+        return True                                  # 비어 있는 것은 여기서 따지지 않습니다
+    for pattern in _DATE_FORMATS:
+        try:
+            datetime.strptime(text.title() if "%b" in pattern or "%B" in pattern else text, pattern)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def _date_findings(documents, labels, form_fields) -> list[dict]:
+    findings = []
+    for doc_type, data in documents.items():
+        shown = form_fields.get(doc_type)
+        for field, label in DATE_FIELDS.items():
+            if field not in data or (shown is not None and field not in shown):
+                continue
+            if _is_date(data[field]):
+                continue
+            name = labels.get(doc_type, doc_type)
+            findings.append({
+                "status": "warning", "kind": "format", "field": field, "field_label": label,
+                "document": doc_type, "document_label": name,
+                "expected": None, "actual": data[field],
+                "message": f"{name}의 {label}{particle(label, '이')} 날짜로 읽히지 않습니다"
+                           f" ('{str(data[field])[:30]}'). 2026-10-21 처럼 적어 주세요.",
+            })
+    return findings
+
+
+# 영문으로 적어야 하는 칸. 세관·은행·바이어는 한글 서류를 받아 주지 않습니다. 채팅은 이를 안내하는데 서류 작성·검증은
+# 한글 서류도 "모든 문서의 주요 필드가 일치합니다"로 통과시켰습니다(전수 점검 4회차).
+ENGLISH_ONLY_FIELDS = {"exporter": "Exporter", "exporter_address": "Exporter 주소", "consignee": "Consignee",
+                       "consignee_address": "Consignee 주소", "notify_party": "Notify Party",
+                       "product_description": "품명(Description)", "shipper": "Shipper"}
+_HANGUL = re.compile(r"[ㄱ-ㆎ가-힣]")
+
+
+def _language_findings(documents, labels, form_fields) -> list[dict]:
+    findings = []
+    for doc_type, data in documents.items():
+        shown = form_fields.get(doc_type)
+        name = labels.get(doc_type, doc_type)
+        rows = [("", data)] + [(f" 품목 {n}줄", row) for n, row in enumerate(data.get("items") or [], start=1)
+                              if isinstance(row, dict)]
+        for where, row in rows:
+            for field, label in ENGLISH_ONLY_FIELDS.items():
+                value = row.get(field)
+                if not isinstance(value, str) or not _HANGUL.search(value):
+                    continue
+                if not where and shown is not None and field not in shown:
+                    continue
+                findings.append({
+                    "status": "warning", "kind": "language", "field": field, "field_label": label,
+                    "document": doc_type, "document_label": name, "expected": None, "actual": value[:60],
+                    "message": f"{name}{where}의 {label}에 한글이 있습니다. 세관·은행은 영문 서류를 요구하므로 "
+                               "영문(로마자)으로 바꿔 주세요."})
+    return findings
+
+
 def validate_documents(documents: dict[str, dict], reference: dict,
                        labels: dict[str, str] | None = None,
                        form_fields: dict[str, list] | None = None) -> dict:
@@ -371,6 +514,9 @@ def validate_documents(documents: dict[str, dict], reference: dict,
     findings.extend(_cross_findings(documents, labels, form_fields, reported,
                                     reference))
     findings.extend(_missing_findings(documents, labels, form_fields, reported))
+    findings.extend(_date_findings(documents, labels, form_fields))
+    findings.extend(_language_findings(documents, labels, form_fields))
+    findings.extend(_item_findings(documents, labels))
 
     return {
         "status": "warning" if findings else "passed",

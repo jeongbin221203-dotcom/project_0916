@@ -24,6 +24,8 @@ AI는 옮겨 적고 해석만 하게 합니다.
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 import re
 from collections import Counter
 from datetime import date
@@ -139,7 +141,7 @@ def resolve_hs(item_name: str, hs_codes=None) -> dict:
 
 
 def _year(target_year) -> int:
-    this_year = date.today().year
+    this_year = today_kst().year
     try:
         year = int(str(target_year).strip()[:4])
     except (TypeError, ValueError):
@@ -223,7 +225,7 @@ def fetch_customs_export_stats(item_name: str = "", target_year=None, hs_codes=N
         return {"success": True, "data": _merge(parts)}
 
     current = collect(year)
-    if current["success"] and not current["data"]["countries"] and year == date.today().year:
+    if current["success"] and not current["data"]["countries"] and year == today_kst().year:
         # 1월 초에는 올해 자료가 아직 없습니다. 지난해로 내려갑니다.
         year -= 1
         current = collect(year)
@@ -347,7 +349,7 @@ def _display_name(name: str, group: str) -> str:
 def _item_period(period, today: date | None = None) -> tuple[int, bool]:
     """(해, 올해 누계인지). "latest"·빈 값 → 최근 완결 연도, "ytd"·"누계" → 올해 누계, "2024" → 그 해."""
 
-    today = today or date.today()
+    today = today or today_kst()
     text = str(period or "").strip().lower()
     if text in ("ytd", "누계", "올해", "올해누계", "당해", "current", str(today.year)):
         return today.year, True

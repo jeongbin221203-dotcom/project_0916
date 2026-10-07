@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 from app.processors.cost_calculator import INCOTERMS_INFO
+from app.processors.korean import josa
 from app.validators import ValidationError
 from app.validators.cargo_validator import MAX_INVOICE_VALUE, parse_number, parse_optional_number
 
@@ -41,21 +42,36 @@ def parse_date(value: Any, field_name: str, *, required: bool = True, field: str
                                   field) from exc
     if not MIN_YEAR <= parsed.year <= MAX_YEAR:
         raise ValidationError(
-            f"{field_name}은(는) {MIN_YEAR}년부터 {MAX_YEAR}년 사이여야 합니다.", field)
+            f"{josa(field_name, '은')} {MIN_YEAR}년부터 {MAX_YEAR}년 사이여야 합니다.", field)
     return parsed
 
 
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def plain_text(value: Any) -> str:
+    """사람이 적은 글. 제어문자(NUL 등)를 지우고, 목록·객체는 글자로 바꾸지 않고 비웁니다.
+
+    전에는 str(value) 라서 이름 칸에 목록을 보내면 "['x']" 가 저장됐고, NUL 문자가 DB·PDF 에 남았습니다
+    (전수 점검 1회차).
+    """
+
+    if value is None or isinstance(value, (list, dict, tuple, set)):
+        return ""
+    return _CONTROL_CHARS.sub("", str(value)).strip()
+
+
 def require_text(value: Any, field_name: str, *, max_length: int = 200, field: str | None = None) -> str:
-    text = str(value or "").strip()
+    text = plain_text(value)
     if not text:
-        raise ValidationError(f"{field_name}을(를) 입력해주세요.", field)
+        raise ValidationError(f"{josa(field_name, '을')} 입력해주세요.", field)
     if len(text) > max_length:
-        raise ValidationError(f"{field_name}은(는) {max_length}자 이내로 입력해주세요.", field)
+        raise ValidationError(f"{josa(field_name, '은')} {max_length}자 이내로 입력해주세요.", field)
     return text
 
 
 def optional_text(value: Any, *, max_length: int = 500) -> str:
-    return str(value or "").strip()[:max_length]
+    return plain_text(value)[:max_length]
 
 
 def validate_route(payload: dict) -> dict:
@@ -130,6 +146,24 @@ def _truthy(value) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def buyer_country(value: Any) -> str:
+    """바이어 나라. 두 글자는 ISO 국가코드여야 하고(대문자로), 그 밖에는 나라 이름으로 봅니다.
+
+    ZZ 같은 없는 코드가 서류 수하인 나라에 그대로 찍혔습니다(전수 점검 1회차).
+    """
+
+    from app.collectors import location_client
+
+    text = optional_text(value, max_length=100)
+    if len(text) == 2 and text.isascii() and text.isalpha():
+        code = text.upper()
+        if location_client.country_name(code) == code:      # 목록에 없으면 코드 그대로 돌아옵니다
+            raise ValidationError(f"바이어 나라 코드 '{text}'를 알 수 없습니다. 나라 이름이나 ISO 두 글자 코드"
+                                  "(예: US, VN)로 적어 주세요.", "buyer_country")
+        return code
+    return text
+
+
 def validate_parties(payload: dict) -> dict:
     """Validate exporter and buyer information."""
 
@@ -150,7 +184,7 @@ def validate_parties(payload: dict) -> dict:
         "exporter_address": optional_text(payload.get("exporter_address")),
         "notify_party": optional_text(payload.get("notify_party"), max_length=300) or "SAME AS CONSIGNEE",
         "buyer_name": require_text(buyer.get("name"), "Buyer(Consignee)명", field="buyer_name"),
-        "buyer_country": optional_text(buyer.get("country"), max_length=100),
+        "buyer_country": buyer_country(buyer.get("country")),
         "buyer_address": optional_text(buyer.get("address")),
         "buyer_email": optional_text(buyer.get("contact_email"), max_length=200),
     }

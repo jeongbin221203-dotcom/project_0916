@@ -20,6 +20,8 @@
 
 from __future__ import annotations
 
+from app.timeutil import today_kst
+
 from functools import lru_cache
 
 import json
@@ -241,7 +243,7 @@ def _date(value, notes: list, label: str) -> str:
     except ValidationError:
         notes.append(f"{label}을(를) 날짜로 읽지 못했습니다. 달력에서 직접 골라 주세요.")
         return ""
-    if parsed < date.today():
+    if parsed < today_kst():
         notes.append(f"{label}이(가) 지난 날짜({parsed.isoformat()})라 비워 두었습니다.")
         return ""
     return parsed.isoformat()
@@ -624,7 +626,7 @@ def read(text: str) -> dict:
         raise ServiceError("지금은 붙여 넣으신 글을 자동으로 읽어 드릴 수 없습니다. "
                            "칸을 직접 채워 주시면 나머지는 그대로 만들어 드립니다.")
 
-    prompt = EXTRACT_PROMPT.format(today=date.today().isoformat())
+    prompt = EXTRACT_PROMPT.format(today=today_kst().isoformat())
     # 계좌번호·SWIFT는 AI로 보내지 않습니다. (붙여 넣은 오퍼 글에 섞여 오는 일이 흔합니다)
     sent = bank_redaction.strip_bank_numbers(written)[0]
     answer = ai_client.chat([{"role": "system", "content": prompt},

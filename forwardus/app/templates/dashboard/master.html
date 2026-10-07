@@ -16,11 +16,11 @@
     <div class="kpi_card accent"><small>전체 활성 화물</small><b>{{ stats.active }}</b>
       <span class="muted small">견적 완료 ~ 도착 (전체 {{ stats.total }}건)</span></div>
     {% for card in stats.cards if card.key != 'waiting' %}
-      <a class="kpi_card link" href="{{ url_for('dashboard.index', status=card.statuses[0]) }}"
+      <a class="kpi_card link" href="{{ url_for('dashboard.index', status='group:' ~ card.key) }}"
          title="{{ card.note }}"><small>{{ card.label }}</small><b>{{ card.count }}</b>
         <span class="muted small">{{ card.note }}</span></a>
     {% endfor %}
-    <div class="kpi_card"><small>전체 사용자</small><b>{{ stats.users }}</b><span class="muted small">가입 계정</span></div>
+    <div class="kpi_card"><small>전체 사용자</small><b>{{ stats.users }}</b><span class="muted small">가입 계정 (마스터 제외)</span></div>
     <div class="kpi_card"><small>이번 달 견적</small><b>{{ stats.month_quotes }}</b><span class="muted small">새로 만든 Shipment</span></div>
     <div class="kpi_card"><small>이번 달 서류</small><b>{{ stats.month_documents }}</b><span class="muted small">작성된 무역 서류</span></div>
   </section>

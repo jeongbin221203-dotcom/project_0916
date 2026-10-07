@@ -6,8 +6,12 @@ import re
 from functools import wraps
 from urllib.parse import urlparse
 
-from flask import (Blueprint, flash, g, jsonify, redirect, render_template, request,
-                   session, url_for)
+from flask import (Blueprint, current_app, flash, g, jsonify, redirect, render_template,
+                   request, session, url_for)
+from sqlalchemy.exc import IntegrityError
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from app import security
 
 from app.extensions import db
 from app.models import User
@@ -16,6 +20,9 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MIN_PASSWORD_LENGTH = 8
+# 없는 계정으로 로그인해도 같은 시간이 걸리게 — 없는 이메일 3ms, 있는 이메일 89ms 로 계정 존재가
+# 드러났습니다(전수 점검 1회차).
+_DUMMY_HASH = generate_password_hash("not-a-real-password")
 
 
 def current_user() -> User | None:
@@ -88,11 +95,18 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
+        if security.login_blocked(current_app, email):
+            flash("로그인에 여러 번 실패해 잠시 막았습니다. 10분 뒤에 다시 해 주세요.", "error")
+            return render_template("auth/login.html", email=email, next_url=next_url), 429
         user = User.query.filter_by(email=email).first() if email else None
         if user and user.check_password(password):
+            security.login_succeeded(current_app, email)
             _log_in(user)
             flash(f"{user.name or user.email}님, 환영합니다.", "success")
             return redirect(_safe_next(next_url))
+        if not user:
+            check_password_hash(_DUMMY_HASH, password)
+        security.login_failed(current_app, email)
         flash("이메일 또는 비밀번호가 맞지 않습니다.", "error")
         return render_template("auth/login.html", email=email, next_url=next_url), 401
 
@@ -106,6 +120,9 @@ def signup():
 
     form = {"email": "", "name": ""}
     error = ""
+    if request.method == "POST" and security.signup_blocked(current_app):
+        flash("가입 요청이 너무 많습니다. 잠시 뒤에 다시 해 주세요.", "error")
+        return render_template("auth/signup.html", form=form, error=""), 429
     if request.method == "POST":
         form["email"] = request.form.get("email", "").strip().lower()
         form["name"] = request.form.get("name", "").strip()
@@ -116,8 +133,8 @@ def signup():
             error = "올바른 이메일 주소를 적어 주세요."
         elif len(form["name"]) > 100:
             error = "이름은 100자까지 적을 수 있습니다."
-        elif len(password) < MIN_PASSWORD_LENGTH:
-            error = f"비밀번호는 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다."
+        elif len(password) < MIN_PASSWORD_LENGTH or not password.strip():
+            error = f"비밀번호는 공백이 아닌 글자를 포함해 {MIN_PASSWORD_LENGTH}자 이상이어야 합니다."
         elif password != password_confirm:
             error = "비밀번호 확인이 일치하지 않습니다."
         elif User.query.filter_by(email=form["email"]).first():
@@ -127,7 +144,14 @@ def signup():
             user = User(email=form["email"], name=form["name"])
             user.set_password(password)
             db.session.add(user)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except IntegrityError:
+                # 같은 이메일이 동시에 들어온 경우 — 조회 뒤 저장 사이에 다른 요청이 먼저 가입했습니다.
+                # 예전에는 500 이었습니다(전수 점검 4회차).
+                db.session.rollback()
+                return render_template("auth/signup.html", form=form,
+                                       error="이미 가입된 이메일입니다."), 400
             _log_in(user)
             flash("회원가입이 완료되었습니다.", "success")
             return redirect(url_for("dashboard.index"))

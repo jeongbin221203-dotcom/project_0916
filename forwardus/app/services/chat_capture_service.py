@@ -36,22 +36,32 @@ ROUTE_PATTERNS = (
 # "500박스", "500 CTN", "300개"
 COUNT = re.compile(r"(\d[\d,]*)\s*(박스|상자|개|팔레트|파렛|카톤|ctns?|cartons?|boxes|box|plts?|pallets?)",
                    re.I)
+# **포장 수가 먼저입니다.** "박스당 20개입, 총 500박스" 가 수량 20(→ 15CBM 화물이 0.6CBM) 으로 읽혔습니다
+# (전문가 점검 2회차). 포장 단위만 모은 패턴으로 먼저 찾고, 없을 때만 낱개(개)를 봅니다.
+PACKAGE_COUNT = re.compile(r"(\d[\d,]*)\s*(박스|상자|팔레트|파렛|카톤|ctns?|cartons?|boxes|box|plts?|pallets?)"
+                           r"(?![가-힣a-z]*\s*(?:당|씩|마다))", re.I)
+# "20개입", "24개씩", "개당" 앞의 수, "3개월", "5개국" 은 수량이 아닙니다.
+EACH_COUNT = re.compile(r"(\d[\d,]*)\s*개(?!\s*(?:입|씩|월|국|사|년|팀|회|조|항|층|호|번|분|시간))(?!\s*(?:당|마다))")
 # "한 박스 12kg", "박스당 12kg", "개당 0.5t"
 PER_PACKAGE = re.compile(r"(?:한|1)?\s*(?:박스|상자|개|팔레트|파렛|carton|ctn|box|plt)\s*(?:당|에|은|는)?\s*"
-                         r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|t|톤|ton)", re.I)
+                         r"(\d[\d,]*(?:\.\d+)?)\s*(kgs?|킬로|metric\s*tons?|tonnes?|tons?|mt|lbs?|t|톤)(?![a-z])",
+                         re.I)
 # "총 6톤", "전체 3,000kg", "총 중량 6,000kg"
 TOTAL_WEIGHT = re.compile(r"(?:총|전체|합쳐서?)\s*(?:중량|무게)?\s*(?:은|는|:)?\s*"
-                          r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|t|톤|ton)", re.I)
+                          r"(\d[\d,]*(?:\.\d+)?)\s*(kgs?|킬로|metric\s*tons?|tonnes?|tons?|mt|lbs?|t|톤)(?![a-z])",
+                          re.I)
 # "중량 12kg", "무게: 12 kg" — 한 포장 무게로 봅니다. (총 중량은 위에서 먼저 뗍니다)
 LABELLED_WEIGHT = re.compile(r"(?:중량|무게)\s*(?:\([^)]*\))?\s*(?:은|는|:|-)?\s*"
-                             r"(\d[\d,]*(?:\.\d+)?)\s*(kg|킬로|t|톤|ton)", re.I)
+                             r"(\d[\d,]*(?:\.\d+)?)\s*(kgs?|킬로|metric\s*tons?|tonnes?|tons?|mt|lbs?|t|톤)(?![a-z])",
+                             re.I)
 # "품명 치약", "품목: 화장품", "치약 500박스"의 '치약'
 PRODUCT_LABELLED = re.compile(r"(?:품명|품목|제품|상품)\s*(?:은|는|:|-)?\s*"
                               r"([가-힣A-Za-z][가-힣A-Za-z0-9 ./-]{0,40}?)\s*(?:[,\n·]|입니다|이고|$)")
 PRODUCT_BEFORE_COUNT = re.compile(r"([가-힣][가-힣A-Za-z0-9]{1,15})\s*(?:를|을)?\s*"
                                   r"\d[\d,]*\s*(?:박스|상자|개|팔레트|파렛|카톤)")
 # 품명 자리에 들어오면 안 되는 말. (수량·포장 이야기지 물건 이름이 아닙니다)
-NOT_PRODUCT = ("총", "전체", "합계", "박스", "상자", "포장", "수량", "중량", "무게", "크기")
+NOT_PRODUCT = ("총", "전체", "합계", "박스", "상자", "포장", "수량", "중량", "무게", "크기", "짜리", "컨테이너",
+               "샘플", "견적", "문의")
 # 항공 · 해상
 AIR_WORDS = ("항공", "비행기", "air", "awb")
 SEA_WORDS = ("해상", "배로", "선박", "컨테이너", "fcl", "lcl", "ocean", "sea")
@@ -66,11 +76,41 @@ ITEM_LABELS = {"product_description": "품명", "quantity": "수량",
                "weight_per_package_kg": "한 포장 무게", "length_cm": "포장 치수"}
 
 
+def _number(text: str) -> float:
+    """"12,5" 는 소수(12.5), "1,250" · "12,500" 은 천 단위. 쉼표 뒤가 1~2자리면 소수점 쉼표입니다.
+
+    "한 박스 12,5kg" 이 125(10배)로 읽혔습니다(전문가 점검 2회차).
+    """
+
+    text = text.strip()
+    if re.fullmatch(r"\d{1,3}(?:\.\d{3})+,\d{1,2}", text):             # 유럽식 1.250,5
+        return float(text.replace(".", "").replace(",", "."))
+    if re.fullmatch(r"\d+,\d{1,2}", text):                              # 12,5
+        return float(text.replace(",", "."))
+    return float(text.replace(",", ""))
+
+
 def _kg(number: str, unit: str) -> str:
-    value = float(number.replace(",", ""))
-    if unit.lower() in ("t", "톤", "ton"):
+    value = _number(number)
+    unit = re.sub(r"\s+", "", unit.lower())
+    if unit in ("t", "톤", "ton", "tons", "tonne", "tonnes", "mt", "metricton", "metrictons"):
         value *= 1000
+    elif unit in ("lb", "lbs"):
+        value *= 0.45359237
     return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def _dims_factor(span: str, after: str) -> float:
+    """치수의 단위 → cm 환산 배수. m=100, mm=0.1, cm·단위 없음=1.
+
+    마지막 숫자 바로 뒤("1.2x1.0x1.5m")를 먼저 보고, 없으면 치수 안의 첫 단위("40cm x 30cm x 25cm")를 봅니다.
+    """
+
+    unit = (re.match(r"\s*(mm|cm|센티|m)(?![a-zA-Z가-힣])", after, re.I)
+            or re.search(r"\d\s*(mm|cm|센티|m)(?![a-zA-Z가-힣])", span, re.I))
+    if not unit:
+        return 1.0
+    return {"m": 100.0, "mm": 0.1}.get(unit.group(1).lower(), 1.0)
 
 
 def _mode(text: str) -> str:
@@ -181,9 +221,16 @@ def read(message: str) -> dict:
     dims = pipeline.DIMS_PATTERN.search(text)
     rest = text
     if dims:
-        item.update(dict(zip(pipeline.DIMS, dims.groups())))
+        factor = _dims_factor(text[dims.start():dims.end()], text[dims.end():dims.end() + 6])
+        values = [float(value) * factor for value in dims.groups()]
+        # 1.2x1.0x1.5m 가 cm 로 저장돼 CBM 이 100만 배 작아졌습니다(전문가 점검 2회차).
+        # 단위가 없는데 세 값이 모두 5 이하이면 미터로 쓴 것입니다(5cm 상자는 없습니다).
+        if factor == 1 and all(value <= 5 for value in values) and not re.search(r"cm|센티|mm", text[dims.start():dims.end() + 6], re.I):
+            values = [value * 100 for value in values]
+        item.update({key: f"{value:g}" for key, value in zip(pipeline.DIMS, values)})
         rest = (text[:dims.start()] + " " + text[dims.end():]).replace("cm", " ")
-    count = COUNT.search(text)
+    # 포장 수(박스·팔레트)를 먼저, 없을 때만 낱개(개). "개월·개국·~개입" 은 수량이 아닙니다.
+    count = PACKAGE_COUNT.search(text) or EACH_COUNT.search(text)
     if count:
         item["quantity"] = count.group(1).replace(",", "")
     # 총 중량은 먼저 떼어 냅니다. 안 그러면 "총 중량 6,000kg"의 6,000이

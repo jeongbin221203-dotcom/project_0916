@@ -167,7 +167,8 @@ def test_API는_마스터에게_전체를_준다(client, two_members):
     ids = {row["shipment_id"] for row in data["shipments"]}
     assert {mine.shipment_id, theirs.shipment_id} <= ids
     assert data["role"] == "master" and data["scope"] == "all"
-    assert data["stats"]["users"] >= 3
+    # 가입한 **일반 회원**만 셉니다(마스터 계정은 사용자가 아닙니다 — 관리자 점검 2회차). alice·bob = 2.
+    assert data["stats"]["users"] == 2
     assert any(row["owner"] == "bob@example.com" for row in data["shipments"])
 
 

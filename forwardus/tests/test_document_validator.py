@@ -529,7 +529,9 @@ def test_틀린_서류만_지적하고_맞는_서류는_안_건드린다():
 
 def test_둘_다_틀리면_둘_다_지적한다():
     found = _run({
-        "commercial_invoice": {**_REF, "pod": "LOS ANGELES,USA"},
+        # 기준값(LOS ANGELES, USA)과 **다른 항구**여야 합니다. "LOS ANGELES,USA" 는 쉼표 뒤 공백만 다른
+        # 같은 항구라 이제 어긋남이 아닙니다(전수 점검 1회차 — 항구는 쉼표·괄호 앞 이름만 맞댑니다).
+        "commercial_invoice": {**_REF, "pod": "LONG BEACH, USA"},
         "packing_list": {**_REF, "pod": "LA, USA"},
     })
     flagged = {(row["document"], row["field"]) for row in found["findings"]}

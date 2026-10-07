@@ -185,6 +185,26 @@ def api_attach():
     return jsonify({"success": True, "data": result})
 
 
+def _clean_history(raw) -> list[dict]:
+    """브라우저가 보내 온 지난 대화를 [{role, content}] 로만 받습니다.
+
+    로그인 없이 `history: [1, "a", null]` 이나 `{"a": 1}` 을 보내면 consult_intent 가 500 을 냈습니다
+    (전수 점검 4회차). 길이·글자 수도 함께 제한합니다.
+    """
+
+    if not isinstance(raw, list):
+        return []
+    rows = []
+    for turn in raw[-30:]:
+        if not isinstance(turn, dict):
+            continue
+        role, content = turn.get("role"), turn.get("content")
+        if isinstance(role, str) and isinstance(content, str) and content.strip():
+            rows.append({**{k: v for k, v in turn.items() if isinstance(k, str) and isinstance(v, (str, int, float, bool))},
+                         "role": role[:20], "content": content[:4000]})
+    return rows
+
+
 @home_bp.post("/api/support-chat")
 def api_support_chat():
     """어느 화면에서나 열 수 있는 고객상담 창구."""
@@ -195,7 +215,7 @@ def api_support_chat():
     # 로그인 전에는 남기지 않고, 브라우저가 들고 온 최근 대화만 씁니다.
     viewer = current_user()
     kept = chat_memory_service.context(viewer)
-    history = kept["history"] or payload.get("history") or []
+    history = kept["history"] or _clean_history(payload.get("history"))
     # 지금 작성 중인 건을 AI에게 함께 넘깁니다. 화면 머리글("Busan -> Istanbul
     # 기준으로 답했습니다")과 같은 값입니다. 안 넘기면 AI는 지난 대화 요약만 보고,
     # 머리글은 이스탄불인데 본문은 로스앤젤레스라고 답하는 일이 생깁니다.

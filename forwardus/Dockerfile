@@ -31,7 +31,9 @@ RUN apt-get update \
 # app/processors/ocr.py 가 이 값을 먼저 봅니다.
 ENV TESSDATA_DIR=/usr/share/tesseract-ocr/5/tessdata \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    OMP_THREAD_LIMIT=1 \
+    PIP_NO_CACHE_DIR=1 \
+    REQUIRE_SECRET_KEY=1
 
 WORKDIR /app
 
@@ -63,10 +65,14 @@ RUN tesseract --list-langs 2>&1 | grep -qx 'kor' \
 # 이 프로그램은 바깥 기관을 기다리는 시간이 대부분이라(I/O) 실타래로도
 # 충분히 여러 사람을 받습니다. 일꾼을 늘리는 것은 계산이 많을 때 이롭습니다.
 #
+# 접속 로그에는 **쿼리 문자열을 남기지 않습니다**(%(U)s = 경로만). 사업자번호·신고번호·B/L 번호가 GET 주소에
+# 실려 로그에 영구히 남던 것을 막습니다(전수 점검 4회차). OMP_THREAD_LIMIT 은 tesseract 가 CPU 를 다 쓰지 않게.
+#
 # --max-requests 는 요청 1,000번마다 일꾼을 새로 띄워, 조금씩 새는 메모리가
 # 쌓여 한도에 닿는 것을 막습니다.
 CMD gunicorn --bind "0.0.0.0:${PORT:-10000}" \
     --workers 1 --threads 8 --timeout 150 \
     --max-requests 1000 --max-requests-jitter 100 \
     --access-logfile - --error-logfile - \
+    --access-logformat '%(h)s "%(m)s %(U)s" %(s)s %(b)s %(L)s' \
     "app:create_app()"

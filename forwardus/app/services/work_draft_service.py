@@ -62,6 +62,22 @@ def clean(payload) -> dict:
     return data
 
 
+def _cleared(payload, source: str) -> tuple[set[str], bool]:
+    """(비워서 보낸 칸, 품목을 명시해서 보냈는가) — **서류 작성 화면**(source=document)일 때만 봅니다.
+
+    서류 작성 화면은 칸을 전부 보내서, 빈 문자열은 사용자가 지운 것입니다. 대화·업로드는 알아낸 칸만
+    보내므로 빈 값을 '지움'으로 읽으면 앞서 적은 항구가 사라집니다(그래서 합치기만 합니다).
+    전에는 지워도 서버에 옛 값이 남아, 지운 바이어명·품목이 운송 계획 화면에서 되살아났습니다
+    (전수 점검 1회차).
+    """
+
+    if source != "document" or not isinstance(payload, dict):
+        return set(), False
+    fields = payload.get("fields") if isinstance(payload.get("fields"), dict) else payload
+    blank = {key for key in SHARED_FIELDS if key in fields and not _text(fields.get(key))}
+    return blank, isinstance(payload.get("items"), list)
+
+
 def _record(viewer):
     from app.models import WorkDraft
 
@@ -72,14 +88,18 @@ def save(viewer, payload, source: str = "document") -> dict:
     from app.models import WorkDraft
 
     data = clean(payload)
+    blank, items_given = _cleared(payload, source)
     record = _record(viewer)
     if record is None:
         record = WorkDraft(user_id=viewer.id)
         db.session.add(record)
-    # 빈 값으로 덮지 않습니다. 대화에서 품목만 적어도 앞서 적은 항구가 남습니다.
+    # 대화·업로드는 빈 값으로 덮지 않습니다. 대화에서 품목만 적어도 앞서 적은 항구가 남습니다.
+    # 서류 작성 화면은 비운 칸을 지우고, 품목을 비워 보내면 품목도 비웁니다.
     if record.data:
-        merged = {**(record.data.get("fields") or {}), **data["fields"]}
-        data = {"fields": merged, "items": data["items"] or record.data.get("items") or []}
+        merged = {key: value for key, value in {**(record.data.get("fields") or {}), **data["fields"]}.items()
+                  if key not in blank or key in data["fields"]}
+        items = data["items"] if (data["items"] or items_given) else (record.data.get("items") or [])
+        data = {"fields": merged, "items": items}
     record.data = data
     record.source = source if source in SOURCES else "document"
     db.session.commit()

@@ -264,15 +264,18 @@ def _read_pdf(data: bytes) -> tuple[str, list]:
 
     import pdfplumber
 
+    from app.processors import safe_files
+
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             if not pdf.pages:
                 raise ServiceError("빈 PDF입니다. 내용이 있는 파일을 올려 주세요.", "VALIDATION_ERROR")
             text = "\n".join((page.extract_text() or "") for page in pdf.pages[:MAX_PDF_TEXT_PAGES])
-            images = [page.to_image(resolution=150).original.copy()
-                      for page in pdf.pages[:MAX_IMAGE_PAGES]]
+            images = [safe_files.render_page(page, 150) for page in pdf.pages[:MAX_IMAGE_PAGES]]
     except ServiceError:
         raise
+    except safe_files.UnsafeFile as exc:               # 쪽 크기가 비정상으로 큰 PDF
+        raise ServiceError(str(exc), "VALIDATION_ERROR")
     except Exception:
         # 암호가 걸렸거나 깨진 PDF. 어느 쪽이든 사람이 할 수 있는 일은 같습니다.
         raise ServiceError("PDF를 열지 못했습니다. 암호가 걸려 있거나 파일이 손상되었을 수 "
@@ -284,10 +287,14 @@ def _read_pdf(data: bytes) -> tuple[str, list]:
 def _read_image(data: bytes) -> list:
     from PIL import Image, UnidentifiedImageError
 
+    from app.processors import safe_files
+
     try:
-        with Image.open(io.BytesIO(data)) as image:
+        with safe_files.open_image(data) as image:        # 가로×세로를 먼저 보고, 크면 읽지 않습니다
             image.load()
             return [image.copy()]
+    except safe_files.UnsafeFile as exc:
+        raise ServiceError(str(exc), "VALIDATION_ERROR")
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise ServiceError("그림 파일을 열지 못했습니다. PNG나 JPG로 다시 저장해 올려 주세요.",
                            "VALIDATION_ERROR")
@@ -358,15 +365,31 @@ def _protect(text: str, images: list, ocr_found: str = "") -> tuple[str, list[st
         hidden += len(ocr_secrets)
         text = (text + "\n\n" if text.strip() else "") + OCR_LABEL + "\n" + masked_ocr
     urls: list[str] = []
-    if images and bank_redaction.ocr_available():
-        for image in images:
-            # OCR이 읽기 좋은 크기로 맞춘 뒤 칠합니다. 칠한 그림만 바깥으로 나갑니다.
-            if max(image.size) > MAX_IMAGE_EDGE:
-                image.thumbnail((MAX_IMAGE_EDGE, MAX_IMAGE_EDGE))
-            masked = bank_redaction.redact_image(_png_bytes(image))
-            hidden += masked["found"]
-            with Image.open(io.BytesIO(masked["image"])) as clean:
-                urls.append(_jpeg_data_url(clean.copy()))
+    ocr_ok = bool(images) and bank_redaction.ocr_available()
+    if ocr_ok:
+        try:
+            for image in images:
+                # OCR이 읽기 좋은 크기로 맞춘 뒤 칠합니다. 칠한 그림만 바깥으로 나갑니다.
+                if max(image.size) > MAX_IMAGE_EDGE:
+                    image.thumbnail((MAX_IMAGE_EDGE, MAX_IMAGE_EDGE))
+                masked = bank_redaction.redact_image(_png_bytes(image))
+                hidden += masked["found"]
+                with Image.open(io.BytesIO(masked["image"])) as clean:
+                    urls.append(_jpeg_data_url(clean.copy()))
+        except ocr.OcrFailed:
+            # 읽다가 실패(시간 초과 등)한 그림은 칠했는지 알 수 없습니다 — **보내지 않습니다.**
+            # 가리지 못한 그림을 보내는 것보다 받지 않는 것이 낫습니다(전수 점검 4회차).
+            urls, ocr_ok = [], False
+            if not text.strip():
+                raise ServiceError("서류 그림의 글자를 읽는 데 실패해 계좌번호를 가릴 수 없어 받지 않았습니다. "
+                                   "잠시 뒤 다시 올리거나, 글자가 있는 PDF로 올리거나, 칸을 직접 채워 주세요.",
+                                   "OCR_FAILED")
+            notes.append("서류 그림의 글자를 읽지 못해 그림은 보내지 않고 글자만 읽었습니다. "
+                         "Shipper·Consignee가 바뀌어 들어가지 않았는지 확인해 주세요.")
+    if ocr_ok:
+        pass
+    elif images and text.strip() and bank_redaction.ocr_available():
+        pass                                                     # 위에서 이미 안내함
     elif images and text.strip():
         # 칠할 도구가 없으면 그림은 보내지 않고, 가린 글자만 보냅니다.
         notes.append("계좌번호를 가릴 도구(OCR · Tesseract)가 없어 서류 그림은 보내지 않고 글자만 "

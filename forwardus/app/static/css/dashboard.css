@@ -18,7 +18,7 @@ a.kpi_card.link:hover { border-color: #c7d7fd; box-shadow: 0 0 0 1px #c7d7fd; }
 .dash_table_head h2 { margin: 0; }
 .dash_filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .dash_filters input[type=search] { flex: 1 1 220px; min-width: 0; }
-.dash_filters select { flex: 0 0 auto; width: auto; }
+.dash_filters select { flex: 0 1 auto; width: auto; min-width: 0; max-width: 100%; }
 /* 표가 넓으면 카드 안에서만 옆으로 넘깁니다. 화면 전체가 밀리지 않게. */
 .table_scroll { overflow-x: auto; }
 .dash_status { display: flex; gap: 6px; align-items: center; }

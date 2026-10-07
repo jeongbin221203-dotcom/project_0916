@@ -73,6 +73,24 @@ def test_빈_글은_판정하지_않는다():
         service.review("   ", "FOB")
 
 
+@pytest.mark.parametrize("text", ["Page 1 of 2", "- 1 -", "Page 1 of 3\n- 2 -\n"])
+def test_쪽_번호만_읽힌_파일은_판정하지_않는다(text):
+    """쪽 머리글을 지우고 나면 본문이 없습니다. 전에는 500 이 났습니다(2026-10-03).
+
+    '필수조항이 전부 빠졌다'고 답하면 안 됩니다 — 못 읽은 것이지 없는 것이 아닙니다.
+    """
+
+    with pytest.raises(ServiceError) as caught:
+        service.review(text, "FOB")
+    assert caught.value.error_code == "UNREADABLE"
+
+
+def test_본문이_없어도_찾기는_빈_결과를_낸다():
+    assert contract_clauses.find_in("") == set()
+    assert contract_clauses.find_in("Page 1 of 2") == set()
+    assert contract_clauses.analyze("- 1 -")["clauses"] == {}
+
+
 def test_독소조항은_문안으로_내보내도_빼라고_말한다():
     body = service.clause_text(["termination_at_will"])
     assert "넣는 것이 아니라 빼는 것" in body
@@ -290,3 +308,117 @@ def test_별지_제목만_있는_줄은_물품_명세가_아니다():
     """'Annex 1: Specification (attached)' 한 줄에도 물품 명세가 있다고 했습니다."""
 
     assert "goods" not in contract_clauses.find_in("Annex 1: Specification (attached)")
+
+
+# ── 일반 사용자용 내려받기 — Word · 텍스트 (2026-10-03) ─────────────────────────
+# .md 는 Windows 에서 더블클릭해도 열 프로그램이 없습니다. 받은 파일을 **도로
+# 열어서** 실무자가 보는 모습 그대로 확인합니다.
+
+def _opened(data: bytes):
+    import io
+
+    import docx
+
+    return docx.Document(io.BytesIO(data))
+
+
+def test_Word_문안은_열리고_영문은_상자에_든다():
+    document = _opened(service.clause_docx(["arbitration", "termination_at_will"]))
+    text = "\n".join(p.text for p in document.paragraphs)
+    assert "법률 자문이 아닙니다" in text
+    assert "넣는 것이 아니라 빼는 것" in text
+    assert "**" not in text
+    boxes = [table.cell(0, 0).text for table in document.tables]
+    assert len(boxes) == 2
+    # 독소(묶음 순서) · 필수 · 이익 순으로 냅니다 — 고른 순서가 아니라.
+    assert "terminate" in boxes[0] and "KCAB" in boxes[1]
+
+
+def test_Word_에서_독소조항_제목은_빨갛다():
+    document = _opened(service.clause_docx(["termination_at_will", "arbitration"]))
+    heads = {p.text: p.runs[0].font.color.rgb for p in document.paragraphs
+             if p.text.startswith("[")}
+    toxic = next(color for head, color in heads.items() if head.startswith("[독소]"))
+    must = next(color for head, color in heads.items() if head.startswith("[필수]"))
+    assert str(toxic) == "C0392B" and str(must) != "C0392B"
+
+
+def test_Word_는_굵게_표시를_진짜_굵은_글자로_바꾼다():
+    document = _opened(service.clause_docx(["arbitration"]))
+    bold = {run.text for p in document.paragraphs for run in p.runs if run.bold}
+    assert any("중재지" in text for text in bold)
+
+
+def test_모든_조항을_Word_로_낼_수_있다():
+    keys = [row["key"] for row in contract_clauses.CLAUSES]
+    assert len(_opened(service.clause_docx(keys)).tables) == len(keys)
+
+
+def test_텍스트_문안은_기호_없이_메모장에서_읽힌다():
+    body = service.clause_plain(["arbitration", "termination_at_will"])
+    assert body.startswith("﻿") and "\r\n" in body
+    assert "**" not in body and "```" not in body and "## " not in body
+    assert "법률 자문이 아닙니다" in body and "넣는 것이 아니라 빼는 것" in body
+    assert "KCAB" in body
+
+
+def test_Word_텍스트도_고른_조항이_없으면_내보내지_않는다():
+    for build in (service.clause_docx, service.clause_plain):
+        with pytest.raises(ServiceError):
+            build([])
+
+
+@pytest.mark.parametrize("kind,mime", [
+    ("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("txt", "text/plain"),
+])
+def test_창구가_Word_텍스트로_내려준다(client, kind, mime):
+    answer = client.post("/contract/export", json={"keys": ["arbitration"], "format": kind})
+    assert answer.status_code == 200
+    assert answer.mimetype == mime
+    assert f"contract-clauses.{kind}" in answer.headers["Content-Disposition"]
+
+
+def test_모르는_형식은_거절한다(client):
+    answer = client.post("/contract/export", json={"keys": ["arbitration"], "format": "exe"})
+    assert answer.status_code == 400
+
+
+def test_영문_문안은_문장_가운데서_줄이_끊기지_않는다():
+    """소스에 80자로 꺾어 둔 줄을 그대로 붙이면 계약서에서 문장이 끊깁니다."""
+
+    box = _opened(service.clause_docx(["payment"])).tables[0].cell(0, 0)
+    lines = [p.text for p in box.paragraphs]
+    # 조 번호("3.")는 뗍니다 — 이용자 계약서의 번호와 부딪힙니다(사용성 점검 2회차).
+    assert lines[0] == "PAYMENT"
+    assert "first-class bank acceptable to the Seller, at least" in lines[1]
+    assert "Seller by a first-class" in service.clause_plain(["payment"])
+
+
+# ── 소유권이 대금 전에 넘어가는 꼴 (2026-10-03) ─────────────────────────────────
+# "title shall pass" 만 보고 '소유권 유보 있음'이라고 했습니다. 인도·선적 때
+# 넘어가면 유보가 **아닙니다** — 바이어가 부도나면 물건은 그쪽 파산재단으로 갑니다.
+TITLE_ON_DELIVERY = [
+    "Title and risk shall pass to the Buyer upon delivery.",
+    "Ownership of the Goods shall pass to the Buyer upon shipment.",
+    "Title to the Goods shall pass to the Buyer when the Goods are loaded on board.",
+    "소유권은 선적 시 매수인에게 이전한다.",
+]
+TITLE_ON_PAYMENT = [
+    "Title shall pass to the Buyer only upon receipt of full payment.",
+    "소유권은 대금 완납 시 매수인에게 이전한다.",
+    "Title to the Goods shall pass to the Buyer upon delivery, provided that the price has "
+    "been paid in full.",
+]
+
+
+@pytest.mark.parametrize("line", TITLE_ON_DELIVERY)
+def test_인도_때_넘어가는_소유권은_유보가_아니다(line):
+    row = contract_clauses.analyze("SALES CONTRACT\n" + line)["clauses"]["title"]
+    assert row["status"] == "weak", line
+    assert "대금" in row["reason"]
+
+
+@pytest.mark.parametrize("line", TITLE_ON_PAYMENT)
+def test_대금_완납_때_넘어가는_소유권은_유보다(line):
+    assert "title" in contract_clauses.find_in("SALES CONTRACT\n" + line)

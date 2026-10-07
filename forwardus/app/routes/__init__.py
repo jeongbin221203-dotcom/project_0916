@@ -128,7 +128,12 @@ def json_body() -> dict:
 
     from flask import request
 
-    body = request.get_json(silent=True)
+    from werkzeug.exceptions import RequestEntityTooLarge
+
+    try:
+        body = request.get_json(silent=True)
+    except RequestEntityTooLarge:
+        raise                                # 본문이 한도를 넘음 — 빈 본문으로 넘기지 않고 413 으로(전수 점검 4회차)
     return body if isinstance(body, dict) else {}
 
 

@@ -122,6 +122,21 @@ def migrate_cost_sources(database) -> None:
             f"WHERE source = 'mock' AND code IN ({codes})"))
 
 
+def migrate_buyer_columns(database) -> None:
+    """바이어를 등록한 회원 칸을 기존 buyers 표에 덧붙입니다. 옛 줄은 주인 없음(NULL)으로 둡니다."""
+
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(database.engine)
+    if "buyers" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("buyers")}
+    if "user_id" not in columns:
+        with database.engine.begin() as connection:
+            connection.execute(text("ALTER TABLE buyers ADD COLUMN user_id INTEGER"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_buyers_user_id ON buyers (user_id)"))
+
+
 def migrate_user_columns(database) -> None:
     """마스터 표시 칸을 기존 users 표에 덧붙입니다."""
 
@@ -134,7 +149,7 @@ def migrate_user_columns(database) -> None:
     if "is_master" not in columns:
         with database.engine.begin() as connection:
             connection.execute(text(
-                "ALTER TABLE users ADD COLUMN is_master BOOLEAN NOT NULL DEFAULT 0"))
+                "ALTER TABLE users ADD COLUMN is_master BOOLEAN NOT NULL DEFAULT FALSE"))
 
 
 def ensure_master_account(database, email: str, password: str) -> None:
@@ -176,6 +191,25 @@ def ensure_master_account(database, email: str, password: str) -> None:
         database.session.rollback()
         if User.query.filter_by(email=email).first() is None:
             raise                       # 없는데도 실패했다면 그건 진짜 문제입니다
+
+
+# 코드가 반드시 있다고 믿는 열. 준비 작업이 실패한 뒤 이것이 없으면 뜨지 않습니다.
+REQUIRED_COLUMNS = {"users": ("is_master",), "buyers": ("user_id",), "shipments": ("user_id", "status")}
+
+
+def _missing_schema() -> list[str]:
+    from sqlalchemy import inspect
+
+    inspector = inspect(db.engine)
+    tables = set(inspector.get_table_names())
+    missing = []
+    for table, columns in REQUIRED_COLUMNS.items():
+        if table not in tables:
+            missing.append(table)
+            continue
+        have = {column["name"] for column in inspector.get_columns(table)}
+        missing += [f"{table}.{name}" for name in columns if name not in have]
+    return missing
 
 
 # 뜰 때 하는 데이터베이스 준비에 거는 자물쇠 번호. 아무 숫자나 되지만,
@@ -223,15 +257,20 @@ def setup_database(flask_app) -> None:
         migrate_cost_sources(db)
         migrate_requirement_documents(db)
         migrate_user_columns(db)
+        migrate_buyer_columns(db)
         ensure_master_account(db, flask_app.config.get("MASTER_EMAIL", ""),
                               flask_app.config.get("MASTER_PASSWORD", ""))
     except (IntegrityError, ProgrammingError, OperationalError):
         # 자물쇠를 쓸 수 없는 곳(SQLite 등)에서 그래도 겹쳤다면, 다른 쪽이
         # 이미 만들어 둔 것입니다. 한 번 눈감고 있는 그대로 씁니다.
-        # 정말 못 만들었다면 첫 조회에서 곧바로 드러납니다.
         db.session.rollback()
         flask_app.logger.warning("데이터베이스 준비가 겹쳤습니다. 다른 일꾼이 "
-                                 "먼저 끝낸 것으로 보고 넘어갑니다.")
+                                 "먼저 끝낸 것으로 보고 넘어갑니다.", exc_info=True)
+        # 그러나 **진짜 실패**(ALTER 권한 없음·잠금 시간 초과)까지 삼키면 열이 빠진 채 떠서 모든 질의가
+        # 500 이 됩니다(관리자 점검 2회차). 필요한 열이 실제로 있는지 다시 확인하고, 없으면 기동을 멈춥니다.
+        missing = _missing_schema()
+        if missing:
+            raise RuntimeError("데이터베이스 준비에 실패했습니다 — 없는 열: " + ", ".join(missing))
     db.session.commit()          # 자물쇠는 여기서 풀립니다
 
 
@@ -247,6 +286,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     db.init_app(flask_app)
 
+    # 쿠키·출처 확인·횟수 제한·응답 머리글·비밀키 점검 (app/security.py)
+    from app import security
+    security.install(flask_app)
+
     from app import models  # noqa: F401  Registers model metadata.
     from app.routes import register_blueprints
 
@@ -257,6 +300,16 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     @flask_app.get("/health")
     def health():
+        # DB 가 끊기거나 Render 무료 Postgres 가 만료돼도 늘 ok 였습니다 — 헬스체크가 재시작·알림의 신호가
+        # 되려면 DB 를 한 번 물어봐야 합니다(관리자 점검 2회차).
+        from sqlalchemy import text
+
+        try:
+            db.session.execute(text("SELECT 1"))
+        except Exception:                          # noqa: BLE001 — 어떤 DB 오류든 '못 쓴다'입니다
+            db.session.rollback()
+            flask_app.logger.error("헬스체크: DB 에 닿지 못했습니다", exc_info=True)
+            return jsonify({"status": "db_down"}), 503
         return jsonify({"status": "ok"})
 
     @flask_app.context_processor
@@ -325,13 +378,24 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         return value.isoformat() if hasattr(value, "isoformat") and value else (value or "-")
 
     def _wants_json() -> bool:
-        return request.path.startswith("/api") or "/api/" in request.path
+        # /api 가 아닌 곳(/documents/start 등)에 JSON 을 보내다 500 이 나면 HTML 오류 페이지가 와서 화면의
+        # response.json() 이 터졌습니다 — JSON 요청이면 JSON 으로 답합니다(관리자 점검 2회차).
+        return (request.path.startswith("/api") or "/api/" in request.path or request.is_json
+                or "application/json" in (request.headers.get("Accept") or ""))
 
     @flask_app.errorhandler(404)
     def not_found(_error):
         if _wants_json():
             return jsonify({"success": False, "error_code": "NOT_FOUND", "message": "요청한 리소스를 찾을 수 없습니다."}), 404
         return render_template("error.html", code=404, message="요청한 페이지를 찾을 수 없습니다."), 404
+
+    @flask_app.errorhandler(405)
+    def method_not_allowed(_error):
+        # 영어 기본 "405 Method Not Allowed" 가 그대로 나갔습니다(사용성 점검 2회차) — 다른 오류처럼 우리 화면으로.
+        message = "이 주소는 이런 방식으로는 열 수 없습니다. 화면의 단추나 메뉴로 들어와 주세요."
+        if _wants_json():
+            return jsonify({"success": False, "error_code": "METHOD_NOT_ALLOWED", "message": message}), 405
+        return render_template("error.html", code=405, message=message), 405
 
     @flask_app.errorhandler(403)
     def forbidden(_error):

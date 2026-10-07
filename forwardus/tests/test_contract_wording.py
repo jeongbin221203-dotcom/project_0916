@@ -218,6 +218,25 @@ CASES = {
         "제29조 매수인이 공급한 원사의 손모율은 3%로 한다.",
         "제29조 위탁가공 후 남은 잔량은 매수인에게 반송한다.",
     ],
+    # ── 실제 분쟁에서 나온 이익조항 (2026-10-04) ──────────────────────────
+    "lc_conformity": [
+        "The documentary credit shall comply with the terms of this Contract in all respects.",
+        "Any L/C amendment not in accordance with this Contract shall require the Seller's prior written consent.",
+        "The L/C shall correspond to this Agreement as to beneficiary name, goods description and documents.",
+        "제4조 신용장의 조건은 본 계약 조건과 부합하여야 한다.",
+    ],
+    "payment_account": [
+        "Payments shall be remitted solely to the Seller's designated bank account stated in Annex 3.",
+        "Any change of the bank account shall be valid only if signed by the Seller's director.",
+        "Payment to any other account shall not constitute payment under this Contract.",
+        "제5조 대금은 아래 지정 계좌로만 송금한다.",
+    ],
+    "deemed_acceptance": [
+        "The Equipment shall be deemed accepted if no written objection is received within 7 days.",
+        "Acceptance shall be deemed given upon the expiry of fourteen (14) days after delivery.",
+        "Deemed acceptance shall occur ten days after successful commissioning.",
+        "제7조 도착 후 10일 이내에 이의가 없으면 검수에 합격한 것으로 본다.",
+    ],
 }
 
 CASE_LIST = [(key, body) for key, bodies in CASES.items() for body in bodies]
