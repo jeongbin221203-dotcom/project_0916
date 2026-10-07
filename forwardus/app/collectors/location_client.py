@@ -37,33 +37,48 @@ _LOCATION_NOTES = {
 }
 _OFFSHORE_NAME = re.compile(r"(?:oil|offshore|terminal|platform|field|fpso|single\s+point|sbm|cbm|rig)", re.I)
 _REGION_FIXES = {"IR": "middle_east", "AF": "middle_east", "PK": "middle_east"}
-_patched: set[int] = set()
+_merged: dict[int, list[dict]] = {}
+
+# 실제 UN/LOCODE → 이 자료의 코드. 이 자료는 일부 큰 항구의 코드가 달라("상하이"가 CNSHA 가 아니라 CNSGH), 사용자가 흔히 쓰는
+# 실제 코드를 쳐도 "항구 코드가 아닙니다"였습니다(무역 실무 점검). 같은 항구로 연결합니다.
+LOCODE_ALIASES = {"CNSHA": "CNSGH", "CNNGB": "CNNBO", "CNSZX": "CNSNZ", "CNTAO": "CNQIN", "CNXMN": "CNXAM",
+                  "CNDLC": "CNDAL", "CNCAN": "CNGGZ", "CNGZH": "CNGGZ"}
 
 
 def _all_locations() -> list[dict]:
-    items = load_mock("locations")
-    if id(items) not in _patched:
-        for item in items:
-            note = _LOCATION_NOTES.get(item["code"])
-            if note:
-                item["major"] = False
-                item["note"] = note
-            fixed = _REGION_FIXES.get(item.get("country_code"))
-            if fixed:
-                item["region"] = fixed
-            # 대표 관문은 항상 '대표'로, 해상 유전·부유식 터미널 같은 곳은 대표에서 뺍니다(primary_gateways.py).
-            country = item.get("country_code")
-            if primary_gateways.is_primary(country, item["code"]):
-                item["major"] = True
-            elif item["kind"] == "port" and (_OFFSHORE_NAME.search(item.get("name_en") or "")
-                                             or (country != "KR" and primary_gateways.PORTS.get(country)
-                                                 and item.get("harbor_size") not in (None, "L"))):
-                # 대표 목록이 있는 나라에서는 대형(L) 항구만 목록에 더 남깁니다 — 'V'(아주 작은) 항구와 유전 터미널이
-                # 대표로 맨 앞에 나오던 것을 막습니다. 직접 검색하면 모두 나옵니다.
-                item["major"] = False
-            elif item["kind"] == "airport" and country != "KR" and primary_gateways.AIRPORTS.get(country)                     and not item.get("cargo_hub") and not item.get("direct_from_korea"):
-                item["major"] = False
-        _patched.add(id(items))
+    base = load_mock("locations")
+    cached = _merged.get(id(base))
+    if cached is not None:
+        return cached
+    items = list(base)
+    # data/build_extras.py 가 더한 세계 주요 항구(원자료에 없던 것)를 합칩니다. 원자료를 다시 만들어도 유지됩니다.
+    try:
+        known = {item["code"] for item in items}
+        items += [dict(row) for row in load_mock("locations_extra") if row["code"] not in known]
+    except (OSError, ValueError, KeyError):
+        pass
+    for item in items:
+        note = _LOCATION_NOTES.get(item["code"])
+        if note:
+            item["major"] = False
+            item["note"] = note
+        fixed = _REGION_FIXES.get(item.get("country_code"))
+        if fixed:
+            item["region"] = fixed
+        # 대표 관문은 항상 '대표'로, 해상 유전·부유식 터미널 같은 곳은 대표에서 뺍니다(primary_gateways.py).
+        country = item.get("country_code")
+        if primary_gateways.is_primary(country, item["code"]):
+            item["major"] = True
+        elif item["kind"] == "port" and (_OFFSHORE_NAME.search(item.get("name_en") or "")
+                                         or (country != "KR" and primary_gateways.PORTS.get(country)
+                                             and item.get("harbor_size") not in (None, "L"))):
+            # 대표 목록이 있는 나라에서는 대형(L) 항구만 목록에 더 남깁니다 — 'V'(아주 작은) 항구와 유전 터미널이
+            # 대표로 맨 앞에 나오던 것을 막습니다. 직접 검색하면 모두 나옵니다.
+            item["major"] = False
+        elif (item["kind"] == "airport" and country != "KR" and primary_gateways.AIRPORTS.get(country)
+              and not item.get("cargo_hub") and not item.get("direct_from_korea")):
+            item["major"] = False
+    _merged[id(base)] = items
     return items
 
 
@@ -79,7 +94,11 @@ def _by_code() -> dict[str, dict]:
 
 @lru_cache(maxsize=2)
 def _build_code_index(_version: int) -> dict[str, dict]:
-    return {item["code"]: item for item in _all_locations()}
+    index = {item["code"]: item for item in _all_locations()}
+    for real, internal in LOCODE_ALIASES.items():
+        if internal in index and real not in index:
+            index[real] = index[internal]
+    return index
 
 
 def _countries() -> dict[str, dict]:
@@ -318,6 +337,8 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         return fail("MOCK_DATA_ERROR", "mock")
 
     keyword = (query or "").strip().lower()
+    if keyword.upper() in LOCODE_ALIASES:                       # 실제 UN/LOCODE(CNSHA …)로 찾아도 같은 항구
+        keyword = LOCODE_ALIASES[keyword.upper()].lower()
     squeezed = "".join(ch for ch in keyword if ch not in ". 	")
     if kind == "airport" and (keyword in AIR_ALIASES or squeezed in AIR_ALIASES):
         keyword = AIR_ALIASES.get(keyword) or AIR_ALIASES[squeezed]
@@ -478,7 +499,15 @@ def sea_route(origin_code: str, destination_code: str) -> dict | None:
         routes = load_mock("sea_routes")["routes"]
     except (OSError, ValueError, KeyError):
         return None
+    origin_code = LOCODE_ALIASES.get(origin_code, origin_code)
+    destination_code = LOCODE_ALIASES.get(destination_code, destination_code)
     leg = routes.get(origin_code, {}).get(destination_code)
+    if not leg:
+        # data/build_extras.py 가 계산한 추가 항구까지의 항로
+        try:
+            leg = load_mock("sea_routes_extra")["routes"].get(origin_code, {}).get(destination_code)
+        except (OSError, ValueError, KeyError):
+            leg = None
     if not leg:
         return None
     return {"distance_km": leg[0], "passages": leg[1] if len(leg) > 1 else []}
