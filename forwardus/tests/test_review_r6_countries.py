@@ -150,7 +150,7 @@ def test_일반_화물은_그대로_조언한다(app):
 
 
 @pytest.mark.parametrize("code", ["EG", "NG", "KE", "TZ", "IQ", "KW", "QA", "BH", "OM", "IL", "AR", "CL", "CO", "PE", "PK",
-                                   "BD", "UA", "DZ", "MA", "UZ", "KZ", "BY"])
+                                   "BD", "UA", "DZ", "MA", "UZ", "KZ", "BY", "ET"])
 def test_자료를_채운_나라는_인증_안내가_있다(code):
     note = country_export_guide.NOTES[code]
     assert note["certs"] and note["watch"]
