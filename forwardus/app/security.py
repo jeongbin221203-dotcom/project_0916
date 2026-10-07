@@ -272,7 +272,7 @@ def install(app: Flask) -> None:
                 except ValueError:                       # "http://[::1" 처럼 깨진 값이 500 을 냈습니다
                     host = ""
                 if not host or (host != (request.host or "").lower() and host not in _allowed_hosts()):
-                    app.logger.warning("출처 거절: origin=%.60s host=%s path=%s ip=%s", origin, request.host,
+                    app.logger.warning("출처 거절: origin=%.60r host=%r path=%.200r ip=%s", origin, request.host,
                                        request.path, client_ip())
                     return _refuse("요청한 주소가 이 사이트와 다릅니다. 주소창의 주소로 직접 들어와 다시 해 주세요."
                                    " (프록시·별칭 주소를 쓴다면 운영자가 ALLOWED_ORIGINS 에 추가해야 합니다)",

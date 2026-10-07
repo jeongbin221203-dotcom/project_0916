@@ -47,6 +47,24 @@ docker run -p 10000:10000 -e SECRET_KEY=$(python -c "import secrets;print(secret
 ```
 Render 는 `forwardus/render.yaml` 로 같은 Dockerfile 을 씁니다(아래 37장의 pip 방식은 OCR·글꼴이 빠져 권장하지 않습니다).
 
+### 환경변수 (운영)
+
+| 이름 | 뜻 | 비우면 |
+|---|---|---|
+| `SECRET_KEY` | 로그인 쿠키 서명 키(긴 무작위 글자) | 운영(Render 등)에서는 **기동이 멈춥니다** |
+| `DATABASE_URL` | PostgreSQL 주소 | 컨테이너 안 SQLite — **재시작하면 데이터가 사라집니다** |
+| `MASTER_EMAIL` · `MASTER_PASSWORD` | 관리자(마스터) 계정 | 로컬 기본값(`config.py`) — 배포에서는 반드시 바꿉니다 |
+| `ALLOWED_ORIGINS` | 프록시·별칭 주소를 쓸 때 허용할 추가 호스트 | 요청 출처가 이 사이트와 다르면 403 |
+| `TRUST_PROXY` · `TRUST_PROXY_HOPS` | 프록시 뒤에서 실제 접속 IP를 믿음 | Render·Heroku 에서는 자동 |
+| `HOST` | `python run.py` 가 열 주소 | `127.0.0.1`(같은 PC 에서만 접속) |
+| `AI_API_KEY` 외 | AI·관세청·환율·선사 연결 키(`.env.example` 참고) | 해당 기능만 모의(Mock) 값 |
+
+### 데이터 흐름 (외부로 나가는 것)
+- **AI 키를 넣은 경우에만** 상담·서류 읽기·계약서 점검·HS 분류의 입력이 외부 AI 서비스(OpenAI, 미국)로 전송됩니다.
+  사진·스캔 서류의 **계좌번호·SWIFT 는 보내기 전에 자동으로 가립니다.** 개인정보나 비밀 내용은 넣지 마세요.
+- 관세청·공공데이터포털 API 에는 품목·번호 조회 값이 전송됩니다.
+- 출처·라이선스는 `THIRD_PARTY.md`, 데이터를 다시 만드는 순서는 `forwardus/docs/data_refresh.md` 에 있습니다.
+
 ### 테스트
 ```bash
 cd forwardus

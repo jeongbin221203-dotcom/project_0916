@@ -188,7 +188,9 @@ def filing_sheet(shipment) -> dict:
         {
             "line_no": cargo.line_no,
             "hs_code": cargo.hs_code,
-            "product_description": cargo.product_description,
+            # 중고·재생품은 서류(송장)와 같게 (USED)를 붙입니다 — 신고서의 물품상태와 어긋나면 안 됩니다(무역 실무 점검)
+            "product_description": (f"{cargo.product_description} ({cargo.used_label})"
+                                    if getattr(cargo, "used_label", "") else cargo.product_description),
             # 규격은 포장 치수가 아니라 물품 자체의 규격입니다. 우리가 아는 것만 적습니다.
             "spec": f"{cargo.length_cm:g} × {cargo.width_cm:g} × {cargo.height_cm:g} cm / 포장",
             # 신고서의 수량·단가는 송장과 같은 기준이어야 합니다. 낱개로 값을 매겼으면

@@ -33,6 +33,9 @@ def detail(shipment_id: str):
 def edit(shipment_id: str):
     """당사자 정보(견적명·수출자·Notify·바이어) 수정 — 서류에도 함께 반영합니다."""
 
+    from sqlalchemy.orm.exc import StaleDataError
+
+    from app.extensions import db
     from app.validators import ValidationError
 
     shipment = load_shipment(shipment_id)
@@ -40,9 +43,15 @@ def edit(shipment_id: str):
         try:
             result = shipment_service.update_shipment(shipment, request.form,
                                                       propagate=request.form.get("propagate") == "1")
+        except StaleDataError:
+            # 다른 곳에서 먼저 지웠거나 바꿨습니다 — 500 대신 안내(동시 수정·삭제 시험에서 500)
+            db.session.rollback()
+            flash("다른 화면에서 이 건이 먼저 바뀌었거나 지워졌습니다. 목록에서 다시 열어 주세요.", "error")
+            return redirect(url_for("dashboard.index"))
         except (ValidationError, ServiceError) as exc:
             flash(str(exc), "error")
             return render_template("shipment/edit.html", shipment=shipment, form=request.form,
+                                   need_confirm=getattr(exc, "code", "") == "RESTRICTED_CONFIRM",
                                    snapshot=shipment_service._party_snapshot(shipment)), 400
         if not result["changed"]:
             flash("바뀐 내용이 없습니다.", "info")
@@ -51,7 +60,10 @@ def edit(shipment_id: str):
             if result["documents"]:
                 message += f" 서류 {len(result['documents'])}개에 반영했고, 다시 검증해야 확정할 수 있습니다."
             if result["kept"]:
-                message += f" 직접 고쳐 둔 칸 {len(result['kept'])}개는 그대로 두었습니다."
+                message += f" 직접 고쳐 둔 칸 {len(result['kept'])}개는 그대로 두었습니다({', '.join(result['kept'][:4])}{' …' if len(result['kept']) > 4 else ''})."
+            if result.get("locked"):
+                message += (f" 확정(final)한 서류 {len(result['locked'])}개({', '.join(result['locked'])})는 옛 정보 그대로입니다 — "
+                            "확정을 풀고 다시 반영하세요.")
             flash(message, "success")
         return redirect(url_for("shipment.detail", shipment_id=shipment_id))
     return render_template("shipment/edit.html", shipment=shipment, form=None,
@@ -60,11 +72,24 @@ def edit(shipment_id: str):
 
 @shipment_bp.post("/<shipment_id>/delete")
 def delete(shipment_id: str):
+    from sqlalchemy.orm.exc import StaleDataError
+
+    from app.extensions import db
+
     shipment = load_shipment(shipment_id)
-    if request.form.get("confirm") != shipment.shipment_id:
+    blocked = shipment_service.delete_blocked_reason(shipment)
+    if blocked:
+        flash(blocked, "error")
+        return redirect(url_for("shipment.detail", shipment_id=shipment_id))
+    if (request.form.get("confirm") or "").strip().upper() != shipment.shipment_id.upper():
         flash("확인을 위해 건 번호를 정확히 입력해야 지울 수 있습니다.", "error")
         return redirect(url_for("shipment.detail", shipment_id=shipment_id))
-    shipment_service.delete_shipment(shipment)
+    try:
+        shipment_service.delete_shipment(shipment)
+    except StaleDataError:
+        db.session.rollback()
+        flash("이미 지워졌거나 다른 곳에서 바뀐 건입니다.", "error")
+        return redirect(url_for("dashboard.index"))
     flash(f"{shipment_id} 건을 지웠습니다.", "success")
     return redirect(url_for("dashboard.index"))
 

@@ -33,4 +33,13 @@ NOTES: dict[str, list[str]] = {
 
 
 def notes_for(country_code: str) -> list[str]:
-    return NOTES.get((country_code or "").strip().upper(), [])
+    code = (country_code or "").strip().upper()
+    if code in NOTES:
+        return NOTES[code]
+    try:
+        from app.processors import country_export_guide
+        if code in country_export_guide._eu_members():           # EU 는 같은 규정 — 독일 한 줄로 막혀 있던 것
+            return NOTES["DE"]
+    except Exception:                                              # noqa: BLE001
+        pass
+    return []

@@ -5,6 +5,7 @@
 {% block content %}
   {{ shipment_header(shipment) }}
   {{ shipment_tabs(shipment, 'document') }}
+  {% include '_advisories.html' %}
 
   <section class="card">
     <div class="row_between wrap">

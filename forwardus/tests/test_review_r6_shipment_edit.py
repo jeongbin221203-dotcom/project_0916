@@ -40,7 +40,7 @@ def test_직접_고쳐_둔_칸은_덮어쓰지_않는다(made):
     result = shipment_service.update_shipment(made, _form(made, buyer_name="NEW BUYER LLC"))
     invoice = next(d for d in made.documents if d.doc_type == "commercial_invoice")
     assert invoice.data["consignee"] == "HAND EDITED BUYER"
-    assert any("consignee" in item for item in result["kept"])
+    assert result["kept"] and all("_" not in item for item in result["kept"])   # 내부 키가 아니라 칸 이름
 
 
 def test_확정된_서류는_건드리지_않는다(made):
@@ -181,3 +181,52 @@ def test_직접_다르게_적어_둔_칸은_전파가_덮지_않는다(made):
     db.session.commit()
     document_service.update_document(made, "commercial_invoice", {"consignee": "NEW NAME"}, propagate=True)
     assert next(d for d in made.documents if d.doc_type == "packing_list").data["consignee"] == "PL SPECIAL NAME"
+
+
+def test_확정_서류가_옛_정보로_남으면_알려_준다(made):
+    invoice = next(d for d in made.documents if d.doc_type == "commercial_invoice")
+    invoice.status = "final"
+    db.session.commit()
+    result = shipment_service.update_shipment(made, _form(made, exporter_name="NEW EXPORTER CO."))
+    assert result["locked"], "확정 서류가 옛 수출자로 남는다는 알림이 있어야 합니다"
+
+
+def test_견적_단계_밖이거나_확정_서류가_있으면_지울_수_없다(made):
+    assert shipment_service.delete_blocked_reason(made) == ""
+    invoice = next(d for d in made.documents if d.doc_type == "commercial_invoice")
+    invoice.status = "final"
+    assert "확정" in shipment_service.delete_blocked_reason(made)
+    invoice.status = "validated"
+    made.status = "booked"
+    assert "지울 수 없습니다" in shipment_service.delete_blocked_reason(made)
+    made.status = "cancelled"
+    assert shipment_service.delete_blocked_reason(made) == ""
+
+
+def test_화면에서도_부킹된_건은_지워지지_않는다(app, create_shipment):
+    from app.models import User
+    browser = _member(app, "late@example.com")
+    shipment = create_shipment()
+    shipment.user_id = User.query.filter_by(email="late@example.com").one().id
+    shipment.status = "booked"
+    db.session.commit()
+    browser.post(f"/shipments/{shipment.shipment_id}/delete", data={"confirm": shipment.shipment_id})
+    db.session.expire_all()
+    assert Shipment.query.filter_by(shipment_id=shipment.shipment_id).first() is not None
+
+
+def test_너무_긴_주소와_이상한_이메일은_조용히_잘라_저장하지_않는다(made):
+    from app.validators import ValidationError
+    with pytest.raises(ValidationError):
+        shipment_service.update_shipment(made, _form(made, exporter_address="A" * 600))
+    with pytest.raises(ValidationError):
+        shipment_service.update_shipment(made, _form(made, buyer_email="not-an-email"))
+    shipment_service.update_shipment(made, _form(made, buyer_email="buyer@example.com"))
+
+
+def test_출처_거절_로그에_개행이_들어가지_않는다(app, caplog):
+    import logging
+    client = app.test_client()
+    with caplog.at_level(logging.WARNING):
+        client.post("/shipments/x%0d%0a[FAKE]%20INJECTED/delete", headers={"Origin": "http://evil.com"})
+    assert all("\n[FAKE]" not in record.getMessage() for record in caplog.records)

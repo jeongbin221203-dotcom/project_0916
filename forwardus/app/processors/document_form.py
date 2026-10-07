@@ -416,7 +416,7 @@ def _table(draw, columns, items, top: int, width: int, fonts, bottom: int | None
     return top
 
 
-DRAFT_NOTE = "ForwardUs 초안 · 아직 확정된 서류가 아닙니다"
+DRAFT_NOTE = "ForwardUs 초안 · 참고용입니다 — 제출 전에 관세사·포워더가 확인해야 하며, 아직 확정된 서류가 아닙니다"
 
 
 def draw_form(kind: str, data: dict, columns: list[dict], note: str = DRAFT_NOTE) -> Image.Image:
@@ -443,7 +443,10 @@ def draw_form(kind: str, data: dict, columns: list[dict], note: str = DRAFT_NOTE
     top = _rows(draw, layout.get("footer", []), top, width, data, fonts, height=76)
 
     # 내용 바로 아래에 답니다. 페이지 맨 밑에 두면 빈 자리를 잘라낼 수 없습니다.
-    draw.text((MARGIN, min(top + 16, PAGE[1] - 30)), note, font=fonts["small"], fill=MUTED)
+    # 연한 회색 12px 한 줄이라 초안인 줄 모르고 내는 일이 없게 눈에 띄는 띠로 둡니다(기업 점검).
+    y = min(top + 16, PAGE[1] - 40)
+    draw.rectangle([MARGIN, y - 6, MARGIN + width, y + 26], fill=(255, 244, 214), outline=(240, 200, 120))
+    draw.text((MARGIN + 10, y), note, font=fonts["label"], fill=(133, 77, 14))
     return page
 
 

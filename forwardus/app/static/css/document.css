@@ -247,3 +247,10 @@
   .doc_head_right { width: 100%; justify-content: space-between; }
   .doc_save_note { text-align: left; }
 }
+
+/* 인쇄 — 포장명세서 표가 열이 많아 마지막 열이 잘리고 스크롤바가 종이에 찍혔습니다(사용자 점검). 줄바꿈을 허용해 폭에 맞춥니다. */
+@media print {
+  .doc_items_wrap { overflow: visible !important; }
+  .doc_items { width: 100%; table-layout: fixed; font-size: 11px; }
+  .doc_items th, .doc_items td { white-space: normal !important; overflow-wrap: anywhere; padding: 4px 5px; }
+}

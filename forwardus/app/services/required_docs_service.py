@@ -382,6 +382,8 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
             # 원산지증명서는 품목이 아니라 협정이 정합니다. 아래 3에서 따로 봅니다.
             if item["key"] == "origin":
                 continue
+            if item["key"] == "used":            # 나라별 중고품 행이 이미 같은 서류를 안내합니다(중복 방지)
+                continue
             add({"key": item["key"], "title": item["title"],
                  "documents": item.get("documents") or [],
                  "agency": item.get("agency", ""), "why": item.get("why", ""),

@@ -136,8 +136,14 @@
     product_description: 3, hs_code: 3, package_type: 3, quantity: 3, length_cm: 3, width_cm: 3,
     height_cm: 3, weight_per_package_kg: 3, net_weight_kg: 3, invoice_value: 3, currency: 3,
     schedule_id: 4,
-    exporter_name: 5, buyer_name: 5,
+    // 위험물 칸은 3단계에 있습니다 — 5단계에서 "UN번호를 쓰세요"만 뜨고 칸이 없던 것(사용자 점검)
+    un_number: 3, dg_class: 3, proper_shipping_name: 3, packing_group: 3, is_dangerous: 3,
+    exporter_name: 5, exporter_address: 5, buyer_name: 5, buyer_country: 5, buyer_address: 5, buyer_email: 5,
+    notify_party: 5,
   };
+  // 막는 오류가 아니라 "한 번 더 확인"인 것들의 확인 표시. 도착국·화물이 바뀌면 비웁니다 — 이란에서 확인한 표시가 남아
+  // 도착국을 러시아로 바꿔도 경고 없이 통과하던 것(사용자 점검).
+  const confirmed = {};
 
   function showError(message) {
     errorBox.textContent = message;
@@ -529,6 +535,7 @@
       (item, input) => {
         state[role] = item;
         if (item) input.value = `${item.name} (${item.code})`;
+        if (role === "destination") showControlNote();
         if (role === "origin") {
           // 출발지가 바뀌면 도착지의 직항 표시가 달라집니다.
           locationSearch.destination?.refresh();
@@ -974,11 +981,11 @@
         <label class="handling_detail" data-handling-panel="used_condition" hidden>
           <span>상태</span>
           <select data-handling="used_condition" aria-label="중고 또는 재생품 구분">
-            <option value="unspecified">중고 (상태 협의)</option>
+            <option value="unspecified">중고 (상태는 아직 정하지 못함)</option>
             <option value="used">중고 (Used)</option>
             <option value="refurbished">재생·리퍼 (Refurbished)</option>
           </select>
-          <small>서류 품명에 (USED)가 자동으로 붙고, 수입국의 중고품 수입 규제(금지·연식·검사)를 안내합니다.</small>
+          <small>서류 품명에 (USED)가 자동으로 붙습니다. 수입국의 중고품 규제(금지·연식·검사)는 건을 만든 뒤 상세·수출요건 화면 맨 위에 안내됩니다.</small>
         </label>
       </div>
       <div class="handling_option special">
@@ -1480,9 +1487,19 @@
   const scheduleMeta = document.querySelector("[data-schedule-meta]");
   const scheduleNote = document.querySelector("[data-schedule-note]");
 
+  // 도착국을 고르는 순간 제재·통제 국가 안내를 보입니다 — 모든 칸을 채운 뒤 생성할 때서야 막히던 것(사용자 점검)
+  function showControlNote() {
+    const box = document.querySelector("[data-control-note]");
+    if (!box) return;
+    const note = state.destination && state.destination.control_note;
+    box.textContent = note || "";
+    box.hidden = !note;
+  }
+
   function invalidateSchedules() {
     state.schedules = [];
     state.schedule_id = null;
+    Object.keys(confirmed).forEach((key) => { delete confirmed[key]; });
   }
 
   function customPayload(role) {
@@ -1761,11 +1778,12 @@
 
   // 막는 오류가 아니라 "한 번 더 확인"인 것들. 다시 누르면 그대로 진행합니다.
   const CONFIRMABLE = { INCOTERMS_CONFIRM: "incoterms_confirmed", RESTRICTED_CONFIRM: "restricted_confirmed", DG_CONFIRM: "dg_confirmed" };
-  const confirmed = {};
+  // 제재·위험물 확인은 [Shipment 생성]을 다시 누르라고 하므로 그 단추가 있는 단계에 머뭅니다(이동하면 단추가 없습니다).
+  const STAY_ON_STEP = new Set(["RESTRICTED_CONFIRM", "DG_CONFIRM"]);
 
   function handleServerError(response) {
     const step = FIELD_STEP[response.field];
-    if (step && step !== state.step) goToStep(step);
+    if (step && step !== state.step && !STAY_ON_STEP.has(response.error_code)) goToStep(step);
     const flag = CONFIRMABLE[response.error_code];
     if (flag) {
       confirmed[flag] = true;
@@ -1789,6 +1807,8 @@
       ["Cargo", m
         ? `${f.product_description.value || "(품명 없음)"} · ${f.quantity.value} pkg · ${formatNumber(m.total_cbm, 3)} CBM · ${formatNumber(m.total_weight_kg, 1)} kg`
         : missing],
+      ["Condition", [...form.querySelectorAll('[data-handling-toggle="used_condition"]')].some((box) => box.checked)
+        ? "중고·재생품 — 서류 품명에 (USED)가 붙습니다" : "신품"],
       ["Invoice", plainNumber(f.invoice_value.value)
         ? `${f.currency.value} ${formatNumber(Number(plainNumber(f.invoice_value.value)), 2)}` : missing],
       ["Schedule", schedule ? `${schedule.carrier} ${schedule.vessel_or_flight} · ETD ${schedule.etd} → ETA ${schedule.eta}` : missing],

@@ -230,8 +230,8 @@ def test_packing_list_uses_the_order_form_with_one_row_per_item(create_shipment)
 
     items = document_service.document_items(doc)
     assert [c["label"] for c in items["columns"]] == [
-        "ITEM NUMBER", "CARTON NO.", "QUANTITY", "SHIPPED", "BACKORDERED", "DESCRIPTION",
-        "L×W×H (cm)", "UNIT WEIGHT", "TOTAL WEIGHT"]
+        "ITEM NUMBER", "PKG NO.", "QUANTITY", "SHIPPED", "BACKORDERED", "DESCRIPTION",
+        "L×W×H (cm)", "UNIT WEIGHT (kg)", "TOTAL WEIGHT (kg)"]
     # 품목을 두 개 넣으면 줄도 두 줄입니다.
     assert len(items["rows"]) == 2
     assert [row["description"] for row in items["rows"]] == ["샴푸", "화장품 세트"]

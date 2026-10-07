@@ -19,7 +19,7 @@ jobs:
           cache: pip
           cache-dependency-path: forwardus/requirements.txt
       - name: Tesseract (OCR 시험용)
-        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-kor fonts-nanum
       - run: pip install -r requirements.txt
       - name: 외부망 없이 도는 시험
         run: pytest -q -m "not live and not slow"

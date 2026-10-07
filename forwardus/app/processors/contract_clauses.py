@@ -3593,11 +3593,30 @@ _amend("evergreen", strict=(r"renew\w*\s+automatically[^.]{0,80}unless\s+both\s+
 # "hereby assigns" 형 지재권 양도, 판매자가 간접·결과적 손해까지 배상하는 문장, 기간·사유 없는 전량 반품권.
 # 판매자가 **지는** 문장만 잡습니다(바이어가 지거나 면책하는 문장은 건드리지 않습니다).
 _amend("term_conflict", detect=(
-    r"\b(?:seller|supplier|vendor)\s+(?:shall|will|agrees\s+to)\s+(?:\w+,?\s+){0,3}?(?:bear|pay|be\s+responsible\s+for)"
+    r"\b(?:seller|supplier|vendor)\s+(?:shall|will|agrees\s+to)\s+(?!(?:\w+,?\s+){0,3}?not\b)(?:\w+,?\s+){0,3}?(?:bear|pay|be\s+responsible\s+for)"
     r"\s+[^.]{0,60}(?:import\s+dut(?:y|ies)|customs\s+dut(?:y|ies)|\bduties\b|\bvat\b|import\s+clearance|"
     r"customs\s+clearance)[^.]{0,60}(?:destination|importing\s+country|buyer'?s\s+country|port\s+of\s+(?:discharge|destination))",
 ))
 _amend("term_conflict", unless_doc=(r"\bDDP\b", r"delivered\s+duty\s+paid", r"관세\s*지급\s*인도"))
+
+# 5회차(기업·무역 실무 점검): 판매자에게 **유리한** 문장은 독소가 아니다 — 같은 문장에 바이어가 내는 말·부정문이 있으면 제외
+_amend("term_conflict", avoid=(
+    r"\bbuyer\s+(?:shall|will)\s+(?:bear|pay)\b[^.]{0,40}\b(?:dut(?:y|ies)|vat|tax(?:es)?)\b",
+    r"\b(?:seller|supplier)\s+(?:shall|will)\s+not\b",
+    r"\b(?:seller|supplier)\s+(?:shall|will)\s+pay\s+no\b", r"\bnot\s+be\s+responsible\b"))
+# 일방 해제·무제한 보증·위험이전 불일치(영어) — 한국어 규칙만 있고 영어가 약했다
+_amend("termination_at_will", detect=(
+    r"\bbuyer\s+(?:may|shall\s+have\s+the\s+right\s+to|has\s+the\s+right\s+to)\s+(?:cancel|terminate)\b[^.]{0,80}"
+    r"\b(?:at\s+any\s+time|for\s+any\s+reason|without\s+(?:prior\s+)?(?:notice|cause|reason|penalty))\b",))
+_amend("open_warranty", detect=(
+    r"\b(?:seller|supplier)\s+(?:gives|provides|grants|offers|warrants)\s+(?:an?\s+)?(?:unlimited|lifetime|perpetual)\s+warranty\b",
+    r"\bwarranty\s+(?:period\s+)?(?:is|shall\s+be)\s+(?:unlimited|perpetual)\b"))
+_amend("term_conflict", detect=(
+    r"\b(?:seller|supplier)\s+(?:shall\s+)?bears?\s+all\s+(?:the\s+)?risks?\s+until\b[^.]{0,80}"
+    r"\b(?:warehouse|premises|destination|delivered|reach)",))
+_amend("full_return", avoid=(
+    r"\bif\s+(?:they\s+|it\s+|the\s+goods\s+)?(?:are|is|were|was)\s+(?:found\s+)?(?:defective|non-?conforming|damaged)",
+    r"\b(?:defective|non-?conforming)\b"))
 _amend("ip_assignment", detect=(
     r"\b(?:seller|supplier|vendor)\s+hereby\s+(?:irrevocably\s+)?(?:assigns?|transfers?)\s+to\s+(?:the\s+)?buyer\b"
     r"[^.]{0,80}\b(?:all|any)\b[^.]{0,40}(?:intellectual\s+property|inventions?|designs?)",))

@@ -5,6 +5,7 @@
 {% block content %}
   {{ shipment_header(shipment) }}
   {{ shipment_tabs(shipment, 'document') }}
+  {% include '_advisories.html' %}
 
   {# 선박·선사·ETD 가 예시(mock) 스케줄에서 온 값이면, 서류에 사실처럼 찍힙니다(전수 점검 1회차).
      실제 스케줄이 아닌 값으로 서류를 확정하지 않게 먼저 알립니다. #}

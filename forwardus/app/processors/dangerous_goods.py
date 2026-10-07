@@ -207,7 +207,10 @@ def guide(dg_class: str, transport_mode: str, country_name: str = "") -> dict:
             f"{where}보낼 때는 도착국 세관·항만이 따로 두는 반입 제한도 확인해야 합니다."
             " 같은 급이라도 나라마다 허가·수량 기준이 다릅니다." if country_name else
             "도착지를 고르면 그 나라에서 확인할 곳을 함께 안내합니다."),
-        "references": REFERENCES,
+        # 항공에 해상 규정(IMDG·선박운송 규칙) 링크가 나오던 것을 운송수단에 맞춰 거릅니다(사용자 점검)
+        "references": [ref for ref in REFERENCES
+                       if not (is_air and ("IMDG" in ref["label"] or "선박" in ref["label"]))
+                       and not (not is_air and "IATA" in ref["label"])],
     }
 
 

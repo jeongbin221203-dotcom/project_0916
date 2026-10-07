@@ -99,6 +99,11 @@ def search_locations(query: str, transport_mode: str, role: str | None = None, c
         return result
     if role == "destination":
         result["data"] = [item for item in result["data"] if item["country_code"] != "KR"]
+        # 도착국을 고르는 자리에서 바로 제재·통제 안내를 보이게 합니다(생성 때서야 막히던 것 — 사용자 점검)
+        from app.processors import trade_controls
+        for item in result["data"]:
+            if trade_controls.level(item["country_code"]):
+                item["control_note"] = trade_controls.note(item["country_code"]).replace("**", "")
     if role == "origin" and not query.strip():
         # 목록을 펼치면 국가관리 무역항만 보여줍니다. 지방관리 무역항은
         # 이름을 입력하면 찾을 수 있습니다. (수출 물량 대부분이 국가관리항입니다)
@@ -750,7 +755,11 @@ def _build_custom_airport(code: str, name: str, country_code: str, country: dict
     return known
 
 
-_BATTERY_WORDS = re.compile(r"lithium|li-?ion|battery|batteries|power\s*bank|리튬|배터리|보조\s*배터리|축전지|충전지", re.I)
+_BATTERY_WORDS = re.compile(
+    r"lithium|li-?ion|battery|batteries|power\s*bank|e-?bike|e-?scooter|scooter|hoverboard|laptop|notebook\s*computer|"
+    r"smart\s*phone|smartphone|mobile\s*phone|tablet|drone|earbuds?|earphones?|headphones?|vape|e-?cigarette|smart\s*watch|"
+    r"cordless|robot\s*vacuum|리튬|배터리|보조\s*배터리|축전지|충전지|킥보드|전동\s*(?:스쿠터|자전거|휠)|노트북|"
+    r"스마트\s*폰|스마트폰|휴대폰|태블릿|드론|이어폰|무선\s*이어폰|헤드폰|전자\s*담배|스마트\s*워치|무선\s*청소기|로봇\s*청소기", re.I)
 
 
 def _check_battery_goods(items: list[dict], payload: dict) -> None:
@@ -775,19 +784,41 @@ def _check_battery_goods(items: list[dict], payload: dict) -> None:
             "한 번 더 눌러 주세요.".replace("**", ""), "is_dangerous", code="DG_CONFIRM")
 
 
-def _check_trade_controls(destination: dict, payload: dict) -> None:
-    """제재·수출통제 국가는 막거나(북한) 한 번 더 확인받습니다(strict). 안내 문구는 processors/trade_controls."""
+def check_trade_controls(country_codes, payload: dict, text: str = "", field: str = "destination_code") -> None:
+    """제재·수출통제 국가는 막거나(북한) 한 번 더 확인받습니다(strict). 안내 문구는 processors/trade_controls.
+
+    country_codes — 검사할 나라들(도착국·바이어 국가). 점령지 이름이 text 에 있으면 strict 로 봅니다.
+    """
+
+    import logging
 
     from app.processors import trade_controls
 
-    code = (destination or {}).get("country_code") or ""
-    kind = trade_controls.level(code)
-    if kind == "blocked":
-        raise ValidationError(trade_controls.note(code).replace("**", ""), "destination_code", code="TRADE_CONTROL")
-    if kind == "strict" and str(payload.get("restricted_confirmed") or "").lower() not in ("1", "true", "yes", "on"):
-        raise ValidationError(trade_controls.note(code).replace("**", "")
-                              + " 그래도 견적을 만들려면 [Shipment 생성]을 한 번 더 눌러 주세요.",
-                              "destination_code", code="RESTRICTED_CONFIRM")
+    confirmed = str(payload.get("restricted_confirmed") or "").lower() in ("1", "true", "yes", "on")
+    strict_hit = None
+    for code in dict.fromkeys(str(c or "").upper() for c in country_codes):
+        kind = trade_controls.level(code)
+        if kind == "blocked":
+            raise ValidationError(trade_controls.note(code).replace("**", ""), field, code="TRADE_CONTROL")
+        if kind == "strict" and strict_hit is None:
+            strict_hit = trade_controls.note(code).replace("**", "")
+    region = trade_controls.region_in_text(text)
+    if region and strict_hit is None:
+        strict_hit = (f"주소·거래처에 '{region}'(러시아 점령지)가 보입니다. 미국·EU 가 지역 단위로 포괄 제재해 거래가 불가능할 수 있습니다."
+                      + trade_controls.CHECK_FIRST.replace("**", ""))
+    if strict_hit and not confirmed:
+        raise ValidationError(strict_hit + " 그래도 진행하려면 한 번 더 눌러 주세요.", field, code="RESTRICTED_CONFIRM")
+    if strict_hit and confirmed:
+        # 확인을 눌러 진행한 기록 — 누가 어느 나라로 진행했는지 운영 로그에 남깁니다(감사 로그 전 단계)
+        logging.getLogger(__name__).warning("제재·통제 확인 후 진행: countries=%s region=%s", list(country_codes), region or "-")
+
+
+def _check_trade_controls(destination: dict, payload: dict, buyer: dict | None = None) -> None:
+    buyer = buyer or {}
+    check_trade_controls(
+        [(destination or {}).get("country_code"), buyer.get("buyer_country")], payload,
+        text=" ".join([buyer.get("buyer_name") or "", buyer.get("buyer_address") or "",
+                       payload.get("notify_party") or "", (destination or {}).get("name") or ""]))
 
 
 def _resolve_locations(route: dict, payload: dict) -> tuple[dict, dict]:
@@ -1339,8 +1370,10 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
             f"출발 희망일({route['requested_departure_date']})이 이미 지났습니다. 오늘 이후 날짜를 골라 주세요.",
             "requested_departure_date")
     origin, destination = _resolve_locations(route, payload)
-    _check_trade_controls(destination, payload)
     parties = validate_parties(payload)
+    # 도착국만이 아니라 **바이어 국가**와 주소 글도 봅니다 — 바이어를 KP·RU·IR 로 적고 도착항만 다른 나라로 하면 통과했습니다
+    # (기업 점검). 두 나라 중 하나라도 통제 대상이면 같은 단계를 적용합니다.
+    _check_trade_controls(destination, payload, buyer=parties)
 
     items = cargo_items(payload)
     _check_battery_goods(items, payload)

@@ -319,6 +319,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         # 고객상담 창은 모든 화면에 붙으므로 여기서 한 번만 준비합니다.
         from app.services import support_chat_service
 
+        from app.services import advisory_service
         from app.routes.auth import current_user
 
         from app.routes import sidebar
@@ -336,7 +337,8 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 "brand_logo": _pick_image("logo"),
                 "brand_mark": _pick_image("logo_mark"),
                 "home_locked": flask_app.config.get("HOME_LOCKED", False),
-                "contract_on": flask_app.config.get("CONTRACT_CLAUSES_ON", False)}
+                "contract_on": flask_app.config.get("CONTRACT_CLAUSES_ON", False),
+                "shipment_advisories": advisory_service.advisories}
 
     # 화면에 쓰는 그림은 파일만 올려 두면 바뀌도록 합니다.
     # app/static/images/ 에 아래 이름으로 넣으면 코드를 고치지 않아도 됩니다.

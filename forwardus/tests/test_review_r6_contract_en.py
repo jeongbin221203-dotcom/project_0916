@@ -34,3 +34,26 @@ def test_영어_독소_문장을_잡는다(text, key):
 ])
 def test_정상_문장은_독소로_잡지_않는다(text, key):
     assert key not in _keys(text)
+
+
+@pytest.mark.parametrize("text, key", [
+    ("Buyer may cancel any order at any time without notice or penalty.", "termination_at_will"),
+    ("Buyer shall have the right to terminate this Agreement for any reason.", "termination_at_will"),
+    ("Seller gives an unlimited warranty on all Products.", "open_warranty"),
+    ("Seller bears all risk until the goods reach Buyer's warehouse.", "term_conflict"),
+])
+def test_영어_일방_해제_무제한_보증_위험이전을_잡는다(text, key):
+    assert key in _keys(text)
+
+
+@pytest.mark.parametrize("text, key", [
+    ("The Seller shall not bear any import duties or taxes at the port of destination.", "term_conflict"),
+    ("The Seller shall not pay VAT or duties levied in the importing country.", "term_conflict"),
+    ("Seller will not be responsible for duties or taxes imposed in the Buyer's country.", "term_conflict"),
+    ("Under EXW, Seller shall pay no export clearance; the Buyer shall pay import duties at the port of destination.", "term_conflict"),
+    ("Buyer may return the Goods within 1 year of delivery if they are found defective.", "full_return"),
+    ("Seller may terminate this Agreement at any time upon 30 days notice.", "termination_at_will"),
+    ("Seller bears all risk until the goods are loaded on board the vessel at the port of shipment.", "term_conflict"),
+])
+def test_판매자에게_유리하거나_정상인_문장은_독소가_아니다(text, key):
+    assert key not in _keys(text)

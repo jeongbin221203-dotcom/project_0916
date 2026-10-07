@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import OrderedDict
 
 from app.models.document import DOCUMENT_TYPES
@@ -135,6 +136,17 @@ def update_shipment(shipment, form: dict, *, propagate: bool = True) -> dict:
     if shipment.status in LOCKED_STATUSES:
         raise ServiceError(f"{shipment.status_label} 상태의 건은 고칠 수 없습니다.", "LOCKED")
     form = form if isinstance(form, dict) else {}
+    # 길면 잘라 저장하는 대신 알립니다 — 서류의 주소가 중간에서 끊길 수 있습니다(기업 점검)
+    for key, label, limit in (("exporter_address", "수출자 주소", 500), ("buyer_address", "Buyer 주소", 500),
+                              ("notify_party", "Notify Party", 300), ("exporter_name", "수출자명", 200),
+                              ("buyer_name", "Buyer명", 200)):
+        if len(str(form.get(key) or "").strip()) > limit:
+            from app.validators import ValidationError
+            raise ValidationError(f"{label}은(는) {limit}자 이내로 적어 주세요.", key)
+    email = str(form.get("buyer_email") or "").strip()
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        from app.validators import ValidationError
+        raise ValidationError("Buyer 이메일 형식이 맞지 않습니다.", "buyer_email")
     parties = validate_parties({
         "exporter_name": form.get("exporter_name"), "exporter_address": form.get("exporter_address"),
         "notify_party": form.get("notify_party"),
@@ -147,6 +159,13 @@ def update_shipment(shipment, form: dict, *, propagate: bool = True) -> dict:
     changed = [key for key, value in new.items() if (before.get(key) or "") != (value or "")]
     if not changed:
         return {"changed": [], "documents": [], "kept": []}
+    # 수정에도 같은 제재 검사 — 생성 때 통과한 건의 바이어 국가를 KP·RU·IR 로 바꾸면 그대로 저장됐습니다(무역 실무 점검)
+    from app.services.planning_service import check_trade_controls
+    from app.collectors import location_client
+    destination = location_client.find_location(shipment.destination_code or "") or {}
+    destination_country = destination.get("country_code", "")
+    check_trade_controls([destination_country, parties["buyer_country"]], form, field="buyer_country",
+                         text=" ".join([parties["buyer_name"], parties["buyer_address"], parties["notify_party"]]))
     old_reference = document_service.build_reference(shipment)
 
     shipment.project_name = project_name
@@ -160,11 +179,18 @@ def update_shipment(shipment, form: dict, *, propagate: bool = True) -> dict:
             user_id=shipment.user_id)
     shipment_repository.commit()
 
-    updated, kept = [], []
+    updated, kept, locked = [], [], []
     if propagate:
         new_reference = document_service.build_reference(shipment)
         for document in document_repository.list_for_shipment(shipment):
-            if document.status == "final" or not isinstance(document.data, dict):
+            if not isinstance(document.data, dict):
+                continue
+            if document.status == "final":
+                # 확정 서류는 건드리지 않지만 **옛 정보로 남는다는 것**을 알립니다(기업 점검: 송장은 옛 수출자, SI 는 새 수출자)
+                if any(key in document.data and (document.data.get(key) or "") == (old_reference.get(key) or "")
+                       and (new_reference.get(key) or "") != (old_reference.get(key) or "")
+                       for source, keys in PARTY_DOCUMENT_FIELDS.items() if source in changed for key in keys):
+                    locked.append(DOCUMENT_TYPES.get(document.doc_type, document.doc_type))
                 continue
             data = dict(document.data)
             touched = False
@@ -178,12 +204,37 @@ def update_shipment(shipment, form: dict, *, propagate: bool = True) -> dict:
                         data[key] = new_reference.get(key, "")
                         touched = True
                     else:
-                        kept.append(f"{DOCUMENT_TYPES.get(document.doc_type, document.doc_type)} · {key}")
+                        kept.append(f"{DOCUMENT_TYPES.get(document.doc_type, document.doc_type)} · "
+                                    f"{document_service.field_label(document.doc_type, key)}")
             if touched:
                 document_repository.upsert(shipment, document.doc_type, data, "generated", document.source or "auto")
                 updated.append(document.doc_type)
         shipment_repository.commit()
-    return {"changed": changed, "documents": updated, "kept": kept}
+    # "서류 5장의 같은 칸"을 칸 이름 하나로 합칩니다 — 개수만 늘어 사용자가 무엇이 안 바뀌었는지 몰랐습니다
+    grouped: dict[str, int] = {}
+    for item in kept:
+        label = item.split(" · ", 1)[1] if " · " in item else item
+        grouped[label] = grouped.get(label, 0) + 1
+    kept = [f"{label}({count}장)" if count > 1 else label for label, count in grouped.items()]
+    return {"changed": changed, "documents": updated, "kept": kept, "locked": locked}
+
+
+DELETABLE_STATUSES = ("draft", "quoted", "cancelled")
+
+
+def delete_blocked_reason(shipment) -> str:
+    """지우면 안 되는 건의 이유. 지워도 되면 빈 글자.
+
+    수출신고 관련 서류는 보관 의무가 있고, 부킹·선적 이후의 건을 번호 입력만으로 지울 수 있으면 사고입니다(기업 점검).
+    확정한 서류가 있거나 견적 단계를 넘은 건은 '취소(보관)'로만 처리합니다.
+    """
+
+    if shipment.status not in DELETABLE_STATUSES:
+        return (f"{shipment.status_label} 상태의 건은 지울 수 없습니다. 수출 관련 서류는 보관해야 하므로 "
+                "'취소'로 상태를 바꿔 두세요(견적 단계의 건만 지울 수 있습니다).")
+    if any(document.status == "final" for document in shipment.documents):
+        return "확정(final)한 서류가 있는 건은 지울 수 없습니다. 확정을 풀거나 '취소'로 상태를 바꿔 두세요."
+    return ""
 
 
 def delete_shipment(shipment) -> None:

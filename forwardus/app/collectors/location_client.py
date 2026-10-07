@@ -35,14 +35,18 @@ _LOCATION_NOTES = {
     "CYKYR": "북키프로스(국제적 미승인 지역) — 제재·법적 확인 필요",
     "CYDHK": "영국 군기지 — 일반 상업 항구가 아닙니다",
 }
-_OFFSHORE_NAME = re.compile(r"(?:oil|offshore|terminal|platform|field|fpso|single\s+point|sbm|cbm|rig)", re.I)
+# 같은 항구가 터미널 이름으로 한 줄 더 올라와 대표 목록에 중복으로 보이는 코드
+_DUPLICATE_TERMINALS = {"CNSHG", "CNNBG", "CNXMG"}
+# 원자료의 이름이 실무에서 쓰는 이름과 다른 것
+_LOCATION_RENAMES = {"KHKOS": ("시아누크빌항", "Sihanoukville (Kampong Saom)")}
+_OFFSHORE_NAME = re.compile(r"\b(?:oil|offshore|terminal|platform|field|fpso|single\s+point|sbm|cbm|rig)\b", re.I)
 _REGION_FIXES = {"IR": "middle_east", "AF": "middle_east", "PK": "middle_east"}
 _merged: dict[int, list[dict]] = {}
 
 # 실제 UN/LOCODE → 이 자료의 코드. 이 자료는 일부 큰 항구의 코드가 달라("상하이"가 CNSHA 가 아니라 CNSGH), 사용자가 흔히 쓰는
 # 실제 코드를 쳐도 "항구 코드가 아닙니다"였습니다(무역 실무 점검). 같은 항구로 연결합니다.
 LOCODE_ALIASES = {"CNSHA": "CNSGH", "CNNGB": "CNNBO", "CNSZX": "CNSNZ", "CNTAO": "CNQIN", "CNXMN": "CNXAM",
-                  "CNDLC": "CNDAL", "CNCAN": "CNGGZ", "CNGZH": "CNGGZ"}
+                  "CNDLC": "CNDAL", "CNCAN": "CNGGZ"}
 
 
 def _all_locations() -> list[dict]:
@@ -55,13 +59,18 @@ def _all_locations() -> list[dict]:
     try:
         known = {item["code"] for item in items}
         items += [dict(row) for row in load_mock("locations_extra") if row["code"] not in known]
-    except (OSError, ValueError, KeyError):
-        pass
+    except (OSError, ValueError, KeyError) as exc:
+        # 확장 항구가 통째로 사라져도 알 수 없던 것을 막습니다 — 원인을 운영 로그에 남깁니다(기업 점검)
+        import logging
+        logging.getLogger(__name__).warning("locations_extra.json 을 합치지 못했습니다: %s", exc)
     for item in items:
         note = _LOCATION_NOTES.get(item["code"])
         if note:
             item["major"] = False
             item["note"] = note
+        renamed = _LOCATION_RENAMES.get(item["code"])
+        if renamed:
+            item["name"], item["name_en"] = renamed
         fixed = _REGION_FIXES.get(item.get("country_code"))
         if fixed:
             item["region"] = fixed
@@ -69,7 +78,7 @@ def _all_locations() -> list[dict]:
         country = item.get("country_code")
         if primary_gateways.is_primary(country, item["code"]):
             item["major"] = True
-        elif item["kind"] == "port" and (_OFFSHORE_NAME.search(item.get("name_en") or "")
+        elif item["kind"] == "port" and ((item.get("harbor_size") and _OFFSHORE_NAME.search(item.get("name_en") or ""))
                                          or (country != "KR" and primary_gateways.PORTS.get(country)
                                              and item.get("harbor_size") not in (None, "L"))):
             # 대표 목록이 있는 나라에서는 대형(L) 항구만 목록에 더 남깁니다 — 'V'(아주 작은) 항구와 유전 터미널이
@@ -78,6 +87,9 @@ def _all_locations() -> list[dict]:
         elif (item["kind"] == "airport" and country != "KR" and primary_gateways.AIRPORTS.get(country)
               and not item.get("cargo_hub") and not item.get("direct_from_korea")):
             item["major"] = False
+        if item["code"] in _DUPLICATE_TERMINALS:
+            item["major"] = False
+            item["harbor_size"] = item.get("harbor_size") or "S"     # 규모가 없는 항구는 대표가 아니면 '작은' 항구로 분류
     _merged[id(base)] = items
     return items
 

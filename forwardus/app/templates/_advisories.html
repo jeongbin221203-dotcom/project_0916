@@ -1,0 +1,12 @@
+{# 건 화면 안내 카드 — 제재·수출통제·중고품. app/services/advisory_service.py #}
+{% set cards = shipment_advisories(shipment) %}
+{% if cards %}
+  <section class="card advisory_card" aria-label="확인이 필요한 안내">
+    {% for card in cards %}
+      <div class="alert {{ 'warn' if card.level in ('blocked', 'strict') else 'info' }}">
+        <b>{{ card.title }}</b>
+        <p>{{ card.text }}</p>
+      </div>
+    {% endfor %}
+  </section>
+{% endif %}

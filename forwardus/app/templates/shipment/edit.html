@@ -9,7 +9,7 @@
   {% set v = form if form else snapshot %}
   <section class="card">
     <h2>당사자 정보 수정</h2>
-    <p class="muted">견적명·수출자·Notify Party·바이어를 고칩니다. 운임·일정·화물 정보를 바꾸려면 새 견적을 만드세요.</p>
+    <p class="muted">견적명·수출자·Notify Party·바이어를 고칩니다. 운임·일정·화물 정보를 바꾸려면 새 견적을 만드세요. (품명·수량 같은 오타는 서류 화면에서 바로 고칠 수 있습니다.)</p>
     <form method="post" action="{{ url_for('shipment.edit', shipment_id=shipment.shipment_id) }}">
       <div class="form_grid">
         <label class="field span2"><span class="field_label">견적명</span>
@@ -29,6 +29,12 @@
         <label class="field"><span class="field_label">Notify Party</span>
           <input class="text_input" type="text" name="notify_party" maxlength="300" value="{{ v.notify_party }}"></label>
       </div>
+      {% if need_confirm %}
+        <label class="dg_check">
+          <input type="checkbox" name="restricted_confirmed" value="1" required>
+          <span>제재·수출통제 해당 여부를 확인했고, 그 판단과 책임이 수출자인 저에게 있음을 이해합니다.</span>
+        </label>
+      {% endif %}
       <label class="dg_check">
         <input type="checkbox" name="propagate" value="1" checked>
         <span>서류에도 반영합니다 — Shipment 값 그대로였던 칸만 바뀌고, 직접 고쳐 둔 칸은 그대로 둡니다.

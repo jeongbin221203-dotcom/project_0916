@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from app.timeutil import today_kst
 
 from datetime import date
@@ -160,9 +161,9 @@ DOCUMENT_ITEM_FIELDS = {
     ],
     # 첨부 서식의 표 머리글. 품목을 넣은 만큼 줄이 생깁니다.
     "packing_list": [
-        ("item_number", "ITEM NUMBER"), ("carton_no", "CARTON NO."), ("quantity", "QUANTITY"),
+        ("item_number", "ITEM NUMBER"), ("carton_no", "PKG NO."), ("quantity", "QUANTITY"),
         ("shipped", "SHIPPED"), ("backordered", "BACKORDERED"), ("description", "DESCRIPTION"),
-        ("dimensions", "L×W×H (cm)"), ("unit_weight", "UNIT WEIGHT"), ("total_weight", "TOTAL WEIGHT"),
+        ("dimensions", "L×W×H (cm)"), ("unit_weight", "UNIT WEIGHT (kg)"), ("total_weight", "TOTAL WEIGHT (kg)"),
     ],
     "proforma_invoice": [
         ("description", "Item"), ("quantity", "Quantity"), ("unit", "UNIT"),
@@ -330,6 +331,9 @@ def _port(name: str, code: str) -> str:
 
     if not code:
         return ""
+    from app.collectors.location_client import LOCODE_ALIASES
+    standard = {internal: real for real, internal in LOCODE_ALIASES.items() if real.startswith(internal[:2])}
+    code = standard.get(code, code)
     return f"{name} ({code})"
 
 
@@ -351,6 +355,19 @@ def _summed(cargos, attribute: str):
     return round(total, 3)
 
 
+MOCK_VESSEL = "(예시 스케줄 — 부킹 후 실제 선명 입력)"
+
+
+def _vessel_text(shipment) -> str:
+    """선명·항차. **예시(mock) 스케줄의 가상 선박은 서류에 실제처럼 찍지 않습니다** — "HMM BLESSING" 같은 이름이 포장명세서에
+    들어가 확정까지 되던 것을 막습니다(기업 점검). 실제 스케줄(API)이면 그대로."""
+
+    vessel = shipment.vessel_or_flight or ""
+    if vessel and getattr(shipment, "schedule_source", "") == "mock":
+        return MOCK_VESSEL
+    return vessel
+
+
 def _dimensions(cargo) -> str:
     """포장당 치수 "40×30×25". 모르는 값이 하나라도 있으면 비웁니다(지어내지 않습니다)."""
 
@@ -368,7 +385,8 @@ def _described(cargo) -> str:
 
     name = cargo.product_description or ""
     label = getattr(cargo, "used_label", "") or ""
-    if label and label not in name.upper():
+    # 부분 문자열로 보면 "Unused"·"Focused"·"Fused"·"Housed" 의 USED 에 걸려 표기가 빠졌습니다(무역 실무 점검) — 낱말 경계로
+    if label and not re.search(rf"\b{label}\b", name, re.I):
         return f"{name} ({label})"
     return name
 
@@ -466,7 +484,7 @@ def build_reference(shipment, doc_type: str = "") -> dict:
         "pol": _port(shipment.origin_name, shipment.origin_code),
         "pod": _port(shipment.destination_name, shipment.destination_code),
         "carrier": shipment.carrier or "",
-        "vessel_or_flight": shipment.vessel_or_flight or "",
+        "vessel_or_flight": _vessel_text(shipment),
         "etd": shipment.etd.isoformat() if shipment.etd else "",
         "eta": shipment.eta.isoformat() if shipment.eta else "",
         # 품명·HS부호는 더할 수 없습니다. 대표를 쓰되 여러 줄이면 "외 N건".
@@ -508,7 +526,7 @@ def build_reference(shipment, doc_type: str = "") -> dict:
         "date_shipped": shipment.etd.isoformat() if shipment.etd else "",
         # ATTENTION 은 담당자 **이름**입니다. 이메일을 넣으면 서류에 "a@b.com"이 찍혔습니다(무역 실무 점검) — 비워 둡니다.
         "attention": "",
-        "shipped_via": " / ".join(part for part in [shipment.carrier, shipment.vessel_or_flight] if part),
+        "shipped_via": " / ".join(part for part in [shipment.carrier, _vessel_text(shipment)] if part),
         "container_no": "",
         "invoice_no": f"CI-{shipment.shipment_id}",
         "comments": "",
@@ -596,7 +614,8 @@ def build_items(shipment, doc_type: str) -> list[dict]:
             "item_number": hs_for_document(cargo.hs_code or "", doc_type),
             # 카톤(포장) 번호와 포장당 치수 — 포워더·바이어가 포장을 세어 대조하는 칸입니다(무역 실무 점검).
             "carton_no": ((f"{first_no}" if cursor == first_no else f"{first_no}–{cursor}")
-                          if isinstance(cargo.quantity, (int, float)) and cargo.quantity else ""),
+                          if isinstance(cargo.quantity, (int, float)) and cargo.quantity
+                          and cargo.package_type != "bulk" else ""),    # 산적은 세지 않습니다
             "dimensions": _dimensions(cargo),
             "shipped": cargo.quantity if cargo.quantity is not None else "",
             "backordered": 0,
