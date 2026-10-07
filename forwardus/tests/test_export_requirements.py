@@ -70,7 +70,7 @@ def test_requirements_cover_every_item_and_always_include_origin(app, create_shi
             {"product_description": "노트북", "hs_code": "8471300000", "package_type": "carton",
              "quantity": 20, "length_cm": 40, "width_cm": 30, "height_cm": 10,
              "weight_per_package_kg": 3},
-        ])
+        ], dg_confirmed=True)       # 노트북은 내장 배터리 때문에 위험물 확인을 한 번 받습니다(사용자 점검)
         check = requirement_service.requirements_for(shipment)
 
     assert [row["line_no"] for row in check["by_item"]] == [1, 2]
