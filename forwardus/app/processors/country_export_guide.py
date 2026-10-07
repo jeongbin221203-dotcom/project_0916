@@ -55,7 +55,7 @@ NOTES: dict[str, dict] = {
     "CN": {"certs": ["**CCC(3C) 강제인증**", "식품은 **GACC 해외생산기업 등록**", "중문 라벨"],
            "watch": ["공장심사(현지 심사원 방문)가 필요합니다",
                      "주요 부품을 바꾸면 변경신고·재인증 대상입니다",
-                     "2026년 자동차부품·용접기 등 16개 품목이 자가선언 → 제3자 인증으로 바뀝니다"],
+                     "SAMR 공고 2025년 제57호 — 전동공구·용접기·소형 전동기·스위치·자동차 안전부품 등 16개 품목이 자가선언에서 제3자 CCC 인증으로 전환됩니다. **2026년 7월부터 인증 신청을 받고, 2027년 1월 1일부터는 인증·마크가 없으면 판매·수입할 수 없는 것으로 알려져 있습니다**(HS로 해당 여부 확인)"],
            "knowledge": "cert-china-ccc"},
     "JP": {"certs": ["전기용품 **PSE**(마름모/원형)", "식품은 건별 **식품등 수입신고**",
                      "건축·공공조달은 **JIS**"],
@@ -65,7 +65,7 @@ NOTES: dict[str, dict] = {
            "knowledge": "cert-japan-pse"},
     "VN": {"certs": ["품목별 **적합성인증(CR 마크)**", "식품·화장품은 공표·등록 절차"],
            "watch": ["한·베트남 FTA와 아세안·RCEP 중 **유리한 협정을 고를 수 있습니다**",
-                     "2026년 위험등급 개편 — 7월 1일부터 새 목록이 적용됩니다"],
+                     "2026년 7월 1일부터 식품·식품접촉 포장·의료기기·의약품(보건부)과 무선장비(과학기술부)에 위험등급별 관리 체계가 새로 적용되는 것으로 알려져 있습니다 — 내 HS가 어느 목록인지 현지 수입자를 통해 확인하세요(화장품은 별도 확인)"],
            "knowledge": "cert-vietnam"},
     "ID": {"certs": ["**SNI 인증**(품목별 강제)", "**할랄 인증** 단계적 의무화",
                      "BPOM 등록(식품·화장품·의약품)"],
@@ -86,7 +86,7 @@ NOTES: dict[str, dict] = {
     "SG": {"certs": ["대부분 품목이 자유롭습니다", "안전품목 **CPS(Consumer Protection Scheme)**",
                      "식품 SFA 허가"],
            "watch": ["관세는 대부분 0%지만 **GST 9%**가 붙습니다",
-                     "2025년 소관이 CCCS로 바뀌었습니다"],
+                     "소비자제품 안전(CPS)·계량 업무가 2025년 7월 1일부터 Enterprise Singapore에서 CCCS(경쟁소비자위원회)로 넘어갔습니다 — 신청·문의 창구는 CCCS 안내를 확인하세요"],
            "knowledge": "cert-singapore"},
     "PH": {"certs": ["**PS/ICC 마크**(BPS)", "식품·화장품 **FDA PH** 등록"],
            "watch": ["**한·필리핀 FTA(2024.12.31 발효)**는 자율발급이 됩니다",
@@ -103,7 +103,7 @@ NOTES: dict[str, dict] = {
                      "퀘벡 Bill 96 — 상표 안 설명 문구까지 프랑스어"],
            "knowledge": "cert-canada"},
     "GB": {"certs": ["**UKCA**(CE와 별도)", "영국 책임자 지정"],
-           "watch": ["**대부분 품목은 UKCA가 아니라 CE가 무기한 인정**됩니다",
+           "watch": ["**대부분 일반 공산품은 UKCA가 아니라 CE가 무기한 인정**되는 것으로 알려져 있습니다 (의료기기·건설제품·해양장비는 별도 기한·UKCA 요건이 있으니 품목별 확인)",
                      "라벨에 **GB 수입자 상호·주소**를 반드시 적습니다"],
            "knowledge": "cert-uk"},
     "TR": {"certs": ["**CE + TSE**", "TAREKS 수입검사"],
@@ -111,7 +111,7 @@ NOTES: dict[str, dict] = {
                      "보증서·설명서·제품 화면 언어까지 튀르키예어"],
            "knowledge": "cert-turkiye"},
     "AE": {"certs": ["**ECAS/EQM**(에미리트 적합성)", "할랄(식품)", "통신 TDRA"],
-           "watch": ["**한·UAE CEPA가 2026년 5월 1일 발효**했습니다",
+           "watch": ["**한·UAE CEPA가 2026년 5월 1일 발효**했습니다 (원산지증명 방식은 관세청 FTA 포털에서 확인하세요)",
                      "무선모듈이 있으면 TDRA가 추가됩니다"],
            "knowledge": "cert-uae"},
     "SA": {"certs": ["**SABER/SALEEM 적합성증(CoC)**", "할랄", "SFDA(식품·의료기기)"],
@@ -121,7 +121,7 @@ NOTES: dict[str, dict] = {
     "BR": {"certs": ["**INMETRO 인증**", "ANATEL(통신), ANVISA(식품·화장품·의료기기)"],
            "watch": ["**CNPJ를 가진 브라질 법인만 인증 명의인**이 됩니다",
                      "한·브라질 MRA가 없어 KC·CE·FCC가 전용되지 않습니다",
-                     "INMETRO 품목은 2026년 3월부터 DUIMP 의무"],
+                     "수입신고가 DUIMP(단일수입신고)로 전환 중이며 2026년 중 단계적으로 의무화되는 것으로 알려져 있습니다(연기된 사례도 있어 통관대리인과 Siscomex 일정표 확인)"],
            "knowledge": "cert-brazil"},
     "RU": {"certs": ["**EAC 인증**(유라시아경제연합 공통)", "GOST 관련 규격"],
            "watch": ["**수출통제·제재 확인이 인증보다 먼저**입니다 (yesTrade)",
@@ -137,7 +137,13 @@ NOTES: dict[str, dict] = {
            "knowledge": "cert-hongkong"},
 }
 # 아래 나라는 EU 규정을 함께 적용받습니다. (EU 회원국 목록은 fta_guide에서 가져옵니다)
-EU_NOTE = {"certs": ["**CE 마킹**(해당 지침이 있는 품목)", "**GPSR** — 일반 소비재도 EU 책임자 필요",
+# 자료가 없던 나라를 채운 표(country_notes_extra.py) — 기존 항목은 덮어쓰지 않습니다.
+from app.processors.country_notes_extra import EXTRA_NOTES  # noqa: E402
+
+for _code, _note in EXTRA_NOTES.items():
+    NOTES.setdefault(_code, _note)
+
+EU_NOTE = {"certs": ["**CE 마킹**(해당 지침이 있는 품목)", "**GPSR**(EU 2023/988, 2024년 12월 13일 적용) — 일반 소비재도 EU 책임자 필요",
                      "RoHS·REACH·배터리 규정", "판매국 공용어 설명서"],
            "watch": ["EU 역내 **책임 경제운영자(EU 대리인)**가 없으면 판매할 수 없습니다",
                      "DoC와 기술문서를 10년 보관해야 합니다"],
@@ -281,10 +287,10 @@ TARIFF_CODES = {
     # 그대로 쓰면 뒤 네 자리가 비어 신고가 반려됩니다. (2026-09-26 확인)
     "SA": ("12자리 GCC 통합관세", "https://zatca.gov.sa/en/"),
     "AE": ("12자리 GCC 통합관세", "https://www.dubaicustoms.gov.ae/en/"),
-    "BH": ("12자리 GCC 통합관세", "https://zatca.gov.sa/en/"),
-    "KW": ("12자리 GCC 통합관세", "https://zatca.gov.sa/en/"),
-    "OM": ("12자리 GCC 통합관세", "https://zatca.gov.sa/en/"),
-    "QA": ("12자리 GCC 통합관세", "https://zatca.gov.sa/en/"),
+    "BH": ("12자리 GCC 통합관세", "https://www.customs.gov.bh/"),
+    "KW": ("12자리 GCC 통합관세", "https://www.customs.gov.kw/"),
+    "OM": ("12자리 GCC 통합관세", "https://www.customs.gov.om/"),
+    "QA": ("12자리 GCC 통합관세", "https://www.customs.gov.qa/"),
     "TR": ("12자리 GTİP",
            "https://www.trade.gov.tr/customs-formalities/frequently-asked-questions/tariff"),
     "MX": ("8자리 TIGIE (통계용 NICO 2자리가 더 붙기도 합니다)", "https://www.snice.gob.mx/"),

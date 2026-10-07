@@ -43,6 +43,8 @@ class Cargo(db.Model):
     proper_shipping_name = db.Column(db.String(200), nullable=False, default="")
     temperature_requirement = db.Column(db.String(20), nullable=False, default="", server_default="")
     special_container_type = db.Column(db.String(20), nullable=False, default="", server_default="")
+    # 중고·재생 여부 — "" | "unspecified"(중고, 상태 협의) | "used" | "refurbished". 서류에 USED 를 찍고 수입국 규제를 짚습니다.
+    used_condition = db.Column(db.String(20), nullable=False, default="", server_default="")
 
     total_cbm = db.Column(db.Float, nullable=False)
     total_weight_kg = db.Column(db.Float, nullable=False)
@@ -54,12 +56,20 @@ class Cargo(db.Model):
     shipment = db.relationship("Shipment", back_populates="cargos")
 
     @property
+    def used_label(self) -> str:
+        """서류 품명 뒤에 붙이는 영문 표기. 신품이면 빈 글자."""
+
+        return {"used": "USED", "unspecified": "USED", "refurbished": "REFURBISHED"}.get(self.used_condition, "")
+
+    @property
     def handling_summary(self) -> str:
         temperature = {"chilled": "냉장", "frozen": "냉동", "unspecified": "냉동·냉장 (협의 필요)"}
         equipment = {"open_top": "오픈탑", "flat_rack": "플랫랙", "tank": "탱크",
                      "other": "기타 특수 장비", "unspecified": "특수 컨테이너 (협의 필요)"}
+        used = {"used": "중고품", "unspecified": "중고품", "refurbished": "재생품"}
         return " · ".join(value for value in [temperature.get(self.temperature_requirement),
-                                             equipment.get(self.special_container_type)] if value)
+                                             equipment.get(self.special_container_type),
+                                             used.get(self.used_condition)] if value)
 
     def to_dict(self) -> dict:
         return {
@@ -69,6 +79,7 @@ class Cargo(db.Model):
             "is_dangerous": self.is_dangerous,
             "temperature_requirement": self.temperature_requirement,
             "special_container_type": self.special_container_type,
+            "used_condition": self.used_condition,
             "un_number": self.un_number,
             "dg_class": self.dg_class,
             "packing_group": self.packing_group,

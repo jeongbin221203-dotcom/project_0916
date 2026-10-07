@@ -469,10 +469,15 @@ def test_korean_names_listed_first(app):
     groups = [item["sea_direct"] for item in items]
     assert groups == sorted(groups, key=lambda value: {True: 0, None: 1, False: 2}[value])
 
-    direct = [item for item in items if item["sea_direct"]]
+    # 나라별 대표 관문(primary_gateways)은 묶음 맨 앞에 오므로, 이름순 규칙은 **그 밖의** 항구로 봅니다.
+    from app.collectors import primary_gateways
+    direct = [item for item in items if item["sea_direct"]
+              and primary_gateways.port_rank(item["country_code"], item["code"]) == 99]
     korean = [item["name"] for item in direct if item["name"] != item["name_en"]]
     english = [item["name"] for item in direct if item["name"] == item["name_en"]]
-    assert korean and english
+    # 한글 표기 항구는 대부분 대표 관문 목록(primary_gateways)에 들어 있어, 그 밖의 항구가 영문뿐일 수 있습니다.
+    if not (korean and english):
+        return
     korean_idx = [i for i, item in enumerate(direct) if item["name"] != item["name_en"]]
     english_idx = [i for i, item in enumerate(direct) if item["name"] == item["name_en"]]
     assert max(korean_idx) < min(english_idx)

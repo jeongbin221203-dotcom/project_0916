@@ -622,3 +622,6 @@ body.hs_modal_open { overflow: hidden; }
    글머리표 대신 "-" 로 시작하고, 한 단 낮춰 흐리게 둡니다. (2026-10-03) */
 .li_sub { display: block; margin-top: 4px; padding-left: 4px; color: var(--muted);
   font-size: 0.93em; line-height: 1.65; }
+.danger_zone { margin-top: 14px; padding: 10px 14px; border: 1px solid #fecaca; border-radius: 12px; background: #fff7f7; }
+.danger_zone summary { cursor: pointer; font-weight: 700; color: #b91c1c; }
+.button.danger { background: #dc2626; color: #fff; border-color: #dc2626; }

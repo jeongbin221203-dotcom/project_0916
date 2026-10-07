@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import shipment_header, shipment_tabs %}
+{% block title %}{{ shipment.shipment_id }} 정보 수정{% endblock %}
+{% block content %}
+  {{ shipment_header(shipment) }}
+  {{ shipment_tabs(shipment, 'detail') }}
+
+  {# 당사자 정보만 고칩니다 — 운임·일정·화물 치수는 견적 계산의 입력이라 바꾸면 견적을 다시 해야 합니다. #}
+  {% set v = form if form else snapshot %}
+  <section class="card">
+    <h2>당사자 정보 수정</h2>
+    <p class="muted">견적명·수출자·Notify Party·바이어를 고칩니다. 운임·일정·화물 정보를 바꾸려면 새 견적을 만드세요.</p>
+    <form method="post" action="{{ url_for('shipment.edit', shipment_id=shipment.shipment_id) }}">
+      <div class="form_grid">
+        <label class="field span2"><span class="field_label">견적명</span>
+          <input class="text_input" type="text" name="project_name" maxlength="200" required value="{{ v.project_name }}"></label>
+        <label class="field"><span class="field_label">수출자 (Exporter) — 영문</span>
+          <input class="text_input" type="text" name="exporter_name" maxlength="200" required value="{{ v.exporter_name }}"></label>
+        <label class="field"><span class="field_label">수출자 주소 — 영문</span>
+          <input class="text_input" type="text" name="exporter_address" maxlength="500" value="{{ v.exporter_address }}"></label>
+        <label class="field"><span class="field_label">Buyer (Consignee) — 영문</span>
+          <input class="text_input" type="text" name="buyer_name" maxlength="200" required value="{{ v.buyer_name }}"></label>
+        <label class="field"><span class="field_label">Buyer 국가 <small class="muted">(코드 또는 나라 이름)</small></span>
+          <input class="text_input" type="text" name="buyer_country" maxlength="60" value="{{ v.buyer_country }}"></label>
+        <label class="field span2"><span class="field_label">Buyer 주소 — 영문</span>
+          <input class="text_input" type="text" name="buyer_address" maxlength="500" value="{{ v.buyer_address }}"></label>
+        <label class="field"><span class="field_label">Buyer 이메일</span>
+          <input class="text_input" type="email" name="buyer_email" maxlength="200" value="{{ v.buyer_email }}"></label>
+        <label class="field"><span class="field_label">Notify Party</span>
+          <input class="text_input" type="text" name="notify_party" maxlength="300" value="{{ v.notify_party }}"></label>
+      </div>
+      <label class="dg_check">
+        <input type="checkbox" name="propagate" value="1" checked>
+        <span>서류에도 반영합니다 — Shipment 값 그대로였던 칸만 바뀌고, 직접 고쳐 둔 칸은 그대로 둡니다.
+          고친 서류는 다시 검증해야 확정할 수 있습니다.</span>
+      </label>
+      <div class="step_actions">
+        <a class="button ghost" href="{{ url_for('shipment.detail', shipment_id=shipment.shipment_id) }}">취소</a>
+        <button class="button primary">저장</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

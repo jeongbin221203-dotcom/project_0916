@@ -230,12 +230,14 @@ def test_packing_list_uses_the_order_form_with_one_row_per_item(create_shipment)
 
     items = document_service.document_items(doc)
     assert [c["label"] for c in items["columns"]] == [
-        "ITEM NUMBER", "QUANTITY", "SHIPPED", "BACKORDERED", "DESCRIPTION",
-        "UNIT WEIGHT", "TOTAL WEIGHT"]
+        "ITEM NUMBER", "CARTON NO.", "QUANTITY", "SHIPPED", "BACKORDERED", "DESCRIPTION",
+        "L×W×H (cm)", "UNIT WEIGHT", "TOTAL WEIGHT"]
     # 품목을 두 개 넣으면 줄도 두 줄입니다.
     assert len(items["rows"]) == 2
     assert [row["description"] for row in items["rows"]] == ["샴푸", "화장품 세트"]
     assert [row["quantity"] for row in items["rows"]] == [100, 30]
+    # 카톤 번호는 품목을 이어서 셉니다(1–100, 101–130)
+    assert [row["carton_no"] for row in items["rows"]] == ["1–100", "101–130"]
     assert [row["total_weight"] for row in items["rows"]] == [1200.0, 540.0]
     assert all(row["shipped"] == row["quantity"] and row["backordered"] == 0
                for row in items["rows"])

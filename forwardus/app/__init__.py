@@ -45,6 +45,8 @@ def migrate_cargo_lines(database) -> None:
              # 보관 온도(냉장·냉동)와 특수 컨테이너(오픈탑·플랫랙·탱크) 요청
              "temperature_requirement": "VARCHAR(20) NOT NULL DEFAULT ''",
              "special_container_type": "VARCHAR(20) NOT NULL DEFAULT ''",
+             # 중고·재생 여부(서류 USED 표기·수입국 중고품 규제 안내)
+             "used_condition": "VARCHAR(20) NOT NULL DEFAULT ''",
              # 품목별 금액도 나중에 더해졌습니다.
              "unit_price": "FLOAT",
              "amount": "FLOAT",

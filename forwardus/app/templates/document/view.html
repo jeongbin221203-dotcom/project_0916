@@ -84,6 +84,10 @@
     {% endif %}
     <form class="card" method="post" action="{{ url_for('document.update', shipment_id=shipment.shipment_id, doc_type=document.doc_type) }}">
       {{ form_body(sections, items, True) }}
+      <label class="dg_check">
+        <input type="checkbox" name="propagate" value="1" checked>
+        <span>다른 서류에도 같은 칸을 함께 고칩니다 — 이 서류와 값이 같았던 칸만 바뀌고, 직접 고쳐 둔 칸·확정 서류는 그대로입니다.</span>
+      </label>
       <div class="step_actions">
         <a class="button ghost" href="{{ url_for('document.view', shipment_id=shipment.shipment_id, doc_type=document.doc_type) }}">취소</a>
         <button class="button primary">수정 완료 · 저장</button>

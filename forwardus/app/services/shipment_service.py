@@ -94,3 +94,107 @@ def transition(shipment, action: str):
     shipment.status = target
     shipment_repository.commit()
     return shipment
+
+
+# --- 수정 · 삭제 ----------------------------------------------------------------------
+#
+# 무역 실무 점검: Shipment 를 고치거나 지울 길이 없어, 마법사에서 바이어·수출자를 잘못 넣으면 서류 5개를 각각 고치거나 건을
+# 새로 만들어야 했습니다. 수정은 **당사자 정보**(견적명·수출자·Notify·바이어)만 받습니다 — 운임·일정·화물 치수는 견적 계산의
+# 입력이라 바꾸면 견적을 다시 해야 하므로 새 건으로 만드는 편이 안전합니다.
+
+LOCKED_STATUSES = ("closed", "cancelled")
+# Shipment 값이 서류의 어느 칸으로 가는지
+PARTY_DOCUMENT_FIELDS = {
+    "exporter_name": ("exporter", "signed_by", "packed_by"),
+    "exporter_address": ("exporter_address",),
+    "notify_party": ("notify_party",),
+    "buyer_name": ("consignee", "buyer"),
+    "buyer_address": ("consignee_address",),
+}
+
+
+def _party_snapshot(shipment) -> dict:
+    buyer = shipment.buyer
+    return {"project_name": shipment.project_name, "exporter_name": shipment.exporter_name,
+            "exporter_address": shipment.exporter_address, "notify_party": shipment.notify_party,
+            "buyer_name": buyer.name if buyer else "", "buyer_country": buyer.country if buyer else "",
+            "buyer_address": buyer.address if buyer else "", "buyer_email": buyer.contact_email if buyer else ""}
+
+
+def update_shipment(shipment, form: dict, *, propagate: bool = True) -> dict:
+    """당사자 정보를 고칩니다. 돌려주는 것: {"changed": [...], "documents": [고친 서류], "kept": [직접 고쳐 둔 칸]}.
+
+    서류에는 **Shipment 값 그대로였던 칸만** 새 값으로 바꿉니다. 사람이 직접 고쳐 둔 칸은 건드리지 않고 알립니다.
+    고친 서류는 다시 검증을 거쳐야 하므로 상태를 '작성됨(generated)'으로 돌립니다. 확정(final) 서류는 건드리지 않습니다.
+    """
+
+    from app.repositories import buyer_repository
+    from app.services import document_service
+    from app.validators.shipment_validator import require_text, validate_parties
+
+    if shipment.status in LOCKED_STATUSES:
+        raise ServiceError(f"{shipment.status_label} 상태의 건은 고칠 수 없습니다.", "LOCKED")
+    form = form if isinstance(form, dict) else {}
+    parties = validate_parties({
+        "exporter_name": form.get("exporter_name"), "exporter_address": form.get("exporter_address"),
+        "notify_party": form.get("notify_party"),
+        "buyer": {"name": form.get("buyer_name"), "country": form.get("buyer_country"),
+                  "address": form.get("buyer_address"), "contact_email": form.get("buyer_email")}})
+    project_name = require_text(form.get("project_name"), "견적명", field="project_name")
+    new = {"project_name": project_name, **parties}
+
+    before = _party_snapshot(shipment)
+    changed = [key for key, value in new.items() if (before.get(key) or "") != (value or "")]
+    if not changed:
+        return {"changed": [], "documents": [], "kept": []}
+    old_reference = document_service.build_reference(shipment)
+
+    shipment.project_name = project_name
+    shipment.exporter_name = parties["exporter_name"]
+    shipment.exporter_address = parties["exporter_address"]
+    shipment.notify_party = parties["notify_party"]
+    if any(key.startswith("buyer_") for key in changed):
+        # 같은 바이어 줄을 다른 건이 함께 쓰므로 그 줄을 고치지 않고 새 줄(또는 같은 값의 기존 줄)로 바꿉니다
+        shipment.buyer = buyer_repository.get_or_create(
+            parties["buyer_name"], parties["buyer_country"], parties["buyer_address"], parties["buyer_email"],
+            user_id=shipment.user_id)
+    shipment_repository.commit()
+
+    updated, kept = [], []
+    if propagate:
+        new_reference = document_service.build_reference(shipment)
+        for document in document_repository.list_for_shipment(shipment):
+            if document.status == "final" or not isinstance(document.data, dict):
+                continue
+            data = dict(document.data)
+            touched = False
+            for source, keys in PARTY_DOCUMENT_FIELDS.items():
+                if source not in changed:
+                    continue
+                for key in keys:
+                    if key not in data:
+                        continue
+                    if (data.get(key) or "") == (old_reference.get(key) or ""):
+                        data[key] = new_reference.get(key, "")
+                        touched = True
+                    else:
+                        kept.append(f"{DOCUMENT_TYPES.get(document.doc_type, document.doc_type)} · {key}")
+            if touched:
+                document_repository.upsert(shipment, document.doc_type, data, "generated", document.source or "auto")
+                updated.append(document.doc_type)
+        shipment_repository.commit()
+    return {"changed": changed, "documents": updated, "kept": kept}
+
+
+def delete_shipment(shipment) -> None:
+    """건과 딸린 서류·비용·화물·추적·올린 증빙을 모두 지웁니다(되돌릴 수 없습니다)."""
+
+    from app.services import requirement_service
+
+    for upload in list(shipment.requirement_documents):
+        try:
+            (requirement_service._upload_root() / upload.stored_name).unlink(missing_ok=True)
+        except OSError:                                    # 파일이 이미 없어도 건은 지웁니다
+            pass
+    shipment_repository.delete(shipment)
+    shipment_repository.commit()

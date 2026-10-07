@@ -281,12 +281,13 @@ def validate_cargo_handling(payload: dict) -> dict:
     choices = {
         "temperature_requirement": {"", "unspecified", "chilled", "frozen"},
         "special_container_type": {"", "unspecified", "open_top", "flat_rack", "tank", "other"},
+        "used_condition": {"", "unspecified", "used", "refurbished"},
     }
     result = {}
     for field, allowed in choices.items():
         value = str(payload.get(field) or "").strip()
         if value not in allowed:
-            raise ValidationError("화물의 보관 조건·특수 컨테이너 종류를 확인해주세요.", field)
+            raise ValidationError("화물의 보관 조건·특수 컨테이너 종류·중고 여부를 확인해주세요.", field)
         result[field] = value
     return result
 

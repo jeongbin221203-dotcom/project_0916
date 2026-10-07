@@ -966,6 +966,21 @@
           <small>설정 온도와 냉장 장비는 운송사와 확인하세요.</small>
         </label>
       </div>
+      <div class="handling_option used">
+        <label class="dg_check">
+          <input type="checkbox" data-handling-toggle="used_condition" aria-label="중고품·재생품">
+          <span>중고품·재생품입니다</span>
+        </label>
+        <label class="handling_detail" data-handling-panel="used_condition" hidden>
+          <span>상태</span>
+          <select data-handling="used_condition" aria-label="중고 또는 재생품 구분">
+            <option value="unspecified">중고 (상태 협의)</option>
+            <option value="used">중고 (Used)</option>
+            <option value="refurbished">재생·리퍼 (Refurbished)</option>
+          </select>
+          <small>서류 품명에 (USED)가 자동으로 붙고, 수입국의 중고품 수입 규제(금지·연식·검사)를 안내합니다.</small>
+        </label>
+      </div>
       <div class="handling_option special">
         <label class="dg_check">
           <input type="checkbox" data-handling-toggle="special_container_type" aria-label="특수 컨테이너 필요">

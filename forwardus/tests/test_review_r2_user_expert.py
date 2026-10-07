@@ -239,7 +239,7 @@ LONG = ("Premium Organic Green Tea Bags 100pcs per box for export 2026 edition w
 def test_긴_품명은_행을_키워_보여_준다():
     _, draw = _drawing()
     short = document_form._table(draw, COLUMNS, [{"description": "Tea", "quantity": 1}], 100, 1100, _fonts())
-    tall = document_form._table(draw, COLUMNS, [{"description": LONG[:70], "quantity": 1}], 100, 1100, _fonts())
+    tall = document_form._table(draw, COLUMNS, [{"description": LONG * 2, "quantity": 1}], 100, 1100, _fonts())
     assert tall > short                                 # 2줄 이상이면 행이 높아집니다
 
 

@@ -51,7 +51,7 @@ def test_북한_가이드는_일반세율을_말하지_않는다():
 
 
 def test_자료_없는_나라는_자료가_없다고_밝힌다():
-    assert "정리해 둔 인증 자료가 없습니다" in country_export_guide.guide("KW", "쿠웨이트")
+    assert "정리해 둔 인증 자료가 없습니다" in country_export_guide.guide("LK", "스리랑카")
 
 
 def test_점령지_항구는_대표_항구가_아니다():
@@ -147,3 +147,25 @@ def test_일반_화물은_그대로_조언한다(app):
             "weight_per_package_kg": 10, "package_type": "carton"}]}})
     assert not result.get("needs_forwarder_quote")
     assert result["sea_mode_advice"]["mode"] in ("LCL", "FCL", "")
+
+
+@pytest.mark.parametrize("code", ["EG", "NG", "KE", "TZ", "IQ", "KW", "QA", "BH", "OM", "IL", "AR", "CL", "CO", "PE", "PK",
+                                   "BD", "UA", "DZ", "MA", "UZ", "KZ", "BY"])
+def test_자료를_채운_나라는_인증_안내가_있다(code):
+    note = country_export_guide.NOTES[code]
+    assert note["certs"] and note["watch"]
+    # 단정 대신 확인 필요를 남깁니다 — 조사 자료가 공식 원문 대조 전입니다
+    joined = " ".join(note["certs"] + note["watch"])
+    assert "확인" in joined
+
+
+def test_기존_나라_안내는_덮어쓰지_않는다():
+    from app.processors.country_notes_extra import EXTRA_NOTES
+    assert not (set(EXTRA_NOTES) & {"US", "CN", "JP", "SA", "AE", "IN", "VN"})
+    assert "UKCA" in " ".join(country_export_guide.NOTES["GB"]["certs"])
+
+
+def test_필수서류_목록에_새_나라_인증이_들어간다():
+    from app.services import required_docs_service
+    rows = required_docs_service._country_notes("NG", "나이지리아", {"85"})
+    assert any("SONCAP" in row["title"] for row in rows)

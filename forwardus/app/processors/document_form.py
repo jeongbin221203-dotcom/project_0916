@@ -364,6 +364,10 @@ def _cell_text(column, item) -> tuple[str, tuple]:
     return text, color
 
 
+WIDE_COLUMN_WEIGHT = {"description": 3.0, "packages": 1.4, "dimensions": 1.5, "shipping_marks": 1.3,
+                      "backordered": 1.3, "item_number": 1.25, "total_weight": 1.2, "unit_weight": 1.15}
+
+
 def _table(draw, columns, items, top: int, width: int, fonts, bottom: int | None = None) -> int:
     """품목 표. 줄 수만큼 늘어납니다.
 
@@ -373,18 +377,22 @@ def _table(draw, columns, items, top: int, width: int, fonts, bottom: int | None
 
     head = 34
     left = MARGIN
-    share = width // max(1, len(columns))
+    # 열 너비 — 품명은 넓게, 치수·번호는 보통으로. 같은 너비로 나누면 열이 9개인 포장명세서에서 품명 칸이
+    # 좁아 긴 품명이 잘렸습니다.
+    weights = [WIDE_COLUMN_WEIGHT.get(column.get("key"), 1.0) for column in columns]
+    widths = [int(width * weight / sum(weights)) for weight in weights]
+    widths[-1] += width - sum(widths)
     draw.rectangle([MARGIN, top, MARGIN + width, top + head], outline=LINE,
                    width=1, fill=(244, 247, 251))
-    for column in columns:
+    for column, share in zip(columns, widths):
         draw.text((left + 8, top + 10), column["label"], font=fonts["label"], fill=LABEL)
         draw.line([left, top, left, top + head], fill=LINE, width=1)
         left += share
     top += head
 
     rows = items or [{}]
-    wrapped = [[_wrap(draw, _cell_text(column, item)[0], fonts["body"], share - 16) for column in columns]
-               for item in rows]
+    wrapped = [[_wrap(draw, _cell_text(column, item)[0], fonts["body"], share - 16)
+                for column, share in zip(columns, widths)] for item in rows]
 
     def heights(cap: int) -> list[int]:
         return [max(40, 16 + 17 * min(cap, max(len(cell) for cell in row))) for row in wrapped]
@@ -395,7 +403,7 @@ def _table(draw, columns, items, top: int, width: int, fonts, bottom: int | None
             cap -= 1
     for item, row, row_h in zip(rows, wrapped, heights(cap)):
         left = MARGIN
-        for column, lines in zip(columns, row):
+        for column, lines, share in zip(columns, row, widths):
             draw.rectangle([left, top, left + share, top + row_h], outline=LINE, width=1)
             color = _cell_text(column, item)[1]
             for index, line in enumerate(lines[:cap]):

@@ -160,9 +160,9 @@ DOCUMENT_ITEM_FIELDS = {
     ],
     # 첨부 서식의 표 머리글. 품목을 넣은 만큼 줄이 생깁니다.
     "packing_list": [
-        ("item_number", "ITEM NUMBER"), ("quantity", "QUANTITY"), ("shipped", "SHIPPED"),
-        ("backordered", "BACKORDERED"), ("description", "DESCRIPTION"),
-        ("unit_weight", "UNIT WEIGHT"), ("total_weight", "TOTAL WEIGHT"),
+        ("item_number", "ITEM NUMBER"), ("carton_no", "CARTON NO."), ("quantity", "QUANTITY"),
+        ("shipped", "SHIPPED"), ("backordered", "BACKORDERED"), ("description", "DESCRIPTION"),
+        ("dimensions", "L×W×H (cm)"), ("unit_weight", "UNIT WEIGHT"), ("total_weight", "TOTAL WEIGHT"),
     ],
     "proforma_invoice": [
         ("description", "Item"), ("quantity", "Quantity"), ("unit", "UNIT"),
@@ -351,6 +351,28 @@ def _summed(cargos, attribute: str):
     return round(total, 3)
 
 
+def _dimensions(cargo) -> str:
+    """포장당 치수 "40×30×25". 모르는 값이 하나라도 있으면 비웁니다(지어내지 않습니다)."""
+
+    parts = [getattr(cargo, key, None) for key in ("length_cm", "width_cm", "height_cm")]
+    if not all(isinstance(part, (int, float)) for part in parts):
+        return ""
+    return "×".join(f"{part:g}" for part in parts)
+
+
+def _described(cargo) -> str:
+    """서류 품명 — 중고·재생품은 뒤에 (USED)·(REFURBISHED) 를 붙입니다.
+
+    중고품을 신품처럼 적은 서류는 수입국 통관에서 허위 신고가 됩니다(전 국가·무역 실무 점검).
+    """
+
+    name = cargo.product_description or ""
+    label = getattr(cargo, "used_label", "") or ""
+    if label and label not in name.upper():
+        return f"{name} ({label})"
+    return name
+
+
 def _headline(cargos, attribute: str) -> str:
     """여러 품목을 대표하는 한 줄. 더할 수 없는 값(품명·HS부호)에 씁니다.
 
@@ -360,7 +382,7 @@ def _headline(cargos, attribute: str) -> str:
 
     if not cargos:
         return ""
-    first = str(getattr(cargos[0], attribute, "") or "")
+    first = _described(cargos[0]) if attribute == "product_description" else str(getattr(cargos[0], attribute, "") or "")
     if len(cargos) <= 1 or not first:
         return first
     return f"{first} 외 {len(cargos) - 1}건"
@@ -558,7 +580,10 @@ def build_items(shipment, doc_type: str) -> list[dict]:
     # 송장 금액이 곧 그 품목의 금액입니다. 여러 개인데 안 적었으면 비워 둡니다.
     single = len(cargos) == 1
     rows = []
+    cursor = 0                                  # 포장명세서의 카톤 번호는 품목을 이어서 셉니다(1–12, 13–20 …)
     for cargo in cargos:
+        first_no = cursor + 1
+        cursor += int(cargo.quantity) if isinstance(cargo.quantity, (int, float)) else 0
         if doc_type in INVOICE_TYPES and priced_by_units(cargo):
             rows.append({key: _unit_priced_row(cargo, doc_type).get(key, "") for key, _ in columns})
             continue
@@ -569,10 +594,14 @@ def build_items(shipment, doc_type: str) -> list[dict]:
             # 포장명세서의 ITEM NUMBER 에는 HS 를 적습니다. 바깥으로 나가는
             # 서류이므로 6자리로 줄입니다.
             "item_number": hs_for_document(cargo.hs_code or "", doc_type),
+            # 카톤(포장) 번호와 포장당 치수 — 포워더·바이어가 포장을 세어 대조하는 칸입니다(무역 실무 점검).
+            "carton_no": ((f"{first_no}" if cursor == first_no else f"{first_no}–{cursor}")
+                          if isinstance(cargo.quantity, (int, float)) and cargo.quantity else ""),
+            "dimensions": _dimensions(cargo),
             "shipped": cargo.quantity if cargo.quantity is not None else "",
             "backordered": 0,
             "unit_weight": cargo.weight_per_package_kg,
-            "description": " / ".join(part for part in [cargo.product_description, dangerous] if part),
+            "description": " / ".join(part for part in [_described(cargo), dangerous] if part),
             "quantity": cargo.quantity if cargo.quantity is not None else "",
             # 포장명세서 ⑬칸은 "수량 또는 순중량"입니다. 순중량을 적었으면 그 값을 씁니다.
             "net_quantity": (f"{cargo.net_weight_kg} kg" if cargo.net_weight_kg is not None
@@ -604,7 +633,7 @@ def _unit_priced_row(cargo, doc_type: str) -> dict:
                  if cargo.is_dangerous and cargo.un_number else "")
     count = count_text(cargo.unit_quantity)
     return {
-        "description": " / ".join(part for part in [cargo.product_description, dangerous] if part),
+        "description": " / ".join(part for part in [_described(cargo), dangerous] if part),
         # 견적송장은 단위 칸이 따로 있고, 상업송장은 수량 칸에 단위까지 적습니다.
         "quantity": count if doc_type == "proforma_invoice" else f"{count} {cargo.price_unit}",
         "unit": cargo.price_unit,
@@ -723,7 +752,12 @@ def get_document(shipment, doc_type: str):
     return document
 
 
-def update_document(shipment, doc_type: str, form: dict):
+# 서류끼리 같은 값이어야 하는 칸 — 한 서류에서 고치면 다른 서류에도 옮길 수 있게 합니다.
+SHARED_KEYS = ("exporter", "exporter_address", "consignee", "consignee_address", "notify_party", "buyer",
+               "product_description", "incoterms", "payment_terms", "etd", "vessel_or_flight", "carrier")
+
+
+def update_document(shipment, doc_type: str, form: dict, propagate: bool = False):
     """고친 내용을 저장합니다. 확정(final)한 뒤에도 고칠 수 있습니다.
 
     예전에는 확정하면 잠갔습니다. 그런데 확정 뒤에 바이어가 주소 한 줄을
@@ -737,9 +771,26 @@ def update_document(shipment, doc_type: str, form: dict):
     """
 
     document = get_document(shipment, doc_type)
+    old = dict(document.data) if isinstance(document.data, dict) else {}
     data = clean_document_fields(form, document.data)
     # Edited content must be validated again.
     document_repository.upsert(shipment, doc_type, data, "generated", "manual")
+    if propagate:
+        # 서류 하나만 고치면 PL·SI·BR 은 옛 값 그대로여서 검증에서 어긋났습니다(무역 실무 점검).
+        # **이 서류의 옛 값과 같았던** 다른 서류의 칸만 새 값으로 바꿉니다 — 직접 고쳐 둔 칸·확정 서류는 그대로.
+        moved = {key: data[key] for key in SHARED_KEYS
+                 if key in data and (old.get(key) or "") != (data.get(key) or "")}
+        for other in document_repository.list_for_shipment(shipment):
+            if other.doc_type == doc_type or other.status == "final" or not isinstance(other.data, dict):
+                continue
+            patched = dict(other.data)
+            touched = False
+            for key, value in moved.items():
+                if key in patched and (patched.get(key) or "") == (old.get(key) or ""):
+                    patched[key] = value
+                    touched = True
+            if touched:
+                document_repository.upsert(shipment, other.doc_type, patched, "generated", other.source or "auto")
     shipment_repository.commit()
     return document
 

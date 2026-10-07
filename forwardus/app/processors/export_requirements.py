@@ -276,8 +276,19 @@ def _digits(hs_code: str) -> str:
     return "".join(ch for ch in str(hs_code or "") if ch.isdigit())
 
 
+USED_RULE = _rule(
+    "used", "중고품·재생품 수출",
+    chapters=[], documents=["제조연도·사용 이력 증빙(구입 영수증·정비 기록)", "중고품 상태 사진·검사 성적서",
+                            "수입국이 요구하면 사전선적검사(PSI) 증명"],
+    agency="수입국 통관·표준 기관 / 관세사", law="수입국 중고품 수입 규제 · 관세법(허위 신고 금지)",
+    why="중고품을 신품처럼 적으면 허위 신고가 됩니다. 나라마다 수입 금지·연식 제한·사전 검사·허가가 다르고, "
+        "중고 기계는 EU·영국 등에서 CE 적합성 문서가 필요할 수 있습니다.",
+    link="통합공고",
+)
+
+
 def check(hs_code: str, *, is_dangerous: bool = False,
-          buyer_wants_origin: bool = False) -> list[dict]:
+          buyer_wants_origin: bool = False, is_used: bool = False) -> list[dict]:
     """이 품목에서 확인해야 할 요건을 모읍니다.
 
     "필요하다"가 아니라 "확인해야 한다"입니다. 같은 류 안에서도 세번에 따라
@@ -299,6 +310,8 @@ def check(hs_code: str, *, is_dangerous: bool = False,
         found.append(_as_item(DANGEROUS_RULE))
     if buyer_wants_origin:
         found.append(_as_item(ORIGIN_RULE))
+    if is_used:
+        found.append(_as_item(USED_RULE))
     return found
 
 

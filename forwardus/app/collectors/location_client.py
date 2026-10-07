@@ -5,9 +5,11 @@ Codes come from the official UN/LOCODE list (see data/build_locations.py).
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from functools import lru_cache
 
+from app.collectors import primary_gateways
 from app.collectors.base_client import fail, load_mock, ok
 from app.processors.transit_calculator import great_circle_km
 
@@ -33,6 +35,7 @@ _LOCATION_NOTES = {
     "CYKYR": "북키프로스(국제적 미승인 지역) — 제재·법적 확인 필요",
     "CYDHK": "영국 군기지 — 일반 상업 항구가 아닙니다",
 }
+_OFFSHORE_NAME = re.compile(r"(?:oil|offshore|terminal|platform|field|fpso|single\s+point|sbm|cbm|rig)", re.I)
 _REGION_FIXES = {"IR": "middle_east", "AF": "middle_east", "PK": "middle_east"}
 _patched: set[int] = set()
 
@@ -48,6 +51,18 @@ def _all_locations() -> list[dict]:
             fixed = _REGION_FIXES.get(item.get("country_code"))
             if fixed:
                 item["region"] = fixed
+            # 대표 관문은 항상 '대표'로, 해상 유전·부유식 터미널 같은 곳은 대표에서 뺍니다(primary_gateways.py).
+            country = item.get("country_code")
+            if primary_gateways.is_primary(country, item["code"]):
+                item["major"] = True
+            elif item["kind"] == "port" and (_OFFSHORE_NAME.search(item.get("name_en") or "")
+                                             or (country != "KR" and primary_gateways.PORTS.get(country)
+                                                 and item.get("harbor_size") not in (None, "L"))):
+                # 대표 목록이 있는 나라에서는 대형(L) 항구만 목록에 더 남깁니다 — 'V'(아주 작은) 항구와 유전 터미널이
+                # 대표로 맨 앞에 나오던 것을 막습니다. 직접 검색하면 모두 나옵니다.
+                item["major"] = False
+            elif item["kind"] == "airport" and country != "KR" and primary_gateways.AIRPORTS.get(country)                     and not item.get("cargo_hub") and not item.get("direct_from_korea"):
+                item["major"] = False
         _patched.add(id(items))
     return items
 
@@ -352,7 +367,13 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
             # 도착 항구도 같은 순서로: 한국 직기항 -> 항로 기록 없음 -> 환적 필요.
             # 출발지인 국내 무역항은 아래의 관리주체·물동량 순서를 씁니다.
             0 if item["country_code"] == "KR" else {True: 0, None: 1, False: 2}[item.get("sea_direct")],
+            # 같은 묶음 안에서는 나라별 대표 관문(손으로 고른 목록)이 먼저 — 없으면 아래 기존 순서(primary_gateways.py)
+            0 if item["country_code"] == "KR" else min(
+                primary_gateways.port_rank(item["country_code"], item["code"]),
+                primary_gateways.airport_rank(item["country_code"], item["code"])),
             PORT_CLASS_RANK.get(item.get("port_class"), 0),
+            # 외국 항구는 규모(L>M>S>V)로 — 이름순으로만 정렬되던 것을 보완(전 국가 검사)
+            0 if item["country_code"] == "KR" else HARBOR_SIZE_RANK.get(item.get("harbor_size"), 4),
             # 국내 무역항은 물동량 순서를 유지합니다.
             -(item.get("cargo_volume_mt") or 0),
             # 부두를 모항 옆에 붙이는 용도로만 씁니다. (국내 무역항)

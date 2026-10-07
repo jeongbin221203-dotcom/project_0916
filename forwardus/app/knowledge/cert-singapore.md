@@ -10,7 +10,7 @@ see: cert-malaysia, cert-hongkong, fta-origin
 
 ### ⚠️ 2025년에 소관 기관이 바뀌었습니다 — 가장 흔한 최신 오류
 
-- 과거 SPRING Singapore → 2018년 **Enterprise Singapore** → **현재 CCCS**(Competition and Consumer Commission of Singapore). 2025.4.8 법 개정으로 소비자제품안전·법정계량 기능이 이관됐습니다.
+- 과거 SPRING Singapore → 2018년 **Enterprise Singapore** → **현재 CCCS**(Competition and Consumer Commission of Singapore). 2025.4.8 법 개정(**2025.7.1 시행**)으로 소비자제품안전·법정계량 기능이 이관됐습니다.
 - **CPSO(Consumer Product Safety Office)**는 지금 CCCS 산하입니다.
 - 👉 **enterprisesg.gov.sg에서 CPS 정보를 찾지 마세요.** 현행 사이트는 **consumerproductsafety.gov.sg**, 신청 시스템은 **cpsaplus.gov.sg**입니다. 구 도메인은 **없어졌습니다.**
 

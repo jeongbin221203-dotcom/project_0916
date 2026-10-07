@@ -9,7 +9,7 @@ from app.validators.cargo_validator import validate_cargo_handling
 
 def test_unchecked_and_legacy_inputs_have_no_handling_request():
     assert validate_cargo_handling({}) == {
-        "temperature_requirement": "", "special_container_type": ""}
+        "temperature_requirement": "", "special_container_type": "", "used_condition": ""}
 
 
 @pytest.mark.parametrize("field,value", [
@@ -40,7 +40,7 @@ def test_requests_survive_multiple_cargo_lines_and_storage(create_shipment, carg
 def test_handling_flags_are_independent_of_dangerous_goods(cargo_input):
     result = validate_cargo_handling({**cargo_input, "is_dangerous": False,
                                     "temperature_requirement": "frozen", "special_container_type": "tank"})
-    assert result == {"temperature_requirement": "frozen", "special_container_type": "tank"}
+    assert result == {"temperature_requirement": "frozen", "special_container_type": "tank", "used_condition": ""}
 
 
 def test_existing_database_gains_empty_handling_columns_without_changing_rows():

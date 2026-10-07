@@ -1443,6 +1443,7 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
             is_dangerous=line["is_dangerous"],
             temperature_requirement=line["temperature_requirement"],
             special_container_type=line["special_container_type"],
+            used_condition=line["used_condition"],
             un_number=line["un_number"],
             dg_class=line["dg_class"],
             packing_group=line["packing_group"],

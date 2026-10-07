@@ -550,7 +550,8 @@ def update(shipment_id: str, doc_type: str):
     try:
         # 확정한 서류를 고쳤는지는 저장하기 전 status로 압니다. 저장하면 generated로 돌아갑니다.
         was_final = document_service.get_document(shipment, doc_type).status == "final"
-        document_service.update_document(shipment, doc_type, request.form.to_dict())
+        document_service.update_document(shipment, doc_type, request.form.to_dict(),
+                                         propagate=request.form.get("propagate") == "1")
         flash("확정을 풀고 저장했습니다. 다시 검증하면 확정할 수 있습니다." if was_final
               else "문서를 저장했습니다. 변경 내용은 다시 검증해주세요.", "success")
     except (ValidationError, ServiceError) as exc:

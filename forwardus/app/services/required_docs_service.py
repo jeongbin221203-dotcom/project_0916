@@ -377,7 +377,8 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
     customs_laws = []
     for cargo in cargos:
         for item in export_requirements.check(cargo.hs_code,
-                                              is_dangerous=cargo.is_dangerous):
+                                              is_dangerous=cargo.is_dangerous,
+                                              is_used=bool(getattr(cargo, "used_condition", ""))):
             # 원산지증명서는 품목이 아니라 협정이 정합니다. 아래 3에서 따로 봅니다.
             if item["key"] == "origin":
                 continue
@@ -416,7 +417,18 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
         country_code = port[:2] if len(port) >= 2 and port[:2].isalpha() else ""
     # 이 건의 HS 류(앞 두 자리). 품목에 안 걸리는 인증을 빼는 데 씁니다.
     chapters = {(cargo.hs_code or "")[:2] for cargo in cargos if (cargo.hs_code or "")[:2].isdigit()}
-    from app.processors import trade_controls
+    from app.processors import trade_controls, used_goods
+
+    used_rows = [cargo for cargo in cargos if getattr(cargo, "used_condition", "")]
+    if used_rows:
+        # 중고품은 수입국 규제를 나라별로 짚습니다 — 목록에 없는 나라는 일반 안내(전 국가·무역 실무 점검)
+        country_notes = used_goods.notes_for(country_code)
+        add({"key": f"used_goods_{country_code or 'any'}", "title": "중고품 수입 규제 확인 (수입국)",
+             "country": country_code,
+             "documents": ["제조연도·사용 이력 증빙", "수입국이 요구하면 사전선적검사(PSI) 증명", "중고품 상태 사진·검사 성적서"],
+             "agency": "수입국 통관·표준 기관 / 현지 수입자",
+             "why": " ".join(country_notes + [used_goods.GENERIC]), "source": "country", "link": "",
+             "confidence": "medium" if country_notes else "low"})
 
     control = trade_controls.note(country_code)
     if control:
