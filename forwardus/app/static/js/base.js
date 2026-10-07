@@ -86,7 +86,13 @@
         return {
           success: false,
           error_code: "INVALID_RESPONSE",
-          message: `서버 응답을 해석하지 못했습니다 (HTTP ${response.status}). 다른 서버가 같은 포트를 쓰고 있지 않은지 확인하세요.`,
+          message: response.status === 429
+            ? "요청이 잠시 몰렸습니다. 1분 뒤 다시 시도해 주세요."
+            : response.status === 503
+              ? "서버가 바쁩니다. 잠시 뒤 다시 시도해 주세요."
+              : response.status >= 500
+                ? "서버에 문제가 생겼습니다. 잠시 뒤 다시 시도해 주세요. 계속되면 고객 상담으로 알려 주세요."
+                : `서버 응답을 해석하지 못했습니다 (HTTP ${response.status}). 새로고침 후 다시 시도해 주세요.`,
         };
       }
     } catch (error) {

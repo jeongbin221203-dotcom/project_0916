@@ -47,7 +47,7 @@ def test_상한을_넘는_본문은_기본_설정에서_413(app):
     response = client.post("/api/support-chat", data=b"x" * (41 * 1024 * 1024), content_type="application/json")
     assert response.status_code == 413
     assert response.get_json()["error_code"] == "PAYLOAD_TOO_LARGE"
-    assert "40MB" in response.get_json()["message"]
+    assert "4MB" in response.get_json()["message"]
 
 
 def test_붙여_넣은_긴_계약서_폼은_받는다(app):

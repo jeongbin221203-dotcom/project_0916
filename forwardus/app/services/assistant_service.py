@@ -369,6 +369,7 @@ def ai_answer(shipment, question: str) -> dict:
     import json
 
     from app.collectors import ai_client
+    from app.processors import bank_redaction
 
     text = (question or "").strip()
     if not text:
@@ -386,7 +387,8 @@ def ai_answer(shipment, question: str) -> dict:
         {"role": "system", "content": "이 건의 자료입니다.\n"
                                       + json.dumps(ai_context(shipment), ensure_ascii=False,
                                                    default=str)},
-        {"role": "user", "content": text[:1000]},
+        # 질문에 계좌번호를 적어도 AI 로 보내지 않습니다(전수 점검 3회차).
+        {"role": "user", "content": bank_redaction.strip_bank_numbers(text[:1000])[0]},
     ])
     if not result["success"]:
         fallback = answer_question(shipment, text)

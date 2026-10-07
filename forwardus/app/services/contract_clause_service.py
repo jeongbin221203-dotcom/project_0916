@@ -518,12 +518,19 @@ def _read_docx_with_notes(data: bytes) -> tuple[str, list[str]]:
 
     import docx
 
+    from app.processors import safe_files
+
+    try:
+        safe_files.check_docx(data)                       # 압축 폭탄(240KB → 풀면 200MB)은 열지 않습니다
+    except safe_files.UnsafeFile as exc:
+        raise ServiceError(str(exc), "VALIDATION_ERROR")
     try:
         document = docx.Document(io.BytesIO(data))
     except Exception:
         raise ServiceError("Word 파일을 열지 못했습니다. 암호가 걸려 있거나 손상되었을 수 있습니다. "
                            "PDF로 저장해 올려 주세요.", "VALIDATION_ERROR")
     text, tracked = _docx_text(document)
+    text = safe_files.clip(text)
     notes = ["Word 의 **변경 추적(수정 표시)**이 있어, 수정을 반영한 본문(넣은 글 포함 · 지운 글 제외)으로 "
              "판정했습니다. 상대가 새로 넣은 문장도 판정에 들어갔습니다."] if tracked else []
     return text, notes
@@ -596,7 +603,9 @@ def _read_contract_pdf(data: bytes) -> tuple[list[str], dict, int]:
             pages = pdf.pages[:MAX_PDF_PAGES]
             texts = [(page.extract_text() or "") for page in pages]
             empty = [i for i, page_text in enumerate(texts) if _body_chars(page_text) < 40]
-            images = {i: pages[i].to_image(resolution=150).original.copy() for i in empty[:MAX_OCR_PAGES]}
+            from app.processors import safe_files
+
+            images = {i: safe_files.render_page(pages[i], 150) for i in empty[:MAX_OCR_PAGES]}
     except ServiceError:
         raise
     except Exception:

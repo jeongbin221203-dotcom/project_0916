@@ -29,6 +29,7 @@
        그 화면 템플릿에서 {% set standalone = true %} 를 적으면 됩니다.
        대신 그 화면이 스스로 돌아갈 길을 내 줘야 합니다. 안 그러면 갇힙니다. #}
     {% if not standalone %}
+    <a class="skip_link" href="#main">본문으로 건너뛰기</a>
     <header class="site_header">
       <div class="header_inner">
         {# 전체 로고를 올려 두면 그것만 쓰고, 없으면 마크 + 글자로 씁니다. #}
@@ -94,7 +95,7 @@
       {% endif %}
     {% endwith %}
 
-    <main class="{% block main_class %}content_width page{% endblock %}">
+    <main id="main" tabindex="-1" class="{% block main_class %}content_width page{% endblock %}">
       {% block content %}{% endblock %}
     </main>
     {% if not standalone %}
@@ -145,7 +146,7 @@
           <button type="button" class="support_close" data-support-close aria-label="닫기">×</button>
         </div>
       </header>
-      <div class="support_log" data-support-log></div>
+      <div class="support_log" data-support-log role="log" aria-live="polite"></div>
       <div class="support_chips" data-support-chips></div>
       <form class="support_form" data-support-form>
         <input class="text_input" type="text" name="question" autocomplete="off"

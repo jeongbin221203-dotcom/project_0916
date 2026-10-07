@@ -53,7 +53,7 @@
   border: 0; outline: none; background: none; resize: none;
   font-size: 18px; line-height: 1.65;
 }
-.home_box textarea::placeholder { color: #94a3b8; }
+.home_box textarea::placeholder { color: #64748b; }
 /* 칩 줄이 상자 모서리를 넘지 않게 안쪽으로 조금 들입니다.
    넘치면 둥근 모서리에 칩이 걸쳐 보입니다. */
 .home_box_foot { display: flex; align-items: center; gap: 10px; margin-top: 6px;

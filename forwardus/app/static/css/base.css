@@ -20,6 +20,11 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+.skip_link { position: absolute; left: 8px; top: -48px; z-index: 1000; padding: 10px 14px; border-radius: 10px;
+  background: var(--white, #fff); color: #1d4ed8; font-weight: 800; border: 2px solid #1d4ed8; }
+.skip_link:focus { top: 8px; }
+main:focus { outline: none; }
 
 /* 화면 배율. 글자만 키우면 칸과 여백이 그대로라 빽빽해 보입니다.
    zoom은 글자·칸·여백을 함께 키웁니다. 좁은 화면에서는 가로 스크롤이
@@ -197,7 +202,7 @@ p { margin: 0 0 10px; }
 .badge.ok { background: var(--green_soft); color: #07694f; }
 .badge.warn { background: var(--amber_soft); color: #8a4f00; }
 .badge.bad { background: #fee2e2; color: #b91c1c; }
-.badge.muted_badge { background: #f1f5f9; color: #94a3b8; }
+.badge.muted_badge { background: #f1f5f9; color: #64748b; }
 .badge.source_mock { background: #fff1e6; color: #b45309; }
 .badge.source_api { background: var(--green_soft); color: #07694f; }
 .badge.source_manual { background: #f3e8ff; color: #7e22ce; }
@@ -459,7 +464,7 @@ body.standalone .page { padding-top: 28px; }
 .ac_list .hs_stats { color: var(--blue_dark); }
 .ac_list details summary { cursor: pointer; }
 .ac_list .ac_group { display: block; padding: 8px 11px 3px; color: var(--muted); font-size: 12px; font-weight: 800; cursor: default; background: none; }
-.ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #94a3b8; }
+.ac_list .ac_group_other { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; color: #64748b; }
 .ac_list .ac_group_other small { font-weight: 600; margin-left: 6px; }
 
 /* HS CODE 간편 검색 창. 어느 화면에서나 [data-hs-open]으로 뜹니다. (hs_modal.js) */

@@ -143,7 +143,7 @@
     errorBox.textContent = message;
     errorBox.hidden = !message;
     errorBox.classList.remove("is_confirm");
-    if (message) errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (message) errorBox.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   }
 
   // 막는 것이 아니라 한 번 더 확인받는 안내. 같은 자리에 다른 색으로 보여줍니다.
@@ -151,7 +151,7 @@
     errorBox.textContent = message;
     errorBox.hidden = false;
     errorBox.classList.add("is_confirm");
-    errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+    errorBox.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   }
 
   function goToStep(step) {

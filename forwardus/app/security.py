@@ -29,7 +29,7 @@ import threading
 import time
 from urllib.parse import urlparse
 
-from flask import Flask, jsonify, make_response, request, session
+from flask import Flask, g, jsonify, make_response, request, session
 
 DEFAULT_SECRET = "forwardus-local-dev-key"
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -42,6 +42,15 @@ LOGIN_MAX_FAILURES = 10
 HEAVY_PREFIXES = ("/api/support-chat", "/api/agent", "/api/attach", "/api/doc-pipeline",
                   "/api/intake", "/documents/extract", "/contract/review", "/planning/api/schedules")
 HEAVY_LIMIT_PER_MINUTE = 40
+# 경로 중간에 번호가 끼는 비용 큰 길 — 끝 부분으로 맞춥니다(전수 점검 3회차: 번호 때문에 제한을 피해 갔습니다).
+HEAVY_SUFFIXES = ("/api/ask", "/requirements/upload", "/analyze", "/customs-filing/translate",
+                  "/planning/api/cargo", "/planning/api/departure-check")
+# GET 이어도 외부·AI 를 부르는 길
+HEAVY_GET_PATHS = ("/documents/api/required-docs",)
+# AI 를 동시에 부르는 요청 수 — 일꾼 스레드(8개)를 다 쓰지 않게 남깁니다. 넘으면 503.
+MAX_CONCURRENT_HEAVY = 5
+# JSON 본문은 파일이 아니라 글이므로 훨씬 작게(파일 올리기만 40MB)
+MAX_JSON_BYTES = 4 * 1024 * 1024
 # 서류 미리보기·임시저장·PDF — 입력을 멈출 때마다 자동으로 부르므로 더 넉넉히(분당 120).
 # 같은 바구니에 두면 서류 칸을 빨리 고치는 정상 사용자가 429 를 받았습니다(관리자 점검 2회차).
 DRAFT_PREFIXES = ("/documents/draft/",)
@@ -87,9 +96,14 @@ class Window:
         now = now if now is not None else time.monotonic()
         with self._lock:
             self._hits.setdefault(key, []).append(now)
-            if len(self._hits) > 20000:          # 오래된 접속자부터 비웁니다
-                for old in list(self._hits)[:5000]:
-                    self._hits.pop(old, None)
+            if len(self._hits) > 20000:
+                # 만료된(최근 1시간 기록이 없는) 키부터 비웁니다. 그래도 많으면 오래된 순.
+                # 가입 창은 1시간이라 그보다 짧게 비우면 안 됩니다.
+                for key in [k for k, v in self._hits.items() if not v or now - v[-1] > 3600]:
+                    self._hits.pop(key, None)
+                if len(self._hits) > 20000:
+                    for old in list(self._hits)[:5000]:
+                        self._hits.pop(old, None)
 
     def reset(self, key: str) -> None:
         with self._lock:
@@ -97,7 +111,18 @@ class Window:
 
 
 def client_ip() -> str:
-    return request.remote_addr or "?"
+    """접속 IP. IPv6 는 /64(가정·회사에 주는 단위)로 묶습니다 — 주소만 바꿔 제한을 피하지 못하게."""
+
+    addr = request.remote_addr or "?"
+    if ":" in addr:
+        try:
+            import ipaddress
+            ip = ipaddress.ip_address(addr.split("%")[0])
+            if ip.version == 6:
+                return str(ipaddress.ip_network(f"{ip}/64", strict=False).network_address) + "/64"
+        except ValueError:
+            pass
+    return addr
 
 
 def rate_limit_on(app: Flask) -> bool:
@@ -148,7 +173,15 @@ def signup_blocked(app: Flask) -> bool:
 
 
 def _allowed_hosts() -> set[str]:
-    return {item.strip().lower() for item in os.getenv("ALLOWED_ORIGINS", "").split(",") if item.strip()}
+    """ALLOWED_ORIGINS 는 'https://a.com' 처럼 주소 전체로 적어도, 'a.com' 으로 적어도 받습니다."""
+
+    hosts = set()
+    for item in os.getenv("ALLOWED_ORIGINS", "").split(","):
+        item = item.strip().lower().rstrip("/")
+        if not item:
+            continue
+        hosts.add(urlparse(item).netloc if "://" in item else item)
+    return hosts
 
 
 def _wants_json() -> bool:
@@ -199,6 +232,7 @@ def install(app: Flask) -> None:
     app.extensions["login_window"] = Window()
     app.extensions["heavy_window"] = Window()
     app.extensions["signup_window"] = Window()
+    heavy_slots = threading.BoundedSemaphore(MAX_CONCURRENT_HEAVY)
 
     @app.before_request
     def guard():
@@ -217,9 +251,14 @@ def install(app: Flask) -> None:
                                    " (프록시·별칭 주소를 쓴다면 운영자가 ALLOWED_ORIGINS 에 추가해야 합니다)",
                                    "BAD_ORIGIN", 403)
         # 2) 비용이 드는 길의 횟수 제한 — 접속자별(+ 접속 IP 별) 슬라이딩 창
-        if request.method == "POST" and rate_limit_on(app):
+        if request.is_json and request.content_length and request.content_length > MAX_JSON_BYTES:
+            return _refuse(f"보낸 내용이 너무 큽니다. 글 내용은 {MAX_JSON_BYTES // (1024 * 1024)}MB 이하로 줄여 주세요.",
+                           "PAYLOAD_TOO_LARGE", 413)
+        heavy_get = request.method == "GET" and request.path in HEAVY_GET_PATHS
+        if (request.method == "POST" or heavy_get) and rate_limit_on(app):
             path = request.path
-            if any(path.startswith(prefix) for prefix in HEAVY_PREFIXES):
+            if (any(path.startswith(prefix) for prefix in HEAVY_PREFIXES)
+                    or path.endswith(HEAVY_SUFFIXES) or heavy_get):
                 bucket, limit = "heavy", HEAVY_LIMIT_PER_MINUTE
             elif any(path.startswith(prefix) for prefix in DRAFT_PREFIXES):
                 bucket, limit = "draft", DRAFT_LIMIT_PER_MINUTE
@@ -239,12 +278,28 @@ def install(app: Flask) -> None:
                     return response
                 for key, _cap in keys:
                     window.add(key)
+                if bucket == "heavy" and request.method == "POST" and path.endswith(
+                        ("/api/ask", "/analyze", "/translate", "/review")) or path.startswith(
+                        ("/api/support-chat", "/api/agent", "/contract/review")):
+                    if not heavy_slots.acquire(blocking=False):
+                        response = _refuse("지금 요청이 몰려 있습니다. 잠시 뒤 다시 해 주세요.", "BUSY", 503)
+                        target = response[0] if isinstance(response, tuple) else response
+                        target.headers["Retry-After"] = str(RETRY_AFTER_SECONDS)
+                        return response
+                    g.heavy_slot = True
         return None
+
+    @app.teardown_request
+    def release_slot(_exc):
+        if g.pop("heavy_slot", False):
+            heavy_slots.release()
 
     @app.errorhandler(413)
     def too_large(_error):
         mb = MAX_BODY_BYTES // (1024 * 1024)
-        return _refuse(f"보낸 내용이 너무 큽니다. {mb}MB 이하로 줄여 주세요.", "PAYLOAD_TOO_LARGE", 413)
+        form = MAX_FORM_BYTES // (1024 * 1024)
+        return _refuse(f"보낸 내용이 너무 큽니다. 파일은 {mb}MB 이하로, 붙여 넣은 글은 약 {form}MB 이하"
+                       "(한글 약 80만 자)로 줄여 주세요.", "PAYLOAD_TOO_LARGE", 413)
 
     @app.after_request
     def headers(response):

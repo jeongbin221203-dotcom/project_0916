@@ -264,15 +264,18 @@ def _read_pdf(data: bytes) -> tuple[str, list]:
 
     import pdfplumber
 
+    from app.processors import safe_files
+
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             if not pdf.pages:
                 raise ServiceError("빈 PDF입니다. 내용이 있는 파일을 올려 주세요.", "VALIDATION_ERROR")
             text = "\n".join((page.extract_text() or "") for page in pdf.pages[:MAX_PDF_TEXT_PAGES])
-            images = [page.to_image(resolution=150).original.copy()
-                      for page in pdf.pages[:MAX_IMAGE_PAGES]]
+            images = [safe_files.render_page(page, 150) for page in pdf.pages[:MAX_IMAGE_PAGES]]
     except ServiceError:
         raise
+    except safe_files.UnsafeFile as exc:               # 쪽 크기가 비정상으로 큰 PDF
+        raise ServiceError(str(exc), "VALIDATION_ERROR")
     except Exception:
         # 암호가 걸렸거나 깨진 PDF. 어느 쪽이든 사람이 할 수 있는 일은 같습니다.
         raise ServiceError("PDF를 열지 못했습니다. 암호가 걸려 있거나 파일이 손상되었을 수 "
@@ -284,10 +287,14 @@ def _read_pdf(data: bytes) -> tuple[str, list]:
 def _read_image(data: bytes) -> list:
     from PIL import Image, UnidentifiedImageError
 
+    from app.processors import safe_files
+
     try:
-        with Image.open(io.BytesIO(data)) as image:
+        with safe_files.open_image(data) as image:        # 가로×세로를 먼저 보고, 크면 읽지 않습니다
             image.load()
             return [image.copy()]
+    except safe_files.UnsafeFile as exc:
+        raise ServiceError(str(exc), "VALIDATION_ERROR")
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise ServiceError("그림 파일을 열지 못했습니다. PNG나 JPG로 다시 저장해 올려 주세요.",
                            "VALIDATION_ERROR")

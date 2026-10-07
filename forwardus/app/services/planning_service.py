@@ -178,12 +178,13 @@ def _hs_name_hints(query: str) -> list[str]:
     import json
 
     from app.collectors import ai_client
+    from app.processors import bank_redaction
 
     if not ai_client.available():
         return []
     result = ai_client.chat([
         {"role": "system", "content": HS_HINT_PROMPT},
-        {"role": "user", "content": query[:200]},
+        {"role": "user", "content": bank_redaction.strip_bank_numbers(query[:200])[0]},
     ], max_tokens=120)
     if not result["success"]:
         return []
