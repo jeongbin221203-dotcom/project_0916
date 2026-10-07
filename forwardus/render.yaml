@@ -32,6 +32,8 @@ services:
 
       # --- AI (서류 읽기 · HS 분류 · 수출 상담) --------------------------------
       # 비우면 AI 기능만 꺼지고 나머지는 그대로 돕니다.
+      - key: HMM_API_KEY          # 해상 스케줄(없으면 모의 스케줄)
+        sync: false
       - key: AI_API_KEY
         sync: false
       - key: AI_DOC_MODEL

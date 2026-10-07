@@ -167,21 +167,64 @@ def _eu_members() -> tuple[str, ...]:
     return tuple(fta_guide.blocs().get("EU", ()))
 
 
+# 흔한 말과 겹치는 짧은 나라 이름 — 나라 뜻으로 쓴 것이 **분명할 때만** 인정합니다.
+# "서류 가나다순 수출"이 가나로, "오만한 바이어"가 오만으로, "말리 수 있나"가 말리로 갔습니다(전수 점검).
+_SHORT_NOT_COUNTRY_AFTER = ("조건", "장소", "받", "하", "네시아", "가", "되", "다순", "한", "수 ")
+_HANGUL = re.compile(r"[가-힣]")
+_ASK_AFTER = re.compile(r"^(?:으?로|에|의|은|는|이|가)?(?:" + "|".join(ASK_WORDS) + r"|수입|관세|제재|금수)")
+_COMMON_WORD_NAMES = {"수단", "가나", "말리", "오만", "도미니카"}
+
+# 정식 표기와 흔한 별칭(2회차 전수 검사에서 못 찾던 것)
+_MORE_ALIASES = {"튀르키예": "TR", "타이완": "TW", "마카오": "MO", "중앙아프리카공화국": "CF", "적도기니": "GQ",
+                 "도미니카공화국": "DO", "콩고민주공화국": "CD", "다알씨": "CD", "인도네시아": "ID"}
+
+
 def find_country(text: str) -> tuple[str, str] | None:
-    """물어본 글에서 나라를 찾습니다. 없으면 None."""
+    """물어본 글에서 나라를 찾습니다. 없으면 None.
+
+    긴 이름부터, 띄어쓰기를 무시하고 찾습니다 — "인도네시아"가 "인도"보다 먼저 맞아야 하고 "적도 기니"가 "기니"로
+    가면 안 됩니다. 짧은 이름은 앞뒤 글자를 보고 다른 낱말의 일부(개인도·인도조건)를 거릅니다.
+    """
 
     asked = str(text or "")
     if not any(word in asked for word in ASK_WORDS):
         return None
-    lowered = asked.lower()
+    squeezed = re.sub(r"\s+", "", asked.lower())
+    # "미국 말고 인도로 수출" — 도착국은 부정어 **뒤**의 나라입니다.
+    for negation in ("말고", "아니고", "아니라", "빼고", "제외하고"):
+        if negation in squeezed:
+            tail = squeezed.split(negation)[-1]
+            found = _find_in(tail)
+            if found:
+                return found
+    return _find_in(squeezed)
+
+
+def _find_in(squeezed: str) -> tuple[str, str] | None:
     names = _countries()
-    for alias, code in ALIASES.items():
-        if alias in lowered and (code == "EU" or code in names):
-            return (code, "유럽연합(EU)" if code == "EU" else names[code])
-    # 긴 이름부터 봅니다. "기니"가 "파푸아뉴기니"보다 먼저 맞으면 엉뚱한 나라가 됩니다.
-    for code, name in sorted(names.items(), key=lambda row: -len(row[1])):
-        if len(name) >= 2 and name in asked:
-            return (code, name)
+    keys: dict[str, tuple[str, str]] = {}
+    for alias, code in {**ALIASES, **_MORE_ALIASES}.items():
+        if code == "EU" or code in names:
+            keys[alias.replace(" ", "")] = (code, "유럽연합(EU)" if code == "EU" else names[code])
+    for code, name in names.items():
+        if len(name.replace(" ", "")) >= 2:
+            keys.setdefault(name.replace(" ", "").lower(), (code, name))
+    for key in sorted(keys, key=len, reverse=True):
+        start = squeezed.find(key)
+        while start != -1:
+            end = start + len(key)
+            before, after = squeezed[start - 1:start] if start else "", squeezed[end:]
+            ok = True
+            if len(key) <= 2 or key in _COMMON_WORD_NAMES:
+                if before and _HANGUL.match(before):
+                    ok = False
+                elif after.startswith(_SHORT_NOT_COUNTRY_AFTER):
+                    ok = False
+                elif key in _COMMON_WORD_NAMES and not _ASK_AFTER.match(after):
+                    ok = False
+            if ok:
+                return keys[key]
+            start = squeezed.find(key, start + 1)
     return None
 
 
@@ -272,8 +315,15 @@ def guide(code: str, name: str) -> str:
     note = EU_NOTE if (eu and code not in NOTES) else NOTES.get(code, {})
     deals = agreements(code) if code != "EU" else ["한·EU FTA"]
 
-    lines = [f"## {name} 수출하기", "",
-             "어느 나라든 **순서는 같습니다.** 다른 것은 ③ 도착국 규제뿐입니다.", "",
+    from app.processors import trade_controls
+
+    control = trade_controls.note(code)
+    control_level = trade_controls.level(code)
+    lines = [f"## {name} 수출하기", ""]
+    if control:
+        # 제재·수출통제 대상은 다른 모든 안내보다 **먼저** 말합니다(전수 점검).
+        lines += [f"> {control}", ""]
+    lines += ["어느 나라든 **순서는 같습니다.** 다른 것은 ③ 도착국 규제뿐입니다.", "",
              "1. HS 부호 10자리 확정 → 우리 쪽 수출요건 확인",
              "2. 계약(인코텀즈·결제조건) → 바이어 신용 확인",
              "3. **도착국 인증·라벨 확인** ← 여기가 나라마다 다릅니다",
@@ -281,7 +331,10 @@ def guide(code: str, name: str) -> str:
              "5. 서류 발송(송장·포장명세서·B/L·C/O) → 대금 회수 → 관세환급·영세율", ""]
 
     lines += ["### 관세 (FTA)", ""]
-    if deals:
+    if control_level in ("blocked", "strict"):
+        lines.append("관세·FTA 안내는 **거래가 가능한지 확인한 뒤**에 보세요. 이 나라는 일반세율 적용 여부를 떠나 "
+                     "수출통제·제재 판정이 먼저입니다.")
+    elif deals:
         lines.append(f"적용해 볼 수 있는 협정: **{' · '.join(deals)}**")
         lines.append("")
         lines.append("협정이 둘 이상이면 **세율이 낮은 쪽을 골라** 원산지증명서를 받으면 됩니다. "
@@ -313,7 +366,9 @@ def guide(code: str, name: str) -> str:
     if note.get("certs"):
         lines += [f"- {row}" for row in note["certs"]]
     else:
-        lines += ["- 이 나라의 강제 인증은 **품목(HS)에 따라** 갈립니다. 아래 창구에서 "
+        lines += ["- **이 나라는 우리가 정리해 둔 인증 자료가 없습니다.** 아래는 일반 안내이며, KOTRA 해외시장뉴스와 "
+                  "현지 수입자에게 강제 인증·선적 전 검사 제도가 있는지 먼저 확인하세요.",
+                  "- 이 나라의 강제 인증은 **품목(HS)에 따라** 갈립니다. 아래 창구에서 "
                   "품목을 넣어 확인하세요.",
                   "- 전기·전자는 안전·전파 인증, 식품·화장품은 등록·성분 규제, 섬유·완구는 "
                   "라벨 규정이 걸리는 것이 일반적입니다.",

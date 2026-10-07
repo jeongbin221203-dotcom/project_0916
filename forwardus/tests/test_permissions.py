@@ -70,7 +70,7 @@ def test_member_sees_only_own_shipments(app, create_shipment):
     legacy = create_shipment()  # 작성자 없음 → 마스터만
 
     dashboard = alice.get("/dashboard").get_data(as_text=True)
-    assert "<h1>내 Dashboard</h1>" in dashboard
+    assert "<h1>내 현황</h1>" in dashboard
     assert mine.shipment_id in dashboard
     assert theirs.shipment_id not in dashboard and legacy.shipment_id not in dashboard
     # 검색해도 남의 것은 나오지 않습니다.
@@ -107,7 +107,7 @@ def test_master_sees_everyone(client, app, create_shipment):
     legacy = create_shipment()
 
     listing = client.get("/dashboard").get_data(as_text=True)
-    assert "전체 Dashboard" in listing
+    assert "전체 현황" in listing
     assert alices.shipment_id in listing and legacy.shipment_id in listing
     assert "alice@example.com" in listing and "(작성자 없음)" in listing
     for page in SHIPMENT_PAGES:

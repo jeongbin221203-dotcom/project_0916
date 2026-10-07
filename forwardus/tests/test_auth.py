@@ -51,7 +51,7 @@ def test_nav_has_dashboard_instead_of_shipments(client):
     panel = nav.split("data-user-menu-panel", 1)[1]
     assert 'href="/dashboard"' in panel and "/auth/logout" in panel
     assert panel.index('href="/dashboard"') < panel.index("/auth/logout")
-    assert "내 Dashboard" in panel                # 회원은 자기 것만 봅니다
+    assert "내 현황" in panel                # 회원은 자기 것만 봅니다
 
 
 def test_dashboard_requires_login(client):
@@ -68,7 +68,7 @@ def test_signup_logs_in_and_hashes_password(client):
     user = User.query.filter_by(email="kim@example.com").one()
     assert user.password_hash != "secret123"
     html = client.get("/dashboard").get_data(as_text=True)
-    assert "김무역님" in html and "로그아웃" in html and "<h1>내 Dashboard</h1>" in html
+    assert "김무역님" in html and "로그아웃" in html and "<h1>내 현황</h1>" in html
 
 
 @pytest.mark.parametrize("overrides", [

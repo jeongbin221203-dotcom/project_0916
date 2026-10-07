@@ -93,9 +93,11 @@
       m.offline_note, m.ai_review?.message, m.ranking?.label,
       m.ranking?.mixed_years && "기준연도가 달라 관세 순위를 비교하지 않았습니다.",
       m.navigation_summary?.note, m.ranking?.tariff_note];
-    return `<li class="ac_group hs_summary"><span>후보 ${items.length}개 · 적합도 우선</span>`
+    // AI 연결 전(내부 품목표 기준)에는 "적합도 우선"이 아니라 이름 일치순입니다 — 라벨이 정렬 기준을 잘못 알렸습니다.
+    const order = m.offline_note ? "이름 일치순 · AI 연결 전, 한글 품명이 더 정확합니다" : "적합도 우선";
+    return `<li class="ac_group hs_summary"><span>후보 ${items.length}개 · ${order}</span>`
       + infoTip("검색·비교 기준", notes)
-      + `<small>초록 높음 · 노랑 조건 확인 · 빨강 낮음 · 회색 미확인</small>`
+      + (m.offline_note ? "" : `<small>초록 높음 · 노랑 조건 확인 · 빨강 낮음 · 회색 미확인</small>`)
       + (m.offline_note ? `<small>내부 품목표 기준</small>` : "")
       + (m.partial_note ? `<small>HS 6자리만 조회됨 · 신고용 부호 확인 필요</small>` : "") + `</li>`;
   }

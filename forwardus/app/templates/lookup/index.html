@@ -21,7 +21,7 @@
             <option value="{{ item.key }}" {{ 'selected' if item.key == kind }}
                     data-hint="{{ item.hint }}" data-example="{{ item.example }}"
                     {{ 'disabled' if not item.ready }}>
-              {{ item.label }}{{ '' if item.ready else ' (키 없음)' }}
+              {{ item.label }}{{ '' if item.ready else ' (연결 전)' }}
             </option>
           {% endfor %}
         </select>
@@ -40,7 +40,7 @@
       <ul class="ctr_help_list">
         {% for item in catalog %}
           <li><b>{{ item.label }}</b> — {{ item.about }}
-            {% if not item.ready %}<span class="badge warn">키 없음 ({{ item.env }})</span>{% endif %}</li>
+            {% if not item.ready %}<span class="badge warn">연결 전 — 지금은 조회할 수 없습니다</span>{% endif %}</li>
         {% endfor %}
       </ul>
     </div>

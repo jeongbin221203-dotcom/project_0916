@@ -1745,7 +1745,7 @@
   }
 
   // 막는 오류가 아니라 "한 번 더 확인"인 것들. 다시 누르면 그대로 진행합니다.
-  const CONFIRMABLE = { INCOTERMS_CONFIRM: "incoterms_confirmed" };
+  const CONFIRMABLE = { INCOTERMS_CONFIRM: "incoterms_confirmed", RESTRICTED_CONFIRM: "restricted_confirmed", DG_CONFIRM: "dg_confirmed" };
   const confirmed = {};
 
   function handleServerError(response) {

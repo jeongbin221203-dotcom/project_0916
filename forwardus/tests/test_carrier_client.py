@@ -215,14 +215,16 @@ def test_example_schedules_name_the_missing_key(app, monkeypatch):
         destination={"code": "DEHAM", "region": "europe"},
         departure_date=date(2026, 10, 1), metrics=METRICS)
     assert result["source"] == "mock"
-    assert "HMM_API_KEY" in result["note"] and "apiportal.hmm21.com" in result["note"]
+    # 키 이름·발급 주소는 이용자 화면에 보이지 않습니다(전수 점검 — 운영자 진단 화면에만 둡니다).
+    assert "예시 스케줄" in result["note"]
+    assert "HMM_API_KEY" not in result["note"] and "apiportal" not in result["note"]
     assert all(item["freight_source"] == "estimate" for item in result["data"])
 
     air = schedule_client.fetch_schedules(
         transport_mode="AIR", sea_mode=None, origin={"code": "ICN"},
         destination={"code": "FRA", "region": "europe"},
         departure_date=date(2026, 10, 1), metrics=METRICS)
-    assert "DATA_GO_KR_SERVICE_KEY" in air["note"]
+    assert "예시 스케줄" in air["note"] and "DATA_GO_KR_SERVICE_KEY" not in air["note"]
 
 
 def test_air_timetable_expands_into_dated_departures(app, monkeypatch):

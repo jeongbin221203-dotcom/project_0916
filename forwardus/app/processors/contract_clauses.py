@@ -3588,6 +3588,27 @@ _amend("non_compete_wide", strict=(
     r"(?:worldwide|any\s+third\s+part)",))
 _amend("retro_price_deduction", detect=(r"(?:issue|grant)\s+(?:a\s+)?credit[^.]{0,60}(?:inventory|stock)",))
 _amend("evergreen", strict=(r"renew\w*\s+automatically[^.]{0,80}unless\s+both\s+parties",))
+
+# 무역 실무 팀장 점검(5회차): 영어 계약서의 독소 문장 몇 개를 놓쳤습니다 — FOB 인데 도착지 관세를 판매자가 내는 문장,
+# "hereby assigns" 형 지재권 양도, 판매자가 간접·결과적 손해까지 배상하는 문장, 기간·사유 없는 전량 반품권.
+# 판매자가 **지는** 문장만 잡습니다(바이어가 지거나 면책하는 문장은 건드리지 않습니다).
+_amend("term_conflict", detect=(
+    r"\b(?:seller|supplier|vendor)\s+(?:shall|will|agrees\s+to)\s+(?:\w+,?\s+){0,3}?(?:bear|pay|be\s+responsible\s+for)"
+    r"\s+[^.]{0,60}(?:import\s+dut(?:y|ies)|customs\s+dut(?:y|ies)|\bduties\b|\bvat\b|import\s+clearance|"
+    r"customs\s+clearance)[^.]{0,60}(?:destination|importing\s+country|buyer'?s\s+country|port\s+of\s+(?:discharge|destination))",
+))
+_amend("term_conflict", unless_doc=(r"\bDDP\b", r"delivered\s+duty\s+paid", r"관세\s*지급\s*인도"))
+_amend("ip_assignment", detect=(
+    r"\b(?:seller|supplier|vendor)\s+hereby\s+(?:irrevocably\s+)?(?:assigns?|transfers?)\s+to\s+(?:the\s+)?buyer\b"
+    r"[^.]{0,80}\b(?:all|any)\b[^.]{0,40}(?:intellectual\s+property|inventions?|designs?)",))
+_amend("unlimited_damages", detect=(
+    r"\b(?:seller|supplier|vendor)(?:'s)?\s+(?:shall\s+be\s+|is\s+|will\s+be\s+)?(?:liable|responsible)\s+for\s+"
+    r"(?:all\s+)?(?:direct\s*,?\s*)?(?:(?:and\s+)?(?:indirect|incidental|special|consequential)\s*,?\s*)+"
+    r"(?:and\s+)?(?:consequential\s+)?(?:damages|losses)(?![^.]{0,80}\b(?:not\s+(?:to\s+)?exceed\w*|limited\s+to|capped|up\s+to)\b)",))
+_amend("full_return", detect=(
+    r"\bbuyer\s+(?:may|shall\s+have\s+the\s+right\s+to|has\s+the\s+right\s+to)\s+return\s+(?:any|all|the)\s+"
+    r"(?:of\s+the\s+)?(?:goods|products|units)[^.]{0,100}(?:at\s+any\s+time|without\s+(?:reason|cause)|"
+    r"within\s+(?:\w+\s+){0,2}\(?\d+\)?\s+years?)",))
 _amend("recall_cost", detect=(
     r"including\s+recall\s+(?:expenses|costs)",
     r"recall\s+(?:expenses|costs)[^.]{0,80}irrespective\s+of[^.]{0,20}(?:seller|supplier)'?s?\s+(?:negligence|fault)"))

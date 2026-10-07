@@ -191,6 +191,7 @@ def _missing_key_note(service: str) -> str:
     wanted = "icn_cargo" if service == "AIR" else "hmm"
     source = next((s for s in carrier_client.sources() if s["key"] == wanted), None)
     if source and not source["ready"]:
-        return (f"{source['label']} 키({source['env']})가 없어 예시 스케줄을 보여줍니다."
-                f" {source.get('signup', '')}에서 무료로 발급받으면 실제 스케줄로 바뀝니다.")
+        # 사용자 화면에는 키 이름·발급 주소를 보이지 않습니다(운영자 정보 — 관세청 조회·자료원 화면에서 봅니다).
+        return ("선사 스케줄 연결 전이라 예시 스케줄을 보여줍니다. 운임·소요일은 참고용 추정이며, "
+                "부킹 확정 후 실제 값으로 고쳐 주세요.")
     return "이 구간의 실제 스케줄을 받지 못해 예시 스케줄을 보여줍니다."

@@ -1429,17 +1429,29 @@
     // 견적)으로 넘겨 둡니다. 자동 저장을 끈 뒤로, 임시저장을 한 번도 누르지
     // 않으면 화면을 옮겼을 때 값이 하나도 없었습니다. (2026-09-26)
     syncWorkDraft();
-    const response = await postJson(config.startUrl, planPayload(), 60000);
+    const response = await postJson(config.startUrl, { ...planPayload(), ...confirmedFlags }, 60000);
     button.disabled = false;
     button.textContent = "서류 만들기";
 
     if (!response.success) {
+      // 막는 오류가 아니라 "한 번 더 확인"인 것(항공+FOB 같은 조합, 제재 국가) — 다시 누르면 그대로 진행합니다.
+      // 이 화면에는 [다음] 버튼이 없어, 예전에는 같은 오류만 되풀이됐습니다(전수 점검 5회차).
+      const flag = CONFIRM_FLAGS[response.error_code];
+      if (flag) {
+        confirmedFlags[flag] = true;
+        showError(`${response.message.replace("[다음]을", "[서류 만들기]를").replace("[Shipment 생성]을", "[서류 만들기]를")}`,
+          response.field);
+        return;
+      }
       showError(response.message, response.field);
       return;
     }
     madeShipment = response.data.shipment_id;
     showResult(response.data);
   });
+
+  const CONFIRM_FLAGS = { INCOTERMS_CONFIRM: "incoterms_confirmed", RESTRICTED_CONFIRM: "restricted_confirmed", DG_CONFIRM: "dg_confirmed" };
+  const confirmedFlags = {};
 
   function showResult(data) {
     // 만들고 나서도 비어 있는 칸은 숨기지 않습니다. 서류에 —로 남을 자리입니다.

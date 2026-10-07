@@ -115,6 +115,11 @@ p { margin: 0 0 10px; }
 
 .site_footer { border-top: 1px solid var(--line); background: #fff; padding: 22px 0; font-size: 13px; }
 .site_footer .content_width { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+details[data-contract-card] > summary { cursor: pointer; list-style: none; }
+details[data-contract-card] > summary::-webkit-details-marker { display: none; }
+.inline_h { display: inline; margin: 0; font-size: inherit; }
+.site_disclaimer { flex-basis: 100%; margin: 4px 0 0; font-size: 12px; line-height: 1.6; }
+.sr_only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* Flash */
 .flash_stack { width: min(1160px, calc(100% - 32px)); margin: 16px auto 0; display: grid; gap: 8px; }

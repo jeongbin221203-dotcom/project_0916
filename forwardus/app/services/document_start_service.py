@@ -278,6 +278,8 @@ def create(payload: dict, user_id: int | None = None) -> dict:
         "buyer_required_date": _text(payload, "buyer_required_date", 20),
         "incoterms": _text(payload, "incoterms", 3).upper(),
         "incoterms_confirmed": payload.get("incoterms_confirmed"),
+        "restricted_confirmed": payload.get("restricted_confirmed"),
+        "dg_confirmed": payload.get("dg_confirmed"),
         "currency": _text(payload, "currency", 3).upper() or "USD",
         "invoice_value": _invoice_value(items),
         "cargo": {"items": items},

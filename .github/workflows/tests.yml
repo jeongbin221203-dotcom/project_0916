@@ -1,0 +1,27 @@
+name: tests
+
+on:
+  push:
+    branches: [main, JB]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: forwardus
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: forwardus/requirements.txt
+      - name: Tesseract (OCR 시험용)
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+      - run: pip install -r requirements.txt
+      - name: 외부망 없이 도는 시험
+        run: pytest -q -m "not live and not slow"
+        env:
+          SECRET_KEY: ci-only-not-a-secret

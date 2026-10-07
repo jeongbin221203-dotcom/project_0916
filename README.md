@@ -17,6 +17,49 @@ FORWARDUS는 소규모 중소기업과 1인사업자가 별도의 물류 전담 
 
 ---
 
+## 빠른 시작 (5분)
+
+**처음 보는 분은 이 절만 읽으면 실행해 볼 수 있습니다.** 아래 1~39장은 설계·협업 문서입니다.
+
+### 무엇을 하는 앱인가
+소규모 수출 기업의 **견적(운송 계획) → 서류(CI·PL·SI·BR) → 통관 준비 → 추적**을 한 번의 입력으로 잇고,
+계약서 조항 점검(한국 수출자 기준)과 수출 상담(AI)을 곁들입니다. 외부 API 키가 없으면 해당 기능만 **모의(Mock)
+데이터**로 동작하며 화면에 그렇게 표시됩니다.
+
+### 실행 (로컬)
+```bash
+cd forwardus
+python -m venv .venv && source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env                                      # SECRET_KEY 만 채우면 됩니다 (나머지 키는 비워도 실행)
+python run.py                                             # http://127.0.0.1:5000
+```
+- 사진·스캔 서류 읽기(OCR)를 쓰려면 Tesseract 가 필요합니다 → `forwardus/docs/ocr_setup.md`. 없어도 앱은 뜨고,
+  글자가 있는 PDF 는 그대로 읽습니다.
+- 가입 후 바로 쓸 수 있습니다. **관리자(마스터) 대시보드**는 환경변수 `MASTER_EMAIL`·`MASTER_PASSWORD` 로 정한 계정으로
+  로그인합니다(로컬 기본값은 `forwardus/config.py` — 배포에서는 반드시 바꿉니다).
+
+### Docker (배포와 같은 환경: Tesseract·한글 글꼴 포함)
+```bash
+cd forwardus
+docker build -t forwardus .
+docker run -p 10000:10000 -e SECRET_KEY=$(python -c "import secrets;print(secrets.token_hex(32))") forwardus
+```
+Render 는 `forwardus/render.yaml` 로 같은 Dockerfile 을 씁니다(아래 37장의 pip 방식은 OCR·글꼴이 빠져 권장하지 않습니다).
+
+### 테스트
+```bash
+cd forwardus
+pytest -m "not live and not slow"       # 외부망 없이 도는 전체 (약 12분, 네트워크 시험 1건은 실패할 수 있음)
+```
+
+### 알려진 한계
+- 정부 API·AI·선사 스케줄은 키가 없으면 모의 데이터입니다(화면에 "Mock" 표시). 운임·소요일은 참고용 추정입니다.
+- 관세율·HS 분류·계약서 조항 점검·서류 자동 작성은 **참고용이며 법률·세무·관세 자문이 아닙니다.** 최종 신고는
+  관세사·포워더와 확인하세요.
+
+---
+
 # 1. 프로젝트 비전
 
 FORWARDUS의 최종 목표는 다음과 같습니다.
@@ -1710,6 +1753,8 @@ pytest
 ---
 
 # 37. Render 배포
+
+> **Docker 로 배포합니다.** `forwardus/render.yaml` 이 `forwardus/Dockerfile` 을 가리킵니다(Tesseract·한글 글꼴 포함). pip 만 쓰는 아래 방식은 OCR·서류 PDF 글꼴이 없어 서류 생성이 멈출 수 있어 권장하지 않습니다.
 
 Build Command:
 

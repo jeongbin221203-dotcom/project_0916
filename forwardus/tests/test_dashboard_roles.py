@@ -1,7 +1,7 @@
 """Dashboard 권한 분기 · API 데이터 분리 · 전역 사이드바 · HS 창 스크롤.
 
 마스터(role master)  전체 통합 Dashboard와 관리자 기능(상태 강제 변경 · 엑셀 내려받기)
-일반 회원(role user) 내 Dashboard. 남의 Shipment는 화면에도 API에도 나오지 않습니다.
+일반 회원(role user) 내 현황. 남의 Shipment는 화면에도 API에도 나오지 않습니다.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def test_마스터는_전체_통합_Dashboard를_본다(client, two_members):
     _, mine, theirs = two_members
     html = client.get("/dashboard").get_data(as_text=True)
 
-    assert "Master Integrated Dashboard" in html
+    assert "관리자 통합 현황" in html
     for label in ("전체 활성 화물", "운송 중", "통관 진행", "도착 완료", "전체 사용자",
                   "이번 달 견적", "이번 달 서류"):
         assert label in html, label
@@ -91,7 +91,7 @@ def test_회원은_내_Dashboard만_본다(two_members):
     alice, mine, theirs = two_members
     html = alice.get("/dashboard").get_data(as_text=True)
 
-    assert "Personal My Dashboard" in html
+    assert "진행 현황" in html
     for label in ("선적 대기", "운송 중", "통관 진행", "도착 완료",
                   "최근 작성한 서류", "최근 일정 · B/L 추적"):
         assert label in html, label
@@ -227,12 +227,12 @@ def test_회원도_Dashboard로_갈_수_있고_보이는_범위만_다르다(app
     member, _, _ = two_members
     html = member.get("/").get_data(as_text=True)
     assert 'href="/dashboard"' in html            # 사이드바가 아니라 이름 메뉴에
-    assert "내 Dashboard" in html                 # 회원에게는 "내"
+    assert "내 현황" in html                 # 회원에게는 "내"
     assert member.get("/dashboard").status_code == 200
 
     master_html = client.get("/").get_data(as_text=True)
     assert 'href="/dashboard"' in master_html
-    assert "전체 Dashboard" in master_html        # 마스터에게는 "전체"
+    assert "전체 현황" in master_html        # 마스터에게는 "전체"
     # 마스터는 모든 회원의 Shipment를 봅니다. (2026-09-25 사용자 확인)
     assert client.get("/dashboard").status_code == 200
 

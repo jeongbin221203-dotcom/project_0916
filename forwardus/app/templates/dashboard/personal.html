@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% from "_macros.html" import status_badge %}
-{% block title %}내 Dashboard{% endblock %}
+{% block title %}내 현황{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ static_url('css/dashboard.css') }}">{% endblock %}
 {% block content %}
   <div class="page_head">
     <div>
-      <p class="eyebrow">Personal My Dashboard</p>
-      <h1>내 Dashboard</h1>
+      <p class="eyebrow">진행 현황</p>
+      <h1>내 현황</h1>
       <p class="muted">내가 만든 Shipment만 보입니다.</p>
     </div>
     <a class="button primary" href="{{ url_for('planning.new') }}">운송 예상 견적</a>

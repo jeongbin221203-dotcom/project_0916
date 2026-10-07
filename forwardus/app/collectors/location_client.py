@@ -22,8 +22,34 @@ CODE_MIN_LENGTH = 3
 CODE_MAX_LENGTH = 10
 
 
+# 원자료(UN/LOCODE·ISO)를 고쳐 쓰지 않고, 읽을 때 한 번 덮어쓰는 정정표 — 자료를 다시 만들어도 유지됩니다.
+# 전 국가 검사에서 나온 것: 러시아 점령지 항구와 북키프로스가 "대표 항구"로 맨 앞에 나왔고, 이란이 아시아
+# 일정(4일·$520)으로 계산됐습니다.
+_LOCATION_NOTES = {
+    "UAERD": "러시아 점령지(베르댠스크) — 상업 기항 불가·제재 확인",
+    "UAMPW": "러시아 점령지(마리우폴) — 상업 기항 불가·제재 확인",
+    "ECN": "북키프로스(국제적 미승인 지역) — 항공 운항·제재·법적 확인 필요",
+    "CYFMG": "북키프로스(국제적 미승인 지역) — 제재·법적 확인 필요",
+    "CYKYR": "북키프로스(국제적 미승인 지역) — 제재·법적 확인 필요",
+    "CYDHK": "영국 군기지 — 일반 상업 항구가 아닙니다",
+}
+_REGION_FIXES = {"IR": "middle_east", "AF": "middle_east", "PK": "middle_east"}
+_patched: set[int] = set()
+
+
 def _all_locations() -> list[dict]:
-    return load_mock("locations")
+    items = load_mock("locations")
+    if id(items) not in _patched:
+        for item in items:
+            note = _LOCATION_NOTES.get(item["code"])
+            if note:
+                item["major"] = False
+                item["note"] = note
+            fixed = _REGION_FIXES.get(item.get("country_code"))
+            if fixed:
+                item["region"] = fixed
+        _patched.add(id(items))
+    return items
 
 
 def _data_version() -> int:
@@ -96,6 +122,14 @@ COUNTRY_ALIASES = {
     "uae": "AE", "turkey": "TR", "turkiye": "TR", "russia": "RU", "korea": "KR", "southkorea": "KR",
     "czechia": "CZ", "ivorycoast": "CI", "laos": "LA", "burma": "MM", "holland": "NL",
     "터키": "TR", "튀르키예": "TR", "미국": "US", "영국": "GB", "대한민국": "KR", "한국": "KR",
+    # 관세청 표기(수출신고필증)와 ISO 일반 표기 — 정확 일치만 하므로 목록에 없는 표기를 더합니다(전 국가 점검).
+    "호주": "AU", "남아프리카공화국": "ZA", "남아공": "ZA", "체코공화국": "CZ", "체코": "CZ", "아랍에미리트연합": "AE",
+    "아랍에미리트": "AE", "러시아연방": "RU", "러시아": "RU", "콩고민주공화국": "CD", "홍콩": "HK", "마카오": "MO",
+    "대만": "TW", "타이완": "TW", "이란": "IR", "시리아": "SY", "볼리비아": "BO", "베네수엘라": "VE", "탄자니아": "TZ",
+    "몰도바": "MD", "브루나이": "BN", "카보베르데": "CV", "베트남": "VN", "라오스": "LA", "미얀마": "MM",
+    "taiwan": "TW", "iran": "IR", "syria": "SY", "bolivia": "BO", "venezuela": "VE", "tanzania": "TZ",
+    "moldova": "MD", "macau": "MO", "macao": "MO", "brunei": "BN", "capeverde": "CV", "czechrepublic": "CZ",
+    "hongkong": "HK", "russianfederation": "RU", "unitedarabemirates": "AE", "southafrica": "ZA",
 }
 
 

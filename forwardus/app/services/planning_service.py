@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.timeutil import today_kst
 
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from app.collectors import (customs_client, exchange_client, location_client, schedule_client,
                             tariff_client)
@@ -750,6 +750,46 @@ def _build_custom_airport(code: str, name: str, country_code: str, country: dict
     return known
 
 
+_BATTERY_WORDS = re.compile(r"lithium|li-?ion|battery|batteries|power\s*bank|리튬|배터리|보조\s*배터리|축전지|충전지", re.I)
+
+
+def _check_battery_goods(items: list[dict], payload: dict) -> None:
+    """리튬 배터리를 위험물로 체크하지 않았으면 **한 번 더 확인**을 받습니다.
+
+    HS 8507.60·8506 이나 품명에 lithium·battery 가 있는데 위험물 체크 없이 입력해도 경고가 하나도 없었습니다
+    (무역 실무 팀장 점검). 리튬 배터리는 대개 UN3480·3481·3090·3091(9급)이라 항공 탑재·포장·서류가 달라집니다.
+    위험물이 아니라면(예: 배터리가 든 것이 아니라 충전기) 그대로 진행할 수 있습니다.
+    """
+
+    if str(payload.get("dg_confirmed") or "").lower() in ("1", "true", "yes", "on"):
+        return
+    for number, item in enumerate(items, start=1):
+        dangerous = str(item.get("is_dangerous") or "").lower() in ("1", "true", "yes", "on", "y")
+        hs = "".join(ch for ch in str(item.get("hs_code") or "") if ch.isdigit())
+        if dangerous or not (hs.startswith(("8507", "8506")) or _BATTERY_WORDS.search(str(item.get("product_description") or ""))):
+            continue
+        raise ValidationError(
+            f"{number}번째 품목은 배터리(리튬)로 보입니다. 리튬 배터리는 보통 **위험물**(UN3480·3481·3090·3091, 9급)이라 "
+            "항공은 화물기 전용·충전율 30% 이하 등 제한이 있고 Shipper's Declaration 이 필요합니다. "
+            "위험물이면 화물 칸의 '위험물'을 체크하고 UN 번호를 입력하세요. 위험물이 아니라면 [Shipment 생성]을 "
+            "한 번 더 눌러 주세요.".replace("**", ""), "is_dangerous", code="DG_CONFIRM")
+
+
+def _check_trade_controls(destination: dict, payload: dict) -> None:
+    """제재·수출통제 국가는 막거나(북한) 한 번 더 확인받습니다(strict). 안내 문구는 processors/trade_controls."""
+
+    from app.processors import trade_controls
+
+    code = (destination or {}).get("country_code") or ""
+    kind = trade_controls.level(code)
+    if kind == "blocked":
+        raise ValidationError(trade_controls.note(code).replace("**", ""), "destination_code", code="TRADE_CONTROL")
+    if kind == "strict" and str(payload.get("restricted_confirmed") or "").lower() not in ("1", "true", "yes", "on"):
+        raise ValidationError(trade_controls.note(code).replace("**", "")
+                              + " 그래도 견적을 만들려면 [Shipment 생성]을 한 번 더 눌러 주세요.",
+                              "destination_code", code="RESTRICTED_CONFIRM")
+
+
 def _resolve_locations(route: dict, payload: dict) -> tuple[dict, dict]:
     kind = location_kind(route["transport_mode"])
     return _resolve_location(payload, "origin", kind), _resolve_location(payload, "destination", kind)
@@ -771,6 +811,20 @@ def calculate_cargo(payload: dict) -> dict:
     # 이 짐이면 LCL인지 FCL인지. 기준은 processors/sea_mode_advisor에 한 곳에만 둡니다.
     metrics["sea_mode_advice"] = sea_mode_advisor.recommend(
         metrics.get("total_cbm"), metrics.get("total_weight_kg"))
+    # 컨테이너에 안 들어가는 화물(OOG)·특수 컨테이너(플랫랙·오픈탑·탱크)는 부피로 대수를 어림하면 안 됩니다.
+    # "컨테이너에 안 들어간다"는 경고와 "40HC 2대면 됩니다"라는 조언이 한 응답에서 충돌했습니다(무역 실무 팀장 점검).
+    items = []
+    if isinstance(payload, dict):
+        raw = payload.get("cargo") or payload.get("items") or payload
+        items = cargo_items({"cargo": raw}) if isinstance(raw, (list, dict)) else []
+    special = any(str(item.get("special_container_type") or "") in ("open_top", "flat_rack", "tank")
+                  for item in items if isinstance(item, dict))
+    if metrics.get("oversize_warning") or special:
+        metrics["needs_forwarder_quote"] = True
+        metrics["sea_mode_advice"] = {
+            **metrics["sea_mode_advice"], "mode": "", "confidence": "none",
+            "reason": "특수 컨테이너·초과(OOG) 화물입니다. 컨테이너 대수와 운임은 부피로 어림할 수 없어 "
+                      "포워더 개별 견적이 필요합니다."}
     return metrics
 
 
@@ -816,6 +870,41 @@ NO_CARGO_NOTE = ("화물 정보를 아직 적지 않아 출항 일정만 보여 
                  "운임은 품목의 크기·무게를 적어야 계산할 수 있습니다.")
 
 
+def _align_mock_transit(items: list[dict], route: dict, origin: dict, destination: dict) -> None:
+    """예시(mock) 스케줄의 소요일을 **실제 항로 계산**에 맞춥니다.
+
+    예시 스케줄은 지역 6개의 고정 값(인도 4일·러시아 30일·뉴욕 13일…)이라 화면의 항로 계산(부산-뉴욕 27~35일)과
+    모순됐고, 그 값이 ETA·납기 판정에 저장됐습니다(전 국가 점검). 항로 계산이 있으면 그 최단 일수에 맞춰 평행 이동하고
+    (템플릿끼리의 차이는 유지), 직항 여부도 항로 자료를 따릅니다. 계산할 수 없으면 건드리지 않습니다.
+    """
+
+    mock = [item for item in items if item.get("source") == "mock"]
+    if not mock or not destination:
+        return
+    try:
+        summary = transit_summary(origin.get("code", "") if origin else "", destination["code"])
+    except Exception:                                    # 계산이 안 되는 구간은 예시 값 그대로
+        return
+    if route["transport_mode"] == "AIR":
+        real = (summary.get("air") or {}).get("min")
+    else:
+        real = ((summary.get("sea") or {}).get(route.get("sea_mode") or "FCL") or {}).get("min")
+    if not real:
+        return
+    shift = int(real) - min(int(item["transit_days"]) for item in mock)
+    direct = None
+    if route["transport_mode"] != "AIR" and origin:
+        lane = location_client.sea_lane_direct(origin["code"], destination.get("country_code", ""))
+        if lane.get("known"):
+            direct = bool(lane["direct"])
+    for item in mock:
+        days = max(1, int(item["transit_days"]) + shift)
+        item["transit_days"] = days
+        item["eta"] = (date.fromisoformat(item["etd"]) + timedelta(days=days)).isoformat()
+        if direct is not None:
+            item["direct"] = direct and bool(item.get("direct", True))
+
+
 def search_schedules(payload: dict) -> dict:
     """Validate route and cargo, then return sorted schedules with deadline checks.
 
@@ -846,6 +935,7 @@ def search_schedules(payload: dict) -> dict:
         raise ServiceError(result["message"], result["error_code"], 502)
 
     items = result["data"]
+    _align_mock_transit(items, route, origin, destination)
     for item in items:
         deadline = check_buyer_deadline(date.fromisoformat(item["eta"]), buyer_required_date, route["transport_mode"])
         if deadline:
@@ -1249,9 +1339,11 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
             f"출발 희망일({route['requested_departure_date']})이 이미 지났습니다. 오늘 이후 날짜를 골라 주세요.",
             "requested_departure_date")
     origin, destination = _resolve_locations(route, payload)
+    _check_trade_controls(destination, payload)
     parties = validate_parties(payload)
 
     items = cargo_items(payload)
+    _check_battery_goods(items, payload)
     metrics = calculate_cargo_lines(items)
     # 품목별 금액을 모두 적었으면 그 합을 송장 금액으로 씁니다.
     # 화면이 보낸 합계는 믿지 않고 서버에서 다시 더합니다.

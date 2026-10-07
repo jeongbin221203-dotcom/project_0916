@@ -43,10 +43,23 @@ def list_shipments(status: str | None = None, viewer=None):
 
 
 def cost_groups(shipment) -> list[dict]:
+    """비용을 묶음별로. 각 줄에 **누가 내는지**(수출자/바이어)를 붙입니다.
+
+    FOB 건의 "Total Logistics Cost"에 운임·보험·도착지 비용이 모두 합산돼, 그대로 보고하면 수출자 원가가 과대하게 읽혔습니다
+    (무역 실무 팀장 점검). 부담 주체는 Incoterms 규칙표(cost_calculator.EXPORTER_PAYS) 한 곳을 따릅니다.
+    """
+
+    from app.services.assistant_service import _exporter_pays
+
     groups: "OrderedDict[str, dict]" = OrderedDict()
     for cost in shipment.costs:
-        group = groups.setdefault(cost.category, {"category": cost.category, "total_krw": 0, "lines": []})
+        group = groups.setdefault(cost.category, {"category": cost.category, "total_krw": 0, "exporter_krw": 0,
+                                                  "lines": []})
+        exporter = _exporter_pays(shipment.incoterms, cost.category)
+        cost.payer = "수출자" if exporter else "바이어"
         group["total_krw"] += cost.krw_amount
+        if exporter:
+            group["exporter_krw"] += cost.krw_amount
         group["lines"].append(cost)
     return list(groups.values())
 
@@ -60,6 +73,7 @@ def build_summary(shipment) -> dict:
     return {
         "shipment": shipment,
         "cost_groups": cost_groups(shipment),
+        "exporter_total_krw": sum(group["exporter_krw"] for group in cost_groups(shipment)),
         "deadline": check_buyer_deadline(shipment.eta, shipment.buyer_required_date, shipment.transport_mode)
         if shipment.eta else None,
         "documents": [

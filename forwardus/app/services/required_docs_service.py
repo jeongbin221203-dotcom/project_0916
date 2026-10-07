@@ -98,6 +98,17 @@ CERT_SCOPE = {
 }
 
 
+# 이 품목 류**만** 보내면 걸리지 않는 인증 — CE·UKCA·GPSR 은 기계·전기·완구·의료기기 같은 제품 규정이라 식품·화장품·섬유에는
+# 해당하지 않습니다(무역 실무 팀장 점검: 라면에 "CE 마킹·GPSR"이 나왔습니다). 품목을 모르면 그대로 보여 줍니다.
+_FOOD = {f"{n:02d}" for n in range(1, 25)}
+_TEXTILE = {f"{n:02d}" for n in range(50, 64)}
+CERT_NOT_FOR = {
+    ("CE 마킹", "UKCA", "GPSR", "SABER", "SALEEM", "BIS", "KC 안전"): _FOOD | {"33"} | _TEXTILE,
+    ("할랄", "Halal", "HALAL"): set(),             # 아래 CERT_ONLY_FOR 로 다룹니다
+}
+CERT_ONLY_FOR = {("할랄", "Halal", "HALAL"): _FOOD | {"30", "33"}}
+
+
 def _cert_fits(title: str, chapters: set[str]) -> bool:
     """이 인증이 지금 보내는 품목에 걸리는지.
 
@@ -107,6 +118,12 @@ def _cert_fits(title: str, chapters: set[str]) -> bool:
 
     if not chapters:
         return True
+    for words, allowed in CERT_ONLY_FOR.items():
+        if any(word in title for word in words) and not (chapters & allowed):
+            return False
+    for words, excluded in CERT_NOT_FOR.items():
+        if excluded and any(word in title for word in words) and chapters <= excluded:
+            return False
     scoped = False
     for words, allowed in CERT_SCOPE.items():
         if any(word in title for word in words):
@@ -399,6 +416,16 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
         country_code = port[:2] if len(port) >= 2 and port[:2].isalpha() else ""
     # 이 건의 HS 류(앞 두 자리). 품목에 안 걸리는 인증을 빼는 데 씁니다.
     chapters = {(cargo.hs_code or "")[:2] for cargo in cargos if (cargo.hs_code or "")[:2].isdigit()}
+    from app.processors import trade_controls
+
+    control = trade_controls.note(country_code)
+    if control:
+        # 제재·수출통제 국가는 목록 맨 위에 — 다른 서류보다 먼저 판정해야 합니다(전 국가 점검).
+        add({"key": f"trade_control_{country_code}", "title": "수출통제·제재 확인 (전략물자 판정)",
+             "country": country_code,
+             "documents": ["전략물자 판정서(해당 시)", "수출허가서(통제 품목인 경우)", "거래 상대방 제재 명단 확인"],
+             "agency": "전략물자관리원 yesTrade · 관세사 · 외교부",
+             "why": control.replace("**", ""), "source": "country", "link": "", "confidence": "high"})
     for row in _country_notes(country_code,
                               getattr(shipment, "destination_name", "") or "", chapters):
         add(row)

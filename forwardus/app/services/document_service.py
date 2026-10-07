@@ -280,6 +280,18 @@ DOC_PREFIX = {
 }
 
 
+# 서류에 찍는 국가 영문명 — ISO 정식명("TAIWAN, PROVINCE OF CHINA"·"NETHERLANDS, KINGDOM OF THE")을 그대로 찍으면
+# 통관·은행 서류에서 어색하거나 민감합니다(전 국가 점검). 대문자 변환 때문에 깨지는 비ASCII(Türkiye 등)도 피합니다.
+DOCUMENT_COUNTRY_NAMES = {
+    "TW": "TAIWAN", "VN": "VIETNAM", "RU": "RUSSIA", "KP": "NORTH KOREA", "IR": "IRAN", "SY": "SYRIA",
+    "BO": "BOLIVIA", "VE": "VENEZUELA", "TZ": "TANZANIA", "MD": "MOLDOVA", "LA": "LAOS", "NL": "NETHERLANDS",
+    "FK": "FALKLAND ISLANDS", "TR": "TURKEY", "CI": "IVORY COAST", "HK": "HONG KONG", "MO": "MACAO",
+    "GB": "UNITED KINGDOM", "US": "UNITED STATES OF AMERICA", "CD": "DEMOCRATIC REPUBLIC OF THE CONGO",
+    "CG": "REPUBLIC OF THE CONGO", "KR": "THE REPUBLIC OF KOREA", "CZ": "CZECH REPUBLIC", "BN": "BRUNEI",
+    "CV": "CAPE VERDE", "PS": "PALESTINE", "FM": "MICRONESIA", "SZ": "ESWATINI",
+}
+
+
 def _origin_text(shipment) -> str:
     """원산지 — 수출신고 화면에서 고친 값(예: "CN · 중국")을 따릅니다. 고정 "KOREA" 면 서류 간 불일치가 났습니다."""
 
@@ -289,6 +301,8 @@ def _origin_text(shipment) -> str:
         return raw.upper() or "THE REPUBLIC OF KOREA"
     if code == "KR":
         return "THE REPUBLIC OF KOREA"
+    if code in DOCUMENT_COUNTRY_NAMES:
+        return DOCUMENT_COUNTRY_NAMES[code]
     from app.collectors import location_client
     return location_client.country_name_en(code).upper()
 
@@ -470,7 +484,8 @@ def build_reference(shipment, doc_type: str = "") -> dict:
         "date_ordered": "",
         "customer_order_no": "",
         "date_shipped": shipment.etd.isoformat() if shipment.etd else "",
-        "attention": buyer.contact_email if buyer else "",
+        # ATTENTION 은 담당자 **이름**입니다. 이메일을 넣으면 서류에 "a@b.com"이 찍혔습니다(무역 실무 점검) — 비워 둡니다.
+        "attention": "",
         "shipped_via": " / ".join(part for part in [shipment.carrier, shipment.vessel_or_flight] if part),
         "container_no": "",
         "invoice_no": f"CI-{shipment.shipment_id}",
@@ -892,7 +907,7 @@ def origin_certificate_guide(shipment) -> dict:
                     "agreements": fallback,
                     "agreement_names": [row["agreement"] for row in fallback],
                     "rates_missing": True,
-                    "note": ("관세청 세율 조회가 지금 되지 않아 **협정세율은 빼고** 보여 드립니다. "
+                    "note": ("관세청 세율 조회가 지금 되지 않아 협정세율은 빼고 보여 드립니다. "
                              "어떤 협정을 쓸 수 있는지와 발급 방식은 아래와 같습니다. "
                              "세율은 FTA 강국 KOREA(fta.go.kr)에서 HS부호로 확인하세요."),
                     "source": "ForwardUs 협정표"}

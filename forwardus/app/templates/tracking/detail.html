@@ -35,10 +35,10 @@
       <div class="row_between wrap">
         <h2>Shipment Timeline</h2>
         <form method="post" action="{{ url_for('tracking.refresh', shipment_id=shipment.shipment_id) }}">
-          <button class="button primary small" {{ 'disabled' if shipment.status in ('delivered', 'closed', 'cancelled') }}>Tracking 조회 (Mock)</button>
+          <button class="button primary small" {{ 'disabled' if shipment.status in ('delivered', 'closed', 'cancelled') }}>추적 갱신 (예시 데이터)</button>
         </form>
       </div>
-      <p class="muted small">실시간 Tracking API가 연결되지 않아, 조회할 때마다 Mock 제공자가 다음 표준 이벤트를 한 단계씩 반환합니다. 실제 위치 정보가 아닙니다.</p>
+      <p class="muted small">실시간 추적이 연결되기 전이라 누를 때마다 예시 이벤트가 한 단계씩 나옵니다. 실제 화물 위치가 아닙니다.</p>
       <ol class="timeline">
         {% for step in steps %}
           <li class="{{ step.state }}">

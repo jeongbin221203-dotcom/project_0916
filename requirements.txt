@@ -1,8 +1,2 @@
-Flask>=3.0,<4
-Flask-SQLAlchemy>=3.1,<4
-SQLAlchemy>=2.0,<3
-python-dotenv>=1.0
-httpx>=0.27,<1
-gunicorn>=21.2
-psycopg[binary]>=3.1; sys_platform != "win32"
-pytest>=8
+# 실제 의존성은 forwardus/requirements.txt 한 곳에서 관리합니다.
+-r forwardus/requirements.txt
