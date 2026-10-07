@@ -783,7 +783,8 @@
     note.setAttribute("role", "status");
     note.innerHTML = `<span class="doc_reading_spin" aria-hidden="true"></span>
       <span><b>${escapeHtml(file && file.name ? file.name : "올린 서류")}을(를) 읽고 있습니다…</b>
-      <small>그림으로 된 서류는 30초쯤 걸립니다. 앞서 적어 두신 내용은 지우고 이 파일 기준으로 채웁니다.</small></span>`;
+      <small>그림으로 된 서류는 30초쯤 걸립니다. 잘 읽히면 이 파일 기준으로 칸을 다시 채우고(앞서 적은 내용은
+        바뀝니다), 읽지 못하면 적어 두신 내용은 그대로 남습니다.</small></span>`;
     panel.prepend(note);
     note.scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -1550,13 +1551,16 @@
       url: config.extractUrl,
       onStart(file) {
         uploadResult.hidden = true;
-        // 새로 올린 파일이 기준입니다. 앞서 적어 둔 값이 섞이면 어느 서류의 값인지 알 수 없습니다.
-        clearForm();
+        // **여기서는 칸을 지우지 않습니다.** 예전에는 올리는 순간 비웠습니다 — 읽을 수 없는 파일(암호 PDF·
+        // 빈 파일)이면 적던 칸과 서버 임시저장까지 사라지고 오류 문구만 남았습니다(사용성 점검 2회차).
+        // 읽기에 성공한 뒤(onResult)에만 비우고 새 파일 기준으로 채웁니다.
         showReading(file);
       },
       onError() { hideReading(); },
       onResult(data) {
         hideReading();
+        // 새로 올린 파일이 기준입니다. 앞서 적어 둔 값이 섞이면 어느 서류의 값인지 알 수 없습니다.
+        clearForm();
         // 이 화면에서 바로 채웁니다. 만들기는 여전히 사람이 누릅니다.
         window.FORWARDUS_DOC_FILL(data.form);
         if (window.ForwardusHsModal) window.ForwardusHsModal.remember(data.hs_queries || []);

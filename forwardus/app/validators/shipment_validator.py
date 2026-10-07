@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 from app.processors.cost_calculator import INCOTERMS_INFO
+from app.processors.korean import josa
 from app.validators import ValidationError
 from app.validators.cargo_validator import MAX_INVOICE_VALUE, parse_number, parse_optional_number
 
@@ -41,7 +42,7 @@ def parse_date(value: Any, field_name: str, *, required: bool = True, field: str
                                   field) from exc
     if not MIN_YEAR <= parsed.year <= MAX_YEAR:
         raise ValidationError(
-            f"{field_name}은(는) {MIN_YEAR}년부터 {MAX_YEAR}년 사이여야 합니다.", field)
+            f"{josa(field_name, '은')} {MIN_YEAR}년부터 {MAX_YEAR}년 사이여야 합니다.", field)
     return parsed
 
 
@@ -63,9 +64,9 @@ def plain_text(value: Any) -> str:
 def require_text(value: Any, field_name: str, *, max_length: int = 200, field: str | None = None) -> str:
     text = plain_text(value)
     if not text:
-        raise ValidationError(f"{field_name}을(를) 입력해주세요.", field)
+        raise ValidationError(f"{josa(field_name, '을')} 입력해주세요.", field)
     if len(text) > max_length:
-        raise ValidationError(f"{field_name}은(는) {max_length}자 이내로 입력해주세요.", field)
+        raise ValidationError(f"{josa(field_name, '은')} {max_length}자 이내로 입력해주세요.", field)
     return text
 
 

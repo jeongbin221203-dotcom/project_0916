@@ -308,11 +308,25 @@ def _cell(draw, box, label: str, value: str, fonts) -> None:
         color = MUTED if part.startswith("미정") else INK
         if part.startswith(HINT):
             part, color = part[len(HINT):], HINT_COLOR
-        for line in _wrap(draw, part, fonts["body"], w - 18):
+        lines = _wrap(draw, part, fonts["body"], w - 18)
+        for index, line in enumerate(lines):
             if top + 18 > y + h - 4:
                 break
-            draw.text((x + 9, top), line, font=fonts["body"], fill=color)
+            # 이 줄이 마지막으로 보이는데 뒤에 더 있으면 "…" 로 잘렸음을 보입니다. L/C 와 글자 단위로
+            # 맞아야 하는 서류가 말없이 잘려 나가 반송될 수 있습니다(전문가 점검 2회차).
+            more = index + 1 < len(lines) and top + 19 + 18 > y + h - 4
+            draw.text((x + 9, top), _ellipsis(draw, line, fonts["body"], w - 18) if more else line,
+                      font=fonts["body"], fill=color)
             top += 19
+
+
+def _ellipsis(draw, line: str, font, width: int) -> str:
+    """줄 끝을 "…" 로 바꿔 폭 안에 넣습니다."""
+
+    text = line.rstrip()
+    while text and draw.textlength(text + "…", font=font) > width:
+        text = text[:-1]
+    return text.rstrip() + "…"
 
 
 def _rows(draw, rows, top: int, width: int, data: dict, fonts, height: int) -> int:
@@ -333,8 +347,28 @@ def _rows(draw, rows, top: int, width: int, data: dict, fonts, height: int) -> i
     return top
 
 
-def _table(draw, columns, items, top: int, width: int, fonts) -> int:
-    """품목 표. 줄 수만큼 늘어납니다."""
+MAX_CELL_LINES = 5        # 품목 칸 한 줄에 그릴 수 있는 최대 글줄(넘으면 "…")
+MIN_CELL_LINES = 1        # 공간이 모자랄 때 줄이는 하한 — 1줄이면 행 높이가 예전(40px)과 같아 20행도 한 장에 들어갑니다
+
+
+def _cell_text(column, item) -> tuple[str, tuple]:
+    value = item.get(column["key"], "")
+    if column["key"] in MONEY_KEYS:
+        text = money_text(value)
+    else:
+        text = f"{value:,}" if isinstance(value, (int, float)) else str(value or "")
+    color = INK
+    if text.startswith(HINT):
+        text, color = text[len(HINT):], HINT_COLOR
+    return text, color
+
+
+def _table(draw, columns, items, top: int, width: int, fonts, bottom: int | None = None) -> int:
+    """품목 표. 줄 수만큼 늘어납니다.
+
+    긴 품명은 행을 키워 **전부** 보여 줍니다(최대 MAX_CELL_LINES 줄). 전에는 2줄(영문 약 35자)에서 말없이
+    잘렸습니다. 페이지 아래(bottom)까지 공간이 모자라면 줄 수를 줄이되, 잘린 줄 끝에 "…" 를 붙입니다.
+    """
 
     head = 34
     left = MARGIN
@@ -347,21 +381,27 @@ def _table(draw, columns, items, top: int, width: int, fonts) -> int:
         left += share
     top += head
 
-    for item in items or [{}]:
+    rows = items or [{}]
+    wrapped = [[_wrap(draw, _cell_text(column, item)[0], fonts["body"], share - 16) for column in columns]
+               for item in rows]
+
+    def heights(cap: int) -> list[int]:
+        return [max(40, 16 + 17 * min(cap, max(len(cell) for cell in row))) for row in wrapped]
+
+    cap = MAX_CELL_LINES
+    if bottom is not None:
+        while cap > MIN_CELL_LINES and top + sum(heights(cap)) > bottom:
+            cap -= 1
+    for item, row, row_h in zip(rows, wrapped, heights(cap)):
         left = MARGIN
-        row_h = 40
-        for column in columns:
+        for column, lines in zip(columns, row):
             draw.rectangle([left, top, left + share, top + row_h], outline=LINE, width=1)
-            value = item.get(column["key"], "")
-            if column["key"] in MONEY_KEYS:
-                text = money_text(value)
-            else:
-                text = f"{value:,}" if isinstance(value, (int, float)) else str(value or "")
-            color = INK
-            if text.startswith(HINT):
-                text, color = text[len(HINT):], HINT_COLOR
-            for index, line in enumerate(_wrap(draw, text, fonts["body"], share - 16)[:2]):
-                draw.text((left + 8, top + 8 + index * 17), line, font=fonts["body"], fill=color)
+            color = _cell_text(column, item)[1]
+            for index, line in enumerate(lines[:cap]):
+                last = index == cap - 1 and len(lines) > cap
+                draw.text((left + 8, top + 8 + index * 17),
+                          _ellipsis(draw, line, fonts["body"], share - 16) if last else line,
+                          font=fonts["body"], fill=color)
             left += share
         top += row_h
     return top
@@ -388,7 +428,9 @@ def draw_form(kind: str, data: dict, columns: list[dict], note: str = DRAFT_NOTE
 
     top = _rows(draw, layout["rows"], 108, width, data, fonts, height=92)
     if layout.get("table"):
-        top = _table(draw, columns, data.get("items") or [], top + 10, width, fonts) + 10
+        footer_h = 76 * len(layout.get("footer", []))
+        top = _table(draw, columns, data.get("items") or [], top + 10, width, fonts,
+                     bottom=PAGE[1] - footer_h - 70) + 10
     top = _rows(draw, layout.get("footer", []), top, width, data, fonts, height=76)
 
     # 내용 바로 아래에 답니다. 페이지 맨 밑에 두면 빈 자리를 잘라낼 수 없습니다.

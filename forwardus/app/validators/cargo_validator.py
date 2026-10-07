@@ -6,6 +6,7 @@ import math
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
+from app.processors.korean import josa
 from app.validators import ValidationError
 
 # Upper bounds that reject clearly abnormal input.
@@ -155,7 +156,7 @@ def parse_number(
     if not math.isfinite(number):
         raise ValidationError(f"{field_name}에는 유한한 숫자만 입력할 수 있습니다.", field)
     if number < 0 or (number == 0 and not allow_zero):
-        raise ValidationError(f"{field_name}은(는) 0보다 커야 합니다.", field)
+        raise ValidationError(f"{josa(field_name, '은')} 0보다 커야 합니다.", field)
     if max_value is not None and number > max_value:
         raise ValidationError(f"{field_name} 값이 허용 범위({max_value:,.0f})를 초과했습니다.", field)
     return number
@@ -176,6 +177,40 @@ def parse_optional_number(value: Any, field_name: str, *, max_value: float | Non
     if value is None or (isinstance(value, str) and not value.strip()):
         return None
     return parse_number(value, field_name, max_value=max_value, field=field)
+
+
+# 포장등급(PG)이 **필요한** 급 / **없는** 급 — UN Model Regulations 기준. 4.1·5.1·9 는 물질마다 달라 여기서는
+# 판단하지 않습니다. 이 검사는 막는 오류가 아니라 **경고**입니다(전수 점검 2회차 — UN1263(페인트)에 급 8·PG I,
+# UN3480 에 PG II, UN9999 가 모두 경고 없이 선적의뢰서 위험물 칸으로 나갔습니다).
+_PG_REQUIRED = {"3", "4.2", "4.3", "5.1", "6.1", "8"}
+_PG_NONE = {"1", "2.1", "2.2", "2.3", "5.2", "6.2", "7"}
+# 자주 나오는 UN 번호 → 급. 다른 급을 고르면 경고합니다(번호가 틀렸거나 급이 틀렸습니다).
+_UN_CLASS = {
+    "1263": "3", "1266": "3", "1993": "3", "1219": "3", "1170": "3", "1987": "3", "1950": "2.1",
+    "1005": "2.3", "1017": "2.3", "1072": "2.2", "1013": "2.2", "1046": "2.2", "1956": "2.2", "1002": "2.2",
+    "3480": "9", "3481": "9", "3090": "9", "3091": "9", "3171": "9", "3077": "9", "3082": "9",
+    "1789": "8", "1830": "8", "1824": "8", "1760": "8", "2794": "8",
+    "1203": "3", "1202": "3", "1090": "3", "1114": "3", "1307": "3",
+}
+
+
+def dg_consistency(un_digits: str, dg_class: str, packing_group: str) -> list[str]:
+    """UN 번호 · 급 · 포장등급이 서로 맞는지. 모르는 것은 말하지 않습니다(없는 것을 있다고 하지 않습니다)."""
+
+    notes = []
+    number = int(un_digits)
+    if not 4 <= number <= 3550:
+        notes.append(f"{josa('UN' + un_digits, '은')} 있는 번호 범위(UN0004~UN3550)를 벗어납니다. 번호를 다시 확인하세요.")
+    known = _UN_CLASS.get(un_digits)
+    if known and known != dg_class:
+        notes.append(f"{josa('UN' + un_digits, '은')} 보통 {known}급입니다. 고르신 {dg_class}급과 다릅니다 — MSDS 14번 항목을 확인하세요.")
+    if dg_class in _PG_REQUIRED and not packing_group:
+        notes.append(f"{dg_class}급은 포장등급(I·II·III)이 있어야 합니다. MSDS 14번 항목에서 확인해 적어 주세요.")
+    if dg_class in _PG_NONE and packing_group:
+        notes.append(f"{dg_class}급에는 보통 포장등급이 없습니다. 적으신 {packing_group}가 맞는지 확인하세요.")
+    if un_digits in ("3480", "3481", "3090", "3091") and packing_group:
+        notes.append("리튬 배터리(UN3480·3481·3090·3091)에는 포장등급이 없습니다.")
+    return notes
 
 
 def validate_dangerous_goods(payload: dict, *, strict: bool = True) -> dict:
@@ -224,8 +259,10 @@ def validate_dangerous_goods(payload: dict, *, strict: bool = True) -> dict:
         return problem("정식운송품명(Proper Shipping Name)을 적어주세요. MSDS 14번 항목에 있습니다.",
                        "proper_shipping_name")
 
+    # 막지는 않고 알립니다 — 번호·급·포장등급이 서로 안 맞으면 선적의뢰서의 위험물 칸이 그대로 틀립니다.
     return {"is_dangerous": True, "un_number": f"UN{digits}", "dg_class": dg_class,
-            "packing_group": packing_group, "proper_shipping_name": psn, "dg_warning": ""}
+            "packing_group": packing_group, "proper_shipping_name": psn,
+            "dg_warning": " ".join(dg_consistency(digits, dg_class, packing_group))}
 
 
 def validate_cargo_handling(payload: dict) -> dict:

@@ -73,6 +73,7 @@
     "quantity", "length_cm", "width_cm", "height_cm", "weight_per_package_kg", "net_weight_kg",
     "currency", "invoice_value", "exporter_name", "exporter_address", "notify_party",
     "buyer_name", "buyer_country", "buyer_address", "buyer_email",
+    "amount",            // 품목 1 금액 — 빠져 있어 복원하면 금액 칸이 비고 '품목 금액 합계' 표시가 풀렸습니다
   ];
 
   function saveDraft() {
@@ -155,7 +156,9 @@
 
   function goToStep(step) {
     state.step = step;
-    form.querySelectorAll("[data-step]").forEach((section) => {
+    // `[data-step]` 만 쓰면 숫자 입력칸의 data-step="1"(증감 단위)까지 걸려 입력칸 8개가 hidden 이 되고, base.js 의
+    // 안전장치가 되돌리며 "확장 프로그램을 끄세요" 경고를 냈습니다(사용성 점검 2회차). 단계 섹션만 고릅니다.
+    form.querySelectorAll("section[data-step]").forEach((section) => {
       section.hidden = Number(section.dataset.step) !== step;
     });
     document.querySelectorAll("[data-step-tab]").forEach((tab) => {
@@ -1257,6 +1260,26 @@
     return extraCargoEntries().map(({ item }) => item);
   }
 
+  // 추가 품목을 **일부만** 채우면 그 품목이 계산·요약·생성에서 말없이 빠졌습니다(5칸이 모두 찬 품목만 남김).
+  // CBM·운임·컨테이너가 실제보다 작게 나왔습니다(사용성 점검 2회차). 어느 품목의 어느 칸이 비었는지 알려
+  // 주고 다음 단계로 넘어가지 못하게 합니다. 완전히 빈 행은 무시합니다.
+  const LINE_LABELS = { quantity: "수량", length_cm: "가로", width_cm: "세로", height_cm: "높이",
+                        weight_per_package_kg: "한 포장 무게" };
+  function incompleteCargoLines() {
+    const bad = [];
+    cargoLinesBox.querySelectorAll(".cargo_item").forEach((row, index) => {
+      const item = {};
+      row.querySelectorAll("[data-line]").forEach((input) => {
+        item[input.dataset.line] = input.dataset.number === undefined
+          ? input.value.trim() : plainNumber(input.value);
+      });
+      const any = ["product_description", ...LINE_FIELDS].some((key) => item[key] !== undefined && item[key] !== "");
+      const missing = LINE_FIELDS.filter((key) => item[key] === "").map((key) => LINE_LABELS[key]);
+      if (any && missing.length) bad.push({ line: index + 2, missing });
+    });
+    return bad;
+  }
+
   document.querySelector("[data-add-cargo]")?.addEventListener("click", () => addCargoLine());
   cargoLinesBox?.addEventListener("click", (event) => {
     if (!event.target.closest("[data-remove-cargo]")) return;
@@ -1709,6 +1732,12 @@
     if (step === 3) {
       if (!f.product_description.value.trim()) return "품명을 입력해주세요.";
       if (!state.metrics) return "화물 치수·수량·중량을 올바르게 입력해주세요.";
+      const half = incompleteCargoLines();
+      if (half.length) {
+        const first = half[0];
+        return `품목 ${first.line}의 ${first.missing.join("·")} 칸을 채워 주세요. 모든 칸이 차야 계산에 들어갑니다`
+          + `${half.length > 1 ? ` (그 밖에 ${half.length - 1}개 품목도 덜 찼습니다)` : ""}.`;
+      }
       if (!plainNumber(f.invoice_value.value)) return "Invoice Value를 입력해주세요.";
     }
     if (step === 4 && !state.schedule_id) return "스케줄을 선택해주세요.";

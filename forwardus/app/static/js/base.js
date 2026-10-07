@@ -261,7 +261,15 @@
       overrideQuery = "";
       search();
     });
-    input.addEventListener("blur", () => { if (!options.keepOpen) setTimeout(() => { list.hidden = true; }, 150); });
+    // 초점이 목록 안(키보드로 후보에 간 경우)에 있으면 닫지 않습니다. 입력칸이 blur 되자마자 닫으면
+    // ↓·Tab 으로 후보에 가도 목록이 사라졌습니다(사용성 점검 2회차).
+    const closeUnlessFocused = () => setTimeout(() => {
+      if (!options.keepOpen && !list.contains(document.activeElement) && document.activeElement !== input) {
+        list.hidden = true;
+      }
+    }, 150);
+    input.addEventListener("blur", closeUnlessFocused);
+    list.addEventListener("focusout", closeUnlessFocused);
     list.addEventListener("mousedown", (event) => {
       // 후보 안의 ⓘ(근거 보기)를 눌렀을 때는 그 후보를 고르지 않습니다.
       if (event.target.closest(".info_tip")) return;
@@ -269,6 +277,42 @@
       if (!li) return;
       onSelect(items[Number(li.dataset.index)], input);
       list.hidden = true;
+    });
+    // 입력칸에서의 키보드 — 전에는 ↓ 로 목록에 못 들어가고, Enter 는 항구를 고르는 대신 폼을 제출해
+    // "캘린더에서 출발 희망일을 선택해주세요" 같은 엉뚱한 오류가 떴습니다(사용성 점검 2회차).
+    //   ↓ ↑   후보 사이 이동(첫 줄·마지막 줄에서 입력칸으로 돌아옵니다)
+    //   Enter  목록이 열려 있으면 폼 제출을 막고, 후보가 **하나뿐이면** 그것을 고릅니다
+    //   Esc    목록 닫기
+    const options_ = () => Array.from(list.querySelectorAll("li[data-index]"));
+    input.addEventListener("keydown", (event) => {
+      if (list.hidden) return;
+      const rows = options_();
+      if (event.key === "ArrowDown" && rows.length) {
+        event.preventDefault();
+        rows[0].focus();
+      } else if (event.key === "Enter") {
+        event.preventDefault();                       // 폼 제출 막기
+        if (rows.length === 1) {
+          onSelect(items[Number(rows[0].dataset.index)], input);
+          list.hidden = true;
+        }
+      } else if (event.key === "Escape") {
+        list.hidden = true;
+      }
+    });
+    list.addEventListener("keydown", (event) => {
+      if (!["ArrowDown", "ArrowUp", "Escape"].includes(event.key)) return;
+      const rows = options_();
+      const at = rows.indexOf(event.target.closest("li[data-index]"));
+      if (event.key === "Escape") {
+        list.hidden = true;
+        input.focus();
+        return;
+      }
+      if (at < 0) return;
+      event.preventDefault();
+      const next = rows[at + (event.key === "ArrowDown" ? 1 : -1)];
+      (next || input).focus();
     });
     // 키보드로도 고릅니다. Tab으로 후보에 가서 Enter·스페이스.
     list.addEventListener("keydown", (event) => {

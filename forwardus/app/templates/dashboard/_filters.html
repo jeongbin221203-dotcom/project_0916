@@ -8,6 +8,10 @@
   {% endif %}
   <select class="text_input" name="status" aria-label="상태">
     <option value="">모든 상태</option>
+    {# 상태 묶음 — KPI 카드를 누르면 이 값으로 들어옵니다 #}
+    {% for key, label in status_groups.items() %}
+      <option value="{{ key }}" {{ 'selected' if filters.status == key }}>▸ {{ label }}</option>
+    {% endfor %}
     {% for key, label in statuses.items() %}
       <option value="{{ key }}" {{ 'selected' if filters.status == key }}>{{ label }}</option>
     {% endfor %}

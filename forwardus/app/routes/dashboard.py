@@ -52,7 +52,10 @@ def index():
     owners = dashboard_service.owner_emails() if viewer.is_admin else None
     shipments = dashboard_service.search(viewer, owners=owners, **filters)
     common = {"viewer": viewer, "shipments": shipments, "filters": filters,
-              "statuses": STATUS_LABELS, **analytics_service.build_dashboard(viewer)}
+              "statuses": STATUS_LABELS,
+              "status_groups": {f"group:{key}": f"{group['label']} ({group['note']})"
+                                for key, group in dashboard_service.STATUS_GROUPS.items()},
+              **analytics_service.build_dashboard(viewer)}
     if viewer.is_admin:
         # 표만 쪽으로 나눕니다. 위의 통계 칸과 CSV는 거른 목록 전체를 그대로 씁니다.
         page = dashboard_service.paginate(
@@ -96,8 +99,11 @@ def admin_export():
     owners = dashboard_service.owner_emails()
     shipments = dashboard_service.search(viewer, owners=owners, **_filters())
     data = dashboard_service.export_csv(viewer, shipments, owners)
-    return Response(data, mimetype="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": "attachment; filename=forwardus_shipments.csv"})
+    # mimetype 에 charset 을 또 적으면 Flask 가 한 번 더 붙여 "charset=utf-8; charset=utf-8" 이 됩니다.
+    # 전체 사용자의 건·작성자 이메일이 든 파일이라 캐시에 남지 않게 합니다(관리자 점검 2회차).
+    return Response(data, content_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename=forwardus_shipments.csv",
+                             "Cache-Control": "no-store"})
 
 
 # --- API --------------------------------------------------------------------------

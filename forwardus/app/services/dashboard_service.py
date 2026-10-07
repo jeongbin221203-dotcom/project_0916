@@ -13,7 +13,7 @@ from __future__ import annotations
 import csv
 import io
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.models.shipment import SHIPMENT_STATUSES, STATUS_LABELS
 from app.services import ServiceError, shipment_service
@@ -72,10 +72,18 @@ def search(viewer, *, status: str | None = None, q: str = "", owner: str = "",
            owners: dict | None = None) -> list:
     """보는 사람이 볼 수 있는 Shipment 안에서만 거릅니다. 로그인 전이면 비어 있습니다."""
 
-    if status not in SHIPMENT_STATUSES:
+    # "group:moving" 처럼 상태 묶음도 받습니다 — KPI 카드의 숫자(운송 중 71 = 출항 31 + 운송 중 40)와 눌렀을
+    # 때 나오는 목록이 같아야 합니다. 전에는 카드가 첫 상태(31줄)만 걸러 숫자를 믿을 수 없었습니다.
+    group = None
+    if isinstance(status, str) and status.startswith("group:") and status[6:] in STATUS_GROUPS:
+        group = STATUS_GROUPS[status[6:]]["statuses"]
+        status = None
+    elif status not in SHIPMENT_STATUSES:
         status = None
     # 범위는 여기서 정해집니다. 일반 회원은 user_id로 거른 쿼리만 탑니다.
     shipments = shipment_service.list_shipments(status, viewer=viewer)
+    if group:
+        shipments = [shipment for shipment in shipments if shipment.status in group]
     needle = (q or "").strip().lower()[:MAX_QUERY]
     owner = (owner or "").strip().lower()[:MAX_QUERY]
     if not needle and not owner:
@@ -152,9 +160,17 @@ def status_cards(shipments) -> list[dict]:
 
 # --- 마스터 ---------------------------------------------------------------------------
 
-def _this_month(value) -> bool:
-    now = datetime.utcnow()
-    return bool(value) and value.year == now.year and value.month == now.month
+def _month_start_utc() -> datetime:
+    """이번 달 1일 00:00(한국 시각)을 UTC 로. 저장된 created_at 은 UTC 라서 이것과 견줍니다.
+
+    전에는 datetime.utcnow() 의 달이라 달이 바뀌는 시각에 9시간 어긋났습니다(관리자 점검 2회차).
+    """
+
+    from app.timeutil import now_kst
+
+    now = now_kst()
+    start_kst = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return (start_kst - timedelta(hours=9)).replace(tzinfo=None)
 
 
 def platform_stats(viewer) -> dict:
@@ -163,15 +179,20 @@ def platform_stats(viewer) -> dict:
     require_admin(viewer)
     from app.models import TradeDocument, User
 
+    from app.models import Shipment
+
     shipments = shipment_service.list_shipments(viewer=viewer)
-    documents = TradeDocument.query.all()
+    start = _month_start_utc()
     return {
         "active": sum(1 for s in shipments if s.status in ACTIVE_STATUSES),
         "total": len(shipments),
         "cards": status_cards(shipments),
-        "users": User.query.count(),
-        "month_quotes": sum(1 for s in shipments if _this_month(s.created_at)),
-        "month_documents": sum(1 for d in documents if _this_month(d.created_at)),
+        # 가입 계정 중 **일반 회원**만(마스터 계정은 사용자가 아닙니다)
+        "users": User.query.filter_by(is_master=False).count(),
+        # 서류 전부(JSON data 까지)를 올려 세던 것을 COUNT 로
+        "month_quotes": Shipment.query.filter(Shipment.created_at >= start,
+                                              Shipment.status != "cancelled").count(),
+        "month_documents": TradeDocument.query.filter(TradeDocument.created_at >= start).count(),
     }
 
 
@@ -211,8 +232,8 @@ def export_csv(viewer, shipments, owners: dict) -> bytes:
 
 def _cell(value) -> str:
     text = "" if value is None else str(value)
-    # 엑셀이 수식으로 읽지 않게 합니다. (=, +, -, @로 시작하는 값)
-    return "'" + text if text[:1] in ("=", "+", "-", "@") else text
+    # 엑셀이 수식으로 읽지 않게 합니다. (=, +, -, @ 로 시작하는 값, 그리고 탭·줄바꿈으로 시작하는 값)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r", "\n") else text
 
 
 # --- 개인 ---------------------------------------------------------------------------

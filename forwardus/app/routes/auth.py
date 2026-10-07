@@ -119,6 +119,9 @@ def signup():
 
     form = {"email": "", "name": ""}
     error = ""
+    if request.method == "POST" and security.signup_blocked(current_app):
+        flash("가입 요청이 너무 많습니다. 잠시 뒤에 다시 해 주세요.", "error")
+        return render_template("auth/signup.html", form=form, error=""), 429
     if request.method == "POST":
         form["email"] = request.form.get("email", "").strip().lower()
         form["name"] = request.form.get("name", "").strip()

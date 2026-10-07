@@ -9,6 +9,7 @@ from app.models.tracking_event import EVENT_LABELS, TRACKING_EVENTS
 from app.processors.schedule_calculator import check_buyer_deadline
 from app.repositories import shipment_repository, tracking_repository
 from app.services import ServiceError
+from app.timeutil import today_kst
 from app.validators import ValidationError
 from app.validators.shipment_validator import optional_text, parse_date
 
@@ -51,6 +52,10 @@ def build_timeline(shipment) -> dict:
         "deadline": check_buyer_deadline(shipment.eta, shipment.buyer_required_date, shipment.transport_mode)
         if shipment.eta else None,
     }
+
+
+# 출항(ETD) 뒤 도착(ETA)까지의 상한. 가장 긴 해상 노선도 이보다 짧습니다.
+MAX_TRANSIT_DAYS = 120
 
 
 def _apply_status(shipment, event_code: str) -> None:
@@ -126,6 +131,11 @@ def add_manual_event(shipment, form: dict) -> None:
     if code not in TRACKING_EVENTS:
         raise ValidationError("이벤트 유형을 선택해주세요.", "event_code")
     event_date = parse_date(form.get("event_date"), "이벤트 일자", field="event_date")
+    # 일어난 일을 적는 곳입니다 — 2030-01-01 의 "Booking Confirmed" 가 그대로 기록돼 타임라인에 찍혔습니다
+    # (사용성 점검 2회차). 오늘(한국 시각)까지만 받습니다.
+    if event_date > today_kst():
+        raise ValidationError(f"이벤트 일자({event_date})가 오늘보다 뒤입니다. 이미 일어난 일만 기록할 수 있습니다.",
+                              "event_date")
     tracking_repository.add_event(
         shipment,
         event_code=code,
@@ -143,6 +153,11 @@ def update_eta_manually(shipment, form: dict) -> dict | None:
     new_eta = parse_date(form.get("new_eta"), "새 ETA", field="new_eta")
     if shipment.etd and new_eta < shipment.etd:
         raise ValidationError("ETA는 ETD보다 빠를 수 없습니다.", "new_eta")
+    # 해상·항공 운송이 출항 뒤 이만큼 넘게 걸리는 일은 없습니다. 연도를 잘못 쓴 것(2027-12-31)이 그대로 기록돼
+    # "Delay Alert 414일 초과"가 떴습니다(사용성 점검 2회차).
+    if shipment.etd and (new_eta - shipment.etd).days > MAX_TRANSIT_DAYS:
+        raise ValidationError(f"ETA({new_eta})가 출항일({shipment.etd})보다 {MAX_TRANSIT_DAYS}일이 넘게 뒤입니다. "
+                              "연도·날짜를 다시 확인해 주세요.", "new_eta")
     change = monitor_eta(shipment, new_eta, "manual")
     shipment_repository.commit()
     return change

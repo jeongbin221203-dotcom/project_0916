@@ -1378,7 +1378,7 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
         )
         for index, (item, line) in enumerate(zip(items, metrics["lines"]), start=1)
     ]
-    shipment_repository.add(shipment)
+    shipment_repository.add_unique(shipment, today_kst().year)
     shipment_repository.replace_costs(shipment, costs["lines"])
     shipment_repository.commit()
     return shipment
