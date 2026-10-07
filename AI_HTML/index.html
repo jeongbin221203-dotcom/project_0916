@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 종류 소개</title>
+  <meta name="description" content="텍스트, 이미지, 음성, 영상, 코드 등 AI의 종류를 한눈에 살펴보는 소개 사이트">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" href="#top">AI<span>Guide</span></a>
+    <nav class="nav" aria-label="주요 메뉴">
+      <a href="#types">AI 종류</a>
+      <a href="#compare">한눈에 비교</a>
+      <a href="#how">작동 원리</a>
+      <a href="#tips">활용 팁</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="다크 모드 전환">◐</button>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="eyebrow">AI Types Overview</p>
+      <h1>AI에도 <em>종류</em>가 있습니다</h1>
+      <p class="lead">글을 쓰는 AI, 그림을 그리는 AI, 목소리를 만드는 AI까지.<br>어떤 AI가 어떤 일을 하는지 한 곳에서 살펴보세요.</p>
+      <a class="btn" href="#types">종류 보러가기</a>
+    </section>
+
+    <section class="section" id="types">
+      <h2>AI 종류 살펴보기</h2>
+      <p class="section-desc">카테고리를 눌러 원하는 분야만 모아볼 수 있습니다.</p>
+
+      <div class="filters" role="group" aria-label="카테고리 필터">
+        <button class="chip active" data-filter="all">전체</button>
+        <button class="chip" data-filter="image">이미지 생성</button>
+        <button class="chip" data-filter="music">음악 생성</button>
+        <button class="chip" data-filter="auto">자동화</button>
+        <button class="chip" data-filter="voice">음성 합성</button>
+        <button class="chip" data-filter="viz">시각화</button>
+        <button class="chip" data-filter="etc">기타</button>
+      </div>
+
+      <div class="grid" id="cardGrid" data-filter="all">
+
+        <a class="card mini" data-cat="image" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer">
+          <h3>ChatGPT 이미지<span class="arrow">↗</span></h3>
+          <p>대화로 만들고 고치는 이미지 생성</p>
+          <span class="catname">이미지 생성</span><span class="tag">범용</span><span class="price free">무료 한도</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>채팅하듯 설명하면 이미지를 만들고 수정까지 이어서 할 수 있습니다.</p><ul><li>대화형 편집</li><li>글자 포함 이미지</li></ul><p class="price-line">💰 무료: 24시간당 2~3장 정도(계정마다 다름) · 유료 플랜은 한도 확대</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="image" href="https://gemini.google.com" target="_blank" rel="noopener noreferrer">
+          <h3>Gemini<span class="arrow">↗</span></h3>
+          <p>구글 계정으로 바로 쓰는 이미지 생성</p>
+          <span class="catname">이미지 생성</span><span class="tag">범용</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>Gemini 앱에서 이미지 생성과 기본 편집(배경 제거 등)을 무료로 쓸 수 있습니다.</p><ul><li>Imagen 기반 생성</li><li>배경 제거, 스티커</li></ul><p class="price-line">💰 무료: Gemini 앱 이용자 누구나 · 지역·시기별 제공 범위 상이</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="image" href="https://designer.microsoft.com" target="_blank" rel="noopener noreferrer">
+          <h3>Microsoft Designer<span class="arrow">↗</span></h3>
+          <p>Image Creator, 하루 15회 무료</p>
+          <span class="catname">이미지 생성</span><span class="tag">범용</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>예전 Bing Image Creator로, 마이크로소프트 계정으로 무료 이미지를 만듭니다.</p><ul><li>하루 15회 무료 생성</li><li>디자인 편집 연동</li></ul><p class="price-line">💰 무료: 하루 15회 생성</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="image" href="https://midjourney.com" target="_blank" rel="noopener noreferrer">
+          <h3>Midjourney<span class="arrow">↗</span></h3>
+          <p>예술적 결과물로 유명한 이미지 AI</p>
+          <span class="catname">이미지 생성</span><span class="tag">아트·퀄리티</span><span class="price paid">유료만</span><span class="req card">카드 필요</span>
+          <div class="detail" role="tooltip"><p>감각적인 이미지 품질로 널리 쓰이는 서비스입니다.</p><ul><li>스타일이 강한 결과물</li><li>유료 구독 필요</li></ul><p class="price-line">💰 무료 이용 불가 · 유료: 월 $10부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="image" href="https://firefly.adobe.com" target="_blank" rel="noopener noreferrer">
+          <h3>Adobe Firefly<span class="arrow">↗</span></h3>
+          <p>어도비 도구와 연동되는 이미지 AI</p>
+          <span class="catname">이미지 생성</span><span class="tag">디자인</span><span class="price free">무료 체험</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>포토샵 등 어도비 도구와 함께 쓰기 좋습니다.</p><ul><li>어도비 앱 연동</li><li>편집·확장 기능</li></ul><p class="price-line">💰 무료: 월 25 크레딧 · 유료: 월 $9.99부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="image" href="https://leonardo.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Leonardo.ai<span class="arrow">↗</span></h3>
+          <p>무료 일일 토큰, 캔버스 편집</p>
+          <span class="catname">이미지 생성</span><span class="tag">디자인</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>다양한 모델과 캔버스 편집(인페인팅·아웃페인팅)을 지원합니다.</p><ul><li>매일 토큰 지급</li><li>캔버스 편집</li></ul><p class="price-line">💰 무료: 하루 150 토큰(약 30~75장) · 유료: 월 $12부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="image" href="https://ideogram.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Ideogram<span class="arrow">↗</span></h3>
+          <p>이미지 속 글자 표현에 강점</p>
+          <span class="catname">이미지 생성</span><span class="tag">텍스트 이미지</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>포스터·로고처럼 글자가 들어가는 이미지에서 정확도가 높다고 평가됩니다.</p><ul><li>글자 표현 정확도</li><li>포스터·로고 시안</li></ul><p class="price-line">💰 무료: 한도 있음(자료마다 수치 상이) · 유료: 월 $7부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="image" href="https://stability.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Stable Diffusion<span class="arrow">↗</span></h3>
+          <p>오픈소스, 직접 설치해 사용</p>
+          <span class="catname">이미지 생성</span><span class="tag">오픈소스</span><span class="price free">무료 (오픈소스)</span><span class="req unknown">설치 필요</span>
+          <div class="detail" role="tooltip"><p>오픈소스 모델로 내 컴퓨터에서 돌릴 수 있고 자유도가 높습니다.</p><ul><li>로컬 설치 가능</li><li>커스터마이징</li></ul><p class="price-line">💰 모델 자체는 무료 · 컴퓨터 사양과 설치 지식 필요</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="music" href="https://suno.com" target="_blank" rel="noopener noreferrer">
+          <h3>Suno<span class="arrow">↗</span></h3>
+          <p>가사까지 포함한 노래 생성</p>
+          <span class="catname">음악 생성</span><span class="tag">노래</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>장르와 가사를 입력하면 보컬이 있는 노래를 만들어 줍니다.</p><ul><li>하루 무료 크레딧</li><li>보컬 포함 곡 생성</li></ul><p class="price-line">💰 무료: 하루 50 크레딧, 비상업 · 유료 Pro: 월 $10(상업 이용)</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="music" href="https://udio.com" target="_blank" rel="noopener noreferrer">
+          <h3>Udio<span class="arrow">↗</span></h3>
+          <p>고품질 노래 생성</p>
+          <span class="catname">음악 생성</span><span class="tag">노래</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>다양한 장르의 음악을 만들 수 있습니다.</p><ul><li>하루/월 크레딧 제한</li><li>장르 다양</li></ul><p class="price-line">💰 무료: 하루 10 크레딧(월 100 한도), 개인용만 · 유료 Pro: 월 $30</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="music" href="https://stableaudio.com" target="_blank" rel="noopener noreferrer">
+          <h3>Stable Audio<span class="arrow">↗</span></h3>
+          <p>짧은 트랙·효과음 생성</p>
+          <span class="catname">음악 생성</span><span class="tag">배경음악</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>Stability AI의 음악·효과음 생성 서비스입니다.</p><ul><li>월 20곡</li><li>트랙 길이 45초 제한</li></ul><p class="price-line">💰 무료: 월 20곡, 곡당 45초</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="music" href="https://aiva.ai" target="_blank" rel="noopener noreferrer">
+          <h3>AIVA<span class="arrow">↗</span></h3>
+          <p>작곡 중심 AI 작곡가</p>
+          <span class="catname">음악 생성</span><span class="tag">작곡</span><span class="price free">무료 체험</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>클래식·영화음악풍 작곡에 많이 쓰이는 AI입니다.</p><ul><li>작곡 도구</li><li>편집 가능</li></ul><p class="price-line">💰 무료: 월 3곡, 비상업</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="music" href="https://soundraw.io" target="_blank" rel="noopener noreferrer">
+          <h3>Soundraw<span class="arrow">↗</span></h3>
+          <p>영상용 배경음악 생성</p>
+          <span class="catname">음악 생성</span><span class="tag">배경음악</span><span class="price unknown">요금 확인 필요</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>영상에 맞는 배경음악을 길이·분위기별로 생성합니다.</p><ul><li>길이 조절</li><li>분위기 선택</li></ul><p class="price-line">💰 요금 정보를 확인하지 못했습니다. 공식 사이트 참고</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="music" href="https://mubert.com" target="_blank" rel="noopener noreferrer">
+          <h3>Mubert<span class="arrow">↗</span></h3>
+          <p>끊김 없는 앰비언트 음악</p>
+          <span class="catname">음악 생성</span><span class="tag">배경음악</span><span class="price unknown">요금 확인 필요</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>스트리밍과 앰비언트 음악에 강점이 있습니다.</p><ul><li>연속 재생 음악</li><li>스트리밍용</li></ul><p class="price-line">💰 유료: 월 $2.99부터 · 무료 여부는 확인하지 못함</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="music" href="https://elevenlabs.io/music" target="_blank" rel="noopener noreferrer">
+          <h3>ElevenLabs Music<span class="arrow">↗</span></h3>
+          <p>저작권 정리된 AI 음악</p>
+          <span class="catname">음악 생성</span><span class="tag">노래</span><span class="price paid">크레딧제</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>크레딧 방식으로 음악을 생성하며 저작권이 정리됐다고 소개됩니다.</p><ul><li>크레딧 과금</li><li>상업 이용 고려</li></ul><p class="price-line">💰 분당 약 $0.80 · 무료 한도는 확인하지 못함</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="auto" href="https://zapier.com" target="_blank" rel="noopener noreferrer">
+          <h3>Zapier<span class="arrow">↗</span></h3>
+          <p>앱 간 자동화의 대표 주자</p>
+          <span class="catname">자동화</span><span class="tag">노코드</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>6,000개 이상의 앱을 연결해 반복 업무를 자동화합니다.</p><ul><li>클릭 위주 설정</li><li>앱 연동 풍부</li></ul><p class="price-line">💰 무료: 월 100 작업 · 유료로 확장</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="auto" href="https://make.com" target="_blank" rel="noopener noreferrer">
+          <h3>Make<span class="arrow">↗</span></h3>
+          <p>무료 한도가 넉넉한 자동화</p>
+          <span class="catname">자동화</span><span class="tag">노코드</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>시각적인 시나리오 편집기로 복잡한 흐름도 만들 수 있습니다.</p><ul><li>시각적 편집</li><li>무료 월 1,000 오퍼레이션</li></ul><p class="price-line">💰 무료: 월 1,000 작업, 시나리오 2개, 15분 간격</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="auto" href="https://n8n.io" target="_blank" rel="noopener noreferrer">
+          <h3>n8n<span class="arrow">↗</span></h3>
+          <p>오픈소스, 직접 호스팅 가능</p>
+          <span class="catname">자동화</span><span class="tag">오픈소스</span><span class="price free">무료 (셀프호스팅)</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>직접 서버에 설치하면 실행 횟수 제한 없이 쓸 수 있습니다.</p><ul><li>셀프호스팅 무제한</li><li>개발자 친화</li></ul><p class="price-line">💰 무료: 직접 설치 시 실행 제한 없음 · 클라우드는 한도 있음</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="auto" href="https://ifttt.com" target="_blank" rel="noopener noreferrer">
+          <h3>IFTTT<span class="arrow">↗</span></h3>
+          <p>간단한 개인용 자동화</p>
+          <span class="catname">자동화</span><span class="tag">간편</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>스마트 기기·앱을 단순한 조건으로 연결합니다.</p><ul><li>단일 단계 애플릿</li><li>개인용에 적합</li></ul><p class="price-line">💰 무료: 애플릿 소수 제한(자료마다 2~5개로 상이)</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="auto" href="https://powerautomate.microsoft.com" target="_blank" rel="noopener noreferrer">
+          <h3>Power Automate<span class="arrow">↗</span></h3>
+          <p>마이크로소프트 업무 자동화</p>
+          <span class="catname">자동화</span><span class="tag">MS 연동</span><span class="price free">M365 포함</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>오피스·팀즈 등 마이크로소프트 서비스와 잘 연동됩니다.</p><ul><li>M365 연동</li><li>프리미엄 커넥터는 유료</li></ul><p class="price-line">💰 M365에 기본 포함(표준 커넥터) · 프리미엄: 사용자당 월 $15</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="voice" href="https://elevenlabs.io" target="_blank" rel="noopener noreferrer">
+          <h3>ElevenLabs<span class="arrow">↗</span></h3>
+          <p>사실감·감정 표현 최고 수준, 클로닝</p>
+          <span class="catname">음성 합성</span><span class="tag">범용</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>사실감과 감정 표현의 기준점으로 자주 꼽힙니다. 영어 오디오북·내레이션에 강합니다.</p><ul><li>보이스 클로닝, 다국어</li><li>오디오 태그로 감정 제어</li></ul><p class="price-line">💰 무료: 월 1만 자, 이메일·구글 가입 · 유료: 월 $5부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="voice" href="https://azure.microsoft.com/products/ai-services/ai-speech" target="_blank" rel="noopener noreferrer">
+          <h3>Azure AI Speech<span class="arrow">↗</span></h3>
+          <p>다국어, 기업 환경 연동</p>
+          <span class="catname">음성 합성</span><span class="tag">API</span><span class="price free">무료 한도</span><span class="req card">카드 필요</span>
+          <div class="detail" role="tooltip"><p>다국어와 기업 환경 연동에 강한 음성 서비스입니다.</p><ul><li>다국어, 기업용</li><li>서비스 탑재용</li></ul><p class="price-line">💰 무료(F0): 월 50만 자 · 본인 확인용 카드 등록 필요, 한도 내 과금 없음</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="voice" href="https://murf.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Murf AI<span class="arrow">↗</span></h3>
+          <p>비즈니스·영상 내레이션</p>
+          <span class="catname">음성 합성</span><span class="tag">범용</span><span class="price trial">무료 체험</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>비즈니스·영상 내레이션용으로 많이 쓰입니다.</p><ul><li>스튜디오형 편집</li><li>다국어 보이스</li></ul><p class="price-line">💰 무료 체험: 음성 10분 · 유료: 월 $29부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="voice" href="https://vrew.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Vrew<span class="arrow">↗</span></h3>
+          <p>한국어 영상 내레이션·자막</p>
+          <span class="catname">음성 합성</span><span class="tag">한국어·영상</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>한국어 영상 내레이션과 자막 작업에 맞는 편집 도구입니다.</p><ul><li>영상 내레이션</li><li>자막 자동 생성</li></ul><p class="price-line">💰 무료: 월 200크레딧(음성 약 2만 자), 워터마크 · 카드 요구 여부는 확인 못함</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="voice" href="https://fish.audio" target="_blank" rel="noopener noreferrer">
+          <h3>Fish Audio<span class="arrow">↗</span></h3>
+          <p>클로닝 자연스러움, 80개+ 언어</p>
+          <span class="catname">음성 합성</span><span class="tag">범용</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>보이스 클로닝 자연스러움에서 벤치마크 1위라는 평가가 있습니다.</p><ul><li>감정 태그 지원</li><li>80개 이상 언어 교차 클로닝</li></ul><p class="price-line">💰 무료: 월 8,000 크레딧(약 7분) · 유료: 월 $11부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="voice" href="https://cartesia.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Cartesia<span class="arrow">↗</span></h3>
+          <p>낮은 지연 시간, 실시간 에이전트</p>
+          <span class="catname">음성 합성</span><span class="tag">API</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>지연 시간이 중요한 실시간 음성 에이전트 후보입니다.</p><ul><li>낮은 지연 시간</li><li>서비스 탑재용</li></ul><p class="price-line">💰 무료: 월 2만 크레딧, 개인용만 허용 · Pro: 월 $5</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="viz" href="https://napkin.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Napkin AI<span class="arrow">↗</span></h3>
+          <p>글을 도식·그래픽으로 변환</p>
+          <span class="catname">시각화</span><span class="tag">도식</span><span class="price trial">무료 체험</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>텍스트를 입력하면 도식과 인포그래픽으로 바꿔 줍니다.</p><ul><li>글→도식 변환</li><li>발표 자료에 적합</li></ul><p class="price-line">💰 무료 체험 14일 · 유료 Pro: 월 $12</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="viz" href="https://julius.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Julius AI<span class="arrow">↗</span></h3>
+          <p>데이터 분석·차트를 대화로</p>
+          <span class="catname">시각화</span><span class="tag">분석</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>엑셀·CSV를 올리고 질문하면 분석과 차트를 만들어 줍니다.</p><ul><li>대화형 분석</li><li>차트 자동 생성</li></ul><p class="price-line">💰 무료: 월 15 메시지 · Plus: 월 $20</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="viz" href="https://flourish.studio" target="_blank" rel="noopener noreferrer">
+          <h3>Flourish<span class="arrow">↗</span></h3>
+          <p>애니메이션·인터랙티브 차트</p>
+          <span class="catname">시각화</span><span class="tag">스토리텔링</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>움직이는 인터랙티브 차트로 데이터 이야기를 전달합니다.</p><ul><li>인터랙티브 차트</li><li>Canva 인수</li></ul><p class="price-line">💰 무료: 가능하나 데이터가 공개됨</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="viz" href="https://datawrapper.de" target="_blank" rel="noopener noreferrer">
+          <h3>Datawrapper<span class="arrow">↗</span></h3>
+          <p>언론사가 많이 쓰는 차트 도구</p>
+          <span class="catname">시각화</span><span class="tag">차트</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>깔끔한 차트와 지도를 빠르게 만들 수 있습니다.</p><ul><li>차트·지도</li><li>웹 삽입</li></ul><p class="price-line">💰 무료: 가능하나 데이터가 공개됨 · 비공개는 유료</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="viz" href="https://powerbi.microsoft.com" target="_blank" rel="noopener noreferrer">
+          <h3>Power BI<span class="arrow">↗</span></h3>
+          <p>대시보드·리포트 분석 도구</p>
+          <span class="catname">시각화</span><span class="tag">대시보드</span><span class="price free">무료 데스크톱</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>기업용 대시보드와 보고서를 만드는 도구입니다.</p><ul><li>대시보드</li><li>마이크로소프트 연동</li></ul><p class="price-line">💰 무료: 데스크톱 앱 · 유료: 월 $14</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="viz" href="https://graphy.app" target="_blank" rel="noopener noreferrer">
+          <h3>Graphy<span class="arrow">↗</span></h3>
+          <p>데이터에 이야기를 입히는 차트</p>
+          <span class="catname">시각화</span><span class="tag">차트</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>차트에 설명을 붙여 이해하기 쉬운 자료를 만듭니다.</p><ul><li>스토리 차트</li><li>AI 설명</li></ul><p class="price-line">💰 무료 플랜 있음 · 유료: 월 $16부터</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer">
+          <h3>ChatGPT<span class="arrow">↗</span></h3>
+          <p>가장 널리 쓰이는 대화형 AI</p>
+          <span class="catname">텍스트 생성</span><span class="tag">챗봇</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>질문 답변, 글쓰기, 요약, 번역 등 범용으로 쓰는 대화형 AI입니다.</p><ul><li>글쓰기·요약·번역</li><li>이미지·파일 활용</li></ul><p class="price-line">💰 무료: 하루 사용량 제한(고급 모델은 일일 제한) · 유료 플랜은 한도 확대</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://claude.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Claude<span class="arrow">↗</span></h3>
+          <p>긴 글·문서 작업에 강한 AI</p>
+          <span class="catname">텍스트 생성</span><span class="tag">챗봇</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>긴 문서 읽기와 글쓰기, 코드 작성에 강점이 있는 대화형 AI입니다.</p><ul><li>긴 문서 분석</li><li>글쓰기·코딩</li></ul><p class="price-line">💰 무료: 약 5시간마다 30개 메시지 안팎 · 유료 플랜은 한도 확대</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://perplexity.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Perplexity<span class="arrow">↗</span></h3>
+          <p>출처를 보여주는 검색형 AI</p>
+          <span class="catname">텍스트 생성</span><span class="tag">검색</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>웹을 검색해 출처와 함께 답을 정리해 주는 검색형 AI입니다.</p><ul><li>출처 표시</li><li>실시간 검색</li></ul><p class="price-line">💰 무료: 크레딧 방식, 무기한 · 고급 모델은 주간 한도에 빨리 도달</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://labs.google/flow" target="_blank" rel="noopener noreferrer">
+          <h3>Google Flow (Veo)<span class="arrow">↗</span></h3>
+          <p>구글의 AI 영상 제작 도구</p>
+          <span class="catname">영상 생성</span><span class="tag">영상</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>구글 Veo 모델로 소리가 포함된 영상 클립을 만드는 도구입니다.</p><ul><li>사운드 포함 영상</li><li>매일 무료 크레딧</li></ul><p class="price-line">💰 무료: 하루 50 크레딧(이월 안 됨), 영상 약 5개 분량</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://klingai.com" target="_blank" rel="noopener noreferrer">
+          <h3>Kling AI<span class="arrow">↗</span></h3>
+          <p>무료 일일 크레딧이 넉넉한 영상 AI</p>
+          <span class="catname">영상 생성</span><span class="tag">영상</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>텍스트나 이미지를 영상으로 바꾸는 서비스입니다.</p><ul><li>하루 무료 크레딧</li><li>최대 10초 클립</li></ul><p class="price-line">💰 무료: 하루 약 166 크레딧(표준 영상 약 6개)</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://runwayml.com" target="_blank" rel="noopener noreferrer">
+          <h3>Runway<span class="arrow">↗</span></h3>
+          <p>영상 편집·생성 전문 도구</p>
+          <span class="catname">영상 생성</span><span class="tag">영상</span><span class="price trial">무료 체험</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>영상 생성과 편집 기능을 함께 제공하는 서비스입니다.</p><ul><li>영상 생성·편집</li><li>크리에이터용</li></ul><p class="price-line">💰 무료: 가입 시 1회 125 크레딧(충전 없음)</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://pika.art" target="_blank" rel="noopener noreferrer">
+          <h3>Pika<span class="arrow">↗</span></h3>
+          <p>간단한 영상 효과·생성</p>
+          <span class="catname">영상 생성</span><span class="tag">영상</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>이미지·텍스트로 짧은 영상과 효과를 만드는 서비스입니다.</p><ul><li>짧은 영상 효과</li><li>쉬운 조작</li></ul><p class="price-line">💰 무료: 가입 시 150 크레딧 + 소량 일일 충전</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://lumalabs.ai/dream-machine" target="_blank" rel="noopener noreferrer">
+          <h3>Luma Dream Machine<span class="arrow">↗</span></h3>
+          <p>카드 없이 시작하는 영상 AI</p>
+          <span class="catname">영상 생성</span><span class="tag">영상</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>텍스트·이미지로 5초 안팎 영상을 만듭니다.</p><ul><li>월 약 30회 생성</li><li>720p, 5초 클립</li></ul><p class="price-line">💰 무료: 월 약 30회, 720p, 클립당 5초</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://hailuoai.video" target="_blank" rel="noopener noreferrer">
+          <h3>Hailuo AI<span class="arrow">↗</span></h3>
+          <p>짧은 영상 생성 체험</p>
+          <span class="catname">영상 생성</span><span class="tag">영상</span><span class="price trial">무료 체험</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>MiniMax의 영상 생성 서비스입니다.</p><ul><li>하루 3~5회</li><li>6초·720p</li></ul><p class="price-line">💰 무료: 하루 3~5회, 신규 체험 성격</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://github.com/features/copilot" target="_blank" rel="noopener noreferrer">
+          <h3>GitHub Copilot<span class="arrow">↗</span></h3>
+          <p>가장 쉽게 시작하는 코딩 AI</p>
+          <span class="catname">코드 생성</span><span class="tag">코드</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>여러 코드 편집기에서 자동 완성과 코드 질문을 지원합니다.</p><ul><li>폭넓은 IDE 지원</li><li>코드 자동 완성</li></ul><p class="price-line">💰 무료: 월 자동완성 2,000회 + 프리미엄 요청 50회</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://cursor.com" target="_blank" rel="noopener noreferrer">
+          <h3>Cursor<span class="arrow">↗</span></h3>
+          <p>AI 중심 코드 편집기</p>
+          <span class="catname">코드 생성</span><span class="tag">코드</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>AI와 대화하며 코드를 수정하는 편집기입니다.</p><ul><li>AI 중심 편집</li><li>크레딧 기반 과금</li></ul><p class="price-line">💰 무료 Hobby 플랜 있음 · 한도 수치는 확인하지 못함</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://windsurf.com" target="_blank" rel="noopener noreferrer">
+          <h3>Windsurf<span class="arrow">↗</span></h3>
+          <p>무료 플랜이 쓸 만한 코딩 AI</p>
+          <span class="catname">코드 생성</span><span class="tag">코드</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>무료에서도 프리미엄 모델을 일부 쓸 수 있는 코딩 AI 편집기입니다.</p><ul><li>프리미엄 모델 접근</li><li>기본 자동완성은 무료</li></ul><p class="price-line">💰 무료: 월 25 크레딧</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://otter.ai" target="_blank" rel="noopener noreferrer">
+          <h3>Otter.ai<span class="arrow">↗</span></h3>
+          <p>회의 자동 기록·요약</p>
+          <span class="catname">음성 인식</span><span class="tag">회의록</span><span class="price free">무료 있음</span><span class="req nocard">카드 불필요</span>
+          <div class="detail" role="tooltip"><p>회의 내용을 자동으로 글로 옮기고 요약합니다.</p><ul><li>실시간 기록</li><li>회의 요약</li></ul><p class="price-line">💰 무료: 월 300분, 대화당 30분 제한</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://clovanote.naver.com" target="_blank" rel="noopener noreferrer">
+          <h3>클로바노트<span class="arrow">↗</span></h3>
+          <p>한국어 회의·강의 기록</p>
+          <span class="catname">음성 인식</span><span class="tag">회의록</span><span class="price free">무료 있음</span><span class="req unknown">카드 확인 필요</span>
+          <div class="detail" role="tooltip"><p>한국어 음성을 글로 바꾸는 네이버의 서비스입니다.</p><ul><li>한국어 인식</li><li>회의·강의 기록</li></ul><p class="price-line">💰 무료: 월 300분(데이터 활용 동의 시 600분) · 개인 유료 플랜은 미지원</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <a class="card mini" data-cat="etc" href="https://openai.com/index/whisper" target="_blank" rel="noopener noreferrer">
+          <h3>Whisper (OpenAI)<span class="arrow">↗</span></h3>
+          <p>오픈소스 음성 인식 모델</p>
+          <span class="catname">음성 인식</span><span class="tag">API</span><span class="price free">무료 (오픈소스)</span><span class="req card">카드 필요</span>
+          <div class="detail" role="tooltip"><p>직접 설치하면 무료로 쓸 수 있고, API로 쓰면 결제 정보가 필요합니다.</p><ul><li>오픈소스 모델</li><li>다국어 인식</li></ul><p class="price-line">💰 직접 설치: 무료 · API: 신규 $5 크레딧(결제 정보 등록 필요)</p><em>클릭하면 공식 사이트로 이동 ↗</em></div>
+        </a>
+
+        <article class="card" data-cat="etc" data-only="etc">
+          <div class="icon">👁️</div>
+          <h3>컴퓨터 비전</h3>
+          <p>이미지와 영상 속 사물, 얼굴, 글자를 인식하고 분류하는 AI입니다.</p>
+          <ul><li>객체 탐지, 이미지 분류</li><li>OCR(글자 인식)</li></ul>
+          <p class="use">활용 예: 공장 제품 불량 검수, 영수증·문서 스캔, 사진 속 사물 찾기</p>
+          <span class="tag">기타</span>
+        </article>
+
+        <article class="card" data-cat="etc" data-only="etc">
+          <div class="icon">📈</div>
+          <h3>예측·추천 AI</h3>
+          <p>데이터의 패턴을 학습해 수요를 예측하거나 취향에 맞는 콘텐츠를 추천합니다.</p>
+          <ul><li>콘텐츠·상품 추천</li><li>수요·이상 탐지</li></ul>
+          <p class="use">활용 예: 동영상·쇼핑몰 추천, 매장 재고 수요 예측, 이상 거래 탐지</p>
+          <span class="tag">기타</span>
+        </article>
+
+        <article class="card" data-cat="etc" data-only="etc">
+          <div class="icon">🦾</div>
+          <h3>로보틱스 AI</h3>
+          <p>센서로 주변을 인식하고 물리적인 기계를 움직이는 AI입니다.</p>
+          <ul><li>자율주행, 물류 로봇</li><li>공장 자동화</li></ul>
+          <p class="use">활용 예: 창고 이동 로봇, 자율주행 차량, 조립 라인 로봇팔</p>
+          <span class="tag">기타</span>
+        </article>
+      </div>
+
+      <p class="price-note">요금·무료 한도는 검색 결과(2026년 기준)를 정리한 것이며 바뀔 수 있습니다. 카드 필요 여부는 가입 방식에 따라 달라질 수 있으니 공식 사이트에서 확인하세요.</p>
+
+      <div class="voice-pick" id="voicePick" hidden>
+        <h3 class="group-title">이럴 땐 이거</h3>
+        <ul class="pick">
+        <li><strong>한국어 영상 제작</strong><span>타입캐스트</span></li>
+        <li><strong>영어 내레이션·감정 표현</strong><span>ElevenLabs</span></li>
+        <li><strong>목소리 복제</strong><span>ElevenLabs, Fish Audio</span></li>
+        <li><strong>서비스에 탑재</strong><span>Google, Azure, Cartesia</span></li>
+      </ul>
+      </div>
+    </section>
+
+    <section class="section alt" id="compare">
+      <h2>한눈에 비교</h2>
+      <p class="section-desc">무엇을 넣으면 무엇이 나오는지, 어떤 상황에 쓰는지 정리했습니다. 분야 이름을 누르면 위의 서비스 목록으로 이동합니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>분야</th><th>하는 일</th><th>입력 → 출력</th><th>이럴 때 쓰세요</th><th>대표 서비스</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><a href="#types" data-goto="etc">텍스트 생성</a></td><td>질문에 답하고 글을 쓰고 요약·번역을 합니다.</td><td>글 → 글</td><td>보고서 초안, 메일 작성, 긴 문서 요약</td><td>ChatGPT, Claude, Perplexity</td></tr>
+            <tr><td><a href="#types" data-goto="image">이미지 생성</a></td><td>설명을 읽고 그림·사진풍 이미지를 만듭니다.</td><td>글·이미지 → 이미지</td><td>썸네일, 포스터 시안, 아이디어 스케치</td><td>Gemini, Midjourney, Adobe Firefly</td></tr>
+            <tr><td><a href="#types" data-goto="etc">영상 생성</a></td><td>글이나 이미지를 짧은 영상 클립으로 바꿉니다.</td><td>글·이미지 → 영상</td><td>짧은 광고, 영상 소스, 이미지에 움직임 주기</td><td>Kling AI, Runway, Luma</td></tr>
+            <tr><td><a href="#types" data-goto="music">음악 생성</a></td><td>분위기와 장르를 받아 곡을 만듭니다.</td><td>글(가사·분위기) → 음악</td><td>영상 배경음악, 노래 시안, 효과음</td><td>Suno, Udio, Stable Audio</td></tr>
+            <tr><td><a href="#types" data-goto="voice">음성 합성</a></td><td>글을 자연스러운 목소리로 읽어 줍니다.</td><td>글 → 음성</td><td>영상 내레이션, 더빙, 오디오북, 안내 방송</td><td>ElevenLabs, 타입캐스트, Fish Audio</td></tr>
+            <tr><td><a href="#types" data-goto="viz">시각화</a></td><td>데이터에 맞는 차트와 도식을 만듭니다.</td><td>데이터·글 → 차트·도식</td><td>보고서 그래프, 발표 자료, 대시보드</td><td>Napkin AI, Julius AI, Datawrapper</td></tr>
+            <tr><td><a href="#types" data-goto="auto">자동화</a></td><td>정해 둔 조건에 따라 여러 앱의 작업을 이어서 실행합니다.</td><td>조건·목표 → 작업 결과</td><td>메일 분류, 데이터 옮기기, 알림 보내기</td><td>Zapier, Make, n8n</td></tr>
+            <tr><td><a href="#types" data-goto="etc">코드 생성</a></td><td>코드를 쓰고 설명하며 오류를 찾습니다.</td><td>글·코드 → 코드</td><td>자동 완성, 버그 수정, 테스트 작성</td><td>GitHub Copilot, Cursor, Windsurf</td></tr>
+            <tr><td><a href="#types" data-goto="etc">음성 인식</a></td><td>말소리를 글자로 바꾸고 요약합니다.</td><td>소리 → 글</td><td>회의록, 강의 필기, 자막 만들기</td><td>Otter.ai, 클로바노트, Whisper</td></tr>
+            <tr><td><a href="#types" data-goto="etc">컴퓨터 비전</a></td><td>이미지·영상 속 사물과 글자를 인식합니다.</td><td>이미지·영상 → 라벨·좌표·글자</td><td>제품 검수, 문서 스캔(OCR), 보안 영상 분석</td><td>Google Cloud Vision, Roboflow, Ultralytics YOLO</td></tr>
+            <tr><td><a href="#types" data-goto="etc">예측·추천</a></td><td>과거 데이터의 패턴으로 앞날을 예상하고 취향에 맞는 것을 고릅니다.</td><td>이용 기록·수치 → 추천·예측값</td><td>상품·콘텐츠 추천, 수요 예측, 이상 탐지</td><td>Amazon Personalize, Prophet, Google Vertex AI</td></tr>
+            <tr><td><a href="#types" data-goto="etc">로보틱스</a></td><td>센서로 주변을 파악하고 기계를 움직입니다.</td><td>센서 신호 → 동작</td><td>물류 로봇, 자율주행, 공장 자동화</td><td>NVIDIA Isaac, ROS 2, Gazebo</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <h2>AI는 어떻게 작동할까?</h2>
+      <p class="section-desc">대부분의 AI는 세 단계를 거칩니다. 이 흐름을 알면 결과가 왜 이렇게 나왔는지 이해하기 쉽습니다.</p>
+      <ol class="steps">
+        <li><strong>1. 학습</strong><span>방대한 글·이미지·소리 데이터에서 패턴을 익힙니다.</span><em>그래서 학습에 없던 최신 정보나 아주 전문적인 내용은 틀릴 수 있습니다.</em></li>
+        <li><strong>2. 추론</strong><span>우리가 입력을 넣으면 익힌 패턴으로 결과를 만들어 냅니다.</span><em>그래서 입력(프롬프트)이 구체적일수록 결과가 좋아집니다.</em></li>
+        <li><strong>3. 개선</strong><span>사람의 평가와 추가 학습으로 품질을 높입니다.</span><em>그래서 같은 서비스도 시간이 지나면 성능과 요금이 달라집니다.</em></li>
+      </ol>
+
+      <h3 class="group-title">분야별로는 이렇게 만들어요</h3>
+      <div class="how-grid">
+        <div class="how-item" tabindex="0"><strong>텍스트 생성</strong><p>앞뒤 문맥을 보고 다음에 올 말을 이어 가며 문장을 만듭니다.</p><div class="how-tip" role="tooltip"><b>필요한 AI</b><p class="chips"><a class="svc" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer">ChatGPT ↗</a><a class="svc" href="https://claude.ai" target="_blank" rel="noopener noreferrer">Claude ↗</a><a class="svc" href="https://perplexity.ai" target="_blank" rel="noopener noreferrer">Perplexity ↗</a></p><a href="#types" data-goto="etc">서비스 목록 보기 →</a></div></div>
+        <div class="how-item" tabindex="0"><strong>이미지 생성</strong><p>잡음 같은 이미지를 설명에 맞게 조금씩 다듬어 그림을 완성하는 방식이 널리 쓰입니다.</p><div class="how-tip" role="tooltip"><b>필요한 AI</b><p class="chips"><a class="svc" href="https://gemini.google.com" target="_blank" rel="noopener noreferrer">Gemini ↗</a><a class="svc" href="https://midjourney.com" target="_blank" rel="noopener noreferrer">Midjourney ↗</a><a class="svc" href="https://firefly.adobe.com" target="_blank" rel="noopener noreferrer">Adobe Firefly ↗</a><a class="svc" href="https://leonardo.ai" target="_blank" rel="noopener noreferrer">Leonardo.ai ↗</a></p><a href="#types" data-goto="image">서비스 목록 보기 →</a></div></div>
+        <div class="how-item" tabindex="0"><strong>음성 합성</strong><p>글을 발음 단위로 나누고 목소리의 높낮이와 속도를 입혀 소리로 만듭니다.</p><div class="how-tip" role="tooltip"><b>필요한 AI</b><p class="chips"><a class="svc" href="https://elevenlabs.io" target="_blank" rel="noopener noreferrer">ElevenLabs ↗</a><a class="svc" href="https://typecast.ai/kr" target="_blank" rel="noopener noreferrer">타입캐스트 ↗</a><a class="svc" href="https://fish.audio" target="_blank" rel="noopener noreferrer">Fish Audio ↗</a></p><a href="#types" data-goto="voice">서비스 목록 보기 →</a></div></div>
+        <div class="how-item" tabindex="0"><strong>음악 생성</strong><p>많은 음악의 리듬·화음 패턴을 익혀 분위기에 맞는 곡을 새로 만듭니다.</p><div class="how-tip" role="tooltip"><b>필요한 AI</b><p class="chips"><a class="svc" href="https://suno.com" target="_blank" rel="noopener noreferrer">Suno ↗</a><a class="svc" href="https://udio.com" target="_blank" rel="noopener noreferrer">Udio ↗</a><a class="svc" href="https://stableaudio.com" target="_blank" rel="noopener noreferrer">Stable Audio ↗</a></p><a href="#types" data-goto="music">서비스 목록 보기 →</a></div></div>
+        <div class="how-item" tabindex="0"><strong>음성 인식</strong><p>소리를 잘게 나눠 어떤 글자·단어에 해당하는지 맞춥니다.</p><div class="how-tip" role="tooltip"><b>필요한 AI</b><p class="chips"><a class="svc" href="https://otter.ai" target="_blank" rel="noopener noreferrer">Otter.ai ↗</a><a class="svc" href="https://clovanote.naver.com" target="_blank" rel="noopener noreferrer">클로바노트 ↗</a><a class="svc" href="https://openai.com/index/whisper" target="_blank" rel="noopener noreferrer">Whisper ↗</a></p><a href="#types" data-goto="etc">서비스 목록 보기 →</a></div></div>
+        <div class="how-item" tabindex="0"><strong>시각화</strong><p>데이터의 형태(시간, 비교, 비율 등)를 읽고 어울리는 차트를 고르거나 그려 줍니다.</p><div class="how-tip" role="tooltip"><b>필요한 AI</b><p class="chips"><a class="svc" href="https://napkin.ai" target="_blank" rel="noopener noreferrer">Napkin AI ↗</a><a class="svc" href="https://julius.ai" target="_blank" rel="noopener noreferrer">Julius AI ↗</a><a class="svc" href="https://datawrapper.de" target="_blank" rel="noopener noreferrer">Datawrapper ↗</a></p><a href="#types" data-goto="viz">서비스 목록 보기 →</a></div></div>
+        <div class="how-item" tabindex="0"><strong>자동화</strong><p>"이런 일이 생기면 저렇게 실행"하는 규칙으로 앱을 연결하고, 판단·글쓰기는 AI에 맡깁니다.</p><div class="how-tip" role="tooltip"><b>필요한 AI</b><p class="chips"><a class="svc" href="https://zapier.com" target="_blank" rel="noopener noreferrer">Zapier ↗</a><a class="svc" href="https://make.com" target="_blank" rel="noopener noreferrer">Make ↗</a><a class="svc" href="https://n8n.io" target="_blank" rel="noopener noreferrer">n8n ↗</a></p><a href="#types" data-goto="auto">서비스 목록 보기 →</a></div></div>
+      </div>
+    </section>
+
+    <section class="section alt" id="tips">
+      <h2>활용 팁</h2>
+      <p class="section-desc">기본 원칙을 지키고, 아래 흐름과 예시를 그대로 가져다 써 보세요.</p>
+
+      <div class="tips">
+        <div><h3>목적부터 정하기</h3><p>글, 그림, 소리, 분석 중 필요한 결과물을 먼저 정하면 도구를 고르기 쉽습니다.</p></div>
+        <div><h3>구체적으로 요청하기</h3><p>대상, 분량, 말투, 형식을 함께 적으세요. "짧게"보다 "300자 이내"가 더 잘 통합니다.</p></div>
+        <div><h3>결과는 꼭 검토하기</h3><p>AI는 틀린 내용을 그럴듯하게 말할 수 있습니다. 숫자·고유명사·출처는 직접 확인하세요.</p></div>
+        <div><h3>개인정보·저작권 주의</h3><p>민감한 정보나 비밀 자료는 넣지 마세요. 무료 플랜은 상업 이용이 제한되는 경우가 많습니다.</p></div>
+      </div>
+
+      <h3 class="group-title">이런 상황엔 이렇게 이어서 쓰세요</h3>
+      <p class="section-desc">각 단계에 마우스를 올리면 활용성이 좋은 AI(★ 먼저 써볼 것)가 나오고, 누르면 공식 사이트로 이동합니다. 이 사이트에 정리한 무료 한도·특징 기준이며 개인 판단이 들어 있으니 직접 써 보고 비교하세요.</p>
+      <div class="flows">
+        <div class="flow">
+          <h4>🎬 유튜브·숏폼 영상 만들기</h4>
+          <div class="flow-steps"><span class="step" tabindex="0"><a href="#types" data-goto="etc">대본(텍스트)</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer">★ ChatGPT ↗<small>범용·대화로 다듬기 좋음</small></a><a class="rec-link" href="https://claude.ai" target="_blank" rel="noopener noreferrer">Claude ↗<small>긴 글·문서 작업에 강함</small></a><a class="rec-link" href="https://perplexity.ai" target="_blank" rel="noopener noreferrer">Perplexity ↗<small>자료 조사·출처 확인</small></a><a class="more" href="#types" data-goto="etc">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="voice">내레이션</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://typecast.ai/kr" target="_blank" rel="noopener noreferrer">★ 타입캐스트 ↗<small>한국어 감정 표현</small></a><a class="rec-link" href="https://elevenlabs.io" target="_blank" rel="noopener noreferrer">ElevenLabs ↗<small>감정·보이스 클로닝</small></a><a class="rec-link" href="https://fish.audio" target="_blank" rel="noopener noreferrer">Fish Audio ↗<small>목소리 복제 자연스러움</small></a><a class="more" href="#types" data-goto="voice">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="etc">영상 클립</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://klingai.com" target="_blank" rel="noopener noreferrer">★ Kling AI ↗<small>무료 일일 크레딧 넉넉</small></a><a class="rec-link" href="https://labs.google/flow" target="_blank" rel="noopener noreferrer">Google Flow ↗<small>소리 포함 영상</small></a><a class="rec-link" href="https://runwayml.com" target="_blank" rel="noopener noreferrer">Runway ↗<small>영상 생성·편집 전문</small></a><a class="more" href="#types" data-goto="etc">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="music">배경음악</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://suno.com" target="_blank" rel="noopener noreferrer">★ Suno ↗<small>무료로 노래·곡 생성</small></a><a class="rec-link" href="https://stableaudio.com" target="_blank" rel="noopener noreferrer">Stable Audio ↗<small>짧은 트랙·효과음</small></a><a class="rec-link" href="https://udio.com" target="_blank" rel="noopener noreferrer">Udio ↗<small>고품질 노래 생성</small></a><a class="more" href="#types" data-goto="music">서비스 목록 보기 →</a></div></span></div>
+          <p>대본을 쓰고, 음성으로 읽히고, 장면별 클립과 배경음악을 붙입니다. 모두 무료 플랜이면 상업 이용 가능 여부부터 확인하세요.</p>
+        </div>
+        <div class="flow">
+          <h4>📊 발표·보고서 준비</h4>
+          <div class="flow-steps"><span class="step" tabindex="0"><a href="#types" data-goto="etc">내용 정리</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://claude.ai" target="_blank" rel="noopener noreferrer">★ Claude ↗<small>긴 문서 요약·정리</small></a><a class="rec-link" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer">ChatGPT ↗<small>범용 대화형</small></a><a class="rec-link" href="https://perplexity.ai" target="_blank" rel="noopener noreferrer">Perplexity ↗<small>출처와 함께 자료 정리</small></a><a class="more" href="#types" data-goto="etc">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="viz">도식·차트</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://napkin.ai" target="_blank" rel="noopener noreferrer">★ Napkin AI ↗<small>글을 도식으로 변환</small></a><a class="rec-link" href="https://julius.ai" target="_blank" rel="noopener noreferrer">Julius AI ↗<small>데이터 분석·차트</small></a><a class="rec-link" href="https://datawrapper.de" target="_blank" rel="noopener noreferrer">Datawrapper ↗<small>깔끔한 차트·지도</small></a><a class="more" href="#types" data-goto="viz">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="image">삽화 이미지</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://gemini.google.com" target="_blank" rel="noopener noreferrer">★ Gemini ↗<small>무료로 바로 생성</small></a><a class="rec-link" href="https://ideogram.ai" target="_blank" rel="noopener noreferrer">Ideogram ↗<small>이미지 속 글자 표현</small></a><a class="rec-link" href="https://designer.microsoft.com" target="_blank" rel="noopener noreferrer">Microsoft Designer ↗<small>하루 15회 무료</small></a><a class="more" href="#types" data-goto="image">서비스 목록 보기 →</a></div></span></div>
+          <p>핵심 문장을 정리한 뒤 도식이나 차트로 바꾸면 슬라이드가 한결 빨리 완성됩니다.</p>
+        </div>
+        <div class="flow">
+          <h4>📝 회의록과 후속 업무</h4>
+          <div class="flow-steps"><span class="step" tabindex="0"><a href="#types" data-goto="etc">음성 인식</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://clovanote.naver.com" target="_blank" rel="noopener noreferrer">★ 클로바노트 ↗<small>한국어 회의·강의</small></a><a class="rec-link" href="https://otter.ai" target="_blank" rel="noopener noreferrer">Otter.ai ↗<small>회의 자동 기록·요약</small></a><a class="rec-link" href="https://openai.com/index/whisper" target="_blank" rel="noopener noreferrer">Whisper ↗<small>오픈소스 음성 인식</small></a><a class="more" href="#types" data-goto="etc">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="etc">요약</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://claude.ai" target="_blank" rel="noopener noreferrer">★ Claude ↗<small>긴 대화 내용 요약</small></a><a class="rec-link" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer">ChatGPT ↗<small>범용 대화형</small></a><a class="rec-link" href="https://perplexity.ai" target="_blank" rel="noopener noreferrer">Perplexity ↗<small>출처와 함께 요약</small></a><a class="more" href="#types" data-goto="etc">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="auto">할 일 자동 전달</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://zapier.com" target="_blank" rel="noopener noreferrer">★ Zapier ↗<small>카드 없이 쉬운 시작</small></a><a class="rec-link" href="https://make.com" target="_blank" rel="noopener noreferrer">Make ↗<small>무료 한도 넉넉</small></a><a class="rec-link" href="https://n8n.io" target="_blank" rel="noopener noreferrer">n8n ↗<small>오픈소스·직접 설치</small></a><a class="more" href="#types" data-goto="auto">서비스 목록 보기 →</a></div></span></div>
+          <p>회의를 글로 옮기고 요약한 뒤, 자동화로 담당자에게 할 일을 보내거나 메신저에 공유합니다.</p>
+        </div>
+        <div class="flow">
+          <h4>🛍️ 제품 소개 콘텐츠</h4>
+          <div class="flow-steps"><span class="step" tabindex="0"><a href="#types" data-goto="etc">소개 문구</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer">★ ChatGPT ↗<small>문구 여러 안 비교</small></a><a class="rec-link" href="https://claude.ai" target="_blank" rel="noopener noreferrer">Claude ↗<small>자연스러운 글쓰기</small></a><a class="rec-link" href="https://gemini.google.com" target="_blank" rel="noopener noreferrer">Gemini ↗<small>구글 계정으로 바로 사용</small></a><a class="more" href="#types" data-goto="etc">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="image">제품 이미지 시안</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://firefly.adobe.com" target="_blank" rel="noopener noreferrer">★ Adobe Firefly ↗<small>디자인 도구 연동</small></a><a class="rec-link" href="https://ideogram.ai" target="_blank" rel="noopener noreferrer">Ideogram ↗<small>글자 포함 이미지</small></a><a class="rec-link" href="https://leonardo.ai" target="_blank" rel="noopener noreferrer">Leonardo.ai ↗<small>캔버스 편집·무료 토큰</small></a><a class="more" href="#types" data-goto="image">서비스 목록 보기 →</a></div></span><span>→</span><span class="step" tabindex="0"><a href="#types" data-goto="voice">안내 음성</a><div class="how-tip" role="tooltip"><b>추천 AI</b><a class="rec-link top" href="https://typecast.ai/kr" target="_blank" rel="noopener noreferrer">★ 타입캐스트 ↗<small>한국어 목소리 다양</small></a><a class="rec-link" href="https://elevenlabs.io" target="_blank" rel="noopener noreferrer">ElevenLabs ↗<small>자연스러운 음질</small></a><a class="rec-link" href="https://fish.audio" target="_blank" rel="noopener noreferrer">Fish Audio ↗<small>목소리 복제·다국어</small></a><a class="more" href="#types" data-goto="voice">서비스 목록 보기 →</a></div></span></div>
+          <p>문구, 이미지 시안, 안내 음성을 한 번에 만들어 초안을 빠르게 비교해 볼 수 있습니다.</p>
+        </div>
+      </div>
+
+      <h3 class="group-title">바로 써볼 수 있는 요청 예시</h3>
+      <p class="section-desc">[ ] 안을 내 상황에 맞게 바꿔서 사용하세요.</p>
+      <div class="prompts">
+        <div class="prompt">
+          <h4>글 요약</h4>
+          <p class="prompt-text">아래 글을 [대상]이 이해하기 쉽게 5줄 이내로 요약해 줘. 핵심 숫자는 그대로 유지해 줘.</p>
+          <button class="copy-btn" type="button">복사</button>
+        </div>
+        <div class="prompt">
+          <h4>이미지 생성</h4>
+          <p class="prompt-text">[주제]를 그린 일러스트. 밝은 파스텔 색감, 단순한 배경, 가로 16:9, 글자는 넣지 마.</p>
+          <button class="copy-btn" type="button">복사</button>
+        </div>
+        <div class="prompt">
+          <h4>음악 생성</h4>
+          <p class="prompt-text">[영상 주제]에 어울리는 차분한 로파이 배경음악. 가사 없이 90초, 템포는 느리게.</p>
+          <button class="copy-btn" type="button">복사</button>
+        </div>
+        <div class="prompt">
+          <h4>음성 합성 대본</h4>
+          <p class="prompt-text">아래 대본을 차분하고 또렷한 20대 여성 톤으로 읽어 줘. 문장 사이에 잠깐 쉬어 줘.</p>
+          <button class="copy-btn" type="button">복사</button>
+        </div>
+        <div class="prompt">
+          <h4>데이터 시각화</h4>
+          <p class="prompt-text">첨부한 표에서 월별 추이를 보여주는 차트를 만들고, 가장 크게 변한 달을 한 줄로 설명해 줘.</p>
+          <button class="copy-btn" type="button">복사</button>
+        </div>
+        <div class="prompt">
+          <h4>자동화 아이디어</h4>
+          <p class="prompt-text">[반복 업무]를 자동화하려고 해. 어떤 조건에서 시작해 어떤 순서로 실행하면 좋을지 단계별로 정리해 줘.</p>
+          <button class="copy-btn" type="button">복사</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 AIGuide · AI 종류 소개 사이트</p>
+    <a href="#top">맨 위로 ↑</a>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
