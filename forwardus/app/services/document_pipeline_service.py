@@ -911,7 +911,16 @@ def _apply(draft: dict, found: dict, notes: list) -> list[str]:
             applied.append(key)
     # 나라 코드는 두 글자입니다. "미국"이라고 적으면 넣지 않고 그대로 둡니다.
     if _has(found.get("buyer_country")):
-        code = str(found["buyer_country"]).strip().upper()[:2]
+        # 앞 두 글자만 잘라 쓰면 Vietnam→VI(미국령 버진아일랜드), Germany→GE(조지아)가 됩니다(5회차) —
+        # 두 글자 코드는 그대로, 이름이면 나라 목록에서 찾고, 못 찾으면 넣지 않습니다.
+        raw_country = str(found["buyer_country"]).strip()
+        from app.collectors import location_client
+        if raw_country.lower() in location_client.COUNTRY_ALIASES:
+            code = location_client.COUNTRY_ALIASES[raw_country.lower()]
+        elif len(raw_country) == 2 and raw_country.isascii() and raw_country.isalpha():
+            code = raw_country.upper()
+        else:
+            code = location_client.find_country_by_name(raw_country) or ""
         if code.isalpha():
             draft["buyer_country"] = code
             applied.append("buyer_country")

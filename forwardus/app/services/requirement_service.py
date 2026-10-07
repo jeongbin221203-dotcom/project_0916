@@ -194,7 +194,20 @@ def extract_text(path: Path, suffix: str) -> str:
             import docx
 
             safe_files.check_docx(path)                  # 풀리면 너무 큰 압축 폭탄은 열지 않습니다
-            return safe_files.clip("\n".join(paragraph.text for paragraph in docx.Document(path).paragraphs))
+            document = docx.Document(path)
+            lines = [paragraph.text for paragraph in document.paragraphs]
+            # 표 안의 글자도 읽습니다 — 원산지증명서는 대부분 표라서 "수출자 정보가 없다"는 잘못된 판정이 났습니다
+            # (전수 점검 5회차). 계약서 점검은 이미 표를 읽습니다.
+            for table in document.tables:
+                for row in table.rows:
+                    cells = []
+                    for cell in row.cells:
+                        text = cell.text.strip()
+                        if text and (not cells or cells[-1] != text):      # 병합된 칸의 되풀이 제거
+                            cells.append(text)
+                    if cells:
+                        lines.append(" | ".join(cells))
+            return safe_files.clip("\n".join(lines))
     except Exception:
         # 어떤 형식이든 읽기에 실패하면 "못 읽었다"로 넘깁니다. 화면에서 이유를 알려 줍니다.
         return ""

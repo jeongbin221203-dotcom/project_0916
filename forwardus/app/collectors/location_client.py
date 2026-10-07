@@ -88,12 +88,25 @@ def _normalize(name: str) -> str:
     return "".join(ch for ch in (name or "").lower() if ch.isalnum())
 
 
+# 목록의 영문명은 ISO 표기("Viet Nam"·"Türkiye"·"United Kingdom of Great Britain…")라 흔한 표기가 안 찾아졌습니다
+# (전수 점검 5회차). 키는 _normalize 형태(소문자·글자와 숫자만), 값은 나라 코드.
+COUNTRY_ALIASES = {
+    "vietnam": "VN", "usa": "US", "us": "US", "america": "US", "unitedstates": "US",
+    "uk": "GB", "britain": "GB", "greatbritain": "GB", "england": "GB", "unitedkingdom": "GB",
+    "uae": "AE", "turkey": "TR", "turkiye": "TR", "russia": "RU", "korea": "KR", "southkorea": "KR",
+    "czechia": "CZ", "ivorycoast": "CI", "laos": "LA", "burma": "MM", "holland": "NL",
+    "터키": "TR", "튀르키예": "TR", "미국": "US", "영국": "GB", "대한민국": "KR", "한국": "KR",
+}
+
+
 def find_country_by_name(name: str) -> str | None:
     """'베트남', 'Vietnam'처럼 나라 이름을 코드로 바꿉니다."""
 
     needle = _normalize(name)
     if not needle:
         return None
+    if needle in COUNTRY_ALIASES:
+        return COUNTRY_ALIASES[needle]
     for country in _countries().values():
         if needle in (_normalize(country["name"]), _normalize(country["name_en"])):
             return country["code"]
@@ -240,6 +253,10 @@ PLACE_ALIASES = {
 }
 # 바다 도착지에서만 쓰는 별칭 — 두바이 항구는 제벨알리입니다(공항 DXB 와 구분).
 SEA_ALIASES = {"두바이": "제벨알리", "dubai": "jebel"}
+# 공항은 한글 이름이 공항 이름("떤선녓")이고 도시는 영문뿐이라, 한글 도시 이름으로는 항공 도착지가 비어 있었습니다(5회차).
+AIR_ALIASES = {"호치민": "ho chi minh", "호찌민": "ho chi minh", "사이공": "ho chi minh", "도쿄": "tokyo",
+               "마닐라": "manila", "오사카": "osaka", "방콕": "bangkok", "하노이": "hanoi", "쿠알라룸푸르": "kuala lumpur",
+               "자카르타": "jakarta", "상하이": "shanghai", "베이징": "beijing", "홍콩": "hong kong"}
 
 
 def search_locations(query: str, kind: str | None = None, country: str | None = None,
@@ -253,7 +270,9 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
 
     keyword = (query or "").strip().lower()
     squeezed = "".join(ch for ch in keyword if ch not in ". 	")
-    if kind == "port" and (keyword in SEA_ALIASES or squeezed in SEA_ALIASES):
+    if kind == "airport" and (keyword in AIR_ALIASES or squeezed in AIR_ALIASES):
+        keyword = AIR_ALIASES.get(keyword) or AIR_ALIASES[squeezed]
+    elif kind == "port" and (keyword in SEA_ALIASES or squeezed in SEA_ALIASES):
         keyword = SEA_ALIASES.get(keyword) or SEA_ALIASES[squeezed]
     else:
         keyword = PLACE_ALIASES.get(keyword) or PLACE_ALIASES.get(squeezed) or keyword
@@ -270,8 +289,11 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         if majors_only and not item["major"]:
             continue
         if keyword:
+            # 도시 이름도 봅니다 — 공항 이름이 "떤선녓"·"John F. Kennedy" 라 "호치민"·"new york" 으로는 항공 도착지가
+            # 비어 있었습니다(전수 점검 5회차).
             haystack = " ".join((
-                item["code"], item["name"], item["name_en"], item["country"], item["country_en"]
+                item["code"], item["name"], item["name_en"], item["country"], item["country_en"],
+                item.get("city") or "", item.get("city_en") or ""
             )).lower()
             if keyword not in haystack:
                 continue

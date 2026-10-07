@@ -194,8 +194,9 @@ def api_create_shipment():
     # 두 번 눌러도 한 번만 만듭니다. (app/routes/__init__.py 의 주석을 보세요)
     already = once_only("shipment", payload)
     if already:
-        return jsonify({"success": True, "data": {"shipment_id": already,
-                                                  "reused": True}})
+        # url 도 함께 줍니다 — 없으면 마법사가 "/planning/undefined"(404)로 이동했습니다(전수 점검 5회차).
+        return jsonify({"success": True, "data": {"shipment_id": already, "reused": True,
+                                                  "url": url_for("document.center", shipment_id=already)}})
     try:
         shipment = planning_service.create_shipment(payload, user_id=current_user().id)
     except (ValidationError, ServiceError) as exc:

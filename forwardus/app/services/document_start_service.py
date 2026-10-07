@@ -207,6 +207,8 @@ def _country_code(payload: dict, key: str = "buyer_country", strict: bool = True
     text = _text(payload, key, 60)
     if not text:
         return ""
+    if text.lower() in location_client.COUNTRY_ALIASES:       # UK → GB 처럼 두 글자여도 코드가 아닌 것
+        return location_client.COUNTRY_ALIASES[text.lower()]
     if len(text) == 2 and text.isascii() and text.isalpha():
         return text.upper()
     found = location_client.find_country_by_name(text)

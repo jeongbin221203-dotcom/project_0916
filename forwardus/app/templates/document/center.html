@@ -185,7 +185,7 @@
   <section class="card origin_card">
     <h2>원산지증명서 <small class="muted">수출국에 따라 쓰는 협정이 다릅니다</small></h2>
     {% if origin_certificate.available %}
-      <p class="muted">{{ origin_certificate.country }}로 보낼 때
+      <p class="muted">{{ origin_certificate.country }} 수출 시
         <b class="mono">{{ origin_certificate.hs_code }}</b> 품목에 쓸 수 있는 협정입니다.</p>
       {% if origin_certificate.agreements %}
         {% for row in origin_certificate.agreements %}
