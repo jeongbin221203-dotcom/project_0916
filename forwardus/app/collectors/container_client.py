@@ -114,9 +114,27 @@ def is_container_no(value: str) -> bool:
 CATEGORY_LETTERS = ("U", "J", "Z")
 
 
+def _letter_values() -> dict[str, int]:
+    """A=10 부터 세되 11의 배수(11·22·33)를 건너뜁니다 → L=23, V=34, W=35.
+
+    예전 식(value + value // 11)은 22·33 을 건너뛰지 못해 L·V·W 가 든 번호(OOLU·HLXU·WHSU 등)의
+    검증숫자가 틀렸고, 올바른 번호가 '있을 수 없는 번호'로 거절됐습니다(전수 점검 4회차).
+    """
+
+    table, value = {}, 10
+    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        if value % 11 == 0:
+            value += 1
+        table[ch] = value
+        value += 1
+    return table
+
+
+_LETTER_VALUES = _letter_values()
+
+
 def _letter_value(letter: str) -> int:
-    value = 10 + (ord(letter) - ord("A"))
-    return value + (value // 11)          # 11의 배수를 건너뜁니다
+    return _LETTER_VALUES[letter]
 
 
 def container_check_digit(first_ten: str) -> int:

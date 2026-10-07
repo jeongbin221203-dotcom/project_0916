@@ -113,7 +113,10 @@ def test_쪽_번호만_글자인_스캔본은_OCR_로_읽는다():
 
 # ── 40만 자 ─────────────────────────────────────────────────────────────────
 def test_한도를_넘는_글은_앞만_봤다고_밝힌다():
-    long = "SALES CONTRACT\n" + ("General terms apply. " * 21_000)
+    # 같은 문장을 되풀이한 글은 반복 검사(전수 점검 4회차)가 거절하므로, 조항마다 다른 긴 글로 시험합니다.
+    long = "SALES CONTRACT\n" + " ".join(
+        f"Clause {n}: the parties agree on item {n * 7919 % 10007} at {n * 31 % 977} units per lot."
+        for n in range(1, 7000))
     result = service.review(long, "FOB")
     assert result["truncated"] is True
     assert result["checked"] == service.MAX_TEXT

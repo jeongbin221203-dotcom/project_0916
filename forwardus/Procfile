@@ -1,1 +1,1 @@
-web: gunicorn --bind "0.0.0.0:${PORT:-10000}" --workers 1 --threads 8 --timeout 150 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - "app:create_app()"
+web: gunicorn --bind "0.0.0.0:${PORT:-10000}" --workers 1 --threads 8 --timeout 150 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - --access-logformat '%(h)s "%(m)s %(U)s" %(s)s %(b)s %(L)s' "app:create_app()"

@@ -27,7 +27,7 @@ DOCUMENT_FIELDS = {
         "pol", "pod", "carrier", "doc_no", "doc_date", "lc_no", "buyer", "notify_party",
         "other_references", "incoterms", "payment_terms", "shipping_marks", "product_description",
         "hs_code", "quantity", "package_type", "unit_price", "invoice_value", "currency",
-        "gross_weight_kg", "net_weight_kg", "remarks", "signed_by",
+        "gross_weight_kg", "net_weight_kg", "country_of_origin", "remarks", "signed_by",
     ],
     # 포장명세서(PACKING LIST): 사용자가 지정한 주문 서식
     # (ORDER # / SHIPPED TO / 품목표 / Comments / PACKED BY)
@@ -212,6 +212,7 @@ DOCUMENT_SECTIONS = {
         {"cols": 3, "fields": ["carrier", "incoterms", "payment_terms"]},
         {"items": True},
         {"cols": 3, "fields": ["invoice_value", "currency", "unit_price"]},
+        {"cols": 3, "fields": ["country_of_origin"]},
         {"title": "합계 (송장과 대조되는 값)", "cols": 4,
          "fields": ["product_description", "hs_code", "quantity", "package_type"]},
         {"cols": 3, "fields": ["gross_weight_kg", "net_weight_kg", "shipping_marks"]},
@@ -277,6 +278,24 @@ DOC_PREFIX = {
     "shipping_instruction": "SI",
     "booking_request": "BR",
 }
+
+
+_ORIGIN_PLACE_TERMS = {"EXW", "FCA", "FAS", "FOB"}
+
+
+def _incoterms_text(shipment) -> str:
+    """"FOB" 만이 아니라 지정 장소와 판을 함께("FOB INCHEON, INCOTERMS 2020").
+
+    Incoterms 는 지정 장소가 있어야 뜻이 정해지고, 은행·세관은 코드만 적힌 송장을 하자로 봅니다
+    (전수 점검 4회차). 서류 간 대조는 앞 세 글자 코드로 비교하므로 영향이 없습니다.
+    """
+
+    code = (shipment.incoterms or "").strip().upper()
+    if not code:
+        return ""
+    place = shipment.origin_name if code in _ORIGIN_PLACE_TERMS else shipment.destination_name
+    place = (place or "").split(",")[0].strip().upper()
+    return f"{code} {place}, INCOTERMS 2020" if place else f"{code}, INCOTERMS 2020"
 
 
 def _port(name: str, code: str) -> str:
@@ -387,7 +406,7 @@ def build_reference(shipment, doc_type: str = "") -> dict:
         "consignee": buyer.name if buyer else "",
         "consignee_address": buyer.address if buyer else "",
         "notify_party": shipment.notify_party,
-        "incoterms": f"{shipment.incoterms}",
+        "incoterms": _incoterms_text(shipment),
         "pol": _port(shipment.origin_name, shipment.origin_code),
         "pod": _port(shipment.destination_name, shipment.destination_code),
         "carrier": shipment.carrier or "",

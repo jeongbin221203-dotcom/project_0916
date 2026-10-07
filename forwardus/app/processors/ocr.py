@@ -169,6 +169,14 @@ def read_text(image) -> str:
     return "\n".join(line for line in lines if line)
 
 
+class OcrFailed(RuntimeError):
+    """OCR 이 **실패**했다(시간 초과·프로세스 충돌·메모리 부족). '글자가 없다'와 다릅니다.
+
+    예전에는 둘 다 빈 목록이라, 계좌번호를 칠해야 할 그림이 칠하지 않은 채 OpenAI 로 나갔습니다
+    (전수 점검 4회차 — PAGE_TIMEOUT 을 줄여 재현했고 결과 그림이 원본과 같았습니다).
+    """
+
+
 def read_lines(image) -> list[tuple[list, str, float, list]]:
     """줄마다 (네 꼭짓점, 글자, 자신감 0~1, 낱말 목록). 위→아래, 왼→오른 순서.
     좌표는 원래 그림 기준입니다. 낱말 목록은 [(네 꼭짓점, 글자, 자신감)]입니다.
@@ -188,8 +196,8 @@ def read_lines(image) -> list[tuple[list, str, float, list]]:
     try:
         data = pytesseract.image_to_data(picture, lang=setup[1], config=_config_flags("--psm 3"),
                                          output_type=pytesseract.Output.DICT, timeout=PAGE_TIMEOUT)
-    except Exception:
-        return []
+    except Exception as exc:
+        raise OcrFailed(str(exc)) from exc
     groups: dict[tuple, dict] = {}
     for index, word in enumerate(data.get("text", [])):
         word = str(word or "").strip()

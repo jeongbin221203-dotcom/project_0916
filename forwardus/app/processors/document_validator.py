@@ -323,6 +323,23 @@ def _missing_findings(documents, labels, form_fields, reported) -> list[dict]:
     return findings
 
 
+_QTY_WITH_UNIT = re.compile(r"^\s*([\d,]+(?:\.\d+)?)\s*[A-Za-z./]{0,12}\s*$")
+
+
+def _qty_number(value):
+    """수량 칸은 "2,000 PCS" 처럼 단위가 붙어 나옵니다. 숫자만 읽습니다(없으면 None).
+
+    단위가 붙은 줄은 qty × price 검산을 통째로 건너뛰어, 6,400 이어야 할 금액이 5,000 이어도 통과했습니다
+    (전수 점검 4회차).
+    """
+
+    number = _as_number(value)
+    if number is not None:
+        return number
+    match = _QTY_WITH_UNIT.match(str(value or ""))
+    return float(match.group(1).replace(",", "")) if match else None
+
+
 def _item_findings(documents, labels) -> list[dict]:
     """품목 표의 셈. 은행은 신용장 서류에서 단가 × 수량 = 금액, 줄 합계 = 송장 금액을 다시 셉니다.
 
@@ -340,7 +357,8 @@ def _item_findings(documents, labels) -> list[dict]:
         for number, row in enumerate(items, start=1):
             if not isinstance(row, dict):
                 continue
-            qty, price, amount = (_as_number(row.get(k)) for k in ("quantity", "unit_price", "amount"))
+            qty, price, amount = (_qty_number(row.get("quantity")), _as_number(row.get("unit_price")),
+                                  _as_number(row.get("amount")))
             amounts.append(amount)
             if None in (qty, price, amount) or qty <= 0:
                 continue
@@ -399,6 +417,36 @@ def _date_findings(documents, labels, form_fields) -> list[dict]:
                 "message": f"{name}의 {label}{particle(label, '이')} 날짜로 읽히지 않습니다"
                            f" ('{str(data[field])[:30]}'). 2026-10-21 처럼 적어 주세요.",
             })
+    return findings
+
+
+# 영문으로 적어야 하는 칸. 세관·은행·바이어는 한글 서류를 받아 주지 않습니다. 채팅은 이를 안내하는데 서류 작성·검증은
+# 한글 서류도 "모든 문서의 주요 필드가 일치합니다"로 통과시켰습니다(전수 점검 4회차).
+ENGLISH_ONLY_FIELDS = {"exporter": "Exporter", "exporter_address": "Exporter 주소", "consignee": "Consignee",
+                       "consignee_address": "Consignee 주소", "notify_party": "Notify Party",
+                       "product_description": "품명(Description)", "shipper": "Shipper"}
+_HANGUL = re.compile(r"[ㄱ-ㆎ가-힣]")
+
+
+def _language_findings(documents, labels, form_fields) -> list[dict]:
+    findings = []
+    for doc_type, data in documents.items():
+        shown = form_fields.get(doc_type)
+        name = labels.get(doc_type, doc_type)
+        rows = [("", data)] + [(f" 품목 {n}줄", row) for n, row in enumerate(data.get("items") or [], start=1)
+                              if isinstance(row, dict)]
+        for where, row in rows:
+            for field, label in ENGLISH_ONLY_FIELDS.items():
+                value = row.get(field)
+                if not isinstance(value, str) or not _HANGUL.search(value):
+                    continue
+                if not where and shown is not None and field not in shown:
+                    continue
+                findings.append({
+                    "status": "warning", "kind": "language", "field": field, "field_label": label,
+                    "document": doc_type, "document_label": name, "expected": None, "actual": value[:60],
+                    "message": f"{name}{where}의 {label}에 한글이 있습니다. 세관·은행은 영문 서류를 요구하므로 "
+                               "영문(로마자)으로 바꿔 주세요."})
     return findings
 
 
@@ -467,6 +515,7 @@ def validate_documents(documents: dict[str, dict], reference: dict,
                                     reference))
     findings.extend(_missing_findings(documents, labels, form_fields, reported))
     findings.extend(_date_findings(documents, labels, form_fields))
+    findings.extend(_language_findings(documents, labels, form_fields))
     findings.extend(_item_findings(documents, labels))
 
     return {

@@ -44,9 +44,18 @@ HEAVY_PREFIXES = ("/api/support-chat", "/api/agent", "/api/attach", "/api/doc-pi
 HEAVY_LIMIT_PER_MINUTE = 40
 # 경로 중간에 번호가 끼는 비용 큰 길 — 끝 부분으로 맞춥니다(전수 점검 3회차: 번호 때문에 제한을 피해 갔습니다).
 HEAVY_SUFFIXES = ("/api/ask", "/requirements/upload", "/analyze", "/customs-filing/translate",
-                  "/planning/api/cargo", "/planning/api/departure-check")
+                  "/planning/api/departure-check")
 # GET 이어도 외부·AI 를 부르는 길
-HEAVY_GET_PATHS = ("/documents/api/required-docs",)
+# 조회 값(쿼리)이 붙은 요청만 셉니다 — 화면을 여는 것까지 세지 않습니다.
+HEAVY_GET_PREFIXES = ("/documents/api/required-docs", "/planning/api/hs-codes", "/planning/api/tariff",
+                      "/tracking/container", "/lookup/")
+HEAVY_GET_SUFFIXES = ("/required-docs",)
+# 비용이 없는 계산(화물 CBM·중량)은 입력할 때마다 부르므로 넉넉한 바구니로
+DRAFT_SUFFIXES = ("/planning/api/cargo",)
+# 파일을 올려 OCR·AI 로 읽는 길 — 한 번에 tesseract 를 여러 번 돌려 동시에 몰리면 메모리·CPU 가 바닥납니다.
+FILE_SLOT_PREFIXES = ("/documents/extract", "/api/attach", "/api/doc-pipeline", "/api/intake")
+FILE_SLOT_SUFFIXES = ("/requirements/upload",)
+MAX_CONCURRENT_FILES = 3
 # AI 를 동시에 부르는 요청 수 — 일꾼 스레드(8개)를 다 쓰지 않게 남깁니다. 넘으면 503.
 MAX_CONCURRENT_HEAVY = 5
 # JSON 본문은 파일이 아니라 글이므로 훨씬 작게(파일 올리기만 40MB)
@@ -233,6 +242,7 @@ def install(app: Flask) -> None:
     app.extensions["heavy_window"] = Window()
     app.extensions["signup_window"] = Window()
     heavy_slots = threading.BoundedSemaphore(MAX_CONCURRENT_HEAVY)
+    file_slots = threading.BoundedSemaphore(MAX_CONCURRENT_FILES)
 
     @app.before_request
     def guard():
@@ -251,16 +261,21 @@ def install(app: Flask) -> None:
                                    " (프록시·별칭 주소를 쓴다면 운영자가 ALLOWED_ORIGINS 에 추가해야 합니다)",
                                    "BAD_ORIGIN", 403)
         # 2) 비용이 드는 길의 횟수 제한 — 접속자별(+ 접속 IP 별) 슬라이딩 창
+        if request.is_json:
+            # 길이를 미리 알리지 않는 청크 전송은 content_length 가 없어 아래 검사를 건너뛰었습니다 —
+            # 30MB JSON 하나로 메모리가 136MB → 950MB(전수 점검 4회차). 읽는 쪽 한도도 함께 낮춥니다.
+            request.max_content_length = min(request.max_content_length or MAX_JSON_BYTES, MAX_JSON_BYTES)
         if request.is_json and request.content_length and request.content_length > MAX_JSON_BYTES:
             return _refuse(f"보낸 내용이 너무 큽니다. 글 내용은 {MAX_JSON_BYTES // (1024 * 1024)}MB 이하로 줄여 주세요.",
                            "PAYLOAD_TOO_LARGE", 413)
-        heavy_get = request.method == "GET" and request.path in HEAVY_GET_PATHS
+        heavy_get = (request.method == "GET" and bool(request.args)
+                     and (request.path.startswith(HEAVY_GET_PREFIXES) or request.path.endswith(HEAVY_GET_SUFFIXES)))
         if (request.method == "POST" or heavy_get) and rate_limit_on(app):
             path = request.path
             if (any(path.startswith(prefix) for prefix in HEAVY_PREFIXES)
                     or path.endswith(HEAVY_SUFFIXES) or heavy_get):
                 bucket, limit = "heavy", HEAVY_LIMIT_PER_MINUTE
-            elif any(path.startswith(prefix) for prefix in DRAFT_PREFIXES):
+            elif any(path.startswith(prefix) for prefix in DRAFT_PREFIXES) or path.endswith(DRAFT_SUFFIXES):
                 bucket, limit = "draft", DRAFT_LIMIT_PER_MINUTE
             else:
                 bucket, limit = "", 0
@@ -278,21 +293,28 @@ def install(app: Flask) -> None:
                     return response
                 for key, _cap in keys:
                     window.add(key)
-                if bucket == "heavy" and request.method == "POST" and path.endswith(
-                        ("/api/ask", "/analyze", "/translate", "/review")) or path.startswith(
-                        ("/api/support-chat", "/api/agent", "/contract/review")):
-                    if not heavy_slots.acquire(blocking=False):
-                        response = _refuse("지금 요청이 몰려 있습니다. 잠시 뒤 다시 해 주세요.", "BUSY", 503)
-                        target = response[0] if isinstance(response, tuple) else response
-                        target.headers["Retry-After"] = str(RETRY_AFTER_SECONDS)
-                        return response
-                    g.heavy_slot = True
+                if request.method == "POST":
+                    pool = None
+                    if path.startswith(FILE_SLOT_PREFIXES) or path.endswith(FILE_SLOT_SUFFIXES):
+                        pool, name = file_slots, "file_slot"
+                    elif path.endswith(("/api/ask", "/analyze", "/translate")) or path.startswith(
+                            ("/api/support-chat", "/api/agent", "/contract/review")):
+                        pool, name = heavy_slots, "heavy_slot"
+                    if pool is not None:
+                        if not pool.acquire(blocking=False):
+                            response = _refuse("지금 요청이 몰려 있습니다. 잠시 뒤 다시 해 주세요.", "BUSY", 503)
+                            target = response[0] if isinstance(response, tuple) else response
+                            target.headers["Retry-After"] = str(RETRY_AFTER_SECONDS)
+                            return response
+                        setattr(g, name, pool)
         return None
 
     @app.teardown_request
     def release_slot(_exc):
-        if g.pop("heavy_slot", False):
-            heavy_slots.release()
+        for name in ("heavy_slot", "file_slot"):
+            pool = g.pop(name, None)
+            if pool is not None:
+                pool.release()
 
     @app.errorhandler(413)
     def too_large(_error):

@@ -100,7 +100,7 @@
       return {
         success: false,
         error_code: timedOut ? "TIMEOUT" : "NETWORK_ERROR",
-        message: timedOut ? "서버 응답 시간이 초과되었습니다." : "서버와 통신하지 못했습니다. 서버가 실행 중인지 확인하세요.",
+        message: timedOut ? "응답이 오래 걸려 중단했습니다. 잠시 뒤 다시 시도해 주세요." : "인터넷 연결을 확인하고 다시 시도해 주세요.",
       };
     } finally {
       clearTimeout(timer);

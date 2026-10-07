@@ -48,6 +48,11 @@ def _rx(pattern: str, flags: int = re.I) -> re.Pattern:
     컴파일이었습니다. 규칙 글자는 바뀌지 않으므로 끝까지 들고 있습니다.
     """
 
+    # 숫자로 시작하는 규칙(\d+\s*kg …)은 숫자만 이어진 글에서 시작 자리마다 끝까지 훑어 제곱으로 느려집니다
+    # (전수 점검 4회차: 숫자 12,000자 → 15초, 10만 자 → 10분 넘게 서버 전체가 멈춤). 숫자 덩어리의 **첫 자리**
+    # 에서만 시작하게 합니다 — 결과는 같습니다(덩어리 가운데서 시작한 것은 첫 자리 것에 포함됩니다).
+    if pattern.startswith(r"\d"):
+        pattern = r"(?<!\d)" + pattern
     return re.compile(pattern, flags)
 
 
@@ -3535,7 +3540,7 @@ _amend("payment_account", detect=(
     r"of\s+the\s+seller",))
 _amend("goods", detect=(
     r"\b(?:goods|products?|commodity)\s*:\s*[^.]{0,80}?\d[\d,]*\s*(?:pcs|MT|units|sets|kgs?|tons?|tonnes?)\b",
-    r"[가-힣A-Za-z0-9]{2,20}\s*\d[\d,]*\s*(?:톤|개|kg|대|세트|매|롤)(?:을|를)\s*[^.]{0,20}공급"))
+    r"[가-힣A-Za-z]{2,20}\s*\d[\d,]*\s*(?:톤|개|kg|대|세트|매|롤)(?:을|를)\s*[^.]{0,20}공급"))
 _amend("quantity_tol", detect=(r"수량[^.]{0,20}[±]\s*\d{1,2}\s*%",))
 _amend("packing", detect=(r"\d+\s*kg\s*(?:포대|박스|상자|드럼|백)", r"팔레트\s*적재", r"화인"))
 _amend("late_interest", detect=(r"지연\s*손해금",))

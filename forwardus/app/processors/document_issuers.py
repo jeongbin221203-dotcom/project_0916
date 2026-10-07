@@ -416,7 +416,7 @@ COUNTRY_AGENCIES = {
     ],
     "GB": [
         {"label": "UKCA 적합성 표시 안내", "url": "https://www.gov.uk/guidance/using-the-ukca-marking",
-         "note": "CE가 아니라 UKCA입니다. 영국 내 책임자(UK Responsible Person)가 필요합니다."},
+         "note": "대부분 품목은 CE 표시가 계속 인정되고, UKCA 가 필요한 품목만 따로 있습니다. 영국 내 책임자(UK Responsible Person)가 필요할 수 있어 품목별로 확인하세요."},
     ],
     "AU": [
         {"label": "ACMA (무선·통신)", "url": "https://www.acma.gov.au",

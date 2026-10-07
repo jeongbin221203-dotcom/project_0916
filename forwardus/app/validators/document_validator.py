@@ -121,6 +121,9 @@ def _check_weights(updated: dict, current) -> None:
         raise ValidationError("총중량(Gross Weight)이 순중량(Net Weight)보다 작을 수 없습니다.", "gross_weight_kg")
 
 
+OPTIONAL_NUMERIC = {"net_weight_kg"}
+
+
 def clean_document_fields(form: dict, current: dict) -> dict:
     """Return a copy of ``current`` updated with validated form values."""
 
@@ -132,6 +135,11 @@ def clean_document_fields(form: dict, current: dict) -> dict:
         if key not in form:
             continue
         raw = form.get(key)
+        if key in OPTIONAL_NUMERIC and (raw is None or (isinstance(raw, str) and not raw.strip())):
+            # 계획 화면이 "(선택)"이라고 한 칸은 비워 둔 채로도 저장됩니다. 예전에는 다른 칸만 고쳐도
+            # "Net Weight 값을 입력해주세요"로 막히고 고친 내용이 모두 사라졌습니다(전수 점검 4회차).
+            updated[key] = ""
+            continue
         if key in NUMERIC_FIELDS:
             number = parse_number(raw, NUMERIC_FIELDS[key], allow_zero=True, field=key)
             if key == "quantity":

@@ -197,6 +197,27 @@ def _text(payload: dict, key: str, limit: int = 300) -> str:
     return str(payload.get(key) or "").strip()[:limit]
 
 
+def _country_code(payload: dict, key: str = "buyer_country", strict: bool = True) -> str:
+    """두 글자 코드 또는 나라 이름("Vietnam"·"베트남")을 코드로.
+
+    예전에는 앞 두 글자만 잘라 썼습니다 — Vietnam→VI(미국령 버진아일랜드), Indonesia→IN(인도),
+    Germany→GE(조지아), Singapore→SI(슬로베니아)로 저장됐습니다(전수 점검 4회차).
+    """
+
+    text = _text(payload, key, 60)
+    if not text:
+        return ""
+    if len(text) == 2 and text.isascii() and text.isalpha():
+        return text.upper()
+    found = location_client.find_country_by_name(text)
+    if found:
+        return found
+    if strict:
+        raise ValidationError(f"Buyer 국가 '{text}'를 알 수 없습니다. 두 글자 국가 코드(예: US)나 "
+                              "나라 이름(예: Vietnam, 베트남)으로 적어 주세요.", key)
+    return ""
+
+
 def _invoice_value(items: list[dict]) -> float:
     """품목 금액의 합. 일부만 적으면 거절합니다.
 
@@ -262,7 +283,7 @@ def create(payload: dict, user_id: int | None = None) -> dict:
         "exporter_address": _text(payload, "exporter_address", 500),
         "notify_party": _text(payload, "notify_party", 300),
         "buyer": {"name": buyer_name,
-                  "country": _text(payload, "buyer_country", 2).upper(),
+                  "country": _country_code(payload),
                   "address": _text(payload, "buyer_address", 500),
                   "contact_email": _text(payload, "buyer_email", 200)},
         "schedule_id": _text(payload, "schedule_id", 80),
@@ -296,7 +317,7 @@ def suggest_project_name(payload: dict, items: list[dict] | None = None) -> str:
     where = _text(payload, "destination_country_name", 60)
     if not where:
         # 국가코드(항구 부호 앞 두 글자)로 한글 나라 이름을 찾습니다. 모르면 항구 부호를 그대로.
-        country = _text(payload, "buyer_country", 2).upper() or code[:2]
+        country = _country_code(payload, strict=False) or code[:2]
         where = (location_client.country_name(country) if country else "") or code
     what = str(items[0].get("product_description") or "").strip() if items else ""
     day = _text(payload, "requested_departure_date", 20)

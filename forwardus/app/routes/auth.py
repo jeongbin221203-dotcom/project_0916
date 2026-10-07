@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 from flask import (Blueprint, current_app, flash, g, jsonify, redirect, render_template,
                    request, session, url_for)
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import security
@@ -143,7 +144,14 @@ def signup():
             user = User(email=form["email"], name=form["name"])
             user.set_password(password)
             db.session.add(user)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except IntegrityError:
+                # 같은 이메일이 동시에 들어온 경우 — 조회 뒤 저장 사이에 다른 요청이 먼저 가입했습니다.
+                # 예전에는 500 이었습니다(전수 점검 4회차).
+                db.session.rollback()
+                return render_template("auth/signup.html", form=form,
+                                       error="이미 가입된 이메일입니다."), 400
             _log_in(user)
             flash("회원가입이 완료되었습니다.", "success")
             return redirect(url_for("dashboard.index"))

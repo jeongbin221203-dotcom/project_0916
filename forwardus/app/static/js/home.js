@@ -274,6 +274,8 @@
 
   // Enter로 보내고, Shift+Enter로 줄을 바꿉니다.
   input.addEventListener("keydown", (event) => {
+    // 한글 조합 중(IME)의 Enter 는 글자를 확정하는 키입니다 — 보내면 마지막 글자가 따로 나가거나 남습니다.
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       stage.requestSubmit();

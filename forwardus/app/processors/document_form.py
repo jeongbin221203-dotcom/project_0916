@@ -145,7 +145,8 @@ LAYOUTS = {
              ("carrier", "Carrier", 0.33)],
             [("pol", no(2, "From"), 0.34), ("pod", no(3, "To"), 0.33),
              ("incoterms", no(16, "Terms of delivery"), 0.33)],
-            [("payment_terms", no(17, "Terms of payment"), 1.0)],
+            [("payment_terms", no(17, "Terms of payment"), 0.67),
+             ("country_of_origin", "Country of origin", 0.33)],
         ],
         "table": True,
         "footer": [

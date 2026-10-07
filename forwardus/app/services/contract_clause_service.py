@@ -203,6 +203,27 @@ def checklist(incoterms: str = "", present: set[str] | None = None,
     return out
 
 
+_LONG_RUN = re.compile(r"(\S){11,}")
+
+
+def _guard_text(body: str) -> str:
+    """병적인 글(같은 글자·같은 토막의 반복)을 분석 전에 걸러냅니다.
+
+    4KB 의 "1111…" 하나가 정규식 폭증으로 14초, 8KB 면 70초 동안 서버 전체를 멈췄습니다(전수 점검 4회차 —
+    파이썬 re 는 GIL 을 놓지 않아 같은 프로세스의 모든 요청이 섰습니다). 진짜 계약서는 같은 글자가 12번
+    이상 이어지는 곳이 밑줄·점선뿐이고, 압축하면 20~40% 로 줄지 몇 %로 줄지 않습니다.
+    """
+
+    body = _LONG_RUN.sub(lambda m: m.group(1) * 12, body)
+    if len(body) > 5000:
+        import zlib
+        raw = body.encode("utf-8", errors="ignore")
+        if len(zlib.compress(raw, 1)) / max(1, len(raw)) < 0.04:
+            raise ServiceError("같은 글자·문장이 되풀이되는 글이라 계약서로 읽을 수 없습니다. "
+                               "계약서 본문이나 파일을 넣어 주세요.", "NOT_CONTRACT")
+    return body
+
+
 def review(text: str, incoterms: str = "", country: str = "") -> dict:
     """올린 계약서 판정.
 
@@ -216,6 +237,8 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
     if not body.strip():
         raise ServiceError("읽을 글이 없습니다. 계약서 파일이나 글을 넣어 주세요.",
                            "VALIDATION_ERROR")
+    full_length = len(body)
+    body = _guard_text(body[:MAX_TEXT])
     analysis = contract_clauses.analyze(body[:MAX_TEXT])
     if analysis.get("empty"):
         # 못 읽은 것을 '필수조항이 전부 빠졌다'고 하면 안 됩니다.
@@ -315,14 +338,14 @@ def review(text: str, incoterms: str = "", country: str = "") -> dict:
                                                   or _party_ab_unknown(body[:MAX_TEXT])),
         # 40만 자를 넘으면 앞만 봅니다 — 그걸 밝힙니다. 전에는 뒤를 안 보면서
         # 글자 수는 전체를 적어 '다 읽었다'고 했습니다. (2026-10-04)
-        "checked": min(len(body), MAX_TEXT),
+        "checked": min(full_length, MAX_TEXT),
         # 판정 기준 — 결과 위에 "CIF · 중국(CN) 기준"으로 적습니다(사용성 4회차).
         "incoterms": (incoterms or "").upper(),
         "incoterms_from_doc": in_doc if not chosen else "",
         "incoterms_mismatch": in_doc if chosen and in_doc and in_doc != chosen else "",
         "blanks": len(contract_clauses._BLANK.findall(head)),
         "review_notes": [lang_note] if lang_note else [],
-        "truncated": len(body) > MAX_TEXT,
+        "truncated": full_length > MAX_TEXT,
         "note": DISCLAIMER,
     }
 

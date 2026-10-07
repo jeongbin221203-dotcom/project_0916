@@ -148,7 +148,15 @@ def parse_number(
     if isinstance(value, str):
         # 화면이 천 단위 쉼표를 붙여 보여주므로 사람이 그대로 옮겨 적습니다.
         # (48,000.00 같은 값) 쉼표는 떼고 읽습니다.
-        value = value.replace(",", "").replace(" ", "")
+        compact = value.replace(" ", "")
+        whole = compact.split(".")[0]
+        if "," in whole:
+            groups = whole.lstrip("+-").split(",")
+            if not (1 <= len(groups[0]) <= 3 and all(len(group) == 3 and group.isdigit() for group in groups[1:])):
+                # "2,5" 를 25 로 읽어 단가가 10배가 됐습니다(전수 점검 4회차) — 소수점인지 천 단위인지 모를 때는 묻습니다.
+                raise ValidationError(f"{field_name}의 쉼표(,)가 소수점인지 천 단위인지 알 수 없습니다. "
+                                      "소수점은 점(.)으로, 천 단위는 3자리마다 쉼표로 적어 주세요.", field)
+        value = compact.replace(",", "")
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
@@ -183,6 +191,8 @@ def parse_optional_number(value: Any, field_name: str, *, max_value: float | Non
 # 판단하지 않습니다. 이 검사는 막는 오류가 아니라 **경고**입니다(전수 점검 2회차 — UN1263(페인트)에 급 8·PG I,
 # UN3480 에 PG II, UN9999 가 모두 경고 없이 선적의뢰서 위험물 칸으로 나갔습니다).
 _PG_REQUIRED = {"3", "4.2", "4.3", "5.1", "6.1", "8"}
+# 8급인데 포장등급이 없는 물질 — 축전지류(UN2794·2795·2800·3028). 경고하면 정상 서류가 오경고를 받습니다.
+_PG_EXEMPT_UN = {"2794", "2795", "2800", "3028"}
 _PG_NONE = {"1", "2.1", "2.2", "2.3", "5.2", "6.2", "7"}
 # 자주 나오는 UN 번호 → 급. 다른 급을 고르면 경고합니다(번호가 틀렸거나 급이 틀렸습니다).
 _UN_CLASS = {
@@ -204,7 +214,7 @@ def dg_consistency(un_digits: str, dg_class: str, packing_group: str) -> list[st
     known = _UN_CLASS.get(un_digits)
     if known and known != dg_class:
         notes.append(f"{josa('UN' + un_digits, '은')} 보통 {known}급입니다. 고르신 {dg_class}급과 다릅니다 — MSDS 14번 항목을 확인하세요.")
-    if dg_class in _PG_REQUIRED and not packing_group:
+    if dg_class in _PG_REQUIRED and not packing_group and un_digits not in _PG_EXEMPT_UN:
         notes.append(f"{dg_class}급은 포장등급(I·II·III)이 있어야 합니다. MSDS 14번 항목에서 확인해 적어 주세요.")
     if dg_class in _PG_NONE and packing_group:
         notes.append(f"{dg_class}급에는 보통 포장등급이 없습니다. 적으신 {packing_group}가 맞는지 확인하세요.")

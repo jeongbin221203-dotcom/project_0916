@@ -230,7 +230,16 @@ PLACE_ALIASES = {
     "베이징": "beijing", "북경": "beijing",
     "상해": "상하이", "심천": "선전", "청도": "칭다오", "대련": "다롄", "천진": "톈진",
     "광주(중국)": "광저우",
+    # 약어·표기 흔들림(전수 점검 4회차) — "LA" 는 부분 일치로 램차방(Lamchabang)이 1순위였고 "NY" 는 스웨덴 Nykoping 이었습니다.
+    "la": "los angeles", "엘에이": "los angeles", "로스엔젤레스": "los angeles", "로스엔젤리스": "los angeles",
+    "losangeles": "los angeles", "losangles": "los angeles",
+    "ny": "new york", "nyc": "new york", "엔와이": "new york", "뉴욕시": "new york",
+    "lb": "long beach", "롱비치": "long beach", "sf": "san francisco", "샌프란": "san francisco",
+    "이스탄불": "istanbul", "싱가폴": "싱가포르", "햄부르크": "함부르크", "haiphong": "haiphong",
+    "하이퐁": "haiphong", "뭄바이항": "mumbai",
 }
+# 바다 도착지에서만 쓰는 별칭 — 두바이 항구는 제벨알리입니다(공항 DXB 와 구분).
+SEA_ALIASES = {"두바이": "제벨알리", "dubai": "jebel"}
 
 
 def search_locations(query: str, kind: str | None = None, country: str | None = None,
@@ -243,7 +252,11 @@ def search_locations(query: str, kind: str | None = None, country: str | None = 
         return fail("MOCK_DATA_ERROR", "mock")
 
     keyword = (query or "").strip().lower()
-    keyword = PLACE_ALIASES.get(keyword, keyword)
+    squeezed = "".join(ch for ch in keyword if ch not in ". 	")
+    if kind == "port" and (keyword in SEA_ALIASES or squeezed in SEA_ALIASES):
+        keyword = SEA_ALIASES.get(keyword) or SEA_ALIASES[squeezed]
+    else:
+        keyword = PLACE_ALIASES.get(keyword) or PLACE_ALIASES.get(squeezed) or keyword
     country = (country or "").strip().upper()
     # With no keyword and no country there is nothing to rank by, so only the
     # well-known locations are suggested. Typing searches the full list.
