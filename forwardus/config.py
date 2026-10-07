@@ -73,6 +73,9 @@ class Config:
 
     SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # 끊긴 연결을 처음 쓴 요청마다 500 이 나던 것을 막습니다 — 쓰기 전에 살아 있는지 확인(pre_ping)하고,
+    # 오래된 연결은 새로 맺습니다(recycle). Render 무료 Postgres 는 유휴 연결을 끊습니다(관리자 점검 2회차).
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "pool_recycle": 280}
 
     DATA_DIR = BASE_DIR / "data"
     MOCK_DATA_DIR = DATA_DIR / "mock"
