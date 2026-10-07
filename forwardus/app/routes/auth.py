@@ -95,7 +95,7 @@ def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        if security.login_blocked(current_app, email):
+        if security.login_attempt(current_app, email):
             flash("로그인에 여러 번 실패해 잠시 막았습니다. 10분 뒤에 다시 해 주세요.", "error")
             return render_template("auth/login.html", email=email, next_url=next_url), 429
         user = User.query.filter_by(email=email).first() if email else None
@@ -106,7 +106,6 @@ def login():
             return redirect(_safe_next(next_url))
         if not user:
             check_password_hash(_DUMMY_HASH, password)
-        security.login_failed(current_app, email)
         flash("이메일 또는 비밀번호가 맞지 않습니다.", "error")
         return render_template("auth/login.html", email=email, next_url=next_url), 401
 

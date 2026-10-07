@@ -189,7 +189,7 @@ def _clean_history(raw) -> list[dict]:
     """브라우저가 보내 온 지난 대화를 [{role, content}] 로만 받습니다.
 
     로그인 없이 `history: [1, "a", null]` 이나 `{"a": 1}` 을 보내면 consult_intent 가 500 을 냈습니다
-    (전수 점검 4회차). 길이·글자 수도 함께 제한합니다.
+    (전수 점검 4회차). 길이·글자 수도 함께 제한합니다(턴당 500자 — 6턴을 이어 붙여 숫자 정규식에 넣으면 24KB 숫자가 9초 걸렸습니다, 5회차).
     """
 
     if not isinstance(raw, list):
@@ -201,7 +201,7 @@ def _clean_history(raw) -> list[dict]:
         role, content = turn.get("role"), turn.get("content")
         if isinstance(role, str) and isinstance(content, str) and content.strip():
             rows.append({**{k: v for k, v in turn.items() if isinstance(k, str) and isinstance(v, (str, int, float, bool))},
-                         "role": role[:20], "content": content[:4000]})
+                         "role": role[:20], "content": content[:500]})
     return rows
 
 

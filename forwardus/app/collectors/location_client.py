@@ -435,6 +435,16 @@ def nearest(location: dict, kind: str, country_code: str | None = None) -> dict 
     return deepcopy(min(candidates, key=lambda item: great_circle_km(here, (item["lat"], item["lon"]))))
 
 
+def country_name_en(country_code: str) -> str:
+    """국가코드의 영문 이름. 목록에 없으면 코드를 그대로."""
+
+    code = (country_code or "").strip().upper()
+    for item in _all_locations():
+        if item["country_code"] == code:
+            return item["country_en"]
+    return code
+
+
 def country_name(country_code: str) -> str:
     """국가코드의 한글 이름. 목록에 없으면 코드를 그대로 돌려줍니다."""
 

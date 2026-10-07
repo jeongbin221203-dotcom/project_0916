@@ -280,6 +280,19 @@ DOC_PREFIX = {
 }
 
 
+def _origin_text(shipment) -> str:
+    """원산지 — 수출신고 화면에서 고친 값(예: "CN · 중국")을 따릅니다. 고정 "KOREA" 면 서류 간 불일치가 났습니다."""
+
+    raw = (getattr(shipment, "country_of_origin", "") or "").strip()
+    code = raw.split("·")[0].strip().upper() if raw else "KR"
+    if not (len(code) == 2 and code.isalpha()):
+        return raw.upper() or "THE REPUBLIC OF KOREA"
+    if code == "KR":
+        return "THE REPUBLIC OF KOREA"
+    from app.collectors import location_client
+    return location_client.country_name_en(code).upper()
+
+
 _ORIGIN_PLACE_TERMS = {"EXW", "FCA", "FAS", "FOB"}
 
 
@@ -385,8 +398,15 @@ def build_reference(shipment, doc_type: str = "") -> dict:
     lines = list(shipment.cargos or [])
     gross = _summed(lines, "total_weight_kg")
     equipment = ""
+    # 냉장·냉동은 일반 컨테이너(GP)가 아니라 리퍼(RH)입니다 — 부킹이 40GP 로 나가면 냉동기가 없습니다(전수 점검 5회차).
+    temperature = (getattr(cargo, "temperature_requirement", "") if cargo else "") or ""
+    reefer = ""
+    if temperature in ("chilled", "frozen"):
+        reefer = (("FROZEN" if temperature == "frozen" else "CHILLED")
+                  + " - SET TEMP ____ C / VENTILATION ____ / HUMIDITY ____ (입력 필요)")
     if shipment.sea_mode == "FCL" and cargo and cargo.container_quantity:
-        equipment = f"{cargo.container_quantity} x {cargo.container_type}"
+        kind = "40RH (REEFER)" if reefer else cargo.container_type
+        equipment = f"{cargo.container_quantity} x {kind}"
     elif shipment.sea_mode == "LCL":
         equipment = "LCL"
     elif shipment.transport_mode == "AIR":
@@ -430,7 +450,7 @@ def build_reference(shipment, doc_type: str = "") -> dict:
         "equipment": equipment,
         "remarks": "",
         # 표준 서식 칸 가운데 Shipment에서 바로 채울 수 있는 것
-        "country_of_origin": "THE REPUBLIC OF KOREA",
+        "country_of_origin": _origin_text(shipment),
         "carriage_by": "AIR" if shipment.transport_mode == "AIR" else "SEA",
         "final_destination": _port(shipment.destination_name, shipment.destination_code),
         "hs6": f"{hs_digits[:4]}.{hs_digits[4:6]}" if len(hs_digits) >= 6 else "",
@@ -442,7 +462,7 @@ def build_reference(shipment, doc_type: str = "") -> dict:
         # 아래는 거래 조건에 따라 달라 서류에서 직접 적습니다.
         "buyer": "", "lc_no": "", "other_references": "", "payment_terms": "", "shipping_marks": "",
         "validity_date": "", "po_no": "", "bank_info": "", "booking_no": "", "container_seal_no": "",
-        "notify_party_2": "", "contact": "", "service_contract_no": "", "routing_remark": "", "reefer": "",
+        "notify_party_2": "", "contact": "", "service_contract_no": "", "routing_remark": "", "reefer": reefer,
         "confirmation_to": "",
         # 포장명세서(주문 서식)의 칸. 사람이 고쳐 쓸 수 있게 알 수 있는 값만 채웁니다.
         "order_no": shipment.shipment_id,

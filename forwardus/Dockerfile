@@ -71,7 +71,7 @@ RUN tesseract --list-langs 2>&1 | grep -qx 'kor' \
 # --max-requests 는 요청 1,000번마다 일꾼을 새로 띄워, 조금씩 새는 메모리가
 # 쌓여 한도에 닿는 것을 막습니다.
 CMD gunicorn --bind "0.0.0.0:${PORT:-10000}" \
-    --workers 1 --threads 8 --timeout 150 \
+    --workers 1 --threads 8 --timeout 150 --graceful-timeout 120 \
     --max-requests 1000 --max-requests-jitter 100 \
     --access-logfile - --error-logfile - \
     --access-logformat '%(h)s "%(m)s %(U)s" %(s)s %(b)s %(L)s' \

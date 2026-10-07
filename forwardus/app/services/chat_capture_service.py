@@ -34,14 +34,14 @@ ROUTE_PATTERNS = (
                r"([가-힣A-Za-z][가-힣A-Za-z .]{1,24})"),
 )
 # "500박스", "500 CTN", "300개"
-COUNT = re.compile(r"(\d[\d,]*)\s*(박스|상자|개|팔레트|파렛|카톤|ctns?|cartons?|boxes|box|plts?|pallets?)",
+COUNT = re.compile(r"(?<![\d,])(\d[\d,]{0,11})\s*(박스|상자|개|팔레트|파렛|카톤|ctns?|cartons?|boxes|box|plts?|pallets?)",
                    re.I)
 # **포장 수가 먼저입니다.** "박스당 20개입, 총 500박스" 가 수량 20(→ 15CBM 화물이 0.6CBM) 으로 읽혔습니다
 # (전문가 점검 2회차). 포장 단위만 모은 패턴으로 먼저 찾고, 없을 때만 낱개(개)를 봅니다.
-PACKAGE_COUNT = re.compile(r"(\d[\d,]*)\s*(박스|상자|팔레트|파렛|카톤|ctns?|cartons?|boxes|box|plts?|pallets?)"
+PACKAGE_COUNT = re.compile(r"(?<![\d,])(\d[\d,]{0,11})\s*(박스|상자|팔레트|파렛|카톤|ctns?|cartons?|boxes|box|plts?|pallets?)"
                            r"(?![가-힣a-z]*\s*(?:당|씩|마다))", re.I)
 # "20개입", "24개씩", "개당" 앞의 수, "3개월", "5개국" 은 수량이 아닙니다.
-EACH_COUNT = re.compile(r"(\d[\d,]*)\s*개(?!\s*(?:입|씩|월|국|사|년|팀|회|조|항|층|호|번|분|시간))(?!\s*(?:당|마다))")
+EACH_COUNT = re.compile(r"(?<![\d,])(\d[\d,]{0,11})\s*개(?!\s*(?:입|씩|월|국|사|년|팀|회|조|항|층|호|번|분|시간))(?!\s*(?:당|마다))")
 # "한 박스 12kg", "박스당 12kg", "개당 0.5t"
 PER_PACKAGE = re.compile(r"(?:한|1)?\s*(?:박스|상자|개|팔레트|파렛|carton|ctn|box|plt)\s*(?:당|에|은|는)?\s*"
                          r"(\d[\d,]*(?:\.\d+)?)\s*(kgs?|킬로|metric\s*tons?|tonnes?|tons?|mt|lbs?|t|톤)(?![a-z])",
@@ -197,7 +197,7 @@ def retune_ports(fields: dict, mode: str) -> dict:
 def read(message: str) -> dict:
     """적힌 값만 뽑습니다. {"fields": {...}, "items": [{...}]} (없으면 빈 dict)"""
 
-    text = str(message or "").strip()
+    text = str(message or "").strip()[:3000]       # 숫자만 긴 글에서 정규식이 제곱으로 느려져 길이를 자릅니다(5회차)
     if len(text) < MIN_LENGTH:
         return {}
 

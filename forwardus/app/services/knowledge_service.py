@@ -192,6 +192,38 @@ def topics() -> list[dict]:
             for entry in entries()]
 
 
+_NOT_INDIA_AFTER = ("조건", "장소", "받", "하", "네시아", "가", "되", "인", "증")
+_NOT_INDIA_BEFORE = ("개", "양", "전", "수", "이")
+
+
+def _must_hit(word: str, asked: str, question: str) -> bool:
+    """필수어가 **그 뜻으로** 들어 있는가.
+
+    공백을 뺀 질문에 부분 문자열로 맞추면 "D/P 서류 인도 조건"이 인도(India) 수출 안내로, "ICC(A)"가 필리핀 ICC
+    인증으로, "Shipping documents"가 CE(doc) 안내로 갔습니다(전수 점검 5회차). 영문 약어는 낱말 경계로,
+    "인도"는 인도조건·인도장소·개인도처럼 다른 낱말의 일부가 아닐 때만 인정합니다.
+    """
+
+    if word not in asked:
+        return False
+    if word.isascii() and word.replace(" ", "").isalnum():
+        lowered = (question or "").lower()
+        pattern = r"(?<![a-z0-9])" + re.escape(word) + r"(?![a-z0-9])"
+        if not re.search(pattern, lowered):
+            return False
+        if word == "icc" and re.search(r"icc\s*\(?\s*[abc]\s*\)?(?![a-z])", lowered):
+            return False                                   # 협회 보험약관 ICC(A)/(B)/(C)
+        return True
+    if word == "인도":
+        for hit in re.finditer("인도", asked):
+            before, after = asked[:hit.start()][-1:], asked[hit.end():]
+            if before in _NOT_INDIA_BEFORE or after.startswith(_NOT_INDIA_AFTER):
+                continue
+            return True
+        return False
+    return True
+
+
 def score(entry: dict, question: str) -> int:
     """질문과 얼마나 맞는지. 긴 말이 맞을수록 확실합니다.
 
@@ -202,7 +234,7 @@ def score(entry: dict, question: str) -> int:
     asked = _compact(question)
     if not asked:
         return 0
-    if entry["_must"] and not any(word in asked for word in entry["_must"]):
+    if entry["_must"] and not any(_must_hit(word, asked, question) for word in entry["_must"]):
         return 0
     total = sum(len(word) for word in entry["_match"] if word and word in asked)
     if total and entry["_must"]:

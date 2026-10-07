@@ -6,7 +6,7 @@
   쪽 번호만 글자로 박힌 스캔본은 OCR 을 하지 않고 거절했습니다.
   국문 갑/을 계약서는 방향을 못 봐서 우리 권리를 독소로 짚었습니다.
   Supplier/Distributor 로 부르는 계약서는 Seller/Buyer 규칙에 안 걸렸습니다.
-  40만 자를 넘는 글은 뒤를 안 보면서 '다 읽었다'고 했습니다.
+  MAX_TEXT 를 넘는 글은 뒤를 안 보면서 '다 읽었다'고 했습니다.
 """
 
 from __future__ import annotations

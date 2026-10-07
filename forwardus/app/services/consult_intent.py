@@ -31,7 +31,7 @@ INTENT_RULES = [
         r"항공|해상|포워더)", re.I)),
     ("tariff", re.compile(r"(관세|세율|tariff|hts|관세율|환급)", re.I)),
     ("origin_fta", re.compile(
-        r"(fta|원산지|c/?o|특혜관세|협정세율|누적기준|세번변경|부가가치기준)", re.I)),
+        r"(fta|원산지|c/?o\b|특혜관세|협정세율|누적기준|세번변경|부가가치기준)", re.I)),
     ("labeling", re.compile(r"(라벨|표시사항|표기|포장 ?표시|성분표|유통기한 ?표시)")),
     ("regulation", re.compile(
         r"(요건|규제|허가|승인|인증|등록|금지|제한|표시|성분|검역|위생|세관장확인|전략물자|제재)")),

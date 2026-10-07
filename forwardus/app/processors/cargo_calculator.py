@@ -163,6 +163,15 @@ def calculate_revenue_ton(total_cbm: float, total_weight_kg: float) -> float:
     return max(total_cbm, total_weight_kg / 1000)
 
 
+def _air_ceiling(value) -> float:
+    """항공 청구중량은 항공사가 0.5kg 단위로 **올려** 청구합니다(전수 점검 5회차 — 38.55kg 이 그대로 나왔습니다).
+
+    합계에서 올립니다(박스마다 올리지 않습니다). 항공사에 따라 1kg 올림도 있어 화면은 '0.5kg 올림 기준'이라고 밝힙니다.
+    """
+
+    return float(math.ceil(round(float(value) * 2, 6)) / 2)
+
+
 def calculate_chargeable_weight(
     total_weight_kg: float, total_cbm: float, volume_factor: float = AIR_VOLUME_FACTOR
 ) -> float:
@@ -263,7 +272,7 @@ def calculate_cargo_metrics(payload: dict, container_type: str = DEFAULT_CONTAIN
         "revenue_ton": _fix(revenue_ton, 3),
         "billable_revenue_ton": _fix(max(_dec(LCL_MIN_REVENUE_TON), revenue_ton), 3),
         "volume_weight_kg": _fix(volume_weight_kg, 2),
-        "chargeable_weight_kg": _fix(max(shown_weight, volume_weight_kg), 2),
+        "chargeable_weight_kg": _air_ceiling(max(shown_weight, volume_weight_kg)),
         "container_type": container_type,
         "container_quantity": calculate_container_quantity(
             float(shown_cbm), float(shown_weight), container_type),
@@ -321,7 +330,7 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
         "revenue_ton": _fix(revenue_ton, 3),
         "billable_revenue_ton": _fix(max(_dec(LCL_MIN_REVENUE_TON), revenue_ton), 3),
         "volume_weight_kg": _fix(total_cbm * AIR_VOLUME_FACTOR_EXACT, 2),
-        "chargeable_weight_kg": _fix(max(total_weight_kg, total_cbm * AIR_VOLUME_FACTOR_EXACT), 2),
+        "chargeable_weight_kg": _air_ceiling(max(total_weight_kg, total_cbm * AIR_VOLUME_FACTOR_EXACT)),
         "container_type": container_type,
         "container_quantity": calculate_container_quantity(
             float(total_cbm), float(total_weight_kg), container_type),

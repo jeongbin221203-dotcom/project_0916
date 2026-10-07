@@ -323,21 +323,37 @@ def _missing_findings(documents, labels, form_fields, reported) -> list[dict]:
     return findings
 
 
-_QTY_WITH_UNIT = re.compile(r"^\s*([\d,]+(?:\.\d+)?)\s*[A-Za-z./]{0,12}\s*$")
+_QTY_WITH_UNIT = re.compile(r"^\s*([\d][\d,\s]*(?:\.\d+)?)\s*[A-Za-z][A-Za-z0-9./²³]{0,11}\s*(?:\(.*\))?\s*$")
 
 
 def _qty_number(value):
-    """수량 칸은 "2,000 PCS" 처럼 단위가 붙어 나옵니다. 숫자만 읽습니다(없으면 None).
+    """수량 칸은 "2,000 PCS"·"500 M2" 처럼 단위가 붙어 나옵니다. 숫자만 읽습니다(못 읽으면 None).
 
     단위가 붙은 줄은 qty × price 검산을 통째로 건너뛰어, 6,400 이어야 할 금액이 5,000 이어도 통과했습니다
-    (전수 점검 4회차).
+    (전수 점검 4회차). 5회차: M2·M3 처럼 숫자가 든 단위, 괄호 설명("12 DZ (144 PCS)")도 읽고, 쉼표는
+    천 단위(3자리 묶음)일 때만 인정합니다 — "2,5 KG" 를 25 로 읽지 않고 건너뜁니다.
     """
 
     number = _as_number(value)
     if number is not None:
         return number
     match = _QTY_WITH_UNIT.match(str(value or ""))
-    return float(match.group(1).replace(",", "")) if match else None
+    if not match:
+        return None
+    digits = " ".join(match.group(1).split())
+    whole = digits.split(".")[0]
+    if "," in whole:
+        groups = whole.replace(" ", "").split(",")
+        if not (1 <= len(groups[0]) <= 3 and all(len(g) == 3 and g.isdigit() for g in groups[1:])):
+            return None
+    elif " " in whole:
+        groups = whole.split(" ")
+        if not (1 <= len(groups[0]) <= 3 and all(len(g) == 3 and g.isdigit() for g in groups[1:])):
+            return None
+    try:
+        return float(digits.replace(",", "").replace(" ", ""))
+    except ValueError:
+        return None
 
 
 def _item_findings(documents, labels) -> list[dict]:

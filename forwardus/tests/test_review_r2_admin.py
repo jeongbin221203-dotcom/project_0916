@@ -132,7 +132,7 @@ def test_잠금과_거절은_로그에_남는다(limited, caplog):
     client = limited.test_client()
     with caplog.at_level(logging.WARNING):
         client.post("/auth/logout", headers={"Origin": "https://evil.example"})
-        for _ in range(10):
+        for _ in range(11):
             client.post("/auth/login", data={"email": "someone@example.com", "password": "wrong"})
     text = caplog.text
     assert "출처 거절" in text and "로그인 잠금" in text

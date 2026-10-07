@@ -194,8 +194,15 @@ ORIGIN_WORDS = ("원산지증명서", "원산지 증명서", "c/o", "certificate
 ORIGIN_ASKING = ("어디서", "어디에", "어떻게", "발급", "신청", "받", "떼", "구하")
 
 
+# "언제 발급하나·전에 받아야 하나·자율발급인가" 는 창구가 아니라 방식·시점을 묻는 말이라 이 고정 답이 가로채지 않습니다
+# (전수 점검 5회차) — FAQ·지식 글로 넘깁니다.
+ORIGIN_NOT_WINDOW = ("언제", "전에", "후에", "자율", "직접 작성", "직접작성", "기한", "유효")
+
+
 def _asks_about_origin(text: str) -> bool:
     lowered = text.lower()
+    if any(word in lowered for word in ORIGIN_NOT_WINDOW):
+        return False
     return (any(word in lowered for word in ORIGIN_WORDS)
             and any(word in lowered for word in ORIGIN_ASKING))
 
@@ -211,8 +218,9 @@ def origin_answer() -> str:
 
     from app.processors import fta_guide
 
-    lines = ["원산지증명서는 **발급 기관이 따로 있습니다.** 저희가 대신 만들어 드릴 수 "
-             "없고, 협정마다 서식과 발급처가 다릅니다.", "",
+    lines = ["원산지증명서는 **협정마다 발급 방식이 다릅니다.** 한중·한-아세안·RCEP 처럼 **기관(세관·상공회의소)이 "
+             "발급**하는 협정이 있고, 한미·한-EU(6,000유로 이하)·EFTA 처럼 **수출자가 직접 작성(자율발급)** 하는 "
+             "협정도 있습니다. 저희가 대신 발급해 드릴 수는 없습니다.", "",
              "**신청 창구**", ""]
     for row in fta_guide.all_apply_links():
         lines.append(f"- [{row['label']}]({row['url']})")

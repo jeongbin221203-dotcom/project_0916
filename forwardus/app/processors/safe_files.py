@@ -15,7 +15,7 @@ import zipfile
 
 MAX_IMAGE_PIXELS = 25_000_000          # 약 5000×5000. 150dpi A4 스캔(1240×1754 ≈ 2.2M)의 10배
 MAX_DOCX_UNCOMPRESSED = 30 * 1024 * 1024
-MAX_TEXT_CHARS = 400_000               # 계약서 점검의 한도(MAX_TEXT)와 같습니다
+MAX_TEXT_CHARS = 250_000               # 계약서 점검의 한도(MAX_TEXT)와 같습니다
 
 
 class UnsafeFile(ValueError):

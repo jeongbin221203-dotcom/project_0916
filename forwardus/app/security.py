@@ -56,6 +56,8 @@ DRAFT_SUFFIXES = ("/planning/api/cargo",)
 FILE_SLOT_PREFIXES = ("/documents/extract", "/api/attach", "/api/doc-pipeline", "/api/intake")
 FILE_SLOT_SUFFIXES = ("/requirements/upload",)
 MAX_CONCURRENT_FILES = 3
+# 서류 미리보기·PDF 는 느려서(미리보기 2초, 5장 PDF 6초) 30개가 몰리면 /health 가 35초 걸렸습니다 — 동시에 3개까지.
+MAX_CONCURRENT_DRAFTS = 3
 # AI 를 동시에 부르는 요청 수 — 일꾼 스레드(8개)를 다 쓰지 않게 남깁니다. 넘으면 503.
 MAX_CONCURRENT_HEAVY = 5
 # JSON 본문은 파일이 아니라 글이므로 훨씬 작게(파일 올리기만 40MB)
@@ -148,12 +150,26 @@ def login_blocked(app: Flask, email: str) -> bool:
     return app.extensions["login_window"].count(login_key(email), LOGIN_WINDOW_SECONDS) >= LOGIN_MAX_FAILURES
 
 
+def login_attempt(app: Flask, email: str) -> bool:
+    """로그인 **시도를 먼저 기록**하고, 한도를 넘었으면 True(막음).
+
+    예전에는 비밀번호를 검사한 **뒤에** 실패를 적어서, 같은 이메일로 60건을 동시에 보내면 10회 한도인데 37번을
+    추측할 수 있었습니다(전수 점검 5회차). 성공하면 login_succeeded 가 기록을 지웁니다.
+    """
+
+    if not rate_limit_on(app):
+        return False
+    window = app.extensions["login_window"]
+    key = login_key(email)
+    window.add(key)
+    count = window.count(key, LOGIN_WINDOW_SECONDS)
+    if count == LOGIN_MAX_FAILURES + 1:
+        app.logger.warning("로그인 잠금: ip=%s email=%s", client_ip(), mask_email(email))
+    return count > LOGIN_MAX_FAILURES
+
+
 def login_failed(app: Flask, email: str) -> None:
-    if rate_limit_on(app):
-        window = app.extensions["login_window"]
-        window.add(login_key(email))
-        if window.count(login_key(email), LOGIN_WINDOW_SECONDS) == LOGIN_MAX_FAILURES:
-            app.logger.warning("로그인 잠금: ip=%s email=%s", client_ip(), mask_email(email))
+    """실패 기록은 login_attempt 가 이미 했습니다(시도 시점). 남겨 둔 자리 — 호출해도 더 세지 않습니다."""
 
 
 def login_succeeded(app: Flask, email: str) -> None:
@@ -243,6 +259,7 @@ def install(app: Flask) -> None:
     app.extensions["signup_window"] = Window()
     heavy_slots = threading.BoundedSemaphore(MAX_CONCURRENT_HEAVY)
     file_slots = threading.BoundedSemaphore(MAX_CONCURRENT_FILES)
+    draft_slots = threading.BoundedSemaphore(MAX_CONCURRENT_DRAFTS)
 
     @app.before_request
     def guard():
@@ -297,6 +314,8 @@ def install(app: Flask) -> None:
                     pool = None
                     if path.startswith(FILE_SLOT_PREFIXES) or path.endswith(FILE_SLOT_SUFFIXES):
                         pool, name = file_slots, "file_slot"
+                    elif bucket == "draft" and path.startswith(DRAFT_PREFIXES):
+                        pool, name = draft_slots, "draft_slot"
                     elif path.endswith(("/api/ask", "/analyze", "/translate")) or path.startswith(
                             ("/api/support-chat", "/api/agent", "/contract/review")):
                         pool, name = heavy_slots, "heavy_slot"
@@ -311,7 +330,7 @@ def install(app: Flask) -> None:
 
     @app.teardown_request
     def release_slot(_exc):
-        for name in ("heavy_slot", "file_slot"):
+        for name in ("heavy_slot", "file_slot", "draft_slot"):
             pool = g.pop(name, None)
             if pool is not None:
                 pool.release()

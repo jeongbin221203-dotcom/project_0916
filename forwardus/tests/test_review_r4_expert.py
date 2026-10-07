@@ -78,3 +78,90 @@ def test_상업송장에_원산지_칸이_있다():
     from app.processors.document_form import LAYOUTS
     names = {name for row in LAYOUTS["commercial_invoice"]["rows"] for cell in row for name in cell[0].split("+")}
     assert "country_of_origin" in names
+
+
+def _hit(entry_must, question):
+    from app.services.knowledge_service import _compact, _must_hit
+    asked = _compact(question)
+    return any(_must_hit(word, asked, question) for word in entry_must)
+
+
+@pytest.mark.parametrize("question", ["D/P는 서류 인도 조건인가요", "Shipping documents 목록", "CBM calculation 방법",
+                                       "CIF 보험은 ICC(A)인가요?", "ICC(C)가 뭐예요?", "FOB 인도 장소는 어디예요"])
+def test_짧은_낱말이_엉뚱한_나라_안내를_고르지_않는다(question):
+    assert not _hit(["인도", "doc", "cul", "icc"], question)
+
+
+@pytest.mark.parametrize("question", ["인도 수출하기", "인도로 수출할 때 인증", "India CE 마킹 doc", "필리핀 ICC 인증", "CUL 마크"])
+def test_진짜_질문은_그대로_걸린다(question):
+    assert _hit(["인도", "doc", "cul", "icc"], question)
+
+
+@pytest.mark.parametrize("raw, expected", [("2,000 PCS", 2000.0), ("500 M2", 500.0), ("500 M3", 500.0),
+                                            ("2 000 PCS", 2000.0), ("12 DZ (144 PCS)", 12.0), ("1,234,567 KG", 1234567.0),
+                                            ("7.5 MT", 7.5)])
+def test_수량_단위_붙은_값을_읽는다(raw, expected):
+    from app.processors.document_validator import _qty_number
+    assert _qty_number(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["2,5 KG", "10,5 MT", "abc", "", "PCS"])
+def test_뜻이_모호하면_읽지_않고_건너뛴다(raw):
+    from app.processors.document_validator import _qty_number
+    assert _qty_number(raw) is None
+
+
+def test_항공_청구중량은_05kg_올림():
+    from app.processors.cargo_calculator import _air_ceiling
+    assert _air_ceiling(38.55) == 39.0
+    assert _air_ceiling(39.0) == 39.0
+    assert _air_ceiling(4.97) == 5.0
+    assert _air_ceiling(39.01) == 39.5
+
+
+def test_포장등급_없는_UN번호는_오경고하지_않는다():
+    from app.validators.cargo_validator import dg_consistency
+    for un, cls in (("3473", "3"), ("3477", "8"), ("3528", "3"), ("3356", "5.1")):
+        assert dg_consistency(un, cls, "") == []
+
+
+@pytest.mark.parametrize("hs, key, expected", [("410110", "animal", True), ("510111", "animal", True),
+                                                ("050100", "animal", False), ("160431", "cites", True),
+                                                ("900190", "pharma", False), ("901890", "pharma", True)])
+def test_수출요건_규칙_정정(hs, key, expected):
+    from app.processors import export_requirements
+    assert (key in {item["key"] for item in export_requirements.check(hs)}) is expected
+
+
+@pytest.mark.parametrize("question", ["FTA 원산지증명서는 수출신고 전에 받아야 하나요?", "한중 FTA 원산지증명서는 자율발급인가요?",
+                                       "원산지증명서는 언제 발급해야 하나요?"])
+def test_발급_시점_방식_질문은_창구_안내가_가로채지_않는다(question):
+    from app.services.support_chat_service import _asks_about_origin
+    assert not _asks_about_origin(question)
+
+
+def test_발급처를_묻는_질문은_창구를_안내하고_자율발급도_밝힌다():
+    from app.services.support_chat_service import _asks_about_origin, origin_answer
+    assert _asks_about_origin("원산지증명서 어디서 받아요?")
+    assert "자율발급" in origin_answer() and "발급 기관이 따로 있습니다" not in origin_answer()
+
+
+class _Cargo:
+    def __init__(self, temperature="", container_type="40GP", quantity=1):
+        self.temperature_requirement, self.container_type, self.container_quantity = temperature, container_type, quantity
+
+
+def test_원산지는_수출신고_화면에서_고친_값을_따른다():
+    from app.services.document_service import _origin_text
+
+    class S:
+        country_of_origin = "CN · 중국"
+    assert _origin_text(S()) == "CHINA"
+
+    class K:
+        country_of_origin = "KR · 대한민국"
+    assert _origin_text(K()) == "THE REPUBLIC OF KOREA"
+
+    class E:
+        country_of_origin = ""
+    assert _origin_text(E()) == "THE REPUBLIC OF KOREA"

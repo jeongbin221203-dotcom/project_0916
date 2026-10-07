@@ -44,4 +44,4 @@ see: bill-of-lading, payment-tt, export-process
 ### At Sight와 Usance
 
 - **At Sight** — 서류 인수 후 곧바로 지급
-- **Usance(기한부)** — 30·60·90일 뒤 지급. **Banker's Usance**는 은행이 이자를 부담(수출자는 즉시 수령), **Shipper's Usance**는 수출자가 그 기간을 기다립니다. 계약서에 어느 쪽인지 반드시 적으세요.
+- **Usance(기한부)** — 30·60·90일 뒤 지급. **Banker's Usance**는 개설은행(또는 지정은행)이 만기 지급을 보장하고 수출자는 매입으로 즉시 수령합니다 — 인수·할인 이자는 **계약에서 정한 쪽(통상 수입자)** 이 부담합니다. **Shipper's Usance**는 수출자가 만기까지 기다리며 이자·환위험을 부담합니다. 계약서에 어느 쪽인지 반드시 적으세요.

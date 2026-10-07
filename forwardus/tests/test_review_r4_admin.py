@@ -199,3 +199,92 @@ def test_AI_동시_요청이_슬롯을_넘으면_503이고_끝나면_풀린다(a
         worker.join(10)
     assert results.count(200) == security.MAX_CONCURRENT_HEAVY
     assert app.test_client().post("/api/support-chat", json={"question": "q"}).status_code == 200
+
+
+def test_폭이_정해진_숫자_규칙은_숫자_덩어리_가운데서도_걸린다():
+    from app.processors import contract_clauses as cc
+    text = "Buyer shall retain 100% of the price which is held back until acceptance by the Buyer."
+    assert cc.analyze(text)["clauses"].get("payment_retention")
+
+
+def test_반복_검사_정규식이_실제로_동작한다():
+    assert svc._LONG_RUN.search("a" + "1" * 30)
+    assert svc._guard_text("서명 " + "_" * 60 + " 날짜") == "서명 " + "_" * 12 + " 날짜"
+
+
+def test_같은_이메일_병렬_로그인_시도도_한도에서_막힌다(app):
+    import threading
+
+    from app import security
+
+    app.config["RATE_LIMIT_ENABLED"] = True
+    codes = []
+
+    def attempt():
+        codes.append(app.test_client().post("/auth/login", data={"email": "victim@example.com",
+                                                                 "password": "wrong"}).status_code)
+
+    workers = [threading.Thread(target=attempt) for _ in range(40)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(30)
+    assert codes.count(401) <= security.LOGIN_MAX_FAILURES
+    assert codes.count(429) >= 40 - security.LOGIN_MAX_FAILURES
+
+
+def test_서류를_동시에_처음_만들어도_500이_아니다(app, create_shipment, monkeypatch):
+    from app.extensions import db
+    from app.models import Shipment, TradeDocument
+    from app.repositories import document_repository
+
+    created = create_shipment()
+    with app.app_context():
+        shipment = db.session.get(Shipment, created["id"]) if isinstance(created, dict) and "id" in created             else Shipment.query.first()
+        # 다른 요청이 먼저 만든 행을 흉내 — 첫 조회는 비어 있고(경합), 저장하려 하면 UNIQUE 에 걸립니다.
+        db.session.add(TradeDocument(shipment_pk=shipment.id, doc_type="commercial_invoice",
+                                     data={"a": 1}, status="generated", source="auto"))
+        db.session.commit()
+        real_get, calls = document_repository.get, {"n": 0}
+
+        def racing_get(sh, doc_type):
+            calls["n"] += 1
+            return None if calls["n"] == 1 else real_get(sh, doc_type)
+
+        monkeypatch.setattr(document_repository, "get", racing_get)
+        document = document_repository.upsert(shipment, "commercial_invoice", {"b": 2}, "generated", "manual")
+        db.session.commit()
+        assert document.data == {"b": 2}
+        assert TradeDocument.query.filter_by(shipment_pk=shipment.id, doc_type="commercial_invoice").count() == 1
+
+
+def test_서류_미리보기_동시_요청도_슬롯으로_제한된다(app):
+    import threading
+
+    from app import security
+
+    gate, started = threading.Event(), threading.Semaphore(0)
+
+    def slow():
+        started.release()
+        gate.wait(10)
+        return "ok"
+
+    endpoint = "document.draft_preview"
+    app.view_functions[endpoint] = slow
+    app.config["RATE_LIMIT_ENABLED"] = True
+    results = []
+
+    def call():
+        results.append(app.test_client().post("/documents/draft/preview", json={}).status_code)
+
+    workers = [threading.Thread(target=call) for _ in range(security.MAX_CONCURRENT_DRAFTS)]
+    for worker in workers:
+        worker.start()
+    for _ in workers:
+        assert started.acquire(timeout=10)
+    over = app.test_client().post("/documents/draft/preview", json={})
+    gate.set()
+    for worker in workers:
+        worker.join(10)
+    assert over.status_code == 503
