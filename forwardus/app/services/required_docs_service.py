@@ -424,7 +424,7 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
     used_rows = [cargo for cargo in cargos if getattr(cargo, "used_condition", "")]
     if used_rows:
         # 중고품은 수입국 규제를 나라별로 짚습니다 — 목록에 없는 나라는 일반 안내(전 국가·무역 실무 점검)
-        country_notes = used_goods.notes_for(country_code)
+        country_notes = used_goods.notes_for(country_code, chapters or None)
         add({"key": f"used_goods_{country_code or 'any'}", "title": "중고품 수입 규제 확인 (수입국)",
              "country": country_code,
              "documents": ["제조연도·사용 이력 증빙", "수입국이 요구하면 사전선적검사(PSI) 증명", "중고품 상태 사진·검사 성적서"],

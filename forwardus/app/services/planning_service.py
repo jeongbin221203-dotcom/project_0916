@@ -784,6 +784,95 @@ def _check_battery_goods(items: list[dict], payload: dict) -> None:
             "한 번 더 눌러 주세요.".replace("**", ""), "is_dangerous", code="DG_CONFIRM")
 
 
+_ENGINE_GOODS_PREFIXES = ("8701", "8702", "8703", "8704", "8705", "8706", "8711", "8426", "8427", "8429", "8430", "8407", "8408")
+
+
+def _check_used_machinery(items: list[dict], payload: dict) -> None:
+    """중고 차량·기계는 연료·배터리·냉매가 남아 있으면 위험물입니다 — 위험물 체크 없이 입력하면 한 번 더 확인(DG_CONFIRM).
+
+    사용자 점검: 중고 지게차·승용차를 보내도 UN3166(차량)·UN3171(배터리 구동 차량)·연료 잔류 안내가 없었습니다.
+    위험물 확인(dg_confirmed)을 같이 씁니다 — 배터리 확인을 이미 했으면 다시 묻지 않습니다.
+    """
+
+    if str(payload.get("dg_confirmed") or "").lower() in ("1", "true", "yes", "on"):
+        return
+    for number, item in enumerate(items, start=1):
+        if not str(item.get("used_condition") or "").strip() or str(item.get("used_condition")) == "none":
+            continue
+        dangerous = str(item.get("is_dangerous") or "").lower() in ("1", "true", "yes", "on", "y")
+        hs = "".join(ch for ch in str(item.get("hs_code") or "") if ch.isdigit())
+        if dangerous or not hs.startswith(_ENGINE_GOODS_PREFIXES):
+            continue
+        raise ValidationError(
+            f"{number}번째 품목은 중고 차량·기계입니다. 연료·배터리·냉매가 남아 있으면 위험물(UN3166 차량, UN3171 배터리 구동 차량 "
+            "등)로 실어야 하고, 연료는 비우고 배터리는 분리·보호하라는 요구가 흔합니다. 위험물이면 화물 칸의 '위험물'을 체크하고 "
+            "UN 번호를 입력하세요. 연료·배터리가 없는 상태라면 [Shipment 생성]을 한 번 더 눌러 주세요.",
+            "is_dangerous", code="DG_CONFIRM")
+
+
+_FREIGHT_REF_CACHE: dict[tuple, float] = {}
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
+def _freight_distance(origin: dict, destination: dict, air: bool) -> float | None:
+    """출발지 → 도착지 거리(km). 해상은 항로 거리, 항공은 대권거리. 모르면 None."""
+
+    if air:
+        try:
+            return great_circle_km(origin["lat"], origin["lon"], destination["lat"], destination["lon"])
+        except (KeyError, TypeError):
+            return None
+    leg = location_client.sea_route(origin.get("code", ""), destination.get("code", ""))
+    return float(leg["distance_km"]) if leg else None
+
+
+def _freight_reference_km(origin: dict, destination: dict, air: bool) -> float | None:
+    """같은 권역 도착지까지의 거리 중앙값 — 권역 균일 요율이 맞춰져 있다고 보는 기준 거리."""
+
+    key = (origin.get("code"), destination.get("region"), air)
+    if key in _FREIGHT_REF_CACHE:
+        return _FREIGHT_REF_CACHE[key] or None
+    kind = "airport" if air else "port"
+    distances = []
+    for item in location_client._all_locations():
+        if item["kind"] != kind or item.get("region") != destination.get("region") or item["country_code"] == "KR":
+            continue
+        if kind == "port" and not item.get("major"):
+            continue
+        value = _freight_distance(origin, item, air)
+        if value:
+            distances.append(value)
+    _FREIGHT_REF_CACHE[key] = _median(distances) if len(distances) >= 3 else 0.0
+    return _FREIGHT_REF_CACHE[key] or None
+
+
+def _scale_mock_freight(items: list[dict], route: dict, origin: dict, destination: dict) -> None:
+    """예시(mock) 운임을 **거리에 맞춰** 보정합니다.
+
+    예시 운임은 권역 6개의 균일 값이라 블라디보스토크(2~4일 거리)가 유럽 요율, 콜카타가 나바셰바와 같았습니다(전 국가·무역 실무
+    점검). 같은 권역 도착지까지의 거리 중앙값 대비 이 항구의 거리로 0.55~1.8배까지 보정합니다(고정비 55% + 거리 비례 45% 어림).
+    실제 요율이 아니라 **참고용 어림값**이며, 요율표(API) 값은 건드리지 않습니다.
+    """
+
+    mock = [item for item in items if item.get("source") == "mock" and item.get("freight_usd")]
+    if not mock or not origin or not destination:
+        return
+    air = route["transport_mode"] == "AIR"
+    distance = _freight_distance(origin, destination, air)
+    reference = _freight_reference_km(origin, destination, air)
+    if not distance or not reference:
+        return
+    factor = min(1.8, max(0.55, 0.55 + 0.45 * distance / reference))
+    for item in mock:
+        item["freight_usd"] = round(item["freight_usd"] * factor, 2)
+        item["freight_distance_factor"] = round(factor, 2)
+
+
 def check_trade_controls(country_codes, payload: dict, text: str = "", field: str = "destination_code") -> None:
     """제재·수출통제 국가는 막거나(북한) 한 번 더 확인받습니다(strict). 안내 문구는 processors/trade_controls.
 
@@ -967,6 +1056,7 @@ def search_schedules(payload: dict) -> dict:
 
     items = result["data"]
     _align_mock_transit(items, route, origin, destination)
+    _scale_mock_freight(items, route, origin, destination)
     for item in items:
         deadline = check_buyer_deadline(date.fromisoformat(item["eta"]), buyer_required_date, route["transport_mode"])
         if deadline:
@@ -1377,6 +1467,7 @@ def create_shipment(payload: dict, user_id: int | None = None) -> Shipment:
 
     items = cargo_items(payload)
     _check_battery_goods(items, payload)
+    _check_used_machinery(items, payload)
     metrics = calculate_cargo_lines(items)
     # 품목별 금액을 모두 적었으면 그 합을 송장 금액으로 씁니다.
     # 화면이 보낸 합계는 믿지 않고 서버에서 다시 더합니다.

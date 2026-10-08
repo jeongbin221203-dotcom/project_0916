@@ -287,6 +287,21 @@ USED_RULE = _rule(
 )
 
 
+USED_VEHICLE_RULE = _rule(
+    "used_vehicle", "중고 자동차·오토바이 수출 (한국 쪽 절차)",
+    chapters=[], documents=["자동차 말소등록(수출 목적) 후 말소사실증명서", "자동차등록증 사본과 소유자 확인(압류·저당 없음)",
+                            "성능·상태점검기록부 또는 검사 성적서(수입국이 요구하면 PSI)",
+                            "수출신고필증(관세사)과 차대번호·연식 기재 확인"],
+    agency="시·군·구청(말소등록) · 관세청(수출신고) · 관세사",
+    law="자동차관리법(말소등록) · 관세법(수출신고)",
+    why="중고차는 수출하려면 먼저 한국 등록을 지우고(수출 말소) 말소사실증명서로 수출신고를 합니다. 차대번호·연식·주행거리가 "
+        "서류와 차량이 같아야 하고, 수입국이 연식·좌핸들·검사를 요구하는 경우가 많습니다. 절차 세부와 필요한 서류는 "
+        "관세사·관할 구청에 확인하세요(확인 필요).",
+    link="통합공고",
+)
+USED_VEHICLE_PREFIXES = ("8702", "8703", "8704", "8705", "8711")
+
+
 def check(hs_code: str, *, is_dangerous: bool = False,
           buyer_wants_origin: bool = False, is_used: bool = False) -> list[dict]:
     """이 품목에서 확인해야 할 요건을 모읍니다.
@@ -312,6 +327,8 @@ def check(hs_code: str, *, is_dangerous: bool = False,
         found.append(_as_item(ORIGIN_RULE))
     if is_used:
         found.append(_as_item(USED_RULE))
+        if digits.startswith(USED_VEHICLE_PREFIXES):
+            found.append(_as_item(USED_VEHICLE_RULE))
     return found
 
 

@@ -38,8 +38,10 @@ def advisories(shipment) -> list[dict]:
                               + trade_controls.CHECK_FIRST.replace("**", "")})
     if any(getattr(cargo, "used_condition", "") for cargo in getattr(shipment, "cargos", []) or []):
         notes = []
+        chapters = {(getattr(cargo, "hs_code", "") or "")[:2] for cargo in shipment.cargos
+                    if (getattr(cargo, "hs_code", "") or "")[:2].isdigit()}
         for code in codes[:1] or [""]:
-            notes += used_goods.notes_for(code)
+            notes += used_goods.notes_for(code, chapters or None)
         cards.append({"level": "used", "title": "중고품 수입 규제 확인 (수입국)",
                       "text": " ".join(notes + [used_goods.GENERIC])})
     return cards
