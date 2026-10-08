@@ -65,7 +65,8 @@ def test_Word_계약서를_읽는다():
 
 # ── PDF ─────────────────────────────────────────────────────────────────────
 def _pdf(pages: list[str]) -> bytes:
-    import pymupdf
+    import pytest
+    pymupdf = pytest.importorskip("pymupdf")
 
     doc = pymupdf.open()
     for body in pages:
@@ -91,7 +92,8 @@ def test_쪽_번호만_글자인_스캔본은_OCR_로_읽는다():
     if not (ocr.available() and bank_redaction.ocr_available()):
         pytest.skip("OCR 이 설치되지 않은 환경")
     from PIL import Image, ImageDraw, ImageFont
-    import pymupdf
+    import pytest
+    pymupdf = pytest.importorskip("pymupdf")
 
     try:
         font = ImageFont.truetype("arial.ttf", 34)

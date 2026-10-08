@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import re
+
 # 확인해야 할 곳. 화면에서 새 창으로 열어 줍니다.
 LOOKUP_LINKS = {
     "통합공고": {
@@ -279,18 +281,22 @@ def _digits(hs_code: str) -> str:
 USED_RULE = _rule(
     "used", "중고품·재생품 수출",
     chapters=[], documents=["제조연도·사용 이력 증빙(구입 영수증·정비 기록)", "중고품 상태 사진·검사 성적서",
-                            "수입국이 요구하면 사전선적검사(PSI) 증명"],
+                            "수입국이 요구하면 사전선적검사(PSI) 증명",
+                            "한국 쪽: 폐기물로 판정되는지(중고 타이어·전자제품 등)와 냉매·연료 잔류 확인(확인 필요)"],
     agency="수입국 통관·표준 기관 / 관세사", law="수입국 중고품 수입 규제 · 관세법(허위 신고 금지)",
     why="중고품을 신품처럼 적으면 허위 신고가 됩니다. 나라마다 수입 금지·연식 제한·사전 검사·허가가 다르고, "
-        "중고 기계는 EU·영국 등에서 CE 적합성 문서가 필요할 수 있습니다.",
+        "중고 기계는 EU·영국 등에서 CE(영국은 UKCA 또는 CE) 적합성 문서가 필요할 수 있습니다. 한국 쪽에서는 폐기물로 보는 "
+        "중고품의 국가 간 이동 신고, 냉매(오존층보호법), 수출용 중고품의 부가세 영세율 증빙이 걸릴 수 있으니 관세사에 "
+        "확인하세요(확인 필요).",
     link="통합공고",
 )
 
 
 USED_VEHICLE_RULE = _rule(
     "used_vehicle", "중고 자동차·오토바이 수출 (한국 쪽 절차)",
-    chapters=[], documents=["자동차 말소등록(수출 목적) 후 말소사실증명서", "자동차등록증 사본과 소유자 확인(압류·저당 없음)",
-                            "성능·상태점검기록부 또는 검사 성적서(수입국이 요구하면 PSI)",
+    chapters=[], documents=["수출예정사실 증빙(수출계약서·신용장·견적송장·상업송장 등) — 수출 목적 말소 신청에 필요",
+                            "자동차 말소등록(수출 목적) 후 말소사실증명서", "자동차등록증 사본과 소유자 확인(압류·저당이 있으면 먼저 해소)",
+                            "수입국이 요구하면 성능·상태점검기록부 또는 사전선적검사(PSI) 증명",
                             "수출신고필증(관세사)과 차대번호·연식 기재 확인"],
     agency="시·군·구청(말소등록) · 관세청(수출신고) · 관세사",
     law="자동차관리법(말소등록) · 관세법(수출신고)",
@@ -299,11 +305,30 @@ USED_VEHICLE_RULE = _rule(
         "관세사·관할 구청에 확인하세요(확인 필요).",
     link="통합공고",
 )
-USED_VEHICLE_PREFIXES = ("8702", "8703", "8704", "8705", "8711")
+USED_MACHINERY_RULE = _rule(
+    "used_machinery", "중고 건설기계·지게차 수출 (한국 쪽 절차)",
+    chapters=[], documents=["건설기계 등록 말소 증빙(등록된 기계인 경우)와 소유자 확인(저당·압류 없음)",
+                            "수출예정사실 증빙(수출계약서·상업송장 등)", "제조연도·가동시간·정비 기록",
+                            "수입국이 요구하면 사전선적검사(PSI) 증명", "수출신고필증(관세사)과 차대(기계) 번호 기재 확인"],
+    agency="시·군·구청(건설기계 등록 말소) · 관세청(수출신고) · 관세사",
+    law="건설기계관리법(등록 말소·수출 이행 신고) · 관세법(수출신고)",
+    why="중고 굴착기·지게차 같은 건설기계는 등록된 기계라면 등록을 말소하고 수출 이행을 확인받는 절차가 있는 것으로 안내됩니다. "
+        "말소 신청에는 수출예정사실 증빙이 필요하고, 연료·배터리·냉매가 남아 있으면 위험물 문제도 생깁니다. 세부 절차는 관할 "
+        "시·군·구청과 관세사에 확인하세요(확인 필요).",
+    link="통합공고",
+)
+USED_MACHINERY_PREFIXES = ("8426", "8427", "8429", "8430", "8701", "8705", "8709")
+USED_MOTORCYCLE_PREFIXES = ("8711",)
+USED_VEHICLE_PREFIXES = ("8702", "8703", "8704")
+
+
+_VEHICLE_NAME = re.compile(r"\b(?:car|sedan|suv|truck|van|bus|automobile)\b|승용차|자동차|중고차|트럭|버스|화물차", re.I)
+_MACHINERY_NAME = re.compile(r"excavator|forklift|bulldozer|wheel\s*loader|crane|tractor|굴착기|굴삭기|지게차|불도저|크레인|트랙터", re.I)
+_MOTORCYCLE_NAME = re.compile(r"motorcycle|scooter|오토바이|스쿠터|이륜차", re.I)
 
 
 def check(hs_code: str, *, is_dangerous: bool = False,
-          buyer_wants_origin: bool = False, is_used: bool = False) -> list[dict]:
+          buyer_wants_origin: bool = False, is_used: bool = False, product_name: str = "") -> list[dict]:
     """이 품목에서 확인해야 할 요건을 모읍니다.
 
     "필요하다"가 아니라 "확인해야 한다"입니다. 같은 류 안에서도 세번에 따라
@@ -327,8 +352,17 @@ def check(hs_code: str, *, is_dangerous: bool = False,
         found.append(_as_item(ORIGIN_RULE))
     if is_used:
         found.append(_as_item(USED_RULE))
-        if digits.startswith(USED_VEHICLE_PREFIXES):
+        name = product_name or ""
+        by_name = not digits[:4].isdigit() or len(digits) < 4          # HS 가 없거나 너무 짧을 때만 품명으로 짐작
+        if digits.startswith(USED_VEHICLE_PREFIXES) or (by_name and _VEHICLE_NAME.search(name)):
             found.append(_as_item(USED_VEHICLE_RULE))
+        elif digits.startswith(USED_MACHINERY_PREFIXES) or (by_name and _MACHINERY_NAME.search(name)):
+            found.append(_as_item(USED_MACHINERY_RULE))
+        elif digits.startswith(USED_MOTORCYCLE_PREFIXES) or (by_name and _MOTORCYCLE_NAME.search(name)):
+            # 이륜차는 자동차 말소등록과 체계가 다를 수 있습니다 — 단정하지 않고 확인을 안내합니다
+            found.append(_as_item({**USED_VEHICLE_RULE, "key": "used_vehicle", "title": "중고 오토바이 수출 (한국 쪽 절차)",
+                                   "why": "이륜자동차는 자동차 말소등록과 다른 신고 체계일 수 있습니다. 사용(폐지) 신고·수출신고 절차를 "
+                                          "관할 구청과 관세사에 먼저 확인하세요(확인 필요)."}))
     return found
 
 

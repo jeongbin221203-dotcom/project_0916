@@ -10,8 +10,14 @@
 from __future__ import annotations
 
 GENERIC = ("중고품은 나라마다 수입 금지·연식 제한·사전 검사(PSI)·별도 허가가 다릅니다. 신품처럼 적으면 허위 신고가 되므로 "
-           "서류 품명에 (USED)를 적고, 제조연도·사용 이력 증빙을 갖추고, 수입국 규제를 수입자·통관대리인에게 먼저 확인하세요. "
-           "중고 기계는 EU·영국 등에서 CE 적합성 문서가 필요할 수 있습니다.")
+           "서류 품명에 (USED)를 적고, 제조연도·사용 이력 증빙을 갖추고, 수입국 규제를 수입자·통관대리인에게 먼저 확인하세요.")
+MACHINERY_CE = " 중고 기계는 EU·영국 등에서 CE(영국은 UKCA 또는 CE) 적합성 문서가 필요할 수 있습니다."
+
+
+def generic(chapters: set[str] | None = None) -> str:
+    """일반 안내. CE 문장은 기계·전기·정밀기기 장(84·85·90)이거나 품목을 아직 모를 때만 붙입니다."""
+
+    return GENERIC + (MACHINERY_CE if not chapters or chapters & _MACHINERY else "")
 
 _CARS = {"87"}
 _CLOTHES = {"61", "62", "63", "64"}

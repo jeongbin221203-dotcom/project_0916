@@ -378,7 +378,8 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
     for cargo in cargos:
         for item in export_requirements.check(cargo.hs_code,
                                               is_dangerous=cargo.is_dangerous,
-                                              is_used=bool(getattr(cargo, "used_condition", ""))):
+                                              is_used=bool(getattr(cargo, "used_condition", "")),
+                                              product_name=getattr(cargo, "product_description", "") or ""):
             # 원산지증명서는 품목이 아니라 협정이 정합니다. 아래 3에서 따로 봅니다.
             if item["key"] == "origin":
                 continue
@@ -429,7 +430,7 @@ def collect(shipment, *, use_ai: bool = True) -> dict:
              "country": country_code,
              "documents": ["제조연도·사용 이력 증빙", "수입국이 요구하면 사전선적검사(PSI) 증명", "중고품 상태 사진·검사 성적서"],
              "agency": "수입국 통관·표준 기관 / 현지 수입자",
-             "why": " ".join(country_notes + [used_goods.GENERIC]), "source": "country", "link": "",
+             "why": " ".join(country_notes + [used_goods.generic(chapters or None)]), "source": "country", "link": "",
              "confidence": "medium" if country_notes else "low"})
 
     control = trade_controls.note(country_code)

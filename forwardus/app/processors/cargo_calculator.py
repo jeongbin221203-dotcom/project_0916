@@ -314,6 +314,7 @@ def calculate_cargo_lines(items: list[dict], container_type: str = DEFAULT_CONTA
                      for index, line in enumerate(lines, start=1)
                      for key in ("net_weight_warning", "units_warning", "density_warning", "oversize_warning")
                      if line.get(key)],
+        "oversize_warning": " ".join(line["oversize_warning"] for line in lines if line.get("oversize_warning")),
         "quantity": sum(line["quantity"] for line in lines),
         # 품목별 금액을 모두 적었으면 그 합이 송장 금액입니다.
         # 하나라도 비어 있으면 지어내지 않고 None을 돌려줍니다.

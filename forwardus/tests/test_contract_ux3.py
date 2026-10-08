@@ -39,7 +39,8 @@ def test_글자_쪽과_스캔_쪽이_섞인_PDF_는_스캔_쪽도_읽는다():
 
     if not (ocr.available() and bank_redaction.ocr_available()):
         pytest.skip("OCR 이 설치되지 않은 환경")
-    import pymupdf
+    import pytest
+    pymupdf = pytest.importorskip("pymupdf")
 
     doc = pymupdf.open()
     for n in range(1, 4):

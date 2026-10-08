@@ -1429,7 +1429,13 @@
     // 견적)으로 넘겨 둡니다. 자동 저장을 끈 뒤로, 임시저장을 한 번도 누르지
     // 않으면 화면을 옮겼을 때 값이 하나도 없었습니다. (2026-09-26)
     syncWorkDraft();
-    const response = await postJson(config.startUrl, { ...planPayload(), ...confirmedFlags }, 60000);
+    // 확인한 뒤 입력(도착지·바이어·품목 …)이 바뀌었으면 확인 표시를 비웁니다 — 이란에서 확인한 표시가 남아 바이어를 러시아로
+    // 바꿔도 경고 없이 서류가 만들어지던 것(무역 실무 재점검).
+    const currentPayload = planPayload();
+    const signature = JSON.stringify(currentPayload);
+    if (signature !== confirmedSignature) Object.keys(confirmedFlags).forEach((key) => { delete confirmedFlags[key]; });
+    lastSignature = signature;
+    const response = await postJson(config.startUrl, { ...currentPayload, ...confirmedFlags }, 60000);
     button.disabled = false;
     button.textContent = "서류 만들기";
 
@@ -1439,6 +1445,7 @@
       const flag = CONFIRM_FLAGS[response.error_code];
       if (flag) {
         confirmedFlags[flag] = true;
+        confirmedSignature = lastSignature;
         showError(`${response.message.replace("[다음]을", "[서류 만들기]를").replace("[Shipment 생성]을", "[서류 만들기]를")}`,
           response.field);
         return;
@@ -1452,6 +1459,8 @@
 
   const CONFIRM_FLAGS = { INCOTERMS_CONFIRM: "incoterms_confirmed", RESTRICTED_CONFIRM: "restricted_confirmed", DG_CONFIRM: "dg_confirmed" };
   const confirmedFlags = {};
+  let confirmedSignature = "";
+  let lastSignature = "";
 
   function showResult(data) {
     // 만들고 나서도 비어 있는 칸은 숨기지 않습니다. 서류에 —로 남을 자리입니다.

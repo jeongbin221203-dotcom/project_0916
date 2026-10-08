@@ -53,15 +53,27 @@ CHECK_FIRST = (" 최종 판단은 yesTrade(전략물자관리원)·관세사·�
                "수출자에게 있습니다.**")
 
 # 주소·거래처 글에 이 지역 이름이 있으면 나라 칸이 다르게 적혀 있어도 확인을 받습니다(바이어를 UA 로 적고 크림 주소를 쓰는 경우)
-SANCTIONED_REGIONS = ("crimea", "sevastopol", "donetsk", "luhansk", "lugansk", "mariupol", "berdyansk", "melitopol",
-                      "크림", "세바스토폴", "도네츠크", "루한스크", "마리우폴", "베르댠스크", "멜리토폴")
+SANCTIONED_REGIONS = ("crimea", "sevastopol", "simferopol", "yalta", "kerch", "donetsk", "luhansk", "lugansk", "donbas",
+                      "donbass", "kherson", "zaporizhzhia", "zaporozhye", "mariupol", "berdyansk", "berdiansk", "melitopol", "tskhinvali", "sukhumi", "abkhazia",
+                      "south ossetia", "transnistria", "tiraspol",
+                      "헤르손", "자포리자", "크림반도", "크림 반도", "크림공화국", "크림 공화국", "크림 자치공화국", "세바스토폴", "심페로폴", "얄타", "케르치",
+                      "도네츠크", "루한스크", "마리우폴", "베르댠스크", "멜리토폴", "압하지야", "남오세티야", "트란스니스트리아",
+                      "крым", "севастополь", "донецк", "луганск", "мариуполь", "симферополь")
 
 
 def region_in_text(*texts: str) -> str:
     """주소·이름 글에 러시아 점령지 이름이 있으면 그 이름. 없으면 빈 글자."""
 
     joined = " ".join(str(text or "") for text in texts).lower()
-    return next((name for name in SANCTIONED_REGIONS if name in joined), "")
+    import re
+
+    for name in SANCTIONED_REGIONS:
+        if name.isascii():
+            if re.search(r"(?<![a-z])" + re.escape(name) + r"(?![a-z])", joined):
+                return name
+        elif name in joined:
+            return name
+    return ""
 
 
 def level(country_code: str) -> str:

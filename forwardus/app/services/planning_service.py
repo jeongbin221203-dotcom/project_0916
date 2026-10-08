@@ -757,7 +757,7 @@ def _build_custom_airport(code: str, name: str, country_code: str, country: dict
 
 _BATTERY_WORDS = re.compile(
     r"lithium|li-?ion|battery|batteries|power\s*bank|e-?bike|e-?scooter|scooter|hoverboard|laptop|notebook\s*computer|"
-    r"smart\s*phone|smartphone|mobile\s*phone|tablet|drone|earbuds?|earphones?|headphones?|vape|e-?cigarette|smart\s*watch|"
+    r"smart\s*phone|smartphone|mobile\s*phone|tablet\s*(?:pc|computer)|drone|earbuds?|earphones?|headphones?|vape|e-?cigarette|smart\s*watch|"
     r"cordless|robot\s*vacuum|리튬|배터리|보조\s*배터리|축전지|충전지|킥보드|전동\s*(?:스쿠터|자전거|휠)|노트북|"
     r"스마트\s*폰|스마트폰|휴대폰|태블릿|드론|이어폰|무선\s*이어폰|헤드폰|전자\s*담배|스마트\s*워치|무선\s*청소기|로봇\s*청소기", re.I)
 
@@ -784,7 +784,12 @@ def _check_battery_goods(items: list[dict], payload: dict) -> None:
             "한 번 더 눌러 주세요.".replace("**", ""), "is_dangerous", code="DG_CONFIRM")
 
 
-_ENGINE_GOODS_PREFIXES = ("8701", "8702", "8703", "8704", "8705", "8706", "8711", "8426", "8427", "8429", "8430", "8407", "8408")
+_ENGINE_GOODS_PREFIXES = ("8701", "8702", "8703", "8704", "8705", "8706", "8709", "8711", "8712", "8426", "8427", "8429",
+                          "8430", "8431", "8407", "8408", "8409", "8413", "8418", "8415", "8432", "8433", "8467", "8502",
+                          "8708", "88", "89")
+_ENGINE_GOODS_WORDS = re.compile(
+    r"excavator|forklift|bulldozer|loader|crane|tractor|combine|generator|engine|motorcycle|"
+    r"굴착기|굴삭기|지게차|불도저|로더|크레인|트랙터|콤바인|발전기|엔진|오토바이|중고차", re.I)
 
 
 def _check_used_machinery(items: list[dict], payload: dict) -> None:
@@ -801,11 +806,12 @@ def _check_used_machinery(items: list[dict], payload: dict) -> None:
             continue
         dangerous = str(item.get("is_dangerous") or "").lower() in ("1", "true", "yes", "on", "y")
         hs = "".join(ch for ch in str(item.get("hs_code") or "") if ch.isdigit())
-        if dangerous or not hs.startswith(_ENGINE_GOODS_PREFIXES):
+        if dangerous or not (hs.startswith(_ENGINE_GOODS_PREFIXES)
+                             or _ENGINE_GOODS_WORDS.search(str(item.get("product_description") or ""))):
             continue
         raise ValidationError(
-            f"{number}번째 품목은 중고 차량·기계입니다. 연료·배터리·냉매가 남아 있으면 위험물(UN3166 차량, UN3171 배터리 구동 차량 "
-            "등)로 실어야 하고, 연료는 비우고 배터리는 분리·보호하라는 요구가 흔합니다. 위험물이면 화물 칸의 '위험물'을 체크하고 "
+            f"{number}번째 품목은 중고 차량·기계입니다. 연료·배터리·냉매가 남아 있으면 위험물(차량 UN3166·UN3171, 엔진 UN3528~3530, 냉매 "
+            "UN2857·UN3159 등 — 상태에 따라 다릅니다)로 실어야 하고, 연료는 비우고 배터리는 분리·보호하라는 요구가 흔합니다. 위험물이면 화물 칸의 '위험물'을 체크하고 "
             "UN 번호를 입력하세요. 연료·배터리가 없는 상태라면 [Shipment 생성]을 한 번 더 눌러 주세요.",
             "is_dangerous", code="DG_CONFIRM")
 
@@ -824,8 +830,11 @@ def _freight_distance(origin: dict, destination: dict, air: bool) -> float | Non
 
     if air:
         try:
-            return great_circle_km(origin["lat"], origin["lon"], destination["lat"], destination["lon"])
-        except (KeyError, TypeError):
+            return great_circle_km((origin["lat"], origin["lon"]), (destination["lat"], destination["lon"]))
+        except (KeyError, TypeError) as exc:
+            # 예전에는 인자를 4개로 불러 TypeError 가 조용히 삼켜져 항공 보정이 한 건도 적용되지 않았습니다(재점검)
+            import logging
+            logging.getLogger(__name__).warning("항공 거리 계산 실패: %s", exc)
             return None
     leg = location_client.sea_route(origin.get("code", ""), destination.get("code", ""))
     return float(leg["distance_km"]) if leg else None
@@ -859,7 +868,8 @@ def _scale_mock_freight(items: list[dict], route: dict, origin: dict, destinatio
     실제 요율이 아니라 **참고용 어림값**이며, 요율표(API) 값은 건드리지 않습니다.
     """
 
-    mock = [item for item in items if item.get("source") == "mock" and item.get("freight_usd")]
+    # 예시 스케줄뿐 아니라 요율표 어림(freight_source == "estimate")인 실데이터 스케줄도 같은 권역 균일 단가라 같이 보정합니다
+    mock = [item for item in items if item.get("freight_source") == "estimate" and item.get("freight_usd")]
     if not mock or not origin or not destination:
         return
     air = route["transport_mode"] == "AIR"
@@ -869,7 +879,11 @@ def _scale_mock_freight(items: list[dict], route: dict, origin: dict, destinatio
         return
     factor = min(1.8, max(0.55, 0.55 + 0.45 * distance / reference))
     for item in mock:
-        item["freight_usd"] = round(item["freight_usd"] * factor, 2)
+        minimum = item.get("freight_minimum_usd") or 0
+        # 최저운임에 걸린 값(소량 LCL·항공)은 거리로 깎거나 올리지 않습니다 — 배율이 최저운임 아래로 내려가던 것(재점검)
+        if minimum and item["freight_usd"] <= minimum * 1.0001:
+            continue
+        item["freight_usd"] = round(max(item["freight_usd"] * factor, minimum), 2)
         item["freight_distance_factor"] = round(factor, 2)
 
 
@@ -883,9 +897,18 @@ def check_trade_controls(country_codes, payload: dict, text: str = "", field: st
 
     from app.processors import trade_controls
 
+    from app.collectors import location_client
+
     confirmed = str(payload.get("restricted_confirmed") or "").lower() in ("1", "true", "yes", "on")
     strict_hit = None
-    for code in dict.fromkeys(str(c or "").upper() for c in country_codes):
+    resolved = []
+    for raw in country_codes:
+        raw = str(raw or "").strip()
+        # 바이어 국가 칸은 이름도 받습니다 — 'Iran'·'러시아'가 코드가 아니라는 이유로 검사를 피하던 것(r11 사용자 점검)
+        if raw and not (len(raw) == 2 and raw.isascii() and raw.isalpha()):
+            raw = location_client.find_country_by_name(raw) or raw
+        resolved.append(raw.upper())
+    for code in dict.fromkeys(resolved):
         kind = trade_controls.level(code)
         if kind == "blocked":
             raise ValidationError(trade_controls.note(code).replace("**", ""), field, code="TRADE_CONTROL")

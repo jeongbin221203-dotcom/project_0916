@@ -43,5 +43,5 @@ def advisories(shipment) -> list[dict]:
         for code in codes[:1] or [""]:
             notes += used_goods.notes_for(code, chapters or None)
         cards.append({"level": "used", "title": "중고품 수입 규제 확인 (수입국)",
-                      "text": " ".join(notes + [used_goods.GENERIC])})
+                      "text": " ".join(notes + [used_goods.generic(chapters or None)])})
     return cards

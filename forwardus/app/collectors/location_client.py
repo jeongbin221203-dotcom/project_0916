@@ -176,6 +176,8 @@ COUNTRY_ALIASES = {
     "taiwan": "TW", "iran": "IR", "syria": "SY", "bolivia": "BO", "venezuela": "VE", "tanzania": "TZ",
     "moldova": "MD", "macau": "MO", "macao": "MO", "brunei": "BN", "capeverde": "CV", "czechrepublic": "CZ",
     "hongkong": "HK", "russianfederation": "RU", "unitedarabemirates": "AE", "southafrica": "ZA",
+    "북한": "KP", "northkorea": "KP", "dprk": "KP", "democraticpeoplesrepublicofkorea": "KP",
+    "islamicrepublicofiran": "IR", "irn": "IR", "rus": "RU", "prk": "KP", "syr": "SY", "cub": "CU", "blr": "BY", "syrianarabrepublic": "SY", "쿠바": "CU", "벨라루스": "BY", "belarus": "BY",
 }
 
 

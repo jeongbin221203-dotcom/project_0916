@@ -52,7 +52,8 @@ def requirements_for(shipment) -> dict:
     seen = {}
     for cargo in cargos:
         items = export_requirements.check(cargo.hs_code, is_dangerous=cargo.is_dangerous,
-                                         is_used=bool(getattr(cargo, "used_condition", "")))
+                                         is_used=bool(getattr(cargo, "used_condition", "")),
+                                         product_name=getattr(cargo, "product_description", "") or "")
         official = official_requirements(cargo.hs_code) if cargo.hs_code else {
             "available": False, "laws": [], "source": "", "message": "HS부호가 없습니다."}
         by_item.append({

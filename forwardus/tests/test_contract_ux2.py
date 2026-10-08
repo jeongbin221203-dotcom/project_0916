@@ -18,7 +18,8 @@ from config import TestConfig
 
 
 def _pdf(pages: list[str]) -> bytes:
-    import pymupdf
+    import pytest
+    pymupdf = pytest.importorskip("pymupdf")
 
     doc = pymupdf.open()
     for body in pages:

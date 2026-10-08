@@ -151,7 +151,8 @@ def _freight(service: str, rate: dict | None, metrics: dict) -> dict:
     else:
         amount = max(rate["rate"] * metrics["chargeable_weight_kg"], rate["minimum"])
         basis = f"{metrics['chargeable_weight_kg']:,.0f} kg C.W."
-    return {"freight_usd": round(amount, 2), "freight_basis": basis, "freight_source": "estimate"}
+    return {"freight_usd": round(amount, 2), "freight_basis": basis, "freight_source": "estimate",
+            "freight_minimum_usd": rate.get("minimum", 0) if service != "FCL" else 0}
 
 
 # --- 예시 스케줄 --------------------------------------------------------------

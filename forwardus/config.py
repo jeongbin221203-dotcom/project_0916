@@ -169,8 +169,8 @@ class Config:
     # 모든 사용자의 Shipment를 보는 마스터 계정. 앱이 뜰 때 없으면 만듭니다.
     # 비밀번호는 처음 만들 때만 씁니다. 운영에서는 .env에서 꼭 바꾸세요.
     # TODO(보안): 브랜치를 모두 합친 뒤 기본 비밀번호 "1234"를 없앱니다.
-    MASTER_EMAIL = os.getenv("MASTER_EMAIL", "forwardus@gmail.com").strip().lower()
-    MASTER_PASSWORD = os.getenv("MASTER_PASSWORD", "1234")
+    MASTER_EMAIL = (os.getenv("MASTER_EMAIL") or "forwardus@gmail.com").strip().lower()
+    MASTER_PASSWORD = (os.getenv("MASTER_PASSWORD") or "1234")
 
 
 class TestConfig(Config):
