@@ -292,21 +292,34 @@
     });
   }
 
-  // 실기: 합격률 60% 미만 회차(+최신 92회) 따라하기, 하루 2회차
-  var PRACTICE = [[[92, 19, "61.61"], [91, 21, "45.61"]], [[90, 18, "56.7"], [88, 20, "57.28"]], [[86, 20, "53.39"], [85, 20, "59.53"]], [[83, 19, "57.28"], [80, 19, "54.49"]], [[77, 18, "49.55"], [75, 20, "58.02"]]];
+  // 실기: 92회는 따라하기(문제+풀이 같은 쪽), 나머지는 실전(문제만 → 정답·풀이는 접어서 확인). [회차, 답안지 쪽수, 합격률, 문제지 쪽수]
+  var PRACTICE = [[[92, 19, "61.61", 0], [91, 21, "45.61", 18]], [[90, 18, "56.7", 16], [88, 20, "57.28", 17]], [[86, 20, "53.39", 17], [85, 20, "59.53", 18]], [[83, 19, "57.28", 16], [80, 19, "54.49", 17]], [[77, 18, "49.55", 14], [75, 20, "58.02", 17]]];
+  function praImgs(prefix, n, cnt) {
+    var h = "";
+    for (var i = 1; i <= cnt; i++) {
+      h += '<img loading="lazy" src="past/' + prefix + n + '_' + i + '.jpg" alt="제' + n + '회 실무 ' + i + '쪽" style="display:block;width:100%;max-width:760px;margin:8px auto;border:1px solid #bbb;background:#fff">';
+    }
+    return h;
+  }
   function buildPractice() {
-    var no = 0;
+    var real = 0;
     PRACTICE.forEach(function (day, di) {
       var el = document.getElementById("praBody" + (di + 1));
       if (!el) return;
-      var h = '<p class="source">원본 인쇄 화면 그대로입니다. 문제(자료설명·수행과제)를 먼저 읽고 프로그램에 직접 입력해 본 뒤, 같은 쪽 아래의 <b>수행과제 풀이</b>와 맞춰 보세요. 마지막 쪽들은 평가문제와 정답입니다.</p>';
+      var h = "";
       day.forEach(function (e) {
-        no++;
-        h += '<details' + (e[0] === day[0][0] ? ' open' : '') + '><summary>따라하기 ' + no + '회 · 제' + e[0] + '회 <small>(FAT 1급 합격률 ' + e[2] + '% · ' + e[1] + '쪽)</small></summary><div>';
-        for (var i = 1; i <= e[1]; i++) {
-          h += '<img loading="lazy" src="past/pr' + e[0] + '_' + i + '.jpg" alt="제' + e[0] + '회 실무 ' + i + '쪽" style="display:block;width:100%;max-width:760px;margin:8px auto;border:1px solid #bbb;background:#fff">';
+        var rate = "FAT 1급 합격률 " + e[2] + "%";
+        if (!e[3]) {
+          h += '<details open><summary>따라하기 1회 · 제' + e[0] + '회 <small>(' + rate + ' · ' + e[1] + '쪽)</small></summary><div>' +
+            '<p class="source">원본 인쇄 화면 그대로입니다. 문제(자료설명·수행과제)를 먼저 읽고 프로그램에 직접 입력해 본 뒤, 같은 쪽 아래의 <b>수행과제 풀이</b>와 맞춰 보세요. 마지막 쪽들은 평가문제와 정답입니다.</p>' +
+            praImgs("pr", e[0], e[1]) + '</div></details>';
+        } else {
+          real++;
+          h += '<details' + (real === 1 || e[0] === day[0][0] ? ' open' : '') + '><summary>실전 ' + real + '회 · 제' + e[0] + '회 <small>(' + rate + ' · 문제 ' + e[3] + '쪽)</small></summary><div>' +
+            '<p class="source">실제 시험지처럼 <b>문제만</b> 나옵니다. 프로그램에 직접 입력해 보고, 끝낸 뒤 아래 "정답·풀이 보기"로 채점하세요.</p>' +
+            praImgs("ps", e[0], e[3]) +
+            '<details class="rawsheet"><summary>정답·풀이 보기 (답안지 원본 ' + e[1] + '쪽)</summary><div>' + praImgs("pr", e[0], e[1]) + '</div></details></div></details>';
         }
-        h += '</div></details>';
       });
       el.innerHTML = h;
     });
@@ -335,7 +348,7 @@
       });
       return h + "</div></details></div></details>";
     }
-    var h = '<h4>실무 유형별 따라하기 <small>(제75~91회 PDF 정리, 92회는 따라하기 1회)</small></h4>' +
+    var h = '<h4>실무 유형별 정리 <small>(제75~91회 정답·풀이 포함, 실전 문제를 푼 뒤 복습용)</small></h4>' +
       '<p class="source">출제범위 항목별로 회차를 모았습니다. 자료설명과 수행과제를 읽고 직접 입력한 뒤 풀이와 맞춰 보세요. 풀이 화면(프로그램 캡처)은 "원본 화면 보기"에서 볼 수 있습니다.</p>';
     P.groups.forEach(function (g) {
       var cnt = 0;
