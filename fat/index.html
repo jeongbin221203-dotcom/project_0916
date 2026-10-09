@@ -114,6 +114,7 @@
   .study-body th { background: var(--accent-soft); }
   .study-body pre.vsol { white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 0.88rem; background: var(--accent-soft); border-radius: 6px; padding: 8px 10px; margin: 4px 0 10px; }
   .study-body .ans { background: #ffe58a; color: #000; padding: 0 2px; border-radius: 3px; }
+  .study-body .stars { color: #f59e0b; font-weight: 700; letter-spacing: 1px; }
   .study-body code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
   .study-body h4 { margin: 18px 0 8px; font-size: 1rem; }
   .opt { margin: 3px 0 3px 6px; font-size: 0.92rem; }
@@ -196,8 +197,8 @@
       <div class="study-body" id="finBody"></div>
     </article>
     <article class="day-panel" data-date="2026-10-10">
-      <h3>10-10 · 원가회계</h3><div class="sub">D+7</div>
-      <div class="study-body" id="costBody"></div>
+      <h3>10-10 · 부가가치세</h3><div class="sub">D+7</div>
+      <div class="study-body" id="vatBody"></div>
     </article>
     <article class="day-panel" data-date="2026-10-11">
       <h3>10-11 · 기출문제</h3><div class="sub">D+6</div>
@@ -253,9 +254,6 @@
 <script src="fin-theory.js"></script>
 <script src="fin-theory-plus.js"></script>
 <script src="fin-q.js"></script>
-<script src="cost-theory.js"></script>
-<script src="cost-theory-plus.js"></script>
-<script src="cost-q.js"></script>
 <script src="vat.js"></script>
 <script src="practice-data.js"></script>
 <script src="past-exam.js"></script>
@@ -265,7 +263,7 @@
   var EXAM = "2026-10-17";
   var PLAN = [
     { date: "2026-10-09", label: "D+8",   task: "재무회계 (8h)" },
-    { date: "2026-10-10", label: "D+7",   task: "원가회계 (8h)" },
+    { date: "2026-10-10", label: "D+7",   task: "부가가치세 (8h)" },
     { date: "2026-10-11", label: "D+6",   task: "기출문제 (8h)" },
     { date: "2026-10-12", label: "D+5",   task: "실기 2번" },
     { date: "2026-10-13", label: "D+4",   task: "실기 2번" },

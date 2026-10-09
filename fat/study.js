@@ -216,6 +216,26 @@
     d.innerHTML = h;
     el.insertBefore(d, el.firstChild);
   }
+  // 이론 정리 항목 제목에 출제 빈도 별표 표시 (제73~92회 이론 200문제 기준)
+  function addStars(root, map) {
+    if (!root) return;
+    var first = null;
+    Array.prototype.forEach.call(root.querySelectorAll(":scope > details > summary"), function (s) {
+      var m = s.textContent.match(/^(\d+)\./);
+      if (!m || !map[m[1]]) return;
+      var span = document.createElement("span");
+      span.className = "stars";
+      span.textContent = " " + new Array(map[m[1]] + 1).join("★");
+      s.appendChild(span);
+      if (!first) first = s.parentNode;
+    });
+    if (first) {
+      var p = document.createElement("p");
+      p.className = "source";
+      p.textContent = "★★★ 자주 출제 · ★★ 보통 · ★ 드묾 (제73~92회 이론 기출 기준)";
+      root.insertBefore(p, first);
+    }
+  }
   var S = window.STUDY || {};
   function buildVat(el) {
     if (!el || !S.vatTheory) return;
@@ -227,11 +247,19 @@
       '<h4>부가가치세 · 기출 60문제 빈출 정리</h4>' + theoryHtml(S.vatTheory) +
       '<h4>부가가치세 필수 문제 <small>(' + n + '문제)</small></h4>' + toolbar() + '<div class="qset">' + groupsHtml(S.vatQ, true) + '</div>';
     el.insertBefore(d, el.firstChild);
+    el.addEventListener("click", function (e) {
+      var act = e.target.getAttribute && e.target.getAttribute("data-act");
+      if (!act) return;
+      var set = e.target.parentNode.nextElementSibling;
+      Array.prototype.forEach.call(set.querySelectorAll(".q details"), function (d2) { d2.open = act === "open"; });
+    });
   }
 
   build(document.getElementById("finBody"), S.finTheory || [], S.finBasic || [], S.fin60 || [], "재무회계 60제");
-  build(document.getElementById("costBody"), S.costTheory || [], S.costBasic || [], S.cost50 || [], "원가회계 50제");
-  buildVat(document.getElementById("costBody"));
+  // 원가회계는 FAT 1급 출제범위가 아니라 화면에서 숨김 (cost-*.js 파일은 보관)
+  buildVat(document.getElementById("vatBody"));
+  addStars(document.getElementById("finBody"), { 1: 3, 2: 3, 3: 3, 4: 1, 5: 2, 6: 1, 7: 1, 8: 1, 9: 3, 10: 1, 11: 2 });
+  addStars(document.getElementById("vatSection"), { 1: 2, 2: 3, 3: 3, 4: 3, 5: 2, 6: 3, 7: 3 });
   buildPractice();
   buildPracticeTopics(document.getElementById("praBody1"));
   buildPast(document.getElementById("pastBody"), S.pastExam || []);
