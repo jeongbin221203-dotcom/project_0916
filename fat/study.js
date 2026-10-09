@@ -42,7 +42,7 @@
     var basicCount = 0;
     basic.forEach(function (g) { basicCount += g[1].length; });
     el.innerHTML =
-      '<h4>이론 정리</h4>' + theoryHtml(theory) +
+      '<h4>' + mainTitle.split(' ')[0] + ' 이론 정리</h4>' + theoryHtml(theory) +
       '<h4>단원별 기출문제 풀어보기 <small>(' + basicCount + '문제)</small></h4>' + toolbar() + '<div class="qset">' + groupsHtml(basic, false) + '</div>' +
       '<h4>' + mainTitle + ' <small>(' + total + '문제)</small></h4>' + toolbar() + '<div class="qset">' + groupsHtml(main, true) + '</div>' +
       '<p class="source">참고: 『2025년 전산세무2급 핵심요약 교재』 © 전산회계다윤(고다윤). 개인 학습용으로 정리함.</p>';
@@ -144,6 +144,25 @@
     });
   }
 
+  // 실기: 합격률 60% 미만 회차(+최신 92회) 따라하기, 하루 2회차
+  var PRACTICE = [[[92, 19, "61.61"], [91, 21, "45.61"]], [[90, 18, "56.7"], [88, 20, "57.28"]], [[86, 20, "53.39"], [85, 20, "59.53"]], [[83, 19, "57.28"], [80, 19, "54.49"]], [[77, 18, "49.55"], [75, 20, "58.02"]]];
+  function buildPractice() {
+    var no = 0;
+    PRACTICE.forEach(function (day, di) {
+      var el = document.getElementById("praBody" + (di + 1));
+      if (!el) return;
+      var h = '<p class="source">원본 인쇄 화면 그대로입니다. 문제(자료설명·수행과제)를 먼저 읽고 프로그램에 직접 입력해 본 뒤, 같은 쪽 아래의 <b>수행과제 풀이</b>와 맞춰 보세요. 마지막 쪽들은 평가문제와 정답입니다.</p>';
+      day.forEach(function (e) {
+        no++;
+        h += '<details' + (e[0] === day[0][0] ? ' open' : '') + '><summary>따라하기 ' + no + '회 · 제' + e[0] + '회 <small>(FAT 1급 합격률 ' + e[2] + '% · ' + e[1] + '쪽)</small></summary><div>';
+        for (var i = 1; i <= e[1]; i++) {
+          h += '<img loading="lazy" src="past/pr' + e[0] + '_' + i + '.jpg" alt="제' + e[0] + '회 실무 ' + i + '쪽" style="display:block;width:100%;max-width:760px;margin:8px auto;border:1px solid #bbb;background:#fff">';
+        }
+        h += '</div></details>';
+      });
+      el.innerHTML = h;
+    });
+  }
   var S = window.STUDY || {};
   function buildVat(el) {
     if (!el || !S.vatTheory) return;
@@ -160,5 +179,6 @@
   build(document.getElementById("finBody"), S.finTheory || [], S.finBasic || [], S.fin60 || [], "재무회계 60제");
   build(document.getElementById("costBody"), S.costTheory || [], S.costBasic || [], S.cost50 || [], "원가회계 50제");
   buildVat(document.getElementById("costBody"));
+  buildPractice();
   buildPast(document.getElementById("pastBody"), S.pastExam || []);
 })();
