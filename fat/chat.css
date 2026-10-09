@@ -1,6 +1,6 @@
 #chatPanel {
-  position: fixed; right: 16px; bottom: 140px; z-index: 50;
-  width: 380px; height: min(560px, calc(100vh - 164px));
+  position: fixed; right: 16px; bottom: 200px; z-index: 50;
+  width: 380px; height: min(560px, calc(100vh - 224px));
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--card); color: var(--text);
   border: 1px solid var(--line); border-radius: 14px;
@@ -14,7 +14,7 @@ body.chat-open #chatPanel { opacity: 1; transform: none; pointer-events: auto; }
   border-radius: 50%; border: 0; cursor: pointer; color: #fff;
   box-shadow: 0 4px 12px rgba(0,0,0,.25);
 }
-#chatToggle { bottom: 76px; background: var(--accent); font-size: 1.4rem; }
+#chatToggle { bottom: 136px; background: var(--accent); font-size: 1.4rem; }
 #topBtn { bottom: 16px; background: #5b6472; font-size: 0.78rem; font-weight: 700; letter-spacing: .02em; }
 #topBtn:hover, #chatToggle:hover { filter: brightness(1.1); }
 .chat-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); }
@@ -35,4 +35,40 @@ body.chat-open #chatPanel { opacity: 1; transform: none; pointer-events: auto; }
 .chat-form textarea { flex: 1; resize: none; height: 56px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-size: 0.9rem; }
 .chat-form button { align-self: flex-end; height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; }
 .chat-form button:disabled { opacity: .5; cursor: default; }
-@media (max-width: 480px) { #chatPanel { right: 8px; left: 8px; width: auto; bottom: 136px; } }
+@media (max-width: 480px) { #chatPanel { right: 8px; left: 8px; width: auto; bottom: 196px; } }
+
+/* 분개 연습 */
+#jrnlToggle { position: fixed; right: 16px; bottom: 76px; z-index: 51; width: 52px; height: 52px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; background: #1f9d6b; font-size: 0.82rem; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+#jrnlToggle:hover, #jrnlToggle.on { filter: brightness(1.1); }
+#jrnlPanel {
+  position: fixed; right: 16px; bottom: 200px; z-index: 50;
+  width: min(460px, calc(100vw - 32px)); height: min(640px, calc(100vh - 224px));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  opacity: 0; transform: translateY(12px) scale(.98); pointer-events: none; transition: opacity .15s, transform .15s;
+}
+body.jrnl-open #jrnlPanel { opacity: 1; transform: none; pointer-events: auto; }
+.jr-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.jr-head small { display: block; color: var(--muted); font-size: 0.75rem; }
+.jr-head button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 0.82rem; padding: 4px 6px; }
+.jr-head button:hover { color: var(--accent); }
+.jr-bar { padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.jr-filters { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.jr-filters button { font: inherit; font-size: 0.78rem; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); cursor: pointer; }
+.jr-filters button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#jrSearch { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-size: 0.88rem; }
+#jrList { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.jr-item { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 0.88rem; line-height: 1.5; }
+.jr-item.is-done { opacity: .6; }
+.jr-q label { cursor: pointer; }
+.jr-item details { margin-top: 6px; }
+.jr-item summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 0.85rem; }
+.jr-ans { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.jr-col em { display: block; font-style: normal; font-weight: 700; color: var(--muted); font-size: 0.78rem; margin-bottom: 2px; }
+.jr-line { display: flex; justify-content: space-between; gap: 6px; background: var(--accent-soft); padding: 3px 7px; border-radius: 5px; margin-bottom: 3px; }
+.jr-line b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.jr-note { grid-column: 1 / -1; margin: 2px 0 0; color: var(--muted); font-size: 0.8rem; }
+.jr-empty { color: var(--muted); text-align: center; padding: 20px; }
+.jr-foot { padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.72rem; }
+@media (max-width: 480px) { #jrnlPanel { right: 8px; width: calc(100vw - 16px); } .jr-ans { grid-template-columns: 1fr; } }
