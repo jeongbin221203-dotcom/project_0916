@@ -77,6 +77,146 @@
     }).join("");
   }
 
+  // ===== 시험 화면 재현 모드: 다크 네이비 PDF 뷰어 + 답안 패널 =====
+  function openExamViewer(cur, n, onSaved) {
+    var pages = (PAST_PAGES[n] || [0])[0];
+    var total = cur[1].length;
+    var answers = {};
+    var zoom = 95, curPage = 1, sec = 60 * 60, timer = null, done = false;
+    var root = document.createElement("div");
+    root.className = "xv";
+    var thumbs = "", sheets = "";
+    for (var i = 1; i <= pages; i++) {
+      thumbs += '<a class="xv-th" data-p="' + i + '"><img loading="lazy" src="past/q' + n + '_' + i + '.jpg" alt=""><span>' + i + '</span></a>';
+      sheets += '<img class="xv-pg" data-p="' + i + '" src="past/q' + n + '_' + i + '.jpg" alt="제' + n + '회 시험지 ' + i + '쪽">';
+    }
+    var rows = "";
+    for (var q = 0; q < total; q++) {
+      rows += '<div class="xv-row" data-q="' + q + '"><b>' + (q + 1) + '</b>';
+      rows += '<input class="xv-in" type="text" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="' + (q + 1) + '번 답">';
+      rows += '</div>';
+    }
+    root.innerHTML =
+      '<div class="xv-top">' +
+      
+      '<span class="xv-title">제' + n + '회 FAT 1급 · 실무이론평가</span>' +
+      '<span class="xv-mid"><span class="xv-pn"><input class="xv-cur" value="1" size="2" aria-label="현재 쪽"> / ' + pages + '</span>' +
+      '<span class="xv-sep"></span><button type="button" class="xv-ic" data-a="zout">−</button><span class="xv-zm">' + zoom + '%</span><button type="button" class="xv-ic" data-a="zin">+</button></span>' +
+      '<span class="xv-right"><span class="xv-time">60:00</span><button type="button" class="xv-ic" data-a="ans" title="답안 패널">✎</button>' +
+      '<button type="button" class="xv-sub" data-a="submit">제출</button><button type="button" class="xv-ic" data-a="close" title="닫기">✕</button></span></div>' +
+      '<div class="xv-body">' +
+      '<aside class="xv-ans"><h4>답안 입력 <small class="xv-cnt">0 / ' + total + '</small></h4>' + rows +
+      '<p class="xv-note">시험지를 보면서 번호별로 답(1~4)을 숫자로 입력하세요. 입력하면 다음 문항으로 넘어가며, 제출 전에는 언제든 바꿀 수 있습니다.</p></aside>' +
+      '<div class="xv-main">' + sheets + '</div></div>';
+    document.body.appendChild(root);
+    document.body.classList.add("xv-open");
+    var main = root.querySelector(".xv-main");
+
+    function fmt(s) { var m = Math.floor(s / 60), r = s % 60; return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r; }
+    function applyZoom() {
+      Array.prototype.forEach.call(main.querySelectorAll(".xv-pg"), function (im) { im.style.width = (zoom * 8) / 1 + "px"; im.style.maxWidth = "none"; });
+      root.querySelector(".xv-zm").textContent = zoom + "%";
+    }
+    function setPage(p) {
+      curPage = p;
+      root.querySelector(".xv-cur").value = p;
+      Array.prototype.forEach.call(root.querySelectorAll(".xv-th"), function (a) { a.classList.toggle("on", parseInt(a.getAttribute("data-p"), 10) === p); });
+    }
+    function goPage(p) {
+      p = Math.max(1, Math.min(pages, p));
+      var im = main.querySelector('.xv-pg[data-p="' + p + '"]');
+      if (im) main.scrollTop = im.offsetTop - 12;
+      setPage(p);
+    }
+    function onScroll() {
+      var best = 1, y = main.scrollTop + main.clientHeight / 3;
+      Array.prototype.forEach.call(main.querySelectorAll(".xv-pg"), function (im) { if (im.offsetTop <= y) best = parseInt(im.getAttribute("data-p"), 10); });
+      if (best !== curPage) setPage(best);
+    }
+    function count() {
+      var c = Object.keys(answers).length;
+      root.querySelector(".xv-cnt").textContent = c + " / " + total;
+    }
+    function finish() {
+      if (done) return;
+      done = true;
+      clearInterval(timer);
+      var ok = 0, un = 0, h = "";
+      cur[1].forEach(function (qq, i) {
+        var a = answers[i], good = a === qq[3];
+        if (!a) un++; else if (good) ok++;
+        h += '<div class="xv-r ' + (!a ? "un" : good ? "ok" : "ng") + '"><b>[' + (i + 1) + ']</b> ' + (!a ? "미응답" : good ? "정답 ✔" : "오답 ✘ (내 답 " + a + ")") + ' · 정답 ' + qq[3] +
+          '<details><summary>문제·해설</summary><div><p>' + qq[1] + '</p>' + qq[2].map(function (o, k) { return '<div>' + CIR[k] + ' ' + o + '</div>'; }).join("") + '<p><b>해설</b> ' + qq[4] + '</p></div></details></div>';
+      });
+      var score = ok * 3;
+      var used = 60 * 60 - sec;
+      var res = document.createElement("div");
+      res.className = "xv-result";
+      res.innerHTML = '<div class="xv-card"><h3>채점 결과 · 제' + n + '회</h3><p class="xv-big">' + score + '점 <small>/ 30점 (정답 ' + ok + ' · 미응답 ' + un + ' · 소요 ' + Math.floor(used / 60) + '분 ' + (used % 60) + '초)</small></p>' + h +
+        '<p><button type="button" class="xv-sub" data-a="close">닫기</button></p></div>';
+      root.appendChild(res);
+      if (onSaved) onSaved(score);
+    }
+    function close() {
+      clearInterval(timer);
+      document.body.classList.remove("xv-open");
+      if (root.parentNode) root.parentNode.removeChild(root);
+      document.removeEventListener("keydown", onKey);
+    }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    document.addEventListener("keydown", onKey);
+
+    root.addEventListener("click", function (e) {
+      var t = e.target;
+      var th = t.closest && t.closest(".xv-th");
+      if (th) { goPage(parseInt(th.getAttribute("data-p"), 10)); return; }
+      var btn = t.closest && t.closest("[data-a]");
+      if (btn) {
+        var a = btn.getAttribute("data-a");
+        if (a === "close") close();
+        else if (a === "side") root.classList.toggle("no-side");
+        else if (a === "ans") root.classList.toggle("no-ans");
+        else if (a === "zin") { zoom = Math.min(200, zoom + 10); applyZoom(); }
+        else if (a === "zout") { zoom = Math.max(40, zoom - 10); applyZoom(); }
+        else if (a === "submit") {
+          var left = total - Object.keys(answers).length;
+          if (left && !window.confirm("답을 선택하지 않은 문항이 " + left + "개 있습니다. 제출할까요?")) return;
+          finish();
+        }
+        return;
+      }
+    });
+    root.querySelector(".xv-ans").addEventListener("input", function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains("xv-in") || done) return;
+      var qi = parseInt(inp.parentNode.getAttribute("data-q"), 10);
+      var d = inp.value.replace(/[^1-4]/g, "");
+      inp.value = d;
+      if (d) { answers[qi] = CIR[parseInt(d, 10) - 1]; var nx = root.querySelector('.xv-row[data-q="' + (qi + 1) + '"] .xv-in'); if (nx) nx.focus(); }
+      else delete answers[qi];
+      count();
+    });
+    root.querySelector(".xv-ans").addEventListener("keydown", function (e) {
+      var inp = e.target;
+      if (!inp.classList || !inp.classList.contains("xv-in")) return;
+      var qi = parseInt(inp.parentNode.getAttribute("data-q"), 10), to = null;
+      if (e.key === "ArrowDown" || e.key === "Enter") to = qi + 1; else if (e.key === "ArrowUp") to = qi - 1;
+      if (to !== null) { var el = root.querySelector('.xv-row[data-q="' + to + '"] .xv-in'); if (el) { e.preventDefault(); el.focus(); el.select(); } }
+    });
+    root.querySelector(".xv-cur").addEventListener("change", function (e) { goPage(parseInt(e.target.value, 10) || 1); });
+    main.addEventListener("scroll", onScroll);
+    timer = setInterval(function () {
+      sec--;
+      root.querySelector(".xv-time").textContent = fmt(Math.max(0, sec));
+      root.querySelector(".xv-time").classList.toggle("low", sec <= 300);
+      if (sec <= 0) finish();
+    }, 1000);
+    if (window.innerWidth < 900) root.classList.add("no-side", "no-ans");
+    applyZoom();
+    setPage(1);
+    return { root: root, goPage: goPage, answers: answers, finish: finish, close: close };
+  }
+
   function buildMock(box, groups) {
     var KEY = "fat1.mock";
     var saved = {};
@@ -86,10 +226,18 @@
       var n = num(g);
       return '<option value="' + n + '">' + g[0] + (saved[n] != null ? " (최근 " + saved[n] + "점)" : "") + '</option>';
     }).join("");
-    box.innerHTML = '<div class="tools"><select id="mockSel">' + opts + '</select> <button type="button" class="btn" id="mockStart">실전 풀이 시작</button> <span id="mockTime" style="margin-left:8px"></span></div><div id="mockArea"></div>';
+    box.innerHTML = '<div class="tools"><select id="mockSel">' + opts + '</select> <button type="button" class="btn" id="mockStart">실전 풀이 시작</button> <button type="button" class="btn" id="mockViewer">시험 화면으로 풀기 (다크)</button> <span id="mockTime" style="margin-left:8px"></span></div><div id="mockArea"></div>';
     var timer = null, sec = 0, cur = null;
     function stop() { if (timer) { clearInterval(timer); timer = null; } }
     function tick() { sec++; var m = Math.floor(sec / 60), r = sec % 60; box.querySelector("#mockTime").textContent = "경과 " + (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r + " / 이론 권장 15분"; }
+    box.querySelector("#mockViewer").addEventListener("click", function () {
+      var n = parseInt(box.querySelector("#mockSel").value, 10);
+      var g = groups.filter(function (x) { return num(x) === n; })[0];
+      openExamViewer(g, n, function (score) {
+        saved[n] = score;
+        try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+      });
+    });
     box.querySelector("#mockStart").addEventListener("click", function () {
       var n = parseInt(box.querySelector("#mockSel").value, 10);
       cur = groups.filter(function (g) { return num(g) === n; })[0];
@@ -111,9 +259,9 @@
           var i = parseInt(el.getAttribute("data-i"), 10), q = cur[1][i];
           var sel = el.querySelector("input:checked");
           var res = el.querySelector(".mres");
-          if (!sel) { un++; res.innerHTML = '<b style="color:#c60">미응답</b> — 정답 ' + q[3] + '<br>' + q[4]; }
-          else if (sel.value === q[3]) { ok++; res.innerHTML = '<b style="color:#080">정답 ✔</b><br>' + q[4]; }
-          else { res.innerHTML = '<b style="color:#c00">오답 ✘</b> (내 답 ' + sel.value + ' / 정답 ' + q[3] + ')<br>' + q[4]; }
+          if (!sel) { un++; res.innerHTML = '<b style="color:#ffb454">미응답</b> — 정답 ' + q[3] + '<br>' + q[4]; }
+          else if (sel.value === q[3]) { ok++; res.innerHTML = '<b style="color:#6fd08c">정답 ✔</b><br>' + q[4]; }
+          else { res.innerHTML = '<b style="color:#ff7b72">오답 ✘</b> (내 답 ' + sel.value + ' / 정답 ' + q[3] + ')<br>' + q[4]; }
         });
         var score = ok * 3;
         box.querySelector("#mockScore").innerHTML = '<b>' + ok + ' / ' + cur[1].length + ' 정답 · ' + score + '점 (30점 만점)</b>' + (un ? ' · 미응답 ' + un : '') + ' · 소요 ' + Math.floor(sec / 60) + '분 ' + (sec % 60) + '초';
