@@ -145,7 +145,20 @@
   }
 
   var S = window.STUDY || {};
+  function buildVat(el) {
+    if (!el || !S.vatTheory) return;
+    var n = 0;
+    S.vatQ.forEach(function (g) { n += g[1].length; });
+    var d = document.createElement('div');
+    d.id = 'vatSection';
+    d.innerHTML =
+      '<h4>부가가치세 · 기출 60문제 빈출 정리</h4>' + theoryHtml(S.vatTheory) +
+      '<h4>부가가치세 필수 문제 <small>(' + n + '문제)</small></h4>' + toolbar() + '<div class="qset">' + groupsHtml(S.vatQ, true) + '</div>';
+    el.insertBefore(d, el.firstChild);
+  }
+
   build(document.getElementById("finBody"), S.finTheory || [], S.finBasic || [], S.fin60 || [], "재무회계 60제");
   build(document.getElementById("costBody"), S.costTheory || [], S.costBasic || [], S.cost50 || [], "원가회계 50제");
+  buildVat(document.getElementById("costBody"));
   buildPast(document.getElementById("pastBody"), S.pastExam || []);
 })();
