@@ -1,4 +1,4 @@
-// 로컬 실행: .env 에 OPENAI_API_KEY=키 를 적고  node server.js  →  http://localhost:3000
+// 로컬 실행: .env 에 OPENAI_API_KEY=키 를 적고  node local-server.js  →  http://localhost:3000
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -31,7 +31,7 @@ http.createServer((req, res) => {
   const file = path.normalize(path.join(ROOT, p));
   const rel = path.relative(ROOT, file);
   const hidden = rel.split(path.sep).some(seg => seg.startsWith("."));
-  if (rel.startsWith("..") || hidden || rel === "server.js" || rel.startsWith("api" + path.sep) || !(path.extname(file) in TYPES)) {
+  if (rel.startsWith("..") || hidden || rel === "local-server.js" || rel.startsWith("api" + path.sep) || !(path.extname(file) in TYPES)) {
     res.writeHead(403); return res.end("forbidden");
   }
   fs.readFile(file, (err, buf) => {

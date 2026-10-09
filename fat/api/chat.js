@@ -1,4 +1,4 @@
-// Vercel 서버리스 함수이자 로컬 server.js 에서도 공용으로 쓰는 챗 API 핸들러
+// Vercel 서버리스 함수이자 로컬 local-server.js 에서도 공용으로 쓰는 챗 API 핸들러
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");

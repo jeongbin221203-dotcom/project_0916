@@ -104,7 +104,7 @@
 
   function ask(msgs) {
     if (!/^https?:$/.test(location.protocol)) {
-      return Promise.reject(new Error("이 페이지는 파일로 열려 있어 AI를 쓸 수 없습니다. start.bat을 더블클릭하거나 터미널에서 node server.js 실행 후 http://localhost:3000 으로 접속해 주세요."));
+      return Promise.reject(new Error("이 페이지는 파일로 열려 있어 AI를 쓸 수 없습니다. start.bat을 더블클릭하거나 터미널에서 node local-server.js 실행 후 http://localhost:3000 으로 접속해 주세요."));
     }
     return askServer(msgs).catch(function (err) {
       if (/Failed to fetch|NetworkError|Unexpected token|JSON/.test(err.message || "")) {
