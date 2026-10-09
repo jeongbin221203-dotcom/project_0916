@@ -6,32 +6,19 @@
 <title>FAT 1급 시험 준비</title>
 <style>
   :root {
-    --bg: #f6f7f9;
-    --card: #ffffff;
-    --text: #1c1f24;
-    --muted: #6b7280;
-    --line: #e3e6ea;
-    --accent: #2f6fed;
-    --accent-soft: #e8effd;
-    --today: #fff4d6;
-    --today-line: #f0b429;
-    --done: #e6f6ec;
-    --done-text: #1f7a3f;
-    --danger: #d9534f;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #121417;
-      --card: #1b1e23;
-      --text: #e8eaed;
-      --muted: #9aa1ab;
-      --line: #2c3139;
-      --accent: #6b9cff;
-      --accent-soft: #1f2a44;
-      --today: #3a2f12;
-      --done: #163322;
-      --done-text: #6fd08c;
-    }
+    color-scheme: dark;
+    --bg: #0a1224;
+    --card: #14213d;
+    --text: #e6edff;
+    --muted: #8fa0cc;
+    --line: #2a3b63;
+    --accent: #6ea8ff;
+    --accent-soft: #1c2d52;
+    --today: #3a3413;
+    --today-line: #ffb400;
+    --done: #14382a;
+    --done-text: #6fd08c;
+    --danger: #ff7b72;
   }
   * { box-sizing: border-box; }
   body {
@@ -98,7 +85,7 @@
   #study { scroll-margin-top: 16px; }
   .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
   .tab { flex: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer; }
-  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #0a1224; font-weight: 700; }
   .day-panel { display: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-height: 320px; }
   .day-panel.active { display: block; }
   .day-panel h3 { margin: 0 0 4px; font-size: 1.15rem; }
@@ -115,6 +102,50 @@
   .study-body pre.vsol { white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 0.88rem; background: var(--accent-soft); border-radius: 6px; padding: 8px 10px; margin: 4px 0 10px; }
   .study-body .ans { background: #ffe58a; color: #000; padding: 0 2px; border-radius: 3px; }
   .study-body .stars { color: #f59e0b; font-weight: 700; letter-spacing: 1px; }
+  /* 시험 화면 재현 모드 (다크 네이비) */
+  body.xv-open { overflow: hidden; }
+  .xv { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; background: #0a1224; color: #e6edff; font-size: 14px; }
+  .xv-top { height: 54px; flex: 0 0 54px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: #14213d; border-bottom: 1px solid #0a1224; }
+  .xv-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .xv-mid { margin: 0 auto; display: flex; align-items: center; gap: 8px; }
+  .xv-pn { display: inline-flex; align-items: center; gap: 4px; }
+  .xv-cur { width: 34px; text-align: center; background: #0a1224; color: #fff; border: 1px solid #3b4d78; border-radius: 4px; padding: 3px; }
+  .xv-sep { width: 1px; height: 22px; background: #3b4d78; margin: 0 6px; }
+  .xv-zm { min-width: 44px; text-align: center; background: #0a1224; border-radius: 4px; padding: 3px 6px; }
+  .xv-right { display: flex; align-items: center; gap: 8px; }
+  .xv-ic { background: none; border: 0; color: #e6edff; font-size: 18px; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; }
+  .xv-ic:hover { background: #24365f; }
+  .xv-time { font-variant-numeric: tabular-nums; font-weight: 700; background: #0a1224; padding: 4px 10px; border-radius: 6px; }
+  .xv-time.low { color: #ff8a80; }
+  .xv-sub { background: #ffb400; color: #1b1b1b; border: 0; border-radius: 6px; font-weight: 700; padding: 7px 16px; cursor: pointer; }
+  .xv-body { flex: 1; min-height: 0; display: flex; }
+  .xv-side { width: 190px; flex: 0 0 190px; overflow: auto; background: #0e1830; padding: 14px 0; text-align: center; }
+  .xv-th { display: block; cursor: pointer; margin-bottom: 14px; color: #c3cff0; }
+  .xv-th img { width: 150px; border: 3px solid transparent; background: #fff; display: block; margin: 0 auto 4px; }
+  .xv-th.on img { border-color: #6ea8ff; }
+  .xv-th.on span { color: #fff; font-weight: 700; }
+  .xv-main { flex: 1; min-width: 0; overflow: auto; background: #0a1224; padding: 14px 0; text-align: center; }
+  .xv-pg { display: block; margin: 0 auto 16px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.6); }
+  .xv-ans { width: 230px; flex: 0 0 230px; overflow: auto; background: #14213d; padding: 12px 14px; border-right: 1px solid #0a1224; }
+  .xv-ans h4 { margin: 0 0 10px; color: #fff; }
+  .xv-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .xv-row b { width: 22px; text-align: right; color: #aab8dd; }
+  .xv-row button { flex: 1; background: #0a1224; color: #e6edff; border: 1px solid #3b4d78; border-radius: 6px; padding: 5px 0; font-size: 15px; cursor: pointer; }
+  .xv-row button.on { background: #4f8cff; border-color: #4f8cff; color: #fff; font-weight: 700; }
+  .xv-in { flex: 1; min-width: 0; text-align: center; background: #0a1224; color: #fff; border: 1px solid #3b4d78; border-radius: 6px; padding: 7px 0; font-size: 17px; font-weight: 700; }
+  .xv-in:focus { outline: 2px solid #4f8cff; border-color: #4f8cff; }
+  .xv-note { color: #8fa0cc; font-size: 12px; line-height: 1.5; }
+  .xv.no-side .xv-side { display: none; }
+  .xv.no-ans .xv-ans { display: none; }
+  .xv-result { position: absolute; inset: 0; overflow: auto; background: rgba(5, 9, 20, .92); padding: 24px 12px; }
+  .xv-card { max-width: 720px; margin: 0 auto; background: #14213d; border-radius: 12px; padding: 18px 20px; }
+  .xv-card h3 { margin: 0 0 6px; }
+  .xv-big { font-size: 28px; font-weight: 800; margin: 6px 0 14px; color: #ffd24d; }
+  .xv-big small { font-size: 13px; font-weight: 400; color: #aab8dd; }
+  .xv-r { padding: 8px 10px; border-radius: 8px; margin-bottom: 8px; background: #0e1830; border-left: 4px solid #3b4d78; }
+  .xv-r.ok { border-left-color: #4cd08a; } .xv-r.ng { border-left-color: #ff6b6b; } .xv-r.un { border-left-color: #ffb400; }
+  .xv-r details { margin-top: 4px; } .xv-r summary { cursor: pointer; color: #9ec0ff; } .xv-r div { color: #d6def5; }
+  @media (max-width: 899px) { .xv-title { display: none; } .xv-side, .xv-ans { position: absolute; top: 54px; bottom: 0; z-index: 2; } .xv-ans { left: 0; } .xv-side { left: 0; } }
   .study-body code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
   .study-body h4 { margin: 18px 0 8px; font-size: 1rem; }
   .opt { margin: 3px 0 3px 6px; font-size: 0.92rem; }
