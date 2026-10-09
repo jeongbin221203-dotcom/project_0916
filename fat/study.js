@@ -163,6 +163,59 @@
       el.innerHTML = h;
     });
   }
+  function buildPracticeTopics(el) {
+    var P = (window.STUDY || {}).practice;
+    if (!el || !P) return;
+    function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function ans(s) { return esc(s).replace(/⟦/g, '<b class="ans">').replace(/⟧/g, "</b>"); }
+    function flow(lines) {
+      var out = [];
+      lines.forEach(function (l) {
+        if (!out.length || /^(\d+\.\s|\d+\)|[①-⑨]|[-•◦·∙*]\s?|\[|\()/.test(l)) out.push(l); else out[out.length - 1] += " " + l;
+      });
+      return out;
+    }
+    function pre(lines) { return '<pre class="vsol">' + esc(lines.join("\n")) + "</pre>"; }
+    function item(it) {
+      var n = it[0], h = '<details><summary>제' + n + '회 · ' + esc(it[1]) + "</summary><div>";
+      if (it[2].length) h += '<p><b>자료설명</b></p>' + pre(flow(it[2]));
+      if (it[3].length) h += '<p><b>수행과제</b></p>' + pre(flow(it[3]));
+      if (it[4].length) h += '<p><b>수행과제 풀이</b></p>' + pre(it[4]);
+      h += '<details class="rawsheet"><summary>원본 화면 보기 (자료·풀이 화면 포함)</summary><div>';
+      it[5].forEach(function (k) {
+        h += '<img loading="lazy" src="past/pr' + n + '_' + k + '.jpg" alt="제' + n + '회 실무 ' + k + '쪽" style="display:block;width:100%;max-width:760px;margin:8px auto;border:1px solid #bbb;background:#fff">';
+      });
+      return h + "</div></details></div></details>";
+    }
+    var h = '<h4>실무 유형별 따라하기 <small>(제75~91회 PDF 정리, 92회는 따라하기 1회)</small></h4>' +
+      '<p class="source">출제범위 항목별로 회차를 모았습니다. 자료설명과 수행과제를 읽고 직접 입력한 뒤 풀이와 맞춰 보세요. 풀이 화면(프로그램 캡처)은 "원본 화면 보기"에서 볼 수 있습니다.</p>';
+    P.groups.forEach(function (g) {
+      var cnt = 0;
+      g[2].forEach(function (s) { cnt += s[1].length; });
+      h += '<details><summary>' + esc(g[0]) + ' <small>(' + cnt + '건)</small></summary><div><p class="source">' + esc(g[1]) + '</p>';
+      g[2].forEach(function (s) {
+        if (s[0]) h += '<h5>' + esc(s[0]) + ' <small>(' + s[1].length + '건)</small></h5>';
+        s[1].forEach(function (it) { h += item(it); });
+      });
+      h += "</div></details>";
+    });
+    h += '<details><summary>자료조회 <small>(평가문제 정답 포함)</small></summary><div><p class="source">부가세 조회, 자금정보 조회, 재무제표·장부 조회 문제입니다. 노란 표시가 정답입니다. 객관식은 옳지 않은 것을 고르는 유형이 많습니다.</p>';
+    P.eval.forEach(function (g) {
+      h += '<h5>' + esc(g[0]) + ' <small>(' + g[1].length + '문제)</small></h5>';
+      g[1].forEach(function (q) {
+        h += '<div class="q"><p><b>제' + q[0] + '회 ' + q[1] + '번</b> <span class="src">[' + esc(q[2]) + ']</span></p><pre class="vsol">' + ans(q[3].join("\n")) + "</pre></div>";
+      });
+    });
+    h += '<h5>회계정보분석 <small>(회차별)</small></h5>';
+    P.ana.forEach(function (a) {
+      h += '<details><summary>제' + a[0] + '회</summary><div><pre class="vsol">' + esc(a[1].join("\n")) + "</pre></div></details>";
+    });
+    h += "</div></details>";
+    var d = document.createElement("div");
+    d.id = "practiceTopics";
+    d.innerHTML = h;
+    el.insertBefore(d, el.firstChild);
+  }
   var S = window.STUDY || {};
   function buildVat(el) {
     if (!el || !S.vatTheory) return;
@@ -180,5 +233,6 @@
   build(document.getElementById("costBody"), S.costTheory || [], S.costBasic || [], S.cost50 || [], "원가회계 50제");
   buildVat(document.getElementById("costBody"));
   buildPractice();
+  buildPracticeTopics(document.getElementById("praBody1"));
   buildPast(document.getElementById("pastBody"), S.pastExam || []);
 })();
