@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAT 1급 시험 준비</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #1c1f24;
+    --muted: #6b7280;
+    --line: #e3e6ea;
+    --accent: #2f6fed;
+    --accent-soft: #e8effd;
+    --today: #fff4d6;
+    --today-line: #f0b429;
+    --done: #e6f6ec;
+    --done-text: #1f7a3f;
+    --danger: #d9534f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121417;
+      --card: #1b1e23;
+      --text: #e8eaed;
+      --muted: #9aa1ab;
+      --line: #2c3139;
+      --accent: #6b9cff;
+      --accent-soft: #1f2a44;
+      --today: #3a2f12;
+      --done: #163322;
+      --done-text: #6fd08c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header { background: var(--card); border-bottom: 1px solid var(--line); padding: 20px 0; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { margin: 0; font-size: 1.4rem; }
+  h1 small { display: block; font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+  .dday { text-align: right; }
+  .dday .num { font-size: 2.2rem; font-weight: 800; color: var(--accent); line-height: 1; }
+  .dday .date { font-size: 0.85rem; color: var(--muted); }
+
+  main { padding: 24px 16px 48px; }
+  section { margin-bottom: 32px; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  h2 .badge { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
+
+  .progress { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin: 8px 0 16px; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 900px; }
+  th, td { border: 1px solid var(--line); text-align: center; padding: 10px 8px; vertical-align: middle; }
+  thead th { background: var(--accent-soft); font-weight: 600; font-size: 0.9rem; }
+  td.task { font-size: 0.95rem; }
+  td.today, th.today { background: var(--today); }
+  thead th.today { border-top: 3px solid var(--today-line); }
+  td.done { background: var(--done); color: var(--done-text); text-decoration: line-through; }
+  td.check label { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; }
+  td.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .dlabel { font-weight: 700; color: var(--accent); }
+  .dlabel.dday { color: var(--danger); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 0.95rem; }
+  .card p, .card li { margin: 0; font-size: 0.9rem; color: var(--muted); }
+  .card ul { margin: 0; padding-left: 18px; }
+
+  .notes textarea {
+    width: 100%; min-height: 160px; resize: vertical;
+    padding: 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--card); color: var(--text); font: inherit; font-size: 0.95rem;
+  }
+  .notes .hint { font-size: 0.8rem; color: var(--muted); }
+  .btn {
+    padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font: inherit; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .card.link { cursor: pointer; transition: border-color .15s, transform .15s; position: relative; }
+  .card.link:hover, .card.link:focus-visible { border-color: var(--accent); transform: translateY(-1px); outline: none; }
+  .card.link::after { content: "공부하러 가기 ↓"; position: absolute; right: 14px; top: 14px; font-size: 0.8rem; color: var(--accent); }
+  thead th[data-date] { cursor: pointer; }
+  thead th[data-date]:hover { text-decoration: underline; }
+
+  #study { scroll-margin-top: 16px; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
+  .tab { flex: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .day-panel { display: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-height: 320px; }
+  .day-panel.active { display: block; }
+  .day-panel h3 { margin: 0 0 4px; font-size: 1.15rem; }
+  .day-panel .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+  .day-panel .placeholder { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 24px; text-align: center; }
+  .study-body details { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; background: var(--card); }
+  .study-body summary { cursor: pointer; padding: 10px 14px; font-weight: 600; }
+  .study-body details > div { padding: 0 16px 12px; font-size: 0.92rem; }
+  .study-body ul { margin: 6px 0; padding-left: 20px; }
+  .study-body li { margin: 3px 0; }
+  .study-body table { min-width: 0; margin: 8px 0; font-size: 0.88rem; }
+  .study-body th, .study-body td { padding: 6px 8px; text-align: left; }
+  .study-body th { background: var(--accent-soft); }
+  .study-body code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+  .study-body h4 { margin: 18px 0 8px; font-size: 1rem; }
+  .opt { margin: 3px 0 3px 6px; font-size: 0.92rem; }
+  .src { color: var(--muted); font-size: 0.85em; }
+  .tools { margin: 4px 0 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .study-body h4 small, .study-body summary small { color: var(--muted); font-weight: 400; }
+  .study-body h5 { margin: 14px 0 6px; font-size: 0.95rem; }
+  .study-body td, .study-body th { vertical-align: top; }
+  .study-body .table-wrap { overflow-x: auto; }
+  .source { margin: 14px 0 0; font-size: 0.72rem; color: var(--muted); }
+  .q { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .q p { margin: 0 0 6px; }
+  .q details { border: 0; margin: 4px 0 0; }
+  .q summary { padding: 4px 0; color: var(--accent); }
+  .q details > div { padding: 4px 0 0; color: var(--muted); }
+  footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 16px; }
+</style>
+<link rel="stylesheet" href="chat.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>FAT 1급 시험 준비<small>회계정보처리 1급 · 9일 집중 플랜</small></h1>
+    <div class="dday">
+      <div class="num" id="ddayNum">D-?</div>
+      <div class="date">시험일 2026-10-17</div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <h2>학습 일정 <span class="badge" id="progressText">0 / 9 완료</span></h2>
+    <div class="progress"><div id="progressBar"></div></div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr id="rowDate"></tr></thead>
+        <tbody>
+          <tr id="rowD"></tr>
+          <tr id="rowTask"></tr>
+          <tr id="rowCheck"></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>오늘 할 일</h2>
+    <div class="cards" id="todayCards"></div>
+  </section>
+
+  <section>
+    <h2>시험 정보 <span class="badge">참고용 · 공식 공지로 재확인 필요</span></h2>
+    <div class="cards">
+      <div class="card"><h3>출제 구성</h3><ul><li>이론 30점 (객관식)</li><li>실무 70점 (프로그램 입력)</li></ul></div>
+      <div class="card"><h3>합격 기준</h3><p>100점 만점 중 70점 이상</p></div>
+      <div class="card"><h3>시험 시간</h3><p>60분</p></div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <h2>틀린 문제 노트 <span class="badge">브라우저에 자동 저장</span></h2>
+    <textarea id="notes" placeholder="틀린 문제, 헷갈리는 분개, 다시 볼 기출 번호를 적어두세요."></textarea>
+    <div class="row">
+      <button class="btn" id="clearNotes">노트 비우기</button>
+      <button class="btn" id="resetChecks">체크 초기화</button>
+      <span class="hint">이 브라우저에만 저장됩니다.</span>
+    </div>
+  </section>
+
+  <section id="study">
+    <h2>학습 공간 <span class="badge" id="studyTitle"></span></h2>
+    <div class="tabs" id="tabs"></div>
+
+    <!-- 날짜별 화면: 아래 article 안을 날짜별로 원하는 내용으로 채우면 됩니다 -->
+    <article class="day-panel" data-date="2026-10-09">
+      <h3>10-09 · 재무회계</h3><div class="sub">D+8</div>
+      <div class="study-body" id="finBody"></div>
+    </article>
+    <article class="day-panel" data-date="2026-10-10">
+      <h3>10-10 · 원가회계</h3><div class="sub">D+7</div>
+      <div class="study-body" id="costBody"></div>
+    </article>
+    <article class="day-panel" data-date="2026-10-11">
+      <h3>10-11 · 기출문제</h3><div class="sub">D+6</div>
+      <div class="study-body">
+        <details open><summary>기출 풀이 요령</summary><div>
+          <ul>
+            <li>시험 시간과 같은 시간을 타이머로 재고, 모르는 문제는 표시만 하고 넘어갑니다.</li>
+            <li>채점 후 오답을 세 가지로 나눕니다: 개념 부족 / 계산 실수 / 문제 해석 실수.</li>
+            <li>개념 부족은 9일·10일 패널의 해당 항목으로 돌아가 다시 읽고, 계산 실수는 같은 유형을 한 번 더 풉니다.</li>
+            <li>틀린 문제는 번호와 이유를 한 줄로 아래 노트에 적어 17일 복습에 씁니다.</li>
+          </ul>
+        </div></details>
+        <p class="source">기출문제 파일은 직접 준비해서 풀어 주세요.</p>
+      </div>
+    </article>
+    <article class="day-panel" data-date="2026-10-12">
+      <h3>10-12 · 실기 2번</h3><div class="sub">D+5</div>
+      <div class="placeholder">실기 학습 내용을 여기에 추가하세요.</div>
+    </article>
+    <article class="day-panel" data-date="2026-10-13">
+      <h3>10-13 · 실기 2번</h3><div class="sub">D+4</div>
+      <div class="placeholder">실기 학습 내용을 여기에 추가하세요.</div>
+    </article>
+    <article class="day-panel" data-date="2026-10-14">
+      <h3>10-14 · 실기 2번</h3><div class="sub">D+3</div>
+      <div class="placeholder">실기 학습 내용을 여기에 추가하세요.</div>
+    </article>
+    <article class="day-panel" data-date="2026-10-15">
+      <h3>10-15 · 실기 2번</h3><div class="sub">D+2</div>
+      <div class="placeholder">실기 학습 내용을 여기에 추가하세요.</div>
+    </article>
+    <article class="day-panel" data-date="2026-10-16">
+      <h3>10-16 · 실기 2번</h3><div class="sub">D+1</div>
+      <div class="placeholder">실기 학습 내용을 여기에 추가하세요.</div>
+    </article>
+    <article class="day-panel" data-date="2026-10-17">
+      <h3>10-17 · 시험전 틀린문제 복습</h3><div class="sub">D-Day</div>
+      <div class="placeholder">틀린 문제 복습 내용을 여기에 추가하세요.</div>
+    </article>
+  </section>
+
+</main>
+
+<footer>FAT 1급 준비 페이지 · 2026-10-09 ~ 2026-10-17</footer>
+
+<script src="fin-theory.js"></script>
+<script src="fin-q.js"></script>
+<script src="cost-theory.js"></script>
+<script src="cost-q.js"></script>
+<script src="study.js"></script>
+<script>
+(function () {
+  var EXAM = "2026-10-17";
+  var PLAN = [
+    { date: "2026-10-09", label: "D+8",   task: "재무회계 (8h)" },
+    { date: "2026-10-10", label: "D+7",   task: "원가회계 (8h)" },
+    { date: "2026-10-11", label: "D+6",   task: "기출문제 (8h)" },
+    { date: "2026-10-12", label: "D+5",   task: "실기 2번" },
+    { date: "2026-10-13", label: "D+4",   task: "실기 2번" },
+    { date: "2026-10-14", label: "D+3",   task: "실기 2번" },
+    { date: "2026-10-15", label: "D+2",   task: "실기 2번" },
+    { date: "2026-10-16", label: "D+1",   task: "실기 2번" },
+    { date: "2026-10-17", label: "D-Day", task: "시험전 틀린문제 복습" }
+  ];
+  var KEY_CHECK = "fat1.checks";
+  var KEY_NOTES = "fat1.notes";
+
+  function load(key, fallback) {
+    try { var v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+    catch (e) { return fallback; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function daysBetween(a, b) {
+    return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+  }
+
+  var today = todayStr();
+  var checks = load(KEY_CHECK, {});
+  var diff = daysBetween(today, EXAM);
+
+  var ddayEl = document.getElementById("ddayNum");
+  ddayEl.textContent = diff > 0 ? "D-" + diff : (diff === 0 ? "D-Day" : "D+" + (-diff));
+
+  var rowDate = document.getElementById("rowDate");
+  var rowD = document.getElementById("rowD");
+  var rowTask = document.getElementById("rowTask");
+  var rowCheck = document.getElementById("rowCheck");
+
+  PLAN.forEach(function (p) {
+    var isToday = p.date === today;
+    var done = !!checks[p.date];
+
+    var th = document.createElement("th");
+    th.textContent = p.date;
+    if (isToday) th.classList.add("today");
+    rowDate.appendChild(th);
+
+    var tdD = document.createElement("td");
+    var span = document.createElement("span");
+    span.className = "dlabel" + (p.label === "D-Day" ? " dday" : "");
+    span.textContent = p.label;
+    tdD.appendChild(span);
+    if (isToday) tdD.classList.add("today");
+    rowD.appendChild(tdD);
+
+    var tdT = document.createElement("td");
+    tdT.className = "task";
+    tdT.textContent = p.task;
+    if (isToday) tdT.classList.add("today");
+    if (done) tdT.classList.add("done");
+    rowTask.appendChild(tdT);
+
+    var tdC = document.createElement("td");
+    tdC.className = "check";
+    if (isToday) tdC.classList.add("today");
+    var label = document.createElement("label");
+    var input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = done;
+    input.addEventListener("change", function () {
+      checks[p.date] = input.checked;
+      save(KEY_CHECK, checks);
+      tdT.classList.toggle("done", input.checked);
+      updateProgress();
+      renderToday();
+    });
+    label.appendChild(input);
+    label.appendChild(document.createTextNode("완료"));
+    tdC.appendChild(label);
+    rowCheck.appendChild(tdC);
+  });
+
+  function updateProgress() {
+    var n = PLAN.filter(function (p) { return checks[p.date]; }).length;
+    document.getElementById("progressText").textContent = n + " / " + PLAN.length + " 완료";
+    document.getElementById("progressBar").style.width = (n / PLAN.length * 100) + "%";
+  }
+
+  function card(title, bodyNode) {
+    var c = document.createElement("div");
+    c.className = "card";
+    var h = document.createElement("h3");
+    h.textContent = title;
+    c.appendChild(h);
+    c.appendChild(bodyNode);
+    return c;
+  }
+  function para(text) { var p = document.createElement("p"); p.textContent = text; return p; }
+
+  // 학습 공간: 날짜별 패널 전환
+  var studySection = document.getElementById("study");
+  var tabsEl = document.getElementById("tabs");
+  var panels = document.querySelectorAll(".day-panel");
+  var tabBtns = {};
+
+  PLAN.forEach(function (p) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "tab";
+    b.textContent = p.date.slice(5) + " " + p.task;
+    b.addEventListener("click", function () { showDay(p.date, false); });
+    tabsEl.appendChild(b);
+    tabBtns[p.date] = b;
+  });
+
+  function showDay(date, scroll) {
+    Array.prototype.forEach.call(panels, function (el) {
+      el.classList.toggle("active", el.getAttribute("data-date") === date);
+    });
+    Object.keys(tabBtns).forEach(function (d) { tabBtns[d].classList.toggle("active", d === date); });
+    var p = PLAN.filter(function (x) { return x.date === date; })[0];
+    document.getElementById("studyTitle").textContent = p ? p.date + " · " + p.task : "";
+    if (scroll) studySection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function makeLink(c, date) {
+    c.classList.add("link");
+    c.tabIndex = 0;
+    c.setAttribute("role", "button");
+    c.addEventListener("click", function () { showDay(date, true); });
+    c.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showDay(date, true); }
+    });
+  }
+
+  // 표의 날짜 헤더를 눌러도 해당 날짜 학습 화면으로 이동
+  Array.prototype.forEach.call(rowDate.children, function (th, i) {
+    th.setAttribute("data-date", PLAN[i].date);
+    th.addEventListener("click", function () { showDay(PLAN[i].date, true); });
+  });
+
+  function renderToday() {
+    var box = document.getElementById("todayCards");
+    box.innerHTML = "";
+    var cur = PLAN.filter(function (p) { return p.date === today; })[0];
+    if (cur) {
+      var tc = card(cur.date + " · " + cur.label, para(cur.task + (checks[cur.date] ? "  ✓ 완료" : "")));
+      makeLink(tc, cur.date);
+      box.appendChild(tc);
+    } else if (diff > 0) {
+      box.appendChild(card("일정 시작 전", para("플랜은 " + PLAN[0].date + "부터 시작합니다.")));
+    } else {
+      box.appendChild(card("시험 종료", para("수고했습니다.")));
+    }
+    var pending = PLAN.filter(function (p) { return p.date < today && !checks[p.date]; });
+    if (pending.length) {
+      var ul = document.createElement("ul");
+      pending.forEach(function (p) {
+        var li = document.createElement("li");
+        li.textContent = p.date + " " + p.task;
+        ul.appendChild(li);
+      });
+      box.appendChild(card("밀린 항목", ul));
+    }
+  }
+
+  var notes = document.getElementById("notes");
+  notes.value = load(KEY_NOTES, "");
+  notes.addEventListener("input", function () { save(KEY_NOTES, notes.value); });
+
+  document.getElementById("clearNotes").addEventListener("click", function () {
+    if (confirm("노트를 모두 지울까요?")) { notes.value = ""; save(KEY_NOTES, ""); }
+  });
+  document.getElementById("resetChecks").addEventListener("click", function () {
+    if (confirm("완료 체크를 모두 초기화할까요?")) {
+      checks = {}; save(KEY_CHECK, checks); location.reload();
+    }
+  });
+
+  updateProgress();
+  renderToday();
+  var initial = PLAN.some(function (p) { return p.date === today; }) ? today : PLAN[0].date;
+  showDay(initial, false);
+})();
+</script>
+<script src="chat-prompt.js"></script>
+<script src="chat.js"></script>
+</body>
+</html>
