@@ -8,7 +8,7 @@
   panel.id = "chatPanel";
   panel.innerHTML =
     '<div class="chat-head"><div><strong>AI 학습 도우미</strong><small>모르는 개념·문제를 물어보세요</small></div>' +
-    '<div><button type="button" id="chatKey">키 설정</button><button type="button" id="chatClear">대화 지우기</button><button type="button" id="chatClose" aria-label="닫기">✕</button></div></div>' +
+    '<div><button type="button" id="chatClear">대화 지우기</button><button type="button" id="chatClose" aria-label="닫기">✕</button></div></div>' +
     '<div id="chatLog"></div>' +
     '<div class="chat-tools"><button type="button" id="chatGrab">선택한 글 가져오기</button></div>' +
     '<form class="chat-form"><textarea id="chatInput" placeholder="질문 입력 (Enter 전송, Shift+Enter 줄바꿈)"></textarea><button id="chatSend" type="submit">전송</button></form>';
@@ -78,11 +78,7 @@
     return t ? t.textContent : "";
   }
 
-  // ---- 응답 요청: 서버(node server.js)가 있으면 서버로, 없으면 브라우저에서 OpenAI로 직접 ----
-  var KEYSTORE = "fat1.openaikey";
-  function getKey() { try { return localStorage.getItem(KEYSTORE) || ""; } catch (e) { return ""; } }
-  function setKey(k) { try { if (k) localStorage.setItem(KEYSTORE, k); else localStorage.removeItem(KEYSTORE); } catch (e) {} }
-
+  // ---- 응답 요청: API 키는 서버(.env 또는 Vercel 환경변수)에만 둠 ----
   var CODESTORE = "fat1.accesscode";
   function getCode() { try { return localStorage.getItem(CODESTORE) || ""; } catch (e) { return ""; } }
   function setCode(c) { try { if (c) localStorage.setItem(CODESTORE, c); else localStorage.removeItem(CODESTORE); } catch (e) {} }
@@ -106,52 +102,17 @@
     });
   }
 
-  function askDirect(msgs) {
-    var key = getKey();
-    if (!key) {
-      key = (window.prompt("OpenAI API 키를 입력하세요 (sk-...). 이 브라우저에만 저장됩니다.") || "").trim();
-      if (!key) return Promise.reject(new Error("API 키가 필요합니다. 💬 창 위의 '키 설정'에서 입력할 수 있습니다."));
-      setKey(key);
-    }
-    var sys = window.CHAT_SYSTEM || "";
-    var c = context();
-    if (c) sys += "\n\n[학습자가 지금 보고 있는 화면]\n" + c;
-    return fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-      body: JSON.stringify({
-        model: "gpt-4o-mini", max_tokens: 1500,
-        messages: [{ role: "system", content: sys }].concat(msgs)
-      })
-    }).then(function (r) {
-      return r.json().then(function (j) {
-        if (!r.ok) {
-          if (r.status === 401) setKey("");
-          throw new Error((j.error && j.error.message) || "API 오류");
-        }
-        return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "(빈 응답)";
-      });
-    });
-  }
-
   function ask(msgs) {
-    var viaServer = /^https?:$/.test(location.protocol);
-    if (!viaServer) return askDirect(msgs);
+    if (!/^https?:$/.test(location.protocol)) {
+      return Promise.reject(new Error("이 페이지는 파일로 열려 있어 AI를 쓸 수 없습니다. start.bat을 더블클릭하거나 터미널에서 node server.js 실행 후 http://localhost:3000 으로 접속해 주세요."));
+    }
     return askServer(msgs).catch(function (err) {
-      // 서버가 없거나 응답이 JSON이 아니면 직접 호출로 대체
-      if (/Failed to fetch|NetworkError|Unexpected token|JSON/.test(err.message || "")) return askDirect(msgs);
+      if (/Failed to fetch|NetworkError|Unexpected token|JSON/.test(err.message || "")) {
+        throw new Error("AI 서버에 연결할 수 없습니다. start.bat을 실행했는지 확인해 주세요.");
+      }
       throw err;
     });
   }
-
-  var keyBtn = panel.querySelector("#chatKey");
-  keyBtn.addEventListener("click", function () {
-    var cur = getKey();
-    var k = window.prompt("OpenAI API 키 (비우면 삭제)" + (cur ? "\n현재: 저장됨" : ""), "");
-    if (k === null) return;
-    setKey(k.trim());
-    add("bot", k.trim() ? "API 키를 저장했습니다." : "저장된 API 키를 삭제했습니다.");
-  });
 
   var busy = false;
   panel.querySelector(".chat-form").addEventListener("submit", function (e) {
