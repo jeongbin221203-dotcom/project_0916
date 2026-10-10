@@ -134,6 +134,15 @@
   .xv-row button.on { background: #4f8cff; border-color: #4f8cff; color: #fff; font-weight: 700; }
   .xv-in { flex: 1; min-width: 0; text-align: center; background: #0a1224; color: #fff; border: 1px solid #3b4d78; border-radius: 6px; padding: 7px 0; font-size: 17px; font-weight: 700; }
   .xv-in:focus { outline: 2px solid #4f8cff; border-color: #4f8cff; }
+  .study-body .rv.on { border-color: #f59e0b; color: #f59e0b; }
+  .xv-row .xv-star, .xv-row .xv-star.on { flex: none; width: 20px; background: none; border: 0; padding: 0; font-size: 14px; color: #8fa0cc; }
+  .xv-row .xv-star.on { color: #ffd24d; }
+  .xv-star { background: none; border: 0; color: #8fa0cc; font-size: 14px; line-height: 1; cursor: pointer; padding: 0 4px; flex: none; }
+  .xv-star.on { color: #ffd24d; }
+  .xv-star:hover { color: #ffd24d; }
+  .xv-r .xv-star { margin-right: 4px; vertical-align: middle; }
+  .xv-hint { color: #8fa0cc; font-size: 12px; }
+  .xv-sec { margin: 14px 0 8px; color: #ffd24d; font-size: 13px; }
   .xv-note { color: #8fa0cc; font-size: 12px; line-height: 1.5; }
   .xv.no-side .xv-side { display: none; }
   .xv.no-ans .xv-ans { display: none; }
@@ -204,7 +213,7 @@
     <div class="cards">
       <div class="card"><h3>출제 구성</h3><ul><li>이론 30점 (객관식)</li><li>실무 70점 (프로그램 입력)</li></ul></div>
       <div class="card"><h3>합격 기준</h3><p>100점 만점 중 70점 이상</p></div>
-      <div class="card"><h3>시험 시간</h3><p>14:00~15:00 (60분)</p></div>
+      <div class="card"><h3>시험 시간</h3><p>14:00~15:00 (60분)</p><p>1시간 전(13:00) 입장 → 시작 전까지 개인 공부 가능</p></div>
     </div>
   </section>
 
@@ -245,23 +254,23 @@
       </div>
     </article>
     <article class="day-panel" data-date="2026-10-12">
-      <h3>10-12 · 실기 2번</h3><div class="sub">D+5</div>
+      <h3>10-12 · 실기 (따라하기 + 모의시험)</h3><div class="sub">D+5</div>
       <div class="study-body" id="praBody1"></div>
     </article>
     <article class="day-panel" data-date="2026-10-13">
-      <h3>10-13 · 실기 2번</h3><div class="sub">D+4</div>
+      <h3>10-13 · 실기 모의시험 2회</h3><div class="sub">D+4</div>
       <div class="study-body" id="praBody2"></div>
     </article>
     <article class="day-panel" data-date="2026-10-14">
-      <h3>10-14 · 실기 2번</h3><div class="sub">D+3</div>
+      <h3>10-14 · 실기 모의시험 2회</h3><div class="sub">D+3</div>
       <div class="study-body" id="praBody3"></div>
     </article>
     <article class="day-panel" data-date="2026-10-15">
-      <h3>10-15 · 실기 2번</h3><div class="sub">D+2</div>
+      <h3>10-15 · 실기 모의시험 2회</h3><div class="sub">D+2</div>
       <div class="study-body" id="praBody4"></div>
     </article>
     <article class="day-panel" data-date="2026-10-16">
-      <h3>10-16 · 실기 2번</h3><div class="sub">D+1</div>
+      <h3>10-16 · 최종 모의시험 (이론+실무)</h3><div class="sub">D+1</div>
       <div class="study-body" id="praBody5"></div>
     </article>
     <article class="day-panel" data-date="2026-10-17">
@@ -269,12 +278,13 @@
       <div class="study-body"><details open><summary>시험 당일 안내</summary><div>
         <ul>
           <li><b>시험일시:</b> 2026-10-17 14:00~15:00 (60분)</li>
-          <li><b>응시 방식:</b> 비대면 온라인. 시험 시작 1시간 전(13:00)부터 온라인 환경점검을 합니다.</li>
+          <li><b>입장:</b> 시험 시작 1시간 전(13:00)에 입장합니다. 입장 후 시험 시작 전까지는 <b>개인 공부가 가능</b>합니다.</li>
+          <li><b>응시 방식:</b> 비대면 온라인. 시험 시작 1시간 전부터 온라인 환경점검을 합니다.</li>
           <li><b>구성:</b> 실무이론평가 30점 + 실무수행평가 70점을 동시에 진행하며, 합계 70점 이상이면 합격입니다.</li>
           <li>※ 시간·방식은 지난 회차 공지 기준입니다. 이번 회차 공지(at.kicpa.or.kr)에서 다시 확인하세요.</li>
         </ul>
       </div></details></div>
-      <div class="placeholder">틀린 문제 복습 내용을 여기에 추가하세요.</div>
+      <div class="study-body" id="reviewBody"></div>
     </article>
   </section>
 
@@ -287,6 +297,7 @@
 <script src="fin-q.js"></script>
 <script src="vat.js"></script>
 <script src="practice-data.js"></script>
+<script src="fullexam-data.js"></script>
 <script src="past-exam.js"></script>
 <script src="study.js"></script>
 <script>
@@ -296,11 +307,11 @@
     { date: "2026-10-09", label: "D+8",   task: "재무회계 (8h)" },
     { date: "2026-10-10", label: "D+7",   task: "부가가치세 (8h)" },
     { date: "2026-10-11", label: "D+6",   task: "기출문제 (8h)" },
-    { date: "2026-10-12", label: "D+5",   task: "실기 2번" },
-    { date: "2026-10-13", label: "D+4",   task: "실기 2번" },
-    { date: "2026-10-14", label: "D+3",   task: "실기 2번" },
-    { date: "2026-10-15", label: "D+2",   task: "실기 2번" },
-    { date: "2026-10-16", label: "D+1",   task: "실기 2번" },
+    { date: "2026-10-12", label: "D+5",   task: "실기 따라하기 1 + 모의시험 1" },
+    { date: "2026-10-13", label: "D+4",   task: "실기 모의시험 2회" },
+    { date: "2026-10-14", label: "D+3",   task: "실기 모의시험 2회" },
+    { date: "2026-10-15", label: "D+2",   task: "실기 모의시험 2회" },
+    { date: "2026-10-16", label: "D+1",   task: "최종 모의시험 2회 (이론+실무)" },
     { date: "2026-10-17", label: "D-Day", task: "시험전 틀린문제 복습" }
   ];
   var KEY_CHECK = "fat1.checks";
