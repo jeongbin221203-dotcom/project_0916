@@ -574,9 +574,9 @@
           var i = parseInt(el.getAttribute("data-i"), 10), q = cur[1][i];
           var sel = el.querySelector("input:checked");
           var res = el.querySelector(".mres");
-          if (!sel) { un++; res.innerHTML = '<b style="color:#ffb454">미응답</b> — 정답 ' + q[3] + '<br>' + q[4]; }
-          else if (sel.value === q[3]) { ok++; res.innerHTML = '<b style="color:#6fd08c">정답 ✔</b><br>' + q[4]; }
-          else { res.innerHTML = '<b style="color:#ff7b72">오답 ✘</b> (내 답 ' + sel.value + ' / 정답 ' + q[3] + ')<br>' + q[4]; }
+          if (!sel) { un++; res.innerHTML = '<b style="color:var(--warn)">미응답</b> — 정답 ' + q[3] + '<br>' + q[4]; }
+          else if (sel.value === q[3]) { ok++; res.innerHTML = '<b style="color:var(--done-text)">정답 ✔</b><br>' + q[4]; }
+          else { res.innerHTML = '<b style="color:var(--danger)">오답 ✘</b> (내 답 ' + sel.value + ' / 정답 ' + q[3] + ')<br>' + q[4]; }
         });
         var score = ok * 3;
         box.querySelector("#mockScore").innerHTML = '<b>' + ok + ' / ' + cur[1].length + ' 정답 · ' + score + '점 (30점 만점)</b>' + (un ? ' · 미응답 ' + un : '') + ' · 소요 ' + Math.floor(sec / 60) + '분 ' + (sec % 60) + '초';

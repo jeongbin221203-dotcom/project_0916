@@ -19,7 +19,33 @@
     --done: #14382a;
     --done-text: #6fd08c;
     --danger: #ff7b72;
+    --warn: #ffb454;
+    --on-accent: #0a1224;
+    --err-bg: #3a1c1b;
+    --err-text: #f3a6a2;
   }
+  /* 화이트 테마 */
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f3f6fc;
+    --card: #ffffff;
+    --text: #1a2340;
+    --muted: #5d6b8c;
+    --line: #d5ddee;
+    --accent: #2563eb;
+    --accent-soft: #e8efff;
+    --today: #fff6d6;
+    --today-line: #e5a100;
+    --done: #e3f6ea;
+    --done-text: #1b7a43;
+    --danger: #d6332a;
+    --warn: #b36b00;
+    --on-accent: #ffffff;
+    --err-bg: #fde8e7;
+    --err-text: #a4271f;
+  }
+  .theme-btn { position: fixed; top: 12px; right: 12px; z-index: 60; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: 0.82rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+  .theme-btn:hover { border-color: var(--accent); color: var(--accent); }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -85,7 +111,7 @@
   #study { scroll-margin-top: 16px; }
   .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
   .tab { flex: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-size: 0.85rem; cursor: pointer; }
-  .tab.active { background: var(--accent); border-color: var(--accent); color: #0a1224; font-weight: 700; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
   .day-panel { display: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-height: 320px; }
   .day-panel.active { display: block; }
   .day-panel h3 { margin: 0 0 4px; font-size: 1.15rem; }
@@ -171,10 +197,42 @@
   .q summary { padding: 4px 0; color: var(--accent); }
   .q details > div { padding: 4px 0 0; color: var(--muted); }
   footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 16px; }
+  /* 시험 화면 재현 모드 - 화이트 */
+  :root[data-theme="light"] .xv { background: #eef2fa; color: #1a2340; }
+  :root[data-theme="light"] .xv-top { background: #ffffff; border-bottom-color: #d5ddee; }
+  :root[data-theme="light"] .xv-cur, :root[data-theme="light"] .xv-zm, :root[data-theme="light"] .xv-time,
+  :root[data-theme="light"] .xv-row button, :root[data-theme="light"] .xv-in { background: #f3f6fc; color: #1a2340; border-color: #c4cfe6; }
+  :root[data-theme="light"] .xv-time { border: 0; }
+  :root[data-theme="light"] .xv-time.low { color: #d6332a; }
+  :root[data-theme="light"] .xv-sep { background: #c4cfe6; }
+  :root[data-theme="light"] .xv-ic { color: #1a2340; }
+  :root[data-theme="light"] .xv-ic:hover { background: #e3eafa; }
+  :root[data-theme="light"] .xv-side { background: #e4eaf7; }
+  :root[data-theme="light"] .xv-th { color: #3a4a70; }
+  :root[data-theme="light"] .xv-th.on span, :root[data-theme="light"] .xv-ans h4 { color: #1a2340; }
+  :root[data-theme="light"] .xv-th.on img { border-color: #2563eb; }
+  :root[data-theme="light"] .xv-main { background: #eef2fa; }
+  :root[data-theme="light"] .xv-pg { box-shadow: 0 2px 10px rgba(0,0,0,.2); }
+  :root[data-theme="light"] .xv-ans { background: #ffffff; border-right-color: #d5ddee; }
+  :root[data-theme="light"] .xv-row b { color: #5d6b8c; }
+  :root[data-theme="light"] .xv-row button.on { background: #2563eb; border-color: #2563eb; color: #fff; }
+  :root[data-theme="light"] .xv-in:focus { outline-color: #2563eb; border-color: #2563eb; }
+  :root[data-theme="light"] .xv-hint, :root[data-theme="light"] .xv-note, :root[data-theme="light"] .xv-big small { color: #5d6b8c; }
+  :root[data-theme="light"] .xv-sec, :root[data-theme="light"] .xv-big { color: #b36b00; }
+  :root[data-theme="light"] .xv-star.on, :root[data-theme="light"] .xv-row .xv-star.on, :root[data-theme="light"] .xv-star:hover { color: #e5a100; }
+  :root[data-theme="light"] .xv-result { background: rgba(230, 236, 248, .94); }
+  :root[data-theme="light"] .xv-card { background: #ffffff; }
+  :root[data-theme="light"] .xv-r { background: #f0f4fc; border-left-color: #c4cfe6; }
+  :root[data-theme="light"] .xv-r summary { color: #2563eb; }
+  :root[data-theme="light"] .xv-r div { color: #2a3659; }
+  :root[data-theme="light"] #topBtn { background: #8a94a6; }
 </style>
+<script>try{if(localStorage.getItem("fat1.theme")==="light")document.documentElement.setAttribute("data-theme","light");}catch(e){}</script>
 <link rel="stylesheet" href="chat.css">
 </head>
 <body>
+
+<button class="theme-btn" id="themeBtn" type="button" aria-label="테마 전환"></button>
 
 <header>
   <div class="wrap">
@@ -300,6 +358,19 @@
 <script src="fullexam-data.js"></script>
 <script src="past-exam.js"></script>
 <script src="study.js"></script>
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById("themeBtn");
+  function paint() { btn.textContent = root.getAttribute("data-theme") === "light" ? "🌙 다크" : "☀️ 화이트"; }
+  btn.addEventListener("click", function () {
+    var light = root.getAttribute("data-theme") !== "light";
+    if (light) root.setAttribute("data-theme", "light"); else root.removeAttribute("data-theme");
+    try { localStorage.setItem("fat1.theme", light ? "light" : "dark"); } catch (e) {}
+    paint();
+  });
+  paint();
+})();
+</script>
 <script>
 (function () {
   var EXAM = "2026-10-17";
