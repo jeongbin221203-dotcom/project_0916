@@ -72,3 +72,18 @@ body.jrnl-open #jrnlPanel { opacity: 1; transform: none; pointer-events: auto; }
 .jr-empty { color: var(--muted); text-align: center; padding: 20px; }
 .jr-foot { padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.72rem; }
 @media (max-width: 480px) { #jrnlPanel { right: 8px; width: calc(100vw - 16px); } .jr-ans { grid-template-columns: 1fr; } }
+
+/* 분개 정답 입력 */
+.jr-in { margin: 6px 0 4px; }
+.jr-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.jr-cols em { font-style: normal; font-weight: 700; font-size: 0.82rem; color: var(--muted); }
+.jr-row { display: flex; gap: 4px; margin-top: 4px; }
+.jr-row input { width: 0; min-width: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; font-size: 0.82rem; }
+.jr-row .jr-a { flex: 1.3 1 0; }
+.jr-row .jr-m { flex: 1 1 0; text-align: right; }
+.jr-act { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.jr-act button { font: inherit; font-size: 0.78rem; padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--text); cursor: pointer; }
+.jr-act .jr-grade { background: var(--accent); border-color: var(--accent); color: #0a1224; font-weight: 700; }
+.jr-res { font-size: 0.82rem; font-weight: 700; }
+.jr-res.ok { color: #6fd08c; }
+.jr-res.ng { color: #ff7b72; }
